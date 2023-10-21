@@ -103,21 +103,23 @@ impl Config {
         let length = found_templates.len();
 
         if length == 0 {
-            return Err(eyre!("Unable to find template \"{}\"", name));
+            let path = PathBuf::from(name);
+
+            if path.is_file() {
+                Ok(Template::from_file(&path)?)
+            } else {
+                Err(eyre!("Unable to find template \"{}\"", name))
+            }
         } else if length > 1 {
-            return Err(eyre!(
-                "Found {} templates with name \"{}\"",
-                length,
-                name
-            ));
+            Err(eyre!("Found {} templates with name \"{}\"", length, name))
+        } else {
+            let template = found_templates.into_iter().next();
+
+            // This unwrap is always safe, as we check the length manually.
+            debug_assert!(template.is_some());
+
+            Ok(template.unwrap())
         }
-
-        let template = found_templates.into_iter().next();
-
-        // This unwrap is always safe, as we check the length manually.
-        debug_assert!(template.is_some());
-
-        Ok(template.unwrap())
     }
 
     fn create_dir(path: &Path) -> Result<()> {

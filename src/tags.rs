@@ -1,70 +1,70 @@
 /// Common functions for reading audio file tags.
 pub trait Tags: std::fmt::Debug + Send + Sync {
     /// The current `[AudioFile]`s album, if any.
-    fn album(&self) -> Option<&str>;
+    fn album(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s album artist, if any.
-    fn album_artist(&self) -> Option<&str>;
+    fn album_artist(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s albumsort, if any.
-    fn albumsort(&self) -> Option<&str>;
+    fn albumsort(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s artist, if any.
-    fn artist(&self) -> Option<&str>;
+    fn artist(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s genre, if any.
-    fn genre(&self) -> Option<&str>;
+    fn genre(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s title, if any.
-    fn title(&self) -> Option<&str>;
+    fn title(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s year, if any.
-    fn year(&self) -> Option<&str>;
-
-    /// The current `[AudioFile]`s date, if any.
-    fn date(&self) -> Option<&str> {
-        self.year()
+    fn year(&self) -> Option<String> {
+        self.date()
     }
 
+    /// The current `[AudioFile]`s date, if any.
+    fn date(&self) -> Option<String>;
+
     /// The current `[AudioFile]`s track number, if any.
-    fn track_number(&self) -> Option<&str> {
-        self.raw_track_number().map(|s| self.get_current(s))
+    fn track_number(&self) -> Option<String> {
+        self.raw_track_number().map(|s| self.get_current(&s))
     }
 
     /// The current `[AudioFile]`s disc number, if any.
-    fn disc_number(&self) -> Option<&str> {
-        self.raw_disc_number().map(|s| self.get_current(s))
+    fn disc_number(&self) -> Option<String> {
+        self.raw_disc_number().map(|s| self.get_current(&s))
     }
 
     /// The current `[AudioFile]`s total amount of tracks, if any.
-    fn total_track_number(&self) -> Option<&str> {
-        self.raw_track_number().and_then(|s| self.get_total(s))
+    fn total_track_number(&self) -> Option<String> {
+        self.raw_track_number().and_then(|s| self.get_total(&s))
     }
 
     /// The current `[AudioFile]`s total amount of discs, if any.
-    fn total_disc_number(&self) -> Option<&str> {
-        self.raw_disc_number().and_then(|s| self.get_total(s))
+    fn total_disc_number(&self) -> Option<String> {
+        self.raw_disc_number().and_then(|s| self.get_total(&s))
     }
 
     /// The current `[AudioFile]`s raw disc number, if any.
-    fn raw_disc_number(&self) -> Option<&str>;
+    fn raw_disc_number(&self) -> Option<String>;
 
     /// The current `[AudioFile]`s raw track number, if any.
-    fn raw_track_number(&self) -> Option<&str>;
+    fn raw_track_number(&self) -> Option<String>;
 
     /// Helper function that gets x from "x/y" or returns the string.
-    fn get_current<'a>(&self, string: &'a str) -> &'a str {
+    fn get_current(&self, string: &str) -> String {
         if let Some((current, _)) = string.split_once('/') {
-            current
+            current.to_owned()
         } else {
-            string
+            string.to_owned()
         }
     }
 
     /// Helper function that gets y from "x/y"
-    fn get_total<'a>(&self, string: &'a str) -> Option<&'a str> {
+    fn get_total(&self, string: &str) -> Option<String> {
         if let Some((_, total)) = string.split_once('/') {
-            Some(total)
+            Some(total.to_owned())
         } else {
             None
         }

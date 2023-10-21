@@ -23,5 +23,5 @@ pub(crate) fn list_templates(config: &Config) -> Result<()> {
 }
 
 fn print_template_info(script: &Template) {
-    print!("{}", script.name());
+    println!("  {}", script.name());
 }

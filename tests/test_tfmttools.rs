@@ -3,7 +3,6 @@ use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use color_eyre::Result;
 use once_cell::sync::Lazy;
-use predicates::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use test_harness::test_runner;
@@ -106,6 +105,7 @@ impl TestEnv {
             &INITIAL_CONFIG_REFERENCE,
             "assert initial config files exists",
         );
+
         self.assert_files_exist(
             &INITIAL_FILE_REFERENCE,
             "assert initial audio files exist",
@@ -135,7 +135,8 @@ impl TestEnv {
 
         for path in reference {
             let child = self.tempdir.child(path);
-            child.assert(predicate::path::exists());
+
+            assert!(child.path().exists(), "{message} failed on '{path}' ");
         }
     }
 
@@ -145,7 +146,7 @@ impl TestEnv {
         for path in reference {
             let child = self.tempdir.child(path);
 
-            child.assert(predicate::path::missing());
+            assert!(!child.path().exists(), "{message} failed on '{path}' ");
         }
     }
 

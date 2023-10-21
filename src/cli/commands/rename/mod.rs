@@ -10,9 +10,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use validate::validate_actions;
 
-pub(crate) const FORBIDDEN_CHARACTERS: [char; 10] =
-    ['<', '>', ':', '\'', '|', '?', '*', '~', '/', '\\'];
-
 pub(crate) fn rename(
     preview: bool,
     config: &Config,
@@ -140,8 +137,6 @@ fn action_from_file(
 
     let string = template.render(audiofile)?;
 
-    let string = replace_invalid_chars(string);
-
     // FIXME let string = normalize_separators(string);
 
     let target = create_target_path_from_string(&string, &extension)?;
@@ -162,12 +157,6 @@ fn create_target_path_from_string(
     let target = std::env::current_dir()?.join(target_path);
 
     Ok(target)
-}
-
-fn replace_invalid_chars(string: String) -> String {
-    FORBIDDEN_CHARACTERS
-        .iter()
-        .fold(string, |string, char| string.replace(*char, ""))
 }
 
 fn partition_actions(actions: Vec<Action>) -> (Vec<Action>, Vec<Action>) {

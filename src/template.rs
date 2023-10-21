@@ -1,6 +1,6 @@
 use crate::tags::Tags;
 use color_eyre::Result;
-use minijinja::Environment;
+use minijinja::{Environment, Value, escape_formatter};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;
@@ -43,7 +43,7 @@ impl<'s> Template<'s> {
     pub fn render(&self, tags: &dyn Tags) -> Result<String> {
         let template = self.environment.get_template(&self.name)?;
 
-        let context = self.create_context(tags);
+        let context = self.create_context(tags)?;
 
         let output = template.render(context)?;
 
@@ -53,14 +53,31 @@ impl<'s> Template<'s> {
     fn create_environment() -> Environment<'s> {
         let mut env = Environment::new();
 
+        env.set_formatter(|out, state, value| {
+            escape_formatter(
+                out,
+                state,
+                if value.is_none() { &Value::UNDEFINED } else { value },
+            )
+        });
+
         env.add_filter("year", year);
-        env.add_filter("pad", pad);
+        env.add_filter("zero_pad", zero_pad);
 
         env
     }
 
-    fn create_context(&self, tags: &dyn Tags) -> minijinja::Value {
-        minijinja::context! {
+    fn create_context(&self, tags: &dyn Tags) -> Result<Value> {
+        let albumsort: Option<usize> =
+            tags.albumsort().map(|s| s.parse()).transpose()?;
+
+        let track_number: Option<usize> =
+            tags.track_number().map(|s| s.parse()).transpose()?;
+
+        let disc_number: Option<usize> =
+            tags.disc_number().map(|s| s.parse()).transpose()?;
+
+        let ctx = minijinja::context! {
             args => self.arguments,
 
             album => &tags.album(),
@@ -68,8 +85,8 @@ impl<'s> Template<'s> {
             albumartist => &tags.album_artist(),
             album_artist => &tags.album_artist(),
 
-            albumsort => &tags.albumsort(),
-            album_sort => &tags.albumsort(),
+            albumsort => albumsort,
+            album_sort => albumsort,
 
             artist => &tags.artist(),
 
@@ -81,14 +98,16 @@ impl<'s> Template<'s> {
 
             year => &tags.year(),
 
-            tracknumber => &tags.track_number(),
-            track_number => &tags.track_number(),
+            tracknumber => track_number,
+            track_number => track_number,
 
-            discnumber => &tags.disc_number(),
-            disc_number => &tags.disc_number(),
-            disknumber => &tags.disc_number(),
-            disk_number => &tags.disc_number(),
-        }
+            discnumber => disc_number,
+            disc_number => disc_number,
+            disknumber => disc_number,
+            disk_number => disc_number,
+        };
+
+        Ok(ctx)
     }
 }
 
@@ -115,10 +134,6 @@ fn year(date: &str) -> Result<String, minijinja::Error> {
     }
 }
 
-fn pad(value: &str, char: &str, width: usize) -> String {
-    // FIXME Doesn't work? format!("{value:char$>width$}")
-
-    let n = width.saturating_sub(value.len()).saturating_div(char.len());
-
-    format!("{}{}", char.repeat(n), value)
+fn zero_pad(value: usize, width: usize) -> String {
+    format!("{value:0>width$}")
 }
