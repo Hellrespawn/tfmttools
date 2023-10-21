@@ -2,19 +2,19 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, PartialEq)]
-#[clap(version, about, long_about = None)]
+#[command(version, about, long_about = None)]
 
 /// Holds application-wide command line arguments.
 pub struct Args {
     /// Sets a custom config file
-    #[clap(short, long, parse(from_os_str))]
+    #[arg(short, long)]
     pub(crate) config: Option<PathBuf>,
 
-    #[clap(short, long)]
+    #[arg(short, long)]
     /// Only preview current action.
     preview: bool,
 
-    #[clap(subcommand)]
+    #[command(subcommand)]
     pub(crate) command: Command,
 }
 
@@ -22,42 +22,42 @@ pub struct Args {
 /// Holds per-subcommand command line arguments.
 pub enum Command {
     /// Clears the history
-    #[clap(name = "clear")]
+    #[command(name = "clear")]
     ClearHistory {
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Only preview current action.
         preview: bool,
     },
     /// Lists all available templates.
-    #[clap(name = "list")]
+    #[command(name = "list")]
     ListTemplates,
     /// Undo {times} times.
     Undo {
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Only preview current action.
         preview: bool,
 
         /// Times to undo.
-        #[clap(default_value_t = 1)]
+        #[arg(default_value_t = 1)]
         times: usize,
     },
     /// Redo {times} times.
     Redo {
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Only preview current action.
         preview: bool,
 
         /// Times to redo
-        #[clap(default_value_t = 1)]
+        #[arg(default_value_t = 1)]
         times: usize,
     },
     /// Rename files according to their tags.
     Rename {
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Only preview current action.
         preview: bool,
 
-        #[clap(short, long, default_value_t=Args::DEFAULT_RECURSION_DEPTH)]
+        #[arg(short, long, default_value_t=Args::DEFAULT_RECURSION_DEPTH)]
         /// Maximum recursion depth when gathering files.
         recurse: usize,
 
@@ -69,11 +69,11 @@ pub enum Command {
     },
     /// Adds examples to the filesystem.
     Seed {
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Only preview current action.
         preview: bool,
 
-        #[clap(short, long)]
+        #[arg(short, long)]
         /// Overwrite existing files.
         force: bool,
     },

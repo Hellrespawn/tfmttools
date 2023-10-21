@@ -5,10 +5,9 @@ use file_history::History;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, PartialEq)]
-#[clap(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None)]
 struct Args {
     /// Sets a custom config file
-    #[clap(parse(from_os_str))]
     config_dir: Option<PathBuf>,
 }
 
