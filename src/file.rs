@@ -1,6 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 use crate::tags::Tags;
-use anyhow::{anyhow, Result};
+use color_eyre::eyre::eyre;
+use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
 use std::path::{Path, PathBuf};
 
@@ -27,7 +28,7 @@ impl AudioFile {
         let tag = tagged_file
             .primary_tag()
             .ok_or_else(|| {
-                anyhow!("Unable to read primary tag for '{}'", path.display())
+                eyre!("Unable to read primary tag for '{}'", path.display())
             })?
             .clone();
 

@@ -1,4 +1,4 @@
 max_width = 80
 reorder_impl_items = true
-imports_granularity = "module"
+imports_granularity = "Module"
 single_line_if_else_max_width = 80

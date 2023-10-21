@@ -30,7 +30,7 @@ impl DiskHandler {
 
     pub(crate) fn clear(&self) -> Result<bool> {
         match fs::remove_file(&self.path) {
-            Ok(_) => Ok(true),
+            Ok(()) => Ok(true),
             Err(err) => {
                 if err.kind() == ErrorKind::NotFound {
                     Ok(false)
@@ -118,9 +118,9 @@ impl DiskHandler {
 mod tests {
     use super::*;
     use crate::action::Action;
-    use anyhow::Result;
     use assert_fs::prelude::*;
     use assert_fs::NamedTempFile;
+    use color_eyre::Result;
     use predicates::prelude::*;
 
     static PREFIX: &str = "rust-file-history-disk-";

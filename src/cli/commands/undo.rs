@@ -1,5 +1,5 @@
 use crate::cli::Config;
-use anyhow::Result;
+use color_eyre::Result;
 use file_history::History;
 
 #[derive(Copy, Clone)]

@@ -1,5 +1,5 @@
 use color_eyre::Result;
 
 fn main() -> Result<()> {
-    tfmttools::cli::histviewer()
+    tfmttools::cli::main(true)
 }

@@ -1,6 +1,6 @@
-use anyhow::Result;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use color_eyre::Result;
 use file_history::{Action, History};
 use predicates::prelude::*;
 

@@ -1,7 +1,7 @@
-use anyhow::Result;
 use assert_cmd::Command;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use color_eyre::Result;
 use once_cell::sync::Lazy;
 use predicates::prelude::*;
 use std::fs;
@@ -11,7 +11,7 @@ use test_harness::test_runner;
 const TEST_DATA_DIRECTORY: &str = "tests/testdata/";
 
 static INITIAL_CONFIG_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
-    vec!["config/simple_input.tapr", "config/typical_input.tapr"]
+    vec!["config/simple_input.tfmt", "config/typical_input.tfmt"]
         .into_iter()
         .map(normalize_separators)
         .collect()
@@ -54,28 +54,28 @@ impl TestEnv {
             tempdir: TempDir::new()?,
         };
 
-        env.populate_scripts()?;
+        env.populate_templates()?;
         env.populate_files()?;
 
         Ok(env)
     }
 
-    fn populate_scripts(&self) -> Result<()> {
+    fn populate_templates(&self) -> Result<()> {
         let paths: Vec<PathBuf> =
-            fs::read_dir(TestEnv::get_test_data_dir().join("script"))?
+            fs::read_dir(TestEnv::get_test_data_dir().join("template"))?
                 .flat_map(|r| r.map(|d| d.path()))
                 .collect();
 
         fs::create_dir(self.get_config_dir())?;
 
-        for script_path in &paths {
-            // Scripts are selected by is_file, should always have a filename so
-            // path.file_name().unwrap() should be safe.
+        for template_path in &paths {
+            // Templates are selected by is_file, should always have a filename
+            // so path.file_name().unwrap() should be safe.
 
-            assert!(script_path.file_name().is_some());
-            let file_name = script_path.file_name().unwrap();
+            assert!(template_path.file_name().is_some());
+            let file_name = template_path.file_name().unwrap();
 
-            fs::copy(script_path, self.get_config_dir().join(file_name))?;
+            fs::copy(template_path, self.get_config_dir().join(file_name))?;
         }
 
         Ok(())
@@ -181,7 +181,7 @@ impl TestEnv {
 fn rename_typical_input(env: &TestEnv) {
     let config_dir = env.get_config_dir();
 
-    let mut cmd = Command::cargo_bin("tapr").unwrap();
+    let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
     let assert = cmd
         .arg("--config")
@@ -200,7 +200,7 @@ fn rename_typical_input(env: &TestEnv) {
 fn undo(env: &TestEnv) {
     let config_dir = env.get_config_dir();
 
-    let mut cmd = Command::cargo_bin("tapr").unwrap();
+    let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
     let assert = cmd
         .arg("--config")
@@ -217,7 +217,7 @@ fn undo(env: &TestEnv) {
 fn redo(env: &TestEnv) {
     let config_dir = env.get_config_dir();
 
-    let mut cmd = Command::cargo_bin("tapr").unwrap();
+    let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
     let assert = cmd
         .arg("--config")
@@ -251,7 +251,7 @@ fn test_rename_simple_input() -> Result<()> {
         |env| {
             let config_dir = env.get_config_dir();
 
-            let mut cmd = Command::cargo_bin("tapr").unwrap();
+            let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
             let assert = cmd
                 .arg("--config")

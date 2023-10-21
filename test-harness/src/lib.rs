@@ -9,7 +9,7 @@
 //! framework. Medium. Retrieved February 23, 2022, from
 //! <https://medium.com/@ericdreichert/test-setup-and-teardown-in-rust-without-a-framework-ba32d97aa5ab>
 
-use anyhow::Result;
+use color_eyre::Result;
 
 /// Runs a test with a setup and safe teardown.
 ///
@@ -47,10 +47,12 @@ where
 mod tests {
     use super::*;
 
+    use color_eyre::eyre::eyre;
+
     #[allow(clippy::unnecessary_wraps)]
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn test_function_err(_: &()) -> Result<()> {
-        anyhow::bail!("Woohoo!")
+        Err(eyre!("test"))
     }
 
     #[allow(clippy::unnecessary_wraps)]
@@ -62,7 +64,7 @@ mod tests {
     #[test]
     fn test_harness_with_err() {
         let func = test_function_err;
-        let harness = test_runner(|| Ok(()), |_| Ok(()), func);
+        let harness = test_runner(|| Ok(()), |()| Ok(()), func);
         let bare = func(&());
 
         match bare {
@@ -77,7 +79,7 @@ mod tests {
     #[test]
     fn test_harness_with_ok() {
         let func = test_function_ok;
-        let harness = test_runner(|| Ok(()), |_| Ok(()), func);
+        let harness = test_runner(|| Ok(()), |()| Ok(()), func);
         let bare = func(&());
 
         match bare {

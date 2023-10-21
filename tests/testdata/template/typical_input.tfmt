@@ -1,0 +1,17 @@
+{# This is a comment for jinja #}
+{{ args[0] -}}
+/
+{{- albumartist or artist -}}
+/
+{%- if album -%}
+    {%- if date -%}
+      {{- date | year -}}
+      {{- albumsort and "." ~ albumsort | pad("0", 2) -}}
+      {{- " - " -}}
+    {%- endif -%}
+    {{- album -}}
+    /
+{%- endif -%}
+{{- discnumber | pad("0", 2) -}}
+{{- tracknumber and tracknumber | pad("0", 2) ~ " - " -}}
+{{- title -}}

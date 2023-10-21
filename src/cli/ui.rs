@@ -5,7 +5,7 @@ use indicatif::{
     ProgressStyle,
 };
 
-pub(crate) fn print_error(error: &anyhow::Error) {
+pub(crate) fn print_error(error: &color_eyre::Report) {
     println!("An error occurred:\n{error}");
 }
 

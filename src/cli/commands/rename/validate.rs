@@ -1,5 +1,6 @@
 use crate::cli::args::Args;
-use anyhow::{bail, Result};
+use color_eyre::eyre::eyre;
+use color_eyre::Result;
 use file_history::Action;
 use std::collections::HashMap;
 use std::path::Path;
@@ -25,8 +26,7 @@ fn validate_collisions(actions: &[Action]) -> Result<()> {
     if collisions.is_empty() {
         Ok(())
     } else {
-        let string = format_collisions(&collisions);
-        bail!(string)
+        Err(eyre!(format_collisions(&collisions)))
     }
 }
 
@@ -102,7 +102,7 @@ fn validate_existing_files(actions: &[Action]) -> Result<()> {
                 .collect::<Vec<String>>()
                 .join("\n")
         );
-        bail!(string);
+        return Err(eyre!(string));
     }
 
     Ok(())
@@ -121,7 +121,9 @@ mod test {
         .map(|(source, target)| Action::mv(source, target));
 
         if let Ok(()) = validate_collisions(&reference) {
-            bail!("validate_collisions should have returned an error!")
+            return Err(eyre!(
+                "validate_collisions should have returned an error!"
+            ));
         }
 
         let reference = [
@@ -131,10 +133,10 @@ mod test {
         .map(|(source, target)| Action::mv(source, target));
 
         if let Err(err) = validate_collisions(&reference) {
-            bail!(
+            return Err(eyre!(
                 "validate_collisions returned an error when it shouldn't!\n{}",
                 err
-            )
+            ));
         }
 
         Ok(())

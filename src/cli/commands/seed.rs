@@ -1,5 +1,6 @@
 use crate::cli::Config;
-use anyhow::{bail, Result};
+use color_eyre::eyre::eyre;
+use color_eyre::Result;
 use std::fs;
 
 struct DefaultFile {
@@ -8,8 +9,8 @@ struct DefaultFile {
 }
 
 static DEFAULT_FILES: [DefaultFile; 1] = [DefaultFile {
-    name: "sync.tapr",
-    content: include_str!("../../../examples/sync.tapr"),
+    name: "sync.tfmt",
+    content: include_str!("../../../examples/sync.tfmt"),
 }];
 
 pub(crate) fn seed(preview: bool, force: bool, config: &Config) -> Result<()> {
@@ -19,14 +20,14 @@ pub(crate) fn seed(preview: bool, force: bool, config: &Config) -> Result<()> {
         .collect();
 
     if !force && !existing_files.is_empty() {
-        bail!(
+        return Err(eyre!(
             "The following files already exist:\n{}",
             existing_files
                 .iter()
                 .map(|f| f.name)
                 .collect::<Vec<&str>>()
                 .join("\n")
-        );
+        ));
     }
 
     for file in &DEFAULT_FILES {

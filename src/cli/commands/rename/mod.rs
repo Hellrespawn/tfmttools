@@ -2,14 +2,12 @@ mod validate;
 
 use crate::cli::{ui, Config};
 use crate::file::AudioFile;
-use crate::script::Script;
-use crate::tapr::get_tapr_environment;
-use anyhow::{anyhow, bail, Result};
+use crate::template::Template;
+use color_eyre::Result;
 use file_history::{Action, History, HistoryError};
 use indicatif::ProgressIterator;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tapr::{Interpreter, Value};
 use validate::validate_actions;
 
 pub(crate) const FORBIDDEN_CHARACTERS: [char; 10] =
@@ -24,13 +22,13 @@ pub(crate) fn rename(
 ) -> Result<()> {
     let mut history = History::load(config.path(), Config::HISTORY_NAME)?;
 
-    let mut script = config.get_script(name)?;
+    let mut template = config.get_template(name)?;
 
     let files = gather_files(recursion_depth)?;
 
-    script.add_arguments_to_node(arguments)?;
+    template.arguments_mut().extend(arguments.to_owned());
 
-    let actions = interpret_files(&script, files)?;
+    let actions = interpret_files(&template, &files)?;
 
     if actions.is_empty() {
         println!("There are no audio files to rename.");
@@ -83,8 +81,8 @@ fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
 }
 
 fn interpret_files(
-    script: &Script,
-    files: Vec<AudioFile>,
+    template: &Template,
+    files: &[AudioFile],
 ) -> Result<Vec<Action>> {
     let bar = ui::create_progressbar(
         files.len() as u64,
@@ -94,9 +92,9 @@ fn interpret_files(
     );
 
     let actions: Result<Vec<Action>> = files
-        .into_iter()
+        .iter()
         .progress_with(bar)
-        .map(|audiofile| action_from_file(script, audiofile))
+        .map(|audiofile| action_from_file(template, audiofile))
         .collect();
 
     actions
@@ -128,7 +126,10 @@ fn get_common_path(actions: &[Action]) -> PathBuf {
     common_path
 }
 
-fn action_from_file(script: &Script, audiofile: AudioFile) -> Result<Action> {
+fn action_from_file(
+    template: &Template,
+    audiofile: &AudioFile,
+) -> Result<Action> {
     let source = audiofile.path().to_owned();
 
     // We already know this is a file with either an "mp3" or "ogg"
@@ -137,48 +138,17 @@ fn action_from_file(script: &Script, audiofile: AudioFile) -> Result<Action> {
 
     let extension = audiofile.extension().to_owned();
 
-    let mut intp = create_interpreter(audiofile);
-    let string = run_interpreter(script, &mut intp)?;
+    let string = template.render(audiofile)?;
+
+    let string = replace_invalid_chars(string);
+
+    // FIXME let string = normalize_separators(string);
 
     let target = create_target_path_from_string(&string, &extension)?;
 
     let action = Action::mv(source, target);
 
     Ok(action)
-}
-
-fn create_interpreter(audiofile: AudioFile) -> Interpreter<'static> {
-    let mut intp = Interpreter::default();
-
-    let env = get_tapr_environment(audiofile);
-
-    intp.push_environment(env);
-
-    intp
-}
-
-fn run_interpreter(script: &Script, intp: &mut Interpreter) -> Result<String> {
-    let value = script.accept(intp)?;
-
-    let Value::List(segments) = value else {
-        bail!("Script did not return list of segments.")
-    };
-
-    let string = segments
-        .into_iter()
-        .map(|v| {
-            if let Value::String(segment) = v {
-                Ok(replace_invalid_chars(segment))
-            } else {
-                Err(anyhow!(
-                    "List of segments contained values other than strings."
-                ))
-            }
-        })
-        .collect::<Result<Vec<_>>>()?
-        .join(std::path::MAIN_SEPARATOR_STR);
-
-    Ok(string)
 }
 
 fn create_target_path_from_string(
@@ -348,8 +318,8 @@ fn remove_dir(history: &mut History, action: Action) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
     use assert_fs::TempDir;
+    use color_eyre::Result;
 
     #[test]
     fn test_remove_dir_error_codes() -> Result<()> {

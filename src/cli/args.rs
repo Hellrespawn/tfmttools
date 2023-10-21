@@ -28,9 +28,9 @@ pub enum Command {
         /// Only preview current action.
         preview: bool,
     },
-    /// Lists all scripts.
+    /// Lists all available templates.
     #[clap(name = "list")]
-    ListScripts,
+    ListTemplates,
     /// Undo {times} times.
     Undo {
         #[clap(short, long)]
@@ -61,10 +61,10 @@ pub enum Command {
         /// Maximum recursion depth when gathering files.
         recurse: usize,
 
-        /// Name of script.
+        /// Name of desired template..
         name: String,
 
-        /// Arguments of script.
+        /// Arguments array to pass to template.
         arguments: Vec<String>,
     },
     /// Adds examples to the filesystem.
@@ -94,7 +94,7 @@ impl Args {
                 | Command::Redo { preview, .. }
                 | Command::Rename { preview, .. }
                 | Command::Seed { preview, .. } => preview,
-                Command::ListScripts => false,
+                Command::ListTemplates => false,
             };
 
         self.preview = preview_aggregate;
@@ -105,7 +105,7 @@ impl Args {
             | Command::Redo { preview, .. }
             | Command::Rename { preview, .. }
             | Command::Seed { preview, .. } => *preview = preview_aggregate,
-            Command::ListScripts => (),
+            Command::ListTemplates => (),
         };
 
         self
@@ -120,7 +120,7 @@ pub(crate) fn parse_args(preview_override: bool) -> Args {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Result;
+    use color_eyre::Result;
 
     fn parse_custom_args(
         args: &[&str],
@@ -133,7 +133,7 @@ mod test {
 
     #[test]
     fn test_preview_aggregate() -> Result<()> {
-        let args_in = ["taprtest clear -p", "taprtest -p clear"];
+        let args_in = ["tfmttest clear -p", "tfmttest -p clear"];
 
         let args_out: Result<Vec<Args>> = args_in
             .iter()

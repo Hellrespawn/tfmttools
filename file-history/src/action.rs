@@ -230,9 +230,9 @@ impl ActionType {
 mod tests {
     // TODO Write test for undoing file that's been moved
     use super::*;
-    use anyhow::Result;
     use assert_fs::prelude::*;
     use assert_fs::TempDir;
+    use color_eyre::Result;
     use predicates::prelude::*;
 
     #[test]
