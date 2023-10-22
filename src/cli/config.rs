@@ -172,14 +172,16 @@ impl Config {
         }
     }
 
-    pub(crate) fn create_dir(path: &Path) -> Result<()> {
-        if !path.exists() {
-            fs::create_dir(path)?;
+    pub(crate) fn create_dir(&self, path: &Path) -> Result<()> {
+        if self.dry_run {
+            Ok(())
+        } else if !path.exists() {
+            Ok(fs::create_dir(path)?)
         } else if !path.is_dir() {
-            return Err(eyre!("Unable to create configuration directory!"));
+            Err(eyre!("Unable to create configuration directory!"))
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     fn get_template_paths(&self) -> Result<Vec<PathBuf>> {

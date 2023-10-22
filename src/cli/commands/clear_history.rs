@@ -9,9 +9,9 @@ pub(crate) fn clear_history(config: &Config) -> Result<()> {
         history.clear()?;
     }
 
-    let pp = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
+    let prefix = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
-    println!("{pp}Cleared history.");
+    println!("{prefix}Cleared history.");
 
     Ok(())
 }

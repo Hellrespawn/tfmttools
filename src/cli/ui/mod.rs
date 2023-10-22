@@ -66,9 +66,9 @@ pub(crate) fn create_progressbar(
         std::borrow::Cow::Borrowed(finished_msg),
     ));
 
-    let pp = if dry_run { DRY_RUN_PREFIX } else { "" };
+    let prefix = if dry_run { DRY_RUN_PREFIX } else { "" };
 
-    let template = format!("{pp}[{{pos}}/{{len}}] {{msg}} {{wide_bar}}");
+    let template = format!("{prefix}[{{pos}}/{{len}}] {{msg}} {{wide_bar}}");
 
     bar.set_style(ProgressStyle::default_bar().template(&template)?);
     bar.set_draw_target(ProgressDrawTarget::stdout());

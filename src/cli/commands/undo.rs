@@ -22,8 +22,8 @@ pub(crate) fn undo(
     };
 
     if config.dry_run() {
-        let pp = DRY_RUN_PREFIX;
-        println!("{pp}{mode_string} {times} renames.");
+        let prefix = DRY_RUN_PREFIX;
+        println!("{prefix}{mode_string} {times} renames.");
     } else {
         let action_counts = match mode {
             UndoMode::Undo => history.undo(times)?,

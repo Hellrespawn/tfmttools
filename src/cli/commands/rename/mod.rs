@@ -16,9 +16,7 @@ pub(crate) fn rename(
     name: &str,
     arguments: Vec<String>,
 ) -> Result<()> {
-    if !config.dry_run() {
-        Config::create_dir(config.config_dir())?;
-    }
+    config.create_dir(config.config_dir())?;
 
     let mut history = History::load(config.config_dir(), HISTORY_NAME)?;
 
@@ -245,9 +243,9 @@ fn clean_up_source_dirs(
         }
     }
 
-    let pp = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
+    let prefix: &str = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
-    println!("{pp}Removed leftover folders.");
+    println!("{prefix}Removed leftover folders.");
 
     Ok(())
 }

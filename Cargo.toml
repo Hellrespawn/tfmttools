@@ -24,6 +24,7 @@ minijinja = { version = "1.0", features = ["loader", "custom_syntax", "debug"] }
 regex = "1.10"
 console = "0.15.7"
 textwrap = "0.16"
+fs-err = "2.9.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"
