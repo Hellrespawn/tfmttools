@@ -3,7 +3,7 @@ use crate::cli::ui;
 use crate::template::Template;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use std::fs;
+use fs_err as fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");

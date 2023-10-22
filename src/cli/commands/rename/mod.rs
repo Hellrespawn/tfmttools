@@ -6,8 +6,8 @@ use crate::file::AudioFile;
 use crate::template::Template;
 use color_eyre::Result;
 use file_history::{Action, History, HistoryError};
+use fs_err as fs;
 use indicatif::ProgressIterator;
-use std::fs;
 use std::path::{Path, PathBuf};
 use validate::validate_actions;
 
@@ -328,14 +328,18 @@ mod tests {
 
         fs::create_dir(&test_folder)?;
         fs::write(test_file, "")?;
-        let result = fs::remove_dir(test_folder);
 
-        if let Err(err) = result {
-            if let Some(error_code) = err.raw_os_error() {
-                assert_eq!(error_code, expected_code);
+        if let Err(err) = fs::remove_dir(test_folder) {
+            if let Some(error_code) =
+                std::io::Error::last_os_error().raw_os_error()
+            {
+                assert_eq!(
+                    error_code, expected_code,
+                    "Expected code {expected_code}, got {error_code}",
+                );
                 Ok(())
             } else {
-                Err(err.into())
+                panic!("Received unexpected error:\n{err}");
             }
         } else {
             Ok(())

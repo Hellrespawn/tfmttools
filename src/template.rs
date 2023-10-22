@@ -1,5 +1,6 @@
 use crate::tags::Tags;
 use color_eyre::Result;
+use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -20,7 +21,7 @@ impl<'s> Template<'s> {
             .expect("File should have a file name.")
             .to_string();
 
-        let template = std::fs::read_to_string(path)?;
+        let template = fs::read_to_string(path)?;
 
         let mut environment = Self::create_environment();
         environment.add_template_owned(name.clone(), template)?;

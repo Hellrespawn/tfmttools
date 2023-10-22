@@ -2,8 +2,8 @@ use assert_cmd::Command;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use color_eyre::Result;
+use fs_err as fs;
 use once_cell::sync::Lazy;
-use std::fs;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
 const TEST_DATA_DIRECTORY: &str = "tests/testdata/";
@@ -174,9 +174,7 @@ impl TestEnv {
 
     fn print_tempdir(&self, message: &str) {
         fn inner(path: &Path, depth: usize) {
-            for result in
-                std::fs::read_dir(path).expect("Unable to read tempdir.")
-            {
+            for result in fs::read_dir(path).expect("Unable to read tempdir.") {
                 if depth == 0 {
                     return;
                 }

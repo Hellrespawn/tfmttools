@@ -1,6 +1,6 @@
 use crate::{ActionGroup, HistoryError, Result};
+use fs_err as fs;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
