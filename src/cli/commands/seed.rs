@@ -1,4 +1,4 @@
-use crate::cli::config::PREVIEW_PREFIX;
+use crate::cli::config::DRY_RUN_PREFIX;
 use crate::cli::Config;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -14,10 +14,10 @@ static DEFAULT_FILES: [DefaultFile; 1] = [DefaultFile {
     content: include_str!("../../../examples/sync.tfmt"),
 }];
 
-pub(crate) fn seed(preview: bool, force: bool, config: &Config) -> Result<()> {
+pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
     let existing_files: Vec<&DefaultFile> = DEFAULT_FILES
         .iter()
-        .filter(|file| config.path().join(file.name).exists())
+        .filter(|file| config.config_dir().join(file.name).exists())
         .collect();
 
     if !force && !existing_files.is_empty() {
@@ -31,15 +31,21 @@ pub(crate) fn seed(preview: bool, force: bool, config: &Config) -> Result<()> {
         ));
     }
 
+    Config::create_dir(config.config_dir())?;
+
     for file in &DEFAULT_FILES {
-        let path = config.path().join(file.name);
+        let path = config.config_dir().join(file.name);
 
-        let pp = if preview { PREVIEW_PREFIX } else { "" };
+        let pp = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
-        if !preview {
+        if !config.dry_run() {
             fs::write(path, file.content)?;
         }
-        println!("{pp}Wrote default files to {}", config.path().display());
+
+        println!(
+            "{pp}Wrote default files to {}",
+            config.config_dir().display()
+        );
     }
 
     Ok(())

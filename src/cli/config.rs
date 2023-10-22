@@ -1,3 +1,4 @@
+use super::Args;
 use crate::cli::ui;
 use crate::template::Template;
 use color_eyre::eyre::eyre;
@@ -6,28 +7,73 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");
-pub(crate) const PREVIEW_PREFIX: &str = "[P] ";
+pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
 pub(crate) const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
-pub(crate) const DEFAULT_PREVIEW_AMOUNT: usize = 8;
-pub(crate) const DEFAULT_RECURSION_DEPTH: usize = 4;
+
+const DEFAULT_PREVIEW_AMOUNT: usize = 8;
+const DEFAULT_RECURSION_DEPTH: usize = 4;
 
 pub(crate) struct Config {
-    path: PathBuf,
+    config_dir: PathBuf,
+    current_dir: PathBuf,
+    dry_run: bool,
+    recursion_depth: usize,
+    preview_amount: usize,
 }
 
 impl Config {
-    pub(crate) fn new(path: &Path) -> Result<Self> {
+    pub(crate) fn new(config_dir: &Path, dry_run: bool) -> Result<Self> {
         let config = Self {
-            path: path.to_owned(),
+            config_dir: config_dir.to_owned(),
+            current_dir: std::env::current_dir()?,
+            dry_run,
+            recursion_depth: DEFAULT_RECURSION_DEPTH,
+            preview_amount: DEFAULT_PREVIEW_AMOUNT,
         };
-
-        Config::create_dir(&config.path)?;
 
         Ok(config)
     }
 
-    pub(crate) fn default() -> Result<Self> {
-        Self::new(&Self::default_path()?)
+    pub(crate) fn from_args(args: &Args) -> Result<Self> {
+        let path = if let Some(path) = &args.config {
+            path.clone()
+        } else {
+            Self::default_path()?
+        };
+
+        let dry_run = args.dry_run();
+
+        Self::new(&path, dry_run)
+    }
+
+    pub(crate) fn config_dir(&self) -> &Path {
+        &self.config_dir
+    }
+
+    pub(crate) fn current_dir(&self) -> &Path {
+        &self.current_dir
+    }
+
+    pub(crate) fn dry_run(&self) -> bool {
+        self.dry_run
+    }
+
+    pub(crate) fn recursion_depth(&self) -> usize {
+        self.recursion_depth
+    }
+
+    pub(crate) fn preview_amount(&self) -> usize {
+        self.preview_amount
+    }
+
+    pub(crate) fn aggregate_dry_run(mut self, dry_run: bool) -> Self {
+        self.dry_run = self.dry_run || dry_run;
+        self
+    }
+
+    pub(crate) fn with_recursion_depth(mut self, depth: Option<usize>) -> Self {
+        self.recursion_depth = depth.unwrap_or(self.recursion_depth);
+        self
     }
 
     /// Search a path for files matching `predicate`, recursing for `depth`.
@@ -76,10 +122,6 @@ impl Config {
         found_paths
     }
 
-    pub(crate) fn path(&self) -> &Path {
-        &self.path
-    }
-
     pub(crate) fn get_templates(&self) -> Result<Vec<Template>> {
         let paths = self.get_template_paths()?;
 
@@ -120,7 +162,7 @@ impl Config {
         }
     }
 
-    fn default_path() -> Result<PathBuf> {
+    pub(crate) fn default_path() -> Result<PathBuf> {
         if let Some(home) = dirs::home_dir() {
             let path = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
 
@@ -130,7 +172,7 @@ impl Config {
         }
     }
 
-    fn create_dir(path: &Path) -> Result<()> {
+    pub(crate) fn create_dir(path: &Path) -> Result<()> {
         if !path.exists() {
             fs::create_dir(path)?;
         } else if !path.is_dir() {
@@ -147,7 +189,8 @@ impl Config {
             })
         };
 
-        let mut paths = Config::search_path(self.path(), 0, &predicate, None);
+        let mut paths =
+            Config::search_path(self.config_dir(), 0, &predicate, None);
         paths.extend(Config::search_path(
             &std::env::current_dir()?,
             0,

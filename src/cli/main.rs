@@ -1,46 +1,41 @@
 use crate::cli::args::Command;
 use crate::cli::commands::{self, UndoMode};
-use crate::cli::{ui, Args, Config};
+use crate::cli::{ui, Config};
 use color_eyre::Result;
 
 /// Main entrypoint for tfmttools
-pub fn main(preview_override: bool) -> Result<()> {
-    let args = crate::cli::args::parse_args(preview_override);
+pub fn main(dry_run_override: bool) -> Result<()> {
+    let args = crate::cli::args::parse_args();
 
-    if let Err(err) = select_command(args) {
+    let config = Config::from_args(&args)?.aggregate_dry_run(dry_run_override);
+
+    if let Err(err) = select_command(config, args.command) {
         ui::print_error(&err);
     }
 
     Ok(())
 }
 
-fn select_command(args: Args) -> Result<()> {
-    let config = if let Some(path) = &args.config {
-        Config::new(path)?
-    } else {
-        Config::default()?
-    };
-
-    match args.command {
-        Command::ClearHistory { preview } => {
-            commands::clear_history(preview, &config)
-        }
+fn select_command(config: Config, command: Command) -> Result<()> {
+    match command {
+        Command::ClearHistory { .. } => commands::clear_history(&config),
         Command::ListTemplates => commands::list_templates(&config),
-        Command::Undo { preview, times } => {
-            commands::undo(preview, &config, UndoMode::Undo, times)
+        Command::Undo { times, .. } => {
+            commands::undo(&config, UndoMode::Undo, times)
         }
-        Command::Redo { preview, times } => {
-            commands::undo(preview, &config, UndoMode::Redo, times)
+        Command::Redo { times, .. } => {
+            commands::undo(&config, UndoMode::Redo, times)
         }
         Command::Rename {
-            preview,
-            recurse,
             name,
             arguments,
-        } => commands::rename(preview, &config, recurse, &name, &arguments),
-
-        Command::Seed { preview, force } => {
-            commands::seed(preview, force, &config)
+            recurse,
+            ..
+        } => {
+            let config = config.with_recursion_depth(recurse);
+            commands::rename(&config, &name, arguments)
         }
+
+        Command::Seed { force, .. } => commands::seed(&config, force),
     }
 }

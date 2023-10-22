@@ -1,6 +1,6 @@
 mod validate;
 
-use crate::cli::config::{HISTORY_NAME, PREVIEW_PREFIX};
+use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
 use crate::cli::{ui, Config};
 use crate::file::AudioFile;
 use crate::template::Template;
@@ -12,36 +12,33 @@ use std::path::{Path, PathBuf};
 use validate::validate_actions;
 
 pub(crate) fn rename(
-    preview: bool,
     config: &Config,
-    recursion_depth: usize,
     name: &str,
-    arguments: &[String],
+    arguments: Vec<String>,
 ) -> Result<()> {
-    let mut history = History::load(config.path(), HISTORY_NAME)?;
+    if !config.dry_run() {
+        Config::create_dir(config.config_dir())?;
+    }
 
-    let mut template = config.get_template(name)?;
+    let mut history = History::load(config.config_dir(), HISTORY_NAME)?;
 
-    let files = gather_files(recursion_depth)?;
+    let template = config.get_template(name)?.with_arguments(arguments);
 
-    template.arguments_mut().extend(arguments.to_owned());
+    let files = gather_files(config)?;
 
-    let actions = create_actions(&template, &files)?;
-
+    let actions = create_actions(config, &template, &files)?;
     let actions = filter_unchanged_destinations(actions);
 
     if actions.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        validate_actions(&actions)?;
+        validate_actions(config, &actions)?;
 
-        perform_actions(preview, recursion_depth, &mut history, actions)
+        perform_actions(config, &mut history, actions)
     }
 }
-fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
-    let path = std::env::current_dir()?;
-
+fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     let spinner = ui::AudioFileSpinner::new(
         "audio files",
         "total files",
@@ -49,8 +46,8 @@ fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
     )?;
 
     let paths = Config::search_path(
-        &path,
-        recursion_depth,
+        config.current_dir(),
+        config.recursion_depth(),
         &|p| {
             p.extension().map_or(false, |extension| {
                 for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
@@ -71,6 +68,7 @@ fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
 }
 
 fn create_actions(
+    config: &Config,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Action>> {
@@ -84,7 +82,7 @@ fn create_actions(
     let actions: Result<Vec<Action>> = files
         .iter()
         .progress_with(bar)
-        .map(|audiofile| action_from_file(template, audiofile))
+        .map(|audiofile| action_from_file(config, template, audiofile))
         .collect();
 
     println!();
@@ -119,24 +117,18 @@ fn get_common_path(paths: &[&Path]) -> PathBuf {
 }
 
 fn action_from_file(
+    config: &Config,
     template: &Template,
     audiofile: &AudioFile,
 ) -> Result<Action> {
-    let source = audiofile.path().to_owned();
-
-    // We already know this is a file with either an "mp3" or "ogg"
-    // extension, so we unwrap safely.
-    debug_assert!(source.extension().is_some());
-
-    let extension = audiofile.extension().to_owned();
-
     let string = template.render(audiofile)?;
 
     let string = normalize_separators(&string);
 
-    let target = create_target_path_from_string(&string, &extension)?;
+    let target =
+        create_target_path_from_string(config, &string, audiofile.extension());
 
-    let action = Action::mv(source, target);
+    let action = Action::mv(audiofile.path(), target);
 
     #[cfg(debug_assertions)]
     crate::debug::delay();
@@ -145,16 +137,15 @@ fn action_from_file(
 }
 
 fn create_target_path_from_string(
+    config: &Config,
     string: &str,
     extension: &str,
-) -> Result<PathBuf> {
+) -> PathBuf {
     let target_path = PathBuf::from(format!("{string}.{extension}"));
 
     // If target_path has an absolute path, join will clobber the current_dir,
     // so this is always safe.
-    let target = std::env::current_dir()?.join(target_path);
-
-    Ok(target)
+    config.current_dir().join(target_path)
 }
 
 // TODO? Refactor this into the `create_actions` progress bar?
@@ -169,12 +160,11 @@ fn filter_unchanged_destinations(actions: Vec<Action>) -> Vec<Action> {
 }
 
 fn perform_actions(
-    preview: bool,
-    recursion_depth: usize,
+    config: &Config,
     history: &mut History,
     actions: Vec<Action>,
 ) -> Result<()> {
-    ui::print_actions_preview(&actions, &std::env::current_dir()?);
+    ui::print_actions_preview(config, &actions, &std::env::current_dir()?);
 
     let common_path = get_common_path(
         &actions
@@ -183,9 +173,9 @@ fn perform_actions(
             .collect::<Vec<_>>(),
     );
 
-    move_files(preview, history, actions)?;
+    move_files(config.dry_run(), history, actions)?;
 
-    clean_up_source_dirs(preview, history, &common_path, recursion_depth)?;
+    clean_up_source_dirs(config, history, &common_path)?;
 
     history.save()?;
 
@@ -193,7 +183,7 @@ fn perform_actions(
 }
 
 fn move_files(
-    preview: bool,
+    dry_run: bool,
     history: &mut History,
     actions: Vec<Action>,
 ) -> Result<()> {
@@ -201,7 +191,7 @@ fn move_files(
         actions.len() as u64,
         "Moving files...",
         "Moved files",
-        preview,
+        dry_run,
     )?;
 
     for action in actions.into_iter().progress_with(bar) {
@@ -210,8 +200,8 @@ fn move_files(
 
         debug_assert!(target.parent().is_some());
 
-        create_dir(preview, history, target.parent().unwrap())?;
-        if !preview {
+        create_dir(dry_run, history, target.parent().unwrap())?;
+        if !dry_run {
             history.apply(action)?;
         }
 
@@ -222,18 +212,18 @@ fn move_files(
     Ok(())
 }
 
-fn create_dir(preview: bool, history: &mut History, path: &Path) -> Result<()> {
+fn create_dir(dry_run: bool, history: &mut History, path: &Path) -> Result<()> {
     if path.is_dir() {
         return Ok(());
     }
 
     if let Some(parent) = path.parent() {
-        create_dir(preview, history, parent)?;
+        create_dir(dry_run, history, parent)?;
     }
 
     let action = Action::mkdir(path);
 
-    if !preview {
+    if !dry_run {
         history.apply(action)?;
     }
 
@@ -241,22 +231,21 @@ fn create_dir(preview: bool, history: &mut History, path: &Path) -> Result<()> {
 }
 
 fn clean_up_source_dirs(
-    preview: bool,
+    config: &Config,
     history: &mut History,
     common_path: &Path,
-    recursion_depth: usize,
 ) -> Result<()> {
-    let dirs = gather_dirs(common_path, recursion_depth);
+    let dirs = gather_dirs(common_path, config.recursion_depth());
 
     let actions: Vec<Action> = dirs.into_iter().map(Action::rmdir).collect();
 
-    if !preview {
+    if !config.dry_run() {
         for action in actions {
             remove_dir(history, action)?;
         }
     }
 
-    let pp = if preview { PREVIEW_PREFIX } else { "" };
+    let pp = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
     println!("{pp}Removed leftover folders.");
 

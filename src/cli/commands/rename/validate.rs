@@ -1,20 +1,26 @@
-use crate::cli::config::DEFAULT_PREVIEW_AMOUNT;
 use crate::cli::ui::table::Table;
+use crate::cli::Config;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use file_history::Action;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub(crate) fn validate_actions(actions: &[Action]) -> Result<()> {
-    validate_double_separators(actions)?;
-    validate_collisions(actions)?;
-    validate_existing_files(actions)?;
+pub(crate) fn validate_actions(
+    config: &Config,
+    actions: &[Action],
+) -> Result<()> {
+    validate_double_separators(config, actions)?;
+    validate_collisions(config, actions)?;
+    validate_existing_files(config, actions)?;
 
     Ok(())
 }
 
-fn validate_double_separators(actions: &[Action]) -> Result<()> {
+fn validate_double_separators(
+    config: &Config,
+    actions: &[Action],
+) -> Result<()> {
     let double_actions = actions
         .iter()
         .filter(|a| {
@@ -27,8 +33,8 @@ fn validate_double_separators(actions: &[Action]) -> Result<()> {
 
     let paths = double_actions
         .iter()
-        .take(DEFAULT_PREVIEW_AMOUNT)
-        .map(|a| a.get_src_tgt_unchecked().1.to_string_lossy())
+        .take(config.preview_amount())
+        .map(|a| a.get_src_tgt_unchecked().1)
         .collect::<Vec<_>>();
 
     if paths.is_empty() {
@@ -42,11 +48,11 @@ fn validate_double_separators(actions: &[Action]) -> Result<()> {
         );
 
         for path in &paths {
-            table.push_string(path.as_ref());
+            table.push_path(path);
         }
 
         if double_actions.len() > paths.len() {
-            table.push_string(&format!(
+            table.push_string(format!(
                 "And {} more...",
                 double_actions.len() - paths.len()
             ));
@@ -56,7 +62,7 @@ fn validate_double_separators(actions: &[Action]) -> Result<()> {
     }
 }
 
-fn validate_collisions(actions: &[Action]) -> Result<()> {
+fn validate_collisions(config: &Config, actions: &[Action]) -> Result<()> {
     let mut map = HashMap::new();
 
     for action in actions {
@@ -70,11 +76,14 @@ fn validate_collisions(actions: &[Action]) -> Result<()> {
     if collisions.is_empty() {
         Ok(())
     } else {
-        Err(eyre!(format_collisions(&collisions)))
+        Err(eyre!(format_collisions(config, &collisions)))
     }
 }
 
-fn format_collisions(collisions_map: &HashMap<&Path, Vec<&Path>>) -> String {
+fn format_collisions(
+    config: &Config,
+    collisions_map: &HashMap<&Path, Vec<&Path>>,
+) -> String {
     let length = collisions_map.len();
 
     let mut string = format!(
@@ -83,19 +92,25 @@ fn format_collisions(collisions_map: &HashMap<&Path, Vec<&Path>>) -> String {
         if length > 1 { "s were" } else { " was" }
     );
 
-    for (path, collisions) in collisions_map.iter().take(DEFAULT_PREVIEW_AMOUNT)
+    for (path, collisions) in
+        collisions_map.iter().take(config.preview_amount())
     {
-        string += &format_collision(path, collisions);
+        string += &format_collision(config, path, collisions);
     }
 
-    if length > DEFAULT_PREVIEW_AMOUNT {
-        string += &format!("\nAnd {} more...", length - DEFAULT_PREVIEW_AMOUNT);
+    if length > config.preview_amount() {
+        string +=
+            &format!("\nAnd {} more...", length - config.preview_amount());
     }
 
     string
 }
 
-fn format_collision(path: &Path, collisions: &[&Path]) -> String {
+fn format_collision(
+    config: &Config,
+    path: &Path,
+    collisions: &[&Path],
+) -> String {
     let mut table = Table::new();
 
     let length = collisions.len();
@@ -107,23 +122,23 @@ fn format_collision(path: &Path, collisions: &[&Path]) -> String {
         if length > 1 { "s" } else { "" },
     ));
 
-    let iter = collisions.iter().take(DEFAULT_PREVIEW_AMOUNT);
+    let iter = collisions.iter().take(config.preview_amount());
 
     for path in iter {
-        table.push_string(path.to_string_lossy().as_ref());
+        table.push_path(path);
     }
 
-    if length > DEFAULT_PREVIEW_AMOUNT {
-        table.push_string(&format!(
+    if length > config.preview_amount() {
+        table.push_string(format!(
             "And {} more...",
-            length - DEFAULT_PREVIEW_AMOUNT
+            length - config.preview_amount()
         ));
     }
 
     table.to_string()
 }
 
-fn validate_existing_files(actions: &[Action]) -> Result<()> {
+fn validate_existing_files(config: &Config, actions: &[Action]) -> Result<()> {
     let existing: Vec<&Path> = actions
         .iter()
         .filter_map(|action| {
@@ -146,14 +161,14 @@ fn validate_existing_files(actions: &[Action]) -> Result<()> {
             if length > 1 { "" } else { "s" },
         ));
 
-        for path in existing.iter().take(DEFAULT_PREVIEW_AMOUNT) {
-            table.push_string(path.to_string_lossy().as_ref());
+        for path in existing.iter().take(config.preview_amount()) {
+            table.push_path(path);
         }
 
-        if length > DEFAULT_PREVIEW_AMOUNT {
-            table.push_string(&format!(
+        if length > config.preview_amount() {
+            table.push_string(format!(
                 "And {} more...",
-                length - DEFAULT_PREVIEW_AMOUNT
+                length - config.preview_amount()
             ));
         }
 
@@ -163,17 +178,21 @@ fn validate_existing_files(actions: &[Action]) -> Result<()> {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
     use super::*;
 
     #[test]
     fn validate_collisions_test() -> Result<()> {
+        let config = Config::new(&PathBuf::new(), false)?;
+
         let reference = [
             ("/a/b/c.file", "/b/c/d.file"),
             ("/c/d/e.file", "/b/c/d.file"),
         ]
         .map(|(source, target)| Action::mv(source, target));
 
-        if let Ok(()) = validate_collisions(&reference) {
+        if let Ok(()) = validate_collisions(&config, &reference) {
             return Err(eyre!(
                 "validate_collisions should have returned an error!"
             ));
@@ -185,7 +204,7 @@ mod test {
         ]
         .map(|(source, target)| Action::mv(source, target));
 
-        if let Err(err) = validate_collisions(&reference) {
+        if let Err(err) = validate_collisions(&config, &reference) {
             return Err(eyre!(
                 "validate_collisions returned an error when it shouldn't!\n{}",
                 err

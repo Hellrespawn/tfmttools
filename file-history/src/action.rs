@@ -170,7 +170,7 @@ impl ActionType {
     }
 
     /// Undoes the action.
-    pub fn undo(&self) -> Result<()> {
+    pub(crate) fn undo(&self) -> Result<()> {
         match self {
             ActionType::Mv { source, target } => {
                 ActionType::copy_or_move_file(target, source)?;

@@ -124,7 +124,7 @@ impl History {
     }
 
     /// Returns true if the history was changed
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.current_group.changed()
             || self.applied_groups.iter().any(ActionGroup::changed)
             || self.undone_groups.iter().any(ActionGroup::changed)

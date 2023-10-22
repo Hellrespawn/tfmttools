@@ -1,18 +1,17 @@
-use crate::cli::config::DEFAULT_RECURSION_DEPTH;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
-pub struct Args {
-    /// Sets a custom config file
+pub(crate) struct Args {
+    /// Sets a custom config folder
     #[arg(short, long)]
     pub(crate) config: Option<PathBuf>,
 
     #[arg(short, long)]
-    /// Only preview current action.
-    preview: bool,
+    /// Don't run command, only show what would happen.
+    dry_run: bool,
 
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -20,13 +19,13 @@ pub struct Args {
 
 #[derive(Subcommand, Debug, PartialEq)]
 /// Holds per-subcommand command line arguments.
-pub enum Command {
+pub(crate) enum Command {
     /// Clears the history
     #[command(name = "clear")]
     ClearHistory {
         #[arg(short, long)]
-        /// Only preview current action.
-        preview: bool,
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
     },
     /// Lists all available templates.
     #[command(name = "list")]
@@ -34,8 +33,8 @@ pub enum Command {
     /// Undo {times} times.
     Undo {
         #[arg(short, long)]
-        /// Only preview current action.
-        preview: bool,
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
 
         /// Times to undo.
         #[arg(default_value_t = 1)]
@@ -44,8 +43,8 @@ pub enum Command {
     /// Redo {times} times.
     Redo {
         #[arg(short, long)]
-        /// Only preview current action.
-        preview: bool,
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
 
         /// Times to redo
         #[arg(default_value_t = 1)]
@@ -54,12 +53,12 @@ pub enum Command {
     /// Rename files according to their tags.
     Rename {
         #[arg(short, long)]
-        /// Only preview current action.
-        preview: bool,
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
 
-        #[arg(short, long, default_value_t=DEFAULT_RECURSION_DEPTH)]
+        #[arg(short, long)]
         /// Maximum recursion depth when gathering files.
-        recurse: usize,
+        recurse: Option<usize>,
 
         /// Name or path of desired template.
         name: String,
@@ -70,8 +69,8 @@ pub enum Command {
     /// Adds examples to the filesystem.
     Seed {
         #[arg(short, long)]
-        /// Only preview current action.
-        preview: bool,
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
 
         #[arg(short, long)]
         /// Overwrite existing files.
@@ -80,72 +79,21 @@ pub enum Command {
 }
 
 impl Args {
-    /// If one preview is true, also sets the other preview.
     #[must_use]
-    pub fn aggregate_preview(mut self, preview_override: bool) -> Self {
-        let preview_aggregate = preview_override
-            || self.preview
+    pub(crate) fn dry_run(&self) -> bool {
+        self.dry_run
             || match self.command {
-                Command::ClearHistory { preview, .. }
-                | Command::Undo { preview, .. }
-                | Command::Redo { preview, .. }
-                | Command::Rename { preview, .. }
-                | Command::Seed { preview, .. } => preview,
+                Command::ClearHistory { dry_run, .. }
+                | Command::Undo { dry_run, .. }
+                | Command::Redo { dry_run, .. }
+                | Command::Rename { dry_run, .. }
+                | Command::Seed { dry_run, .. } => dry_run,
                 Command::ListTemplates => false,
-            };
-
-        self.preview = preview_aggregate;
-
-        match &mut self.command {
-            Command::ClearHistory { preview, .. }
-            | Command::Undo { preview, .. }
-            | Command::Redo { preview, .. }
-            | Command::Rename { preview, .. }
-            | Command::Seed { preview, .. } => *preview = preview_aggregate,
-            Command::ListTemplates => (),
-        };
-
-        self
+            }
     }
 }
 
 /// Parses arguments
-pub(crate) fn parse_args(preview_override: bool) -> Args {
-    Args::parse().aggregate_preview(preview_override)
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use color_eyre::Result;
-
-    fn parse_custom_args(
-        args: &[&str],
-        preview_override: bool,
-    ) -> Result<Args> {
-        let args =
-            Args::try_parse_from(args)?.aggregate_preview(preview_override);
-        Ok(args)
-    }
-
-    #[test]
-    fn test_preview_aggregate() -> Result<()> {
-        let args_in = ["tfmttest clear -p", "tfmttest -p clear"];
-
-        let args_out: Result<Vec<Args>> = args_in
-            .iter()
-            .map(|a| {
-                parse_custom_args(
-                    &a.split_whitespace().collect::<Vec<&str>>(),
-                    false,
-                )
-            })
-            .collect();
-
-        let equal = args_out?.windows(2).all(|w| w[0] == w[1]);
-
-        assert!(equal);
-
-        Ok(())
-    }
+pub(crate) fn parse_args() -> Args {
+    Args::parse()
 }

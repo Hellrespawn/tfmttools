@@ -1,17 +1,15 @@
-use std::path::Path;
-
+use super::config::DRY_RUN_PREFIX;
+use super::Config;
+use crate::cli::ui::table::Table;
 use color_eyre::Result;
 use file_history::Action;
 use indicatif::{
     ProgressBar as IProgressBar, ProgressDrawTarget, ProgressFinish,
     ProgressStyle,
 };
+use std::path::Path;
 
-use crate::cli::config::DEFAULT_PREVIEW_AMOUNT;
-
-use super::config::PREVIEW_PREFIX;
-
-pub mod table;
+pub(crate) mod table;
 
 pub(crate) fn print_error(error: &color_eyre::Report) {
     println!("An error occurred:\n{error}");
@@ -62,13 +60,13 @@ pub(crate) fn create_progressbar(
     len: u64,
     msg: &'static str,
     finished_msg: &'static str,
-    preview: bool,
+    dry_run: bool,
 ) -> Result<IProgressBar> {
     let bar = IProgressBar::new(len).with_finish(ProgressFinish::WithMessage(
         std::borrow::Cow::Borrowed(finished_msg),
     ));
 
-    let pp = if preview { PREVIEW_PREFIX } else { "" };
+    let pp = if dry_run { DRY_RUN_PREFIX } else { "" };
 
     let template = format!("{pp}[{{pos}}/{{len}}] {{msg}} {{wide_bar}}");
 
@@ -79,10 +77,14 @@ pub(crate) fn create_progressbar(
     Ok(bar)
 }
 
-pub(crate) fn print_actions_preview(actions: &[Action], common_path: &Path) {
+pub(crate) fn print_actions_preview(
+    config: &Config,
+    actions: &[Action],
+    common_path: &Path,
+) {
     let length = actions.len();
 
-    let step = std::cmp::max(actions.len() / DEFAULT_PREVIEW_AMOUNT, 1);
+    let step = std::cmp::max(actions.len() / config.preview_amount(), 1);
 
     let slice = actions
         .iter()
@@ -91,15 +93,17 @@ pub(crate) fn print_actions_preview(actions: &[Action], common_path: &Path) {
         .map(|p| p.strip_prefix(common_path).unwrap_or(p))
         .collect::<Vec<_>>();
 
-    if slice.len() <= DEFAULT_PREVIEW_AMOUNT {
-        println!("Previewing {} files:", slice.len());
+    let mut table = Table::new();
+
+    table.set_heading(if slice.len() <= config.preview_amount() {
+        format!("Previewing {} files", slice.len())
     } else {
-        println!("Previewing {} of {} files:", slice.len(), length);
-    }
+        format!("Previewing {} of {} files", slice.len(), length)
+    });
 
     for path in slice {
-        println!("{}", path.display());
+        table.push_path(path);
     }
 
-    println!();
+    println!("{table}");
 }

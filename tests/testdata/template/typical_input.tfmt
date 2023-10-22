@@ -1,6 +1,5 @@
-{# This is a comment for jinja #}
+{# Stef's personal script. `args[0]` is a directory prefix. #}
 {{- args[0] -}}
-/
 {{- albumartist or artist -}}
 /
 {%- if album -%}

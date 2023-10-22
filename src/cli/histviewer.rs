@@ -16,13 +16,13 @@ struct Args {
 pub fn histviewer() -> Result<()> {
     let args = Args::parse();
 
-    let config = if let Some(config_dir) = args.config_dir {
-        Config::new(&config_dir)?
+    let config_dir = if let Some(path) = &args.config_dir {
+        path.clone()
     } else {
-        Config::default()?
+        Config::default_path()?
     };
 
-    let history = History::load(config.path(), HISTORY_NAME)?;
+    let history = History::load(&config_dir, HISTORY_NAME)?;
 
     println!("{history}");
 

@@ -10,6 +10,7 @@ struct HistoryOnDisk {
     undone_groups: Vec<ActionGroup>,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(PartialEq, Debug)]
 pub(crate) struct DiskHandler {
     path: PathBuf,

@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
 //#![warn(clippy::cargo)]
 #![allow(clippy::must_use_candidate)]
@@ -18,19 +18,16 @@ mod actiongroup;
 mod disk;
 mod util;
 
-use std::path::PathBuf;
-
 use actiongroup::ActionGroup;
 use disk::DiskHandler;
+use std::path::PathBuf;
 use thiserror::Error;
 
-pub(crate) use action::ActionType;
-
-pub use action::Action;
+pub use action::{Action, ActionType};
 pub use history::History;
 
 /// Wrapper for Result
-pub type Result<T> = std::result::Result<T, HistoryError>;
+pub(crate) type Result<T> = std::result::Result<T, HistoryError>;
 
 #[derive(Error, Debug)]
 /// Error relating to file-history

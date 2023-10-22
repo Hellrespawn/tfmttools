@@ -51,15 +51,15 @@ static SIMPLE_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
 
 static TYPICAL_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
-    "myname/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
-    "myname/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-    "myname/MASTER BOOT RECORD/2016.03 - CEDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-    "myname/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
-    "myname/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
-    "myname/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
-    "myname/Nightwish/2004 - Once/03 - Nemo.mp3",
-    "myname/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
-    "myname/Nightwish/While Your Lips Are Still Red.mp3",
+    "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
+    "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
+    "output_dir/MASTER BOOT RECORD/2016.03 - CEDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+    "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
+    "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
+    "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
+    "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
+    "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
+    "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
 ]    .into_iter()
 .map(normalize_separators)
 .collect()
@@ -211,7 +211,7 @@ fn rename_typical_input(env: &TestEnv) {
         .arg(config_dir)
         .arg("rename")
         .arg("typical_input")
-        .arg("myname")
+        .arg("output_dir/")
         .current_dir(env.tempdir.path())
         .assert();
 

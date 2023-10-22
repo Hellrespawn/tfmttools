@@ -1,16 +1,12 @@
-/// Parses command line arguments
-pub(crate) mod args;
-/// Handles commands
-pub(crate) mod commands;
-/// Contains filesystem code
-pub(crate) mod config;
-/// Contains UI code
-pub(crate) mod ui;
-
-pub(crate) use config::Config;
-
+mod args;
+mod commands;
+mod config;
 mod histviewer;
 mod main;
-pub use args::Args;
+mod ui;
+
+pub(crate) use args::Args;
+pub(crate) use config::Config;
+
 pub use histviewer::histviewer;
 pub use main::main;

@@ -6,14 +6,14 @@ use regex::Regex;
 use std::path::Path;
 
 #[derive(Debug)]
-pub struct Template<'s> {
+pub(crate) struct Template<'s> {
     name: String,
     environment: Environment<'s>,
     arguments: Vec<String>,
 }
 
 impl<'s> Template<'s> {
-    pub fn from_file(path: &Path) -> Result<Self> {
+    pub(crate) fn from_file(path: &Path) -> Result<Self> {
         let name = path
             .file_stem()
             .map(std::ffi::OsStr::to_string_lossy)
@@ -32,22 +32,52 @@ impl<'s> Template<'s> {
         })
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn arguments_mut(&mut self) -> &mut Vec<String> {
-        &mut self.arguments
+    pub(crate) fn description(&self) -> Result<Option<String>> {
+        let template = self.get_template()?;
+        let source = template.source();
+
+        let syntax = self.environment.syntax();
+
+        let string = source
+            .lines()
+            .take_while(|l| l.starts_with(syntax.comment_start.as_ref()))
+            .map(|l| {
+                l.replace(syntax.comment_start.as_ref(), "")
+                    .replace(syntax.comment_end.as_ref(), "")
+                    .trim()
+                    .to_owned()
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        if string.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(string))
+        }
     }
 
-    pub fn render(&self, tags: &dyn Tags) -> Result<String> {
-        let template = self.environment.get_template(&self.name)?;
+    pub(crate) fn with_arguments(mut self, arguments: Vec<String>) -> Self {
+        self.arguments = arguments;
+        self
+    }
+
+    pub(crate) fn render(&self, tags: &dyn Tags) -> Result<String> {
+        let template = self.get_template()?;
 
         let context = self.create_context(tags)?;
 
         let output = template.render(context)?;
 
         Ok(output)
+    }
+
+    fn get_template(&self) -> Result<minijinja::Template> {
+        Ok(self.environment.get_template(&self.name)?)
     }
 
     fn create_environment() -> Environment<'s> {
