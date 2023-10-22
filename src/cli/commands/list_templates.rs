@@ -6,7 +6,6 @@ pub(crate) fn list_templates(config: &Config) -> Result<()> {
     let templates = config.get_templates()?;
 
     if templates.is_empty() {
-        // FIXME Dynamically check template directories.
         println!(
             "Couldn't find any templates at {} or in the current directory.",
             config.path().display()

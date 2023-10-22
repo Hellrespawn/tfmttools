@@ -1,9 +1,9 @@
+use crate::cli::config::DEFAULT_RECURSION_DEPTH;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, long_about = None)]
-
 /// Holds application-wide command line arguments.
 pub struct Args {
     /// Sets a custom config file
@@ -57,11 +57,11 @@ pub enum Command {
         /// Only preview current action.
         preview: bool,
 
-        #[arg(short, long, default_value_t=Args::DEFAULT_RECURSION_DEPTH)]
+        #[arg(short, long, default_value_t=DEFAULT_RECURSION_DEPTH)]
         /// Maximum recursion depth when gathering files.
         recurse: usize,
 
-        /// Name of desired template..
+        /// Name or path of desired template.
         name: String,
 
         /// Arguments array to pass to template.
@@ -80,9 +80,6 @@ pub enum Command {
 }
 
 impl Args {
-    pub(crate) const DEFAULT_PREVIEW_AMOUNT: usize = 8;
-    pub(crate) const DEFAULT_RECURSION_DEPTH: usize = 4;
-
     /// If one preview is true, also sets the other preview.
     #[must_use]
     pub fn aggregate_preview(mut self, preview_override: bool) -> Self {

@@ -1,5 +1,6 @@
 mod validate;
 
+use crate::cli::config::{HISTORY_NAME, PREVIEW_PREFIX};
 use crate::cli::{ui, Config};
 use crate::file::AudioFile;
 use crate::template::Template;
@@ -17,7 +18,7 @@ pub(crate) fn rename(
     name: &str,
     arguments: &[String],
 ) -> Result<()> {
-    let mut history = History::load(config.path(), Config::HISTORY_NAME)?;
+    let mut history = History::load(config.path(), HISTORY_NAME)?;
 
     let mut template = config.get_template(name)?;
 
@@ -25,25 +26,17 @@ pub(crate) fn rename(
 
     template.arguments_mut().extend(arguments.to_owned());
 
-    let actions = interpret_files(&template, &files)?;
+    let actions = create_actions(&template, &files)?;
+
+    let actions = filter_unchanged_destinations(actions);
 
     if actions.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        let (actions, _filtered_actions) = partition_actions(actions);
-
         validate_actions(&actions)?;
 
-        let common_path = get_common_path(&actions);
-
-        perform_actions(
-            preview,
-            recursion_depth,
-            &common_path,
-            &mut history,
-            actions,
-        )
+        perform_actions(preview, recursion_depth, &mut history, actions)
     }
 }
 fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
@@ -53,7 +46,7 @@ fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
         "audio files",
         "total files",
         "Gathering files...",
-    );
+    )?;
 
     let paths = Config::search_path(
         &path,
@@ -77,16 +70,16 @@ fn gather_files(recursion_depth: usize) -> Result<Vec<AudioFile>> {
     paths.iter().map(|p| AudioFile::new(p)).collect()
 }
 
-fn interpret_files(
+fn create_actions(
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Action>> {
     let bar = ui::create_progressbar(
         files.len() as u64,
-        "Interpreting files...",
-        "Interpreted files.",
+        "Determining output paths...",
+        "Determined output paths",
         false,
-    );
+    )?;
 
     let actions: Result<Vec<Action>> = files
         .iter()
@@ -94,20 +87,22 @@ fn interpret_files(
         .map(|audiofile| action_from_file(template, audiofile))
         .collect();
 
+    println!();
+    println!();
+
     actions
 }
 
-fn get_common_path(actions: &[Action]) -> PathBuf {
-    debug_assert!(!actions.is_empty());
+fn get_common_path(paths: &[&Path]) -> PathBuf {
+    debug_assert!(!paths.is_empty());
 
-    // We have already returned if no files were found, so this index
+    let mut iter = paths.iter();
+
+    // We have already returned if no files were found, so this unwrap
     // should be safe.
-    let (common_path, _) = actions[0].get_src_tgt_unchecked();
-    let mut common_path = common_path.to_path_buf();
+    let mut common_path = iter.next().unwrap().to_path_buf();
 
-    for action in actions {
-        let (path, _) = action.get_src_tgt_unchecked();
-
+    for path in iter {
         let mut new_common_path = PathBuf::new();
 
         for (left, right) in path.components().zip(common_path.components()) {
@@ -137,11 +132,14 @@ fn action_from_file(
 
     let string = template.render(audiofile)?;
 
-    // FIXME let string = normalize_separators(string);
+    let string = normalize_separators(&string);
 
     let target = create_target_path_from_string(&string, &extension)?;
 
     let action = Action::mv(source, target);
+
+    #[cfg(debug_assertions)]
+    crate::debug::delay();
 
     Ok(action)
 }
@@ -159,28 +157,35 @@ fn create_target_path_from_string(
     Ok(target)
 }
 
-fn partition_actions(actions: Vec<Action>) -> (Vec<Action>, Vec<Action>) {
-    actions.into_iter().partition(|action| {
-        let (source, target) = action.get_src_tgt_unchecked();
-        source != target
-    })
+// TODO? Refactor this into the `create_actions` progress bar?
+fn filter_unchanged_destinations(actions: Vec<Action>) -> Vec<Action> {
+    actions
+        .into_iter()
+        .filter(|action| {
+            let (source, target) = action.get_src_tgt_unchecked();
+            source != target
+        })
+        .collect()
 }
 
 fn perform_actions(
     preview: bool,
     recursion_depth: usize,
-    common_path: &Path,
     history: &mut History,
     actions: Vec<Action>,
 ) -> Result<()> {
-    ui::print_actions_preview(
-        &actions,
-        crate::cli::Args::DEFAULT_PREVIEW_AMOUNT,
+    ui::print_actions_preview(&actions, &std::env::current_dir()?);
+
+    let common_path = get_common_path(
+        &actions
+            .iter()
+            .map(|a| a.get_src_tgt_unchecked().0)
+            .collect::<Vec<_>>(),
     );
 
     move_files(preview, history, actions)?;
 
-    clean_up_source_dirs(preview, history, common_path, recursion_depth)?;
+    clean_up_source_dirs(preview, history, &common_path, recursion_depth)?;
 
     history.save()?;
 
@@ -195,19 +200,23 @@ fn move_files(
     let bar = ui::create_progressbar(
         actions.len() as u64,
         "Moving files...",
-        "Moved files.",
+        "Moved files",
         preview,
-    );
+    )?;
 
     for action in actions.into_iter().progress_with(bar) {
         let (_, target) = action.get_src_tgt_unchecked();
         // Actions target are all files, and always have a parent.
 
         debug_assert!(target.parent().is_some());
+
         create_dir(preview, history, target.parent().unwrap())?;
         if !preview {
             history.apply(action)?;
         }
+
+        #[cfg(debug_assertions)]
+        crate::debug::delay();
     }
 
     Ok(())
@@ -247,7 +256,7 @@ fn clean_up_source_dirs(
         }
     }
 
-    let pp = if preview { Config::PREVIEW_PREFIX } else { "" };
+    let pp = if preview { PREVIEW_PREFIX } else { "" };
 
     println!("{pp}Removed leftover folders.");
 
@@ -302,6 +311,13 @@ fn remove_dir(history: &mut History, action: Action) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn normalize_separators(string: &str) -> String {
+    string
+        .split(['\\', '/'])
+        .collect::<Vec<&str>>()
+        .join(std::path::MAIN_SEPARATOR_STR)
 }
 
 #[cfg(test)]

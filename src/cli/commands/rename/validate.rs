@@ -1,4 +1,5 @@
-use crate::cli::args::Args;
+use crate::cli::config::DEFAULT_PREVIEW_AMOUNT;
+use crate::cli::ui::table::Table;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use file_history::Action;
@@ -6,10 +7,53 @@ use std::collections::HashMap;
 use std::path::Path;
 
 pub(crate) fn validate_actions(actions: &[Action]) -> Result<()> {
+    validate_double_separators(actions)?;
     validate_collisions(actions)?;
     validate_existing_files(actions)?;
 
     Ok(())
+}
+
+fn validate_double_separators(actions: &[Action]) -> Result<()> {
+    let double_actions = actions
+        .iter()
+        .filter(|a| {
+            a.get_src_tgt_unchecked()
+                .1
+                .to_string_lossy()
+                .contains(&std::path::MAIN_SEPARATOR_STR.repeat(2))
+        })
+        .collect::<Vec<_>>();
+
+    let paths = double_actions
+        .iter()
+        .take(DEFAULT_PREVIEW_AMOUNT)
+        .map(|a| a.get_src_tgt_unchecked().1.to_string_lossy())
+        .collect::<Vec<_>>();
+
+    if paths.is_empty() {
+        Ok(())
+    } else {
+        let mut table = Table::new();
+
+        table.set_heading(
+            "The following destinations contain double directory separators"
+                .to_owned(),
+        );
+
+        for path in &paths {
+            table.push_string(path.as_ref());
+        }
+
+        if double_actions.len() > paths.len() {
+            table.push_string(&format!(
+                "And {} more...",
+                double_actions.len() - paths.len()
+            ));
+        }
+
+        Err(eyre!(table.to_string()))
+    }
 }
 
 fn validate_collisions(actions: &[Action]) -> Result<()> {
@@ -30,47 +74,53 @@ fn validate_collisions(actions: &[Action]) -> Result<()> {
     }
 }
 
-fn format_collisions(collisions: &HashMap<&Path, Vec<&Path>>) -> String {
-    let length = collisions.len();
+fn format_collisions(collisions_map: &HashMap<&Path, Vec<&Path>>) -> String {
+    let length = collisions_map.len();
+
     let mut string = format!(
-        "{} collision{} {} detected{}:\n",
+        "{} collision{} detected:\n",
         length,
-        if length > 1 { "s" } else { "" },
-        if length > 1 { "were" } else { "was" },
-        if length > Args::DEFAULT_PREVIEW_AMOUNT {
-            format!("! Showing {}", Args::DEFAULT_PREVIEW_AMOUNT)
-        } else {
-            String::new()
-        },
+        if length > 1 { "s were" } else { " was" }
     );
 
-    for (i, (path, collisions)) in collisions.iter().enumerate() {
-        if i >= Args::DEFAULT_PREVIEW_AMOUNT {
-            break;
-        }
-        let length = collisions.len();
-        string += &format!(
-            "{} is pointed to by {} file{}{}:\n",
-            path.display(),
-            length,
-            if length > 1 { "s" } else { "" },
-            if length > Args::DEFAULT_PREVIEW_AMOUNT {
-                format!("! Showing {}", Args::DEFAULT_PREVIEW_AMOUNT)
-            } else {
-                String::new()
-            },
-        );
+    for (path, collisions) in collisions_map.iter().take(DEFAULT_PREVIEW_AMOUNT)
+    {
+        string += &format_collision(path, collisions);
+    }
 
-        for (i, path) in collisions.iter().enumerate() {
-            if i >= Args::DEFAULT_PREVIEW_AMOUNT {
-                break;
-            }
-            string += &format!("{}\n", path.display());
-        }
-        string += "\n";
+    if length > DEFAULT_PREVIEW_AMOUNT {
+        string += &format!("\nAnd {} more...", length - DEFAULT_PREVIEW_AMOUNT);
     }
 
     string
+}
+
+fn format_collision(path: &Path, collisions: &[&Path]) -> String {
+    let mut table = Table::new();
+
+    let length = collisions.len();
+
+    table.set_heading(format!(
+        "{} is pointed to by {} file{}",
+        path.display(),
+        length,
+        if length > 1 { "s" } else { "" },
+    ));
+
+    let iter = collisions.iter().take(DEFAULT_PREVIEW_AMOUNT);
+
+    for path in iter {
+        table.push_string(path.to_string_lossy().as_ref());
+    }
+
+    if length > DEFAULT_PREVIEW_AMOUNT {
+        table.push_string(&format!(
+            "And {} more...",
+            length - DEFAULT_PREVIEW_AMOUNT
+        ));
+    }
+
+    table.to_string()
 }
 
 fn validate_existing_files(actions: &[Action]) -> Result<()> {
@@ -84,28 +134,31 @@ fn validate_existing_files(actions: &[Action]) -> Result<()> {
 
     let length = existing.len();
 
-    if !existing.is_empty() {
-        let string = format!(
-            "{} file{} already exist{}{}:\n{}",
+    if existing.is_empty() {
+        Ok(())
+    } else {
+        let mut table = Table::new();
+
+        table.set_heading(format!(
+            "{} file{} already exist{}",
             length,
             if length > 1 { "s" } else { "" },
             if length > 1 { "" } else { "s" },
-            if length > Args::DEFAULT_PREVIEW_AMOUNT {
-                format!("! Showing {}", Args::DEFAULT_PREVIEW_AMOUNT)
-            } else {
-                String::new()
-            },
-            existing
-                .iter()
-                .take(Args::DEFAULT_PREVIEW_AMOUNT)
-                .map(|p| p.display().to_string())
-                .collect::<Vec<String>>()
-                .join("\n")
-        );
-        return Err(eyre!(string));
-    }
+        ));
 
-    Ok(())
+        for path in existing.iter().take(DEFAULT_PREVIEW_AMOUNT) {
+            table.push_string(path.to_string_lossy().as_ref());
+        }
+
+        if length > DEFAULT_PREVIEW_AMOUNT {
+            table.push_string(&format!(
+                "And {} more...",
+                length - DEFAULT_PREVIEW_AMOUNT
+            ));
+        }
+
+        Err(eyre!(table.to_string()))
+    }
 }
 
 #[cfg(test)]

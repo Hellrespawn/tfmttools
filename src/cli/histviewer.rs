@@ -1,3 +1,4 @@
+use crate::cli::config::HISTORY_NAME;
 use crate::cli::Config;
 use clap::Parser;
 use color_eyre::Result;
@@ -15,11 +16,13 @@ struct Args {
 pub fn histviewer() -> Result<()> {
     let args = Args::parse();
 
-    let config_dir = args.config_dir.unwrap_or_else(|| {
-        Config::default_path().expect("Unable to read home folder!")
-    });
+    let config = if let Some(config_dir) = args.config_dir {
+        Config::new(&config_dir)?
+    } else {
+        Config::default()?
+    };
 
-    let history = History::load(&config_dir, Config::HISTORY_NAME)?;
+    let history = History::load(config.path(), HISTORY_NAME)?;
 
     println!("{history}");
 

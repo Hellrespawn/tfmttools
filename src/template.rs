@@ -1,6 +1,6 @@
 use crate::tags::Tags;
 use color_eyre::Result;
-use minijinja::{Environment, Value, escape_formatter};
+use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::Path;

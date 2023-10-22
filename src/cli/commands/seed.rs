@@ -1,3 +1,4 @@
+use crate::cli::config::PREVIEW_PREFIX;
 use crate::cli::Config;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -33,7 +34,7 @@ pub(crate) fn seed(preview: bool, force: bool, config: &Config) -> Result<()> {
     for file in &DEFAULT_FILES {
         let path = config.path().join(file.name);
 
-        let pp = if preview { Config::PREVIEW_PREFIX } else { "" };
+        let pp = if preview { PREVIEW_PREFIX } else { "" };
 
         if !preview {
             fs::write(path, file.content)?;

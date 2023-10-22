@@ -1,9 +1,17 @@
-use crate::cli::Config;
+use std::path::Path;
+
+use color_eyre::Result;
 use file_history::Action;
 use indicatif::{
     ProgressBar as IProgressBar, ProgressDrawTarget, ProgressFinish,
     ProgressStyle,
 };
+
+use crate::cli::config::DEFAULT_PREVIEW_AMOUNT;
+
+use super::config::PREVIEW_PREFIX;
+
+pub mod table;
 
 pub(crate) fn print_error(error: &color_eyre::Report) {
     println!("An error occurred:\n{error}");
@@ -18,22 +26,20 @@ impl AudioFileSpinner {
         found: &str,
         total: &str,
         message: &'static str,
-    ) -> AudioFileSpinner {
-        let spinner = IProgressBar::new(0);
+    ) -> Result<AudioFileSpinner> {
+        let spinner = IProgressBar::new(0).with_finish(ProgressFinish::Abandon);
 
         let template = format!(
             "[{{pos}}/{{len}} {found}/{total}] {{wide_msg}} {{spinner}}",
         );
 
-        let style = ProgressStyle::default_spinner()
-            .template(&template)
-            .on_finish(ProgressFinish::AtCurrentPos);
+        let style = ProgressStyle::default_spinner().template(&template)?;
 
         spinner.set_style(style);
         spinner.set_draw_target(ProgressDrawTarget::stdout());
         spinner.set_message(message);
 
-        AudioFileSpinner { spinner }
+        Ok(AudioFileSpinner { spinner })
     }
 
     pub(crate) fn inc_found(&self) {
@@ -47,7 +53,7 @@ impl AudioFileSpinner {
     }
 
     pub(crate) fn finish(&self, message: &'static str) {
-        self.spinner.finish_at_current_pos();
+        self.spinner.finish_using_style();
         self.spinner.set_message(message);
     }
 }
@@ -57,44 +63,42 @@ pub(crate) fn create_progressbar(
     msg: &'static str,
     finished_msg: &'static str,
     preview: bool,
-) -> IProgressBar {
-    let bar = IProgressBar::new(len);
+) -> Result<IProgressBar> {
+    let bar = IProgressBar::new(len).with_finish(ProgressFinish::WithMessage(
+        std::borrow::Cow::Borrowed(finished_msg),
+    ));
 
-    let pp = if preview { Config::PREVIEW_PREFIX } else { "" };
+    let pp = if preview { PREVIEW_PREFIX } else { "" };
 
     let template = format!("{pp}[{{pos}}/{{len}}] {{msg}} {{wide_bar}}");
 
-    bar.set_style(ProgressStyle::default_bar().template(&template).on_finish(
-        ProgressFinish::WithMessage(std::borrow::Cow::Borrowed(finished_msg)),
-    ));
+    bar.set_style(ProgressStyle::default_bar().template(&template)?);
     bar.set_draw_target(ProgressDrawTarget::stdout());
     bar.set_message(msg);
 
-    bar
+    Ok(bar)
 }
 
-pub(crate) fn print_actions_preview(actions: &[Action], preview_amount: usize) {
+pub(crate) fn print_actions_preview(actions: &[Action], common_path: &Path) {
     let length = actions.len();
 
-    println!(
-        "\nPreviewing {} files:",
-        if length <= preview_amount {
-            length.to_string()
-        } else {
-            format!(
-                "{}/{}",
-                std::cmp::min(preview_amount, actions.len()),
-                length
-            )
-        }
-    );
+    let step = std::cmp::max(actions.len() / DEFAULT_PREVIEW_AMOUNT, 1);
 
-    let step = std::cmp::max(length / preview_amount, 1);
+    let slice = actions
+        .iter()
+        .step_by(step)
+        .map(|a| a.get_src_tgt_unchecked().1)
+        .map(|p| p.strip_prefix(common_path).unwrap_or(p))
+        .collect::<Vec<_>>();
 
-    for action in actions.iter().step_by(step) {
-        // FIXME Check actual amount previewed
-        let (_, target) = action.get_src_tgt_unchecked();
-        println!("{}", target.display());
+    if slice.len() <= DEFAULT_PREVIEW_AMOUNT {
+        println!("Previewing {} files:", slice.len());
+    } else {
+        println!("Previewing {} of {} files:", slice.len(), length);
+    }
+
+    for path in slice {
+        println!("{}", path.display());
     }
 
     println!();

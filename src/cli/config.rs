@@ -5,16 +5,17 @@ use color_eyre::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");
+pub(crate) const PREVIEW_PREFIX: &str = "[P] ";
+pub(crate) const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
+pub(crate) const DEFAULT_PREVIEW_AMOUNT: usize = 8;
+pub(crate) const DEFAULT_RECURSION_DEPTH: usize = 4;
+
 pub(crate) struct Config {
     path: PathBuf,
 }
 
 impl Config {
-    pub(crate) const HISTORY_NAME: &'static str = env!("CARGO_PKG_NAME");
-    pub(crate) const PREVIEW_PREFIX: &'static str = "[P] ";
-    pub(crate) const TEMPLATE_EXTENSIONS: [&'static str; 3] =
-        ["tfmt", "jinja", "j2"];
-
     pub(crate) fn new(path: &Path) -> Result<Self> {
         let config = Self {
             path: path.to_owned(),
@@ -25,14 +26,8 @@ impl Config {
         Ok(config)
     }
 
-    pub(crate) fn default_path() -> Result<PathBuf> {
-        if let Some(home) = dirs::home_dir() {
-            let path = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
-
-            Ok(path)
-        } else {
-            Err(eyre!("Unable to read home directory!"))
-        }
+    pub(crate) fn default() -> Result<Self> {
+        Self::new(&Self::default_path()?)
     }
 
     /// Search a path for files matching `predicate`, recursing for `depth`.
@@ -63,6 +58,9 @@ impl Config {
                             spinner.inc_found();
                         }
                         found_paths.push(entry_path);
+
+                        #[cfg(debug_assertions)]
+                        crate::debug::delay();
                     }
                 } else if entry_path.is_dir() && depth > 0 {
                     found_paths.extend(Config::search_path(
@@ -122,6 +120,16 @@ impl Config {
         }
     }
 
+    fn default_path() -> Result<PathBuf> {
+        if let Some(home) = dirs::home_dir() {
+            let path = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
+
+            Ok(path)
+        } else {
+            Err(eyre!("Unable to read home directory!"))
+        }
+    }
+
     fn create_dir(path: &Path) -> Result<()> {
         if !path.exists() {
             fs::create_dir(path)?;
@@ -135,7 +143,7 @@ impl Config {
     fn get_template_paths(&self) -> Result<Vec<PathBuf>> {
         let predicate: fn(&Path) -> bool = |p| {
             p.extension().map_or(false, |s| {
-                Config::TEMPLATE_EXTENSIONS.iter().any(|ext| s == *ext)
+                TEMPLATE_EXTENSIONS.iter().any(|ext| s == *ext)
             })
         };
 

@@ -16,7 +16,9 @@ mod file;
 mod tags;
 mod template;
 
-// TODO Update `indicatif` to 0.17
+#[cfg(debug_assertions)]
+mod debug;
+
 // TODO Check if leftovers are images and offer to delete.
 
 // TODO? Update tag with leading/trailing whitespace?

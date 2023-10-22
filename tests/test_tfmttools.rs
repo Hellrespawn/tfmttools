@@ -5,7 +5,6 @@ use color_eyre::Result;
 use once_cell::sync::Lazy;
 use std::fs;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
-use test_harness::test_runner;
 
 const TEST_DATA_DIRECTORY: &str = "tests/testdata/";
 
@@ -18,12 +17,32 @@ static INITIAL_CONFIG_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
 
 static INITIAL_FILE_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
+        "files/Amon Amarth - Under Siege.mp3",
+        "files/Damjan Mravunac - Welcome To Heaven.ogg",
         "files/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
-        "files/Dune - MASTER BOOT RECORD.mp3",
-        "files/SET MIDI=SYNTH1 MAPG MODE1 - MASTER BOOT RECORD.mp3",
-        "files/Under Siege - Amon Amarth.mp3",
-        "files/Welcome To Heaven - Damjan Mravunac.ogg",
-        "files/While Your Lips Are Still Red - Nightwish.mp3",
+        "files/MASTER BOOT RECORD - Dune.mp3",
+        "files/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
+        "files/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "files/Nightwish - Elvenpath (Live).mp3",
+        "files/Nightwish - Nemo.mp3",
+        "files/Nightwish - While Your Lips Are Still Red.mp3",
+    ]
+    .into_iter()
+    .map(normalize_separators)
+    .collect()
+});
+
+static SIMPLE_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
+    vec![
+        "Amon Amarth/Under Siege.mp3",
+        "Damjan Mravunac/Welcome To Heaven.ogg",
+        "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
+        "MASTER BOOT RECORD/Dune.mp3",
+        "MASTER BOOT RECORD/RAMDRIVE.SYS.mp3",
+        "MASTER BOOT RECORD/SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "Nightwish/Elvenpath (Live).mp3",
+        "Nightwish/Nemo.mp3",
+        "Nightwish/While Your Lips Are Still Red.mp3",
     ]
     .into_iter()
     .map(normalize_separators)
@@ -35,8 +54,11 @@ static TYPICAL_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     "myname/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
     "myname/MASTER BOOT RECORD/WAREZ/Dune.mp3",
     "myname/MASTER BOOT RECORD/2016.03 - CEDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+    "myname/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
     "myname/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
     "myname/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
+    "myname/Nightwish/2004 - Once/03 - Nemo.mp3",
+    "myname/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
     "myname/Nightwish/While Your Lips Are Still Red.mp3",
 ]    .into_iter()
 .map(normalize_separators)
@@ -234,144 +256,116 @@ fn redo(env: &TestEnv) {
 
 #[test]
 fn test_rename_simple_input() -> Result<()> {
-    let reference: Vec<String> = vec![
-        "MASTER BOOT RECORD/Dune.mp3",
-        "MASTER BOOT RECORD/SET MIDI=SYNTH1 MAPG MODE1.mp3",
-        "Amon Amarth/Under Siege.mp3",
-        "Damjan Mravunac/Welcome To Heaven.ogg",
-        "Nightwish/While Your Lips Are Still Red.mp3",
-        "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
-    ]
-    .into_iter()
-    .map(normalize_separators)
-    .collect();
+    let env = TestEnv::new()?;
 
-    test_runner(
-        TestEnv::new,
-        |_| Ok(()),
-        |env| {
-            let config_dir = env.get_config_dir();
+    let config_dir = env.get_config_dir();
 
-            let mut cmd = Command::cargo_bin("tfmt").unwrap();
+    let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
-            let assert = cmd
-                .arg("--config")
-                .arg(config_dir)
-                .arg("rename")
-                .arg("simple_input")
-                .current_dir(env.tempdir.path())
-                .assert();
+    let assert = cmd
+        .arg("--config")
+        .arg(config_dir)
+        .arg("rename")
+        .arg("simple_input")
+        .current_dir(env.tempdir.path())
+        .assert();
 
-            println!(
-                "{}",
-                String::from_utf8_lossy(&assert.get_output().stdout)
-            );
+    println!("{}", String::from_utf8_lossy(&assert.get_output().stdout));
 
-            assert.success();
+    assert.success();
 
-            env.assert_files_missing(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files are missing",
-            );
-            env.assert_files_exist(&reference, "assert reference files exist");
+    env.assert_files_missing(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files are missing",
+    );
+    env.assert_files_exist(
+        &SIMPLE_INPUT_REFERENCE,
+        "assert reference files exist",
+    );
 
-            Ok(())
-        },
-    )
+    Ok(())
 }
 
 #[test]
 fn test_rename_typical_input() -> Result<()> {
-    test_runner(
-        TestEnv::new,
-        |_| Ok(()),
-        |env| {
-            rename_typical_input(env);
+    let env = TestEnv::new()?;
 
-            env.assert_files_missing(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files are missing",
-            );
-            env.assert_files_exist(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files exist",
-            );
+    rename_typical_input(&env);
 
-            Ok(())
-        },
-    )
+    env.assert_files_missing(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files are missing",
+    );
+    env.assert_files_exist(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files exist",
+    );
+
+    Ok(())
 }
 
 #[test]
 fn test_undo_typical_input() -> Result<()> {
-    test_runner(
-        TestEnv::new,
-        |_| Ok(()),
-        |env| {
-            rename_typical_input(env);
-            env.assert_files_missing(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files are missing",
-            );
-            env.assert_files_exist(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files exist",
-            );
+    let env = TestEnv::new()?;
 
-            undo(env);
-            env.assert_files_exist(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files have returned",
-            );
-            env.assert_files_missing(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files are removed",
-            );
+    rename_typical_input(&env);
+    env.assert_files_missing(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files are missing",
+    );
+    env.assert_files_exist(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files exist",
+    );
 
-            Ok(())
-        },
-    )
+    undo(&env);
+    env.assert_files_exist(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files have returned",
+    );
+    env.assert_files_missing(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files are removed",
+    );
+
+    Ok(())
 }
 
 #[test]
 fn test_redo_typical_input() -> Result<()> {
-    test_runner(
-        TestEnv::new,
-        |_| Ok(()),
-        |env| {
-            rename_typical_input(env);
-            env.assert_files_missing(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files are missing",
-            );
-            env.assert_files_exist(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files exist",
-            );
+    let env = TestEnv::new()?;
 
-            undo(env);
-            env.assert_files_exist(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files have returned",
-            );
-            env.assert_files_missing(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files are removed",
-            );
+    rename_typical_input(&env);
+    env.assert_files_missing(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files are missing",
+    );
+    env.assert_files_exist(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files exist",
+    );
 
-            redo(env);
-            env.assert_files_missing(
-                &INITIAL_FILE_REFERENCE,
-                "assert initial files are missing again",
-            );
-            env.assert_files_exist(
-                &TYPICAL_INPUT_REFERENCE,
-                "assert reference files are exist again",
-            );
+    undo(&env);
+    env.assert_files_exist(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files have returned",
+    );
+    env.assert_files_missing(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files are removed",
+    );
 
-            Ok(())
-        },
-    )
+    redo(&env);
+    env.assert_files_missing(
+        &INITIAL_FILE_REFERENCE,
+        "assert initial files are missing again",
+    );
+    env.assert_files_exist(
+        &TYPICAL_INPUT_REFERENCE,
+        "assert reference files are exist again",
+    );
+
+    Ok(())
 }
 
 /// Normalizes separators for the platform in `string`.

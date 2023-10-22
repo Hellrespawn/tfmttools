@@ -1,6 +1,8 @@
-use crate::cli::Config;
 use color_eyre::Result;
 use file_history::History;
+
+use crate::cli::config::{HISTORY_NAME, PREVIEW_PREFIX};
+use crate::cli::Config;
 
 #[derive(Copy, Clone)]
 pub(crate) enum UndoMode {
@@ -14,7 +16,7 @@ pub(crate) fn undo(
     mode: UndoMode,
     times: usize,
 ) -> Result<()> {
-    let mut history = History::load(config.path(), Config::HISTORY_NAME)?;
+    let mut history = History::load(config.path(), HISTORY_NAME)?;
 
     let mode_string = match mode {
         UndoMode::Undo => "Undid",
@@ -22,7 +24,7 @@ pub(crate) fn undo(
     };
 
     if preview {
-        let pp = Config::PREVIEW_PREFIX;
+        let pp = PREVIEW_PREFIX;
         println!("{pp}{mode_string} {times} renames.");
     } else {
         let action_counts = match mode {

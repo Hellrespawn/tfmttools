@@ -18,7 +18,7 @@ fn select_command(args: Args) -> Result<()> {
     let config = if let Some(path) = &args.config {
         Config::new(path)?
     } else {
-        Config::new(&Config::default_path()?)?
+        Config::default()?
     };
 
     match args.command {
