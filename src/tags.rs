@@ -28,22 +28,26 @@ pub(crate) trait Tags: std::fmt::Debug + Send + Sync {
 
     /// The current `[AudioFile]`s track number, if any.
     fn track_number(&self) -> Option<String> {
-        self.raw_track_number().map(|s| self.get_current(&s))
+        self.raw_track_number()
+            .map(|string| self.get_current(&string))
     }
 
     /// The current `[AudioFile]`s disc number, if any.
     fn disc_number(&self) -> Option<String> {
-        self.raw_disc_number().map(|s| self.get_current(&s))
+        self.raw_disc_number()
+            .map(|string| self.get_current(&string))
     }
 
     /// The current `[AudioFile]`s total amount of tracks, if any.
     fn total_track_number(&self) -> Option<String> {
-        self.raw_track_number().and_then(|s| self.get_total(&s))
+        self.raw_track_number()
+            .and_then(|string| self.get_total(&string))
     }
 
     /// The current `[AudioFile]`s total amount of discs, if any.
     fn total_disc_number(&self) -> Option<String> {
-        self.raw_disc_number().and_then(|s| self.get_total(&s))
+        self.raw_disc_number()
+            .and_then(|string| self.get_total(&string))
     }
 
     /// The current `[AudioFile]`s raw disc number, if any.

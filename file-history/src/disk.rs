@@ -1,13 +1,13 @@
-use crate::{ActionGroup, HistoryError, Result};
+use crate::{ChangeList, HistoryError, Result};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize)]
-struct HistoryOnDisk {
-    applied_groups: Vec<ActionGroup>,
-    undone_groups: Vec<ActionGroup>,
+struct HistoryDto {
+    applied_lists: Vec<ChangeList>,
+    undone_lists: Vec<ChangeList>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -50,18 +50,17 @@ impl DiskHandler {
         }
     }
 
-    pub(crate) fn read(&self) -> Result<(Vec<ActionGroup>, Vec<ActionGroup>)> {
+    pub(crate) fn read(&self) -> Result<(Vec<ChangeList>, Vec<ChangeList>)> {
         match fs::read(&self.path) {
             Ok(file_contents) => {
                 #[cfg(feature = "bincode")]
-                let history: HistoryOnDisk =
-                    bincode::deserialize(&file_contents)?;
+                let history: HistoryDto = bincode::deserialize(&file_contents)?;
 
                 #[cfg(feature = "serde_json")]
-                let history: HistoryOnDisk =
+                let history: HistoryDto =
                     serde_json::from_slice(&file_contents)?;
 
-                Ok((history.applied_groups, history.undone_groups))
+                Ok((history.applied_lists, history.undone_lists))
             }
             Err(err) => {
                 if let ErrorKind::NotFound = err.kind() {
@@ -75,12 +74,12 @@ impl DiskHandler {
 
     pub(crate) fn write(
         &self,
-        applied_groups: &[ActionGroup],
-        undone_groups: &[ActionGroup],
+        applied_lists: &[ChangeList],
+        undone_lists: &[ChangeList],
     ) -> Result<()> {
-        let history = HistoryOnDisk {
-            applied_groups: applied_groups.to_vec(),
-            undone_groups: undone_groups.to_vec(),
+        let history = HistoryDto {
+            applied_lists: applied_lists.to_vec(),
+            undone_lists: undone_lists.to_vec(),
         };
 
         #[cfg(feature = "bincode")]
@@ -118,7 +117,7 @@ impl DiskHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::Action;
+    use crate::change::Change;
     use assert_fs::prelude::*;
     use assert_fs::NamedTempFile;
     use color_eyre::Result;
@@ -138,35 +137,35 @@ mod tests {
         Ok(file)
     }
 
-    fn get_test_group() -> ActionGroup {
-        let mut action_group = ActionGroup::new();
+    fn get_test_list() -> ChangeList {
+        let mut change_list = ChangeList::new();
 
-        action_group.push(Action::mkdir("/file/test/create"));
-        action_group.push(Action::rmdir("/file/test/remove"));
-        action_group.push(Action::mv("/file/test/source", "/file/test/target"));
+        change_list.push(Change::mkdir("/file/test/create"));
+        change_list.push(Change::rmdir("/file/test/remove"));
+        change_list.push(Change::mv("/file/test/source", "/file/test/target"));
 
-        action_group
+        change_list
     }
 
-    fn get_test_queue() -> Vec<ActionGroup> {
+    fn get_test_queue() -> Vec<ChangeList> {
         vec![
-            get_test_group(),
-            get_test_group(),
-            get_test_group(),
-            get_test_group(),
+            get_test_list(),
+            get_test_list(),
+            get_test_list(),
+            get_test_list(),
         ]
     }
 
     fn write_read_compare_test_data(disk_handler: &DiskHandler) -> Result<()> {
-        let applied_actions_in = get_test_queue();
-        let undone_actions_in = get_test_queue();
+        let applied_changes_in = get_test_queue();
+        let undone_changes_in = get_test_queue();
 
-        disk_handler.write(&applied_actions_in, &undone_actions_in)?;
+        disk_handler.write(&applied_changes_in, &undone_changes_in)?;
 
-        let (applied_actions_out, undone_actions_out) = disk_handler.read()?;
+        let (applied_changes_out, undone_changes_out) = disk_handler.read()?;
 
-        assert_eq!(applied_actions_in, applied_actions_out);
-        assert_eq!(undone_actions_in, undone_actions_out);
+        assert_eq!(applied_changes_in, applied_changes_out);
+        assert_eq!(undone_changes_in, undone_changes_out);
 
         Ok(())
     }

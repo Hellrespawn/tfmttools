@@ -2,7 +2,7 @@ use super::config::DRY_RUN_PREFIX;
 use super::Config;
 use crate::cli::ui::table::Table;
 use color_eyre::Result;
-use file_history::Action;
+use file_history::Change;
 use indicatif::{
     ProgressBar as IProgressBar, ProgressDrawTarget, ProgressFinish,
     ProgressStyle,
@@ -77,20 +77,20 @@ pub(crate) fn create_progressbar(
     Ok(bar)
 }
 
-pub(crate) fn print_actions_preview(
+pub(crate) fn print_changes_preview(
     config: &Config,
-    actions: &[Action],
+    changes: &[Change],
     common_path: &Path,
 ) {
-    let length = actions.len();
+    let length = changes.len();
 
-    let step = std::cmp::max(actions.len() / config.preview_amount(), 1);
+    let step = std::cmp::max(changes.len() / config.preview_amount(), 1);
 
-    let slice = actions
+    let slice = changes
         .iter()
         .step_by(step)
-        .map(|a| a.get_src_tgt_unchecked().1)
-        .map(|p| p.strip_prefix(common_path).unwrap_or(p))
+        .map(file_history::Change::target)
+        .map(|path| path.strip_prefix(common_path).unwrap_or(path))
         .collect::<Vec<_>>();
 
     let mut table = Table::new();

@@ -5,7 +5,7 @@ use file_history::History;
 
 pub(crate) fn clear_history(config: &Config) -> Result<()> {
     if config.dry_run() {
-        let mut history = History::load(config.config_dir(), HISTORY_NAME)?;
+        let mut history = History::load(config.directory(), HISTORY_NAME)?;
         history.clear()?;
     }
 

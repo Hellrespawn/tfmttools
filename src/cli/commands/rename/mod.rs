@@ -5,35 +5,35 @@ use crate::cli::{ui, Config};
 use crate::file::AudioFile;
 use crate::template::Template;
 use color_eyre::Result;
-use file_history::{Action, History, HistoryError};
+use file_history::{Change, History, HistoryError};
 use fs_err as fs;
 use indicatif::ProgressIterator;
 use std::path::{Path, PathBuf};
-use validate::validate_actions;
+use validate::validate_changes;
 
 pub(crate) fn rename(
     config: &Config,
     name: &str,
     arguments: Vec<String>,
 ) -> Result<()> {
-    config.create_dir(config.config_dir())?;
+    config.create_dir(config.directory())?;
 
-    let mut history = History::load(config.config_dir(), HISTORY_NAME)?;
+    let mut history = History::load(config.directory(), HISTORY_NAME)?;
 
     let template = config.get_template(name)?.with_arguments(arguments);
 
     let files = gather_files(config)?;
 
-    let actions = create_actions(config, &template, &files)?;
-    let actions = filter_unchanged_destinations(actions);
+    let changes = create_changes(config, &template, &files)?;
+    let changes = filter_unchanged_destinations(changes);
 
-    if actions.is_empty() {
+    if changes.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        validate_actions(config, &actions)?;
+        validate_changes(config, &changes)?;
 
-        perform_actions(config, &mut history, actions)
+        perform_changes(config, &mut history, changes)
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
@@ -46,8 +46,8 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     let paths = Config::search_path(
         config.current_dir(),
         config.recursion_depth(),
-        &|p| {
-            p.extension().map_or(false, |extension| {
+        &|path| {
+            path.extension().map_or(false, |extension| {
                 for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
                     if extension == supported_extension {
                         return true;
@@ -62,14 +62,14 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
 
     spinner.finish("Gathered files.");
 
-    paths.iter().map(|p| AudioFile::new(p)).collect()
+    paths.iter().map(|path| AudioFile::new(path)).collect()
 }
 
-fn create_actions(
+fn create_changes(
     config: &Config,
     template: &Template,
     files: &[AudioFile],
-) -> Result<Vec<Action>> {
+) -> Result<Vec<Change>> {
     let bar = ui::create_progressbar(
         files.len() as u64,
         "Determining output paths...",
@@ -77,16 +77,16 @@ fn create_actions(
         false,
     )?;
 
-    let actions: Result<Vec<Action>> = files
+    let changes: Result<Vec<Change>> = files
         .iter()
         .progress_with(bar)
-        .map(|audiofile| action_from_file(config, template, audiofile))
+        .map(|audiofile| change_from_file(config, template, audiofile))
         .collect();
 
     println!();
     println!();
 
-    actions
+    changes
 }
 
 fn get_common_path(paths: &[&Path]) -> PathBuf {
@@ -114,11 +114,11 @@ fn get_common_path(paths: &[&Path]) -> PathBuf {
     common_path
 }
 
-fn action_from_file(
+fn change_from_file(
     config: &Config,
     template: &Template,
     audiofile: &AudioFile,
-) -> Result<Action> {
+) -> Result<Change> {
     let string = template.render(audiofile)?;
 
     let string = normalize_separators(&string);
@@ -126,12 +126,12 @@ fn action_from_file(
     let target =
         create_target_path_from_string(config, &string, audiofile.extension());
 
-    let action = Action::mv(audiofile.path(), target);
+    let change = Change::mv(audiofile.path(), target);
 
     #[cfg(debug_assertions)]
     crate::debug::delay();
 
-    Ok(action)
+    Ok(change)
 }
 
 fn create_target_path_from_string(
@@ -146,32 +146,39 @@ fn create_target_path_from_string(
     config.current_dir().join(target_path)
 }
 
-// TODO? Refactor this into the `create_actions` progress bar?
-fn filter_unchanged_destinations(actions: Vec<Action>) -> Vec<Action> {
-    actions
+// TODO? Refactor this into the `create_changes` progress bar?
+fn filter_unchanged_destinations(changes: Vec<Change>) -> Vec<Change> {
+    changes
         .into_iter()
-        .filter(|action| {
-            let (source, target) = action.get_src_tgt_unchecked();
-            source != target
+        .filter(|change| {
+            let source = change
+                .source()
+                .expect("Can only validate collisions on move.");
+
+            source != change.target()
         })
         .collect()
 }
 
-fn perform_actions(
+fn perform_changes(
     config: &Config,
     history: &mut History,
-    actions: Vec<Action>,
+    changes: Vec<Change>,
 ) -> Result<()> {
-    ui::print_actions_preview(config, &actions, &std::env::current_dir()?);
+    ui::print_changes_preview(config, &changes, &std::env::current_dir()?);
 
     let common_path = get_common_path(
-        &actions
+        &changes
             .iter()
-            .map(|a| a.get_src_tgt_unchecked().0)
+            .map(|change| {
+                change
+                    .source()
+                    .expect("Can only validate collisions on move.")
+            })
             .collect::<Vec<_>>(),
     );
 
-    move_files(config.dry_run(), history, actions)?;
+    move_files(config.dry_run(), history, changes)?;
 
     clean_up_source_dirs(config, history, &common_path)?;
 
@@ -183,24 +190,24 @@ fn perform_actions(
 fn move_files(
     dry_run: bool,
     history: &mut History,
-    actions: Vec<Action>,
+    changes: Vec<Change>,
 ) -> Result<()> {
     let bar = ui::create_progressbar(
-        actions.len() as u64,
+        changes.len() as u64,
         "Moving files...",
         "Moved files",
         dry_run,
     )?;
 
-    for action in actions.into_iter().progress_with(bar) {
-        let (_, target) = action.get_src_tgt_unchecked();
-        // Actions target are all files, and always have a parent.
+    for change in changes.into_iter().progress_with(bar) {
+        let target = change.target();
 
+        // Actions target are all files, and always have a parent.
         debug_assert!(target.parent().is_some());
 
         create_dir(dry_run, history, target.parent().unwrap())?;
         if !dry_run {
-            history.apply(action)?;
+            history.apply(change)?;
         }
 
         #[cfg(debug_assertions)]
@@ -219,10 +226,10 @@ fn create_dir(dry_run: bool, history: &mut History, path: &Path) -> Result<()> {
         create_dir(dry_run, history, parent)?;
     }
 
-    let action = Action::mkdir(path);
+    let change = Change::mkdir(path);
 
     if !dry_run {
-        history.apply(action)?;
+        history.apply(change)?;
     }
 
     Ok(())
@@ -235,11 +242,11 @@ fn clean_up_source_dirs(
 ) -> Result<()> {
     let dirs = gather_dirs(common_path, config.recursion_depth());
 
-    let actions: Vec<Action> = dirs.into_iter().map(Action::rmdir).collect();
+    let changes: Vec<Change> = dirs.into_iter().map(Change::rmdir).collect();
 
     if !config.dry_run() {
-        for action in actions {
-            remove_dir(history, action)?;
+        for change in changes {
+            remove_dir(history, change)?;
         }
     }
 
@@ -268,8 +275,8 @@ fn gather_dirs(path: &Path, depth: usize) -> Vec<PathBuf> {
     dirs
 }
 
-fn remove_dir(history: &mut History, action: Action) -> Result<()> {
-    let result = history.apply(action);
+fn remove_dir(history: &mut History, change: Change) -> Result<()> {
+    let result = history.apply(change);
 
     if let Err(err) = result {
         let mut is_expected_error = false;

@@ -1,7 +1,7 @@
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use color_eyre::Result;
-use file_history::{Action, History};
+use file_history::{Change, History};
 use predicates::prelude::*;
 
 // TODO Write undo/redo tests
@@ -39,7 +39,7 @@ fn test_apply_action() -> Result<()> {
 
     let mut history = History::load(dir.path(), FILE_NAME)?;
 
-    let action = Action::mkdir(&path);
+    let action = Change::mkdir(&path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -58,7 +58,7 @@ fn test_undo_action() -> Result<()> {
 
     let mut history = History::load(dir.path(), FILE_NAME)?;
 
-    let action = Action::mkdir(&path);
+    let action = Change::mkdir(&path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -83,7 +83,7 @@ fn test_redo_action() -> Result<()> {
 
     let mut history = History::load(dir.path(), FILE_NAME)?;
 
-    let action = Action::mkdir(&path);
+    let action = Change::mkdir(&path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -112,7 +112,7 @@ fn test_read_write_from_disk() -> Result<()> {
 
     let mut history = History::load(dir.path(), FILE_NAME)?;
 
-    let action = Action::mkdir(&path);
+    let action = Change::mkdir(&path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());

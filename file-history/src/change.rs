@@ -4,31 +4,31 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
-/// Action is responsible for doing and undoing filesystem operations
+/// Change is responsible for doing and undoing filesystem operations
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash)]
-pub struct Action {
-    action_type: ActionType,
+pub struct Change {
+    change_type: ChangeType,
     applied: bool,
 }
 
-impl fmt::Display for Action {
+impl fmt::Display for Change {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let indent = "  ";
-        match &self.action_type {
-            ActionType::Mv { source, target } => write!(
+        match &self.change_type {
+            ChangeType::Mv { source, target } => write!(
                 f,
-                "Action::Move {{\n{indent}source: \"{}\",\n{indent}target: \"{}\"\n}}",
+                "Change::Move {{\n{indent}source: \"{}\",\n{indent}target: \"{}\"\n}}",
                 source.display(),
                 target.display(), indent=indent
             )?,
-            ActionType::MkDir(path) => {
+            ChangeType::MkDir(path) => {
                 write!(
-                    f, "Action::MakeDir(\n{}\"{}\"\n)", indent, path.display()
+                    f, "Change::MakeDir(\n{}\"{}\"\n)", indent, path.display()
                 )?;
             }
-            ActionType::RmDir(path) => {
+            ChangeType::RmDir(path) => {
                 write!(
-                    f, "Action::RemoveDir(\n{}\"{}\"\n)",indent,  path.display()
+                    f, "Change::RemoveDir(\n{}\"{}\"\n)",indent,  path.display()
                 )?;
             }
         }
@@ -43,59 +43,56 @@ impl fmt::Display for Action {
     }
 }
 
-impl Action {
-    /// Create new `Move` Action
+impl Change {
     pub fn mv<P, Q>(source: P, target: Q) -> Self
     where
         P: AsRef<Path>,
         Q: AsRef<Path>,
     {
-        let action_type = ActionType::Mv {
+        let change_type = ChangeType::Mv {
             source: source.as_ref().to_owned(),
             target: target.as_ref().to_owned(),
         };
 
         Self {
-            action_type,
+            change_type,
             applied: false,
         }
     }
 
-    /// Create new `MakeDir` Action
     pub fn mkdir<P>(target: P) -> Self
     where
         P: AsRef<Path>,
     {
-        let action_type = ActionType::MkDir(target.as_ref().to_owned());
+        let change_type = ChangeType::MkDir(target.as_ref().to_owned());
 
         Self {
-            action_type,
+            change_type,
             applied: false,
         }
     }
 
-    /// Create new `RemoveDir` Action
     pub fn rmdir<P>(target: P) -> Self
     where
         P: AsRef<Path>,
     {
-        let action_type = ActionType::RmDir(target.as_ref().to_owned());
+        let change_type = ChangeType::RmDir(target.as_ref().to_owned());
 
         Self {
-            action_type,
+            change_type,
             applied: false,
         }
     }
 
-    pub(crate) fn action_type(&self) -> &ActionType {
-        &self.action_type
+    pub(crate) fn change_type(&self) -> &ChangeType {
+        &self.change_type
     }
 
     pub(crate) fn apply(&mut self) -> Result<()> {
         if self.applied {
             Err(HistoryError::AppliedTwice(self.clone()))
         } else {
-            self.action_type.apply()?;
+            self.change_type.apply()?;
             self.applied = true;
             Ok(())
         }
@@ -103,7 +100,7 @@ impl Action {
 
     pub(crate) fn undo(&mut self) -> Result<()> {
         if self.applied {
-            self.action_type.undo()?;
+            self.change_type.undo()?;
             self.applied = false;
             Ok(())
         } else {
@@ -111,25 +108,26 @@ impl Action {
         }
     }
 
-    /// Gets source and target from this action.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if this action's type is not `Action::Move`
-    pub fn get_src_tgt_unchecked(&self) -> (&Path, &Path) {
-        if let ActionType::Mv { source, target } = self.action_type() {
-            (source, target)
+    pub fn source(&self) -> Option<&Path> {
+        if let ChangeType::Mv { source, .. } = &self.change_type {
+            Some(source)
         } else {
-            panic!("Current Action is not Action::Move!")
+            None
+        }
+    }
+
+    pub fn target(&self) -> &Path {
+        match self.change_type() {
+            ChangeType::Mv { target, .. }
+            | ChangeType::MkDir(target)
+            | ChangeType::RmDir(target) => target,
         }
     }
 }
 
-/// Type is a reserved word.
 #[allow(clippy::module_name_repetitions)]
-/// Action is responsible for doing and undoing filesystem operations
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash)]
-pub enum ActionType {
+pub enum ChangeType {
     /// Represents the moving of a file.
     Mv {
         /// Source path
@@ -142,12 +140,12 @@ pub enum ActionType {
     /// Represents the deletion of a directory
     RmDir(PathBuf),
 }
-impl ActionType {
-    /// Applies the action
+impl ChangeType {
+    /// Applies the change
     pub(crate) fn apply(&self) -> Result<()> {
         match self {
-            ActionType::Mv { source, target } => {
-                ActionType::copy_or_move_file(source, target)?;
+            ChangeType::Mv { source, target } => {
+                ChangeType::copy_or_move_file(source, target)?;
 
                 trace!(
                     "Renamed:\n\"{}\"\n\"{}\"",
@@ -156,12 +154,12 @@ impl ActionType {
                 );
             }
 
-            ActionType::MkDir(path) => {
+            ChangeType::MkDir(path) => {
                 fs::create_dir(path)?;
                 trace!("Created directory {}", path.display());
             }
 
-            ActionType::RmDir(path) => {
+            ChangeType::RmDir(path) => {
                 fs::remove_dir(path)?;
                 trace!("Removed directory {}", path.display());
             }
@@ -169,11 +167,11 @@ impl ActionType {
         Ok(())
     }
 
-    /// Undoes the action.
+    /// Undoes the change.
     pub(crate) fn undo(&self) -> Result<()> {
         match self {
-            ActionType::Mv { source, target } => {
-                ActionType::copy_or_move_file(target, source)?;
+            ChangeType::Mv { source, target } => {
+                ChangeType::copy_or_move_file(target, source)?;
 
                 trace!(
                     "Undid:\n\"{}\"\n\"{}\"",
@@ -182,13 +180,13 @@ impl ActionType {
                 );
             }
 
-            ActionType::MkDir(path) => {
+            ChangeType::MkDir(path) => {
                 fs::remove_dir(path)?;
 
                 trace!("Undid directory {}", path.display());
             }
 
-            ActionType::RmDir(path) => {
+            ChangeType::RmDir(path) => {
                 fs::create_dir(path)?;
 
                 trace!("Recreated directory {}", path.display());
@@ -240,17 +238,17 @@ mod tests {
         let dir = TempDir::new()?;
         let path = dir.child("test");
 
-        let mut action = Action::mkdir(&path);
+        let mut change = Change::mkdir(&path);
 
         // Before: doesn't exist
         path.assert(predicate::path::missing());
 
-        action.apply()?;
+        change.apply()?;
 
         // Applied: exists
         path.assert(predicate::path::exists());
 
-        action.undo()?;
+        change.undo()?;
 
         // Undone: doesn't exist
         path.assert(predicate::path::missing());
@@ -262,19 +260,19 @@ mod tests {
     fn test_remove_dir() -> Result<()> {
         let dir = TempDir::new()?;
         let path = dir.child("test");
-        ActionType::MkDir(path.to_path_buf()).apply()?;
+        ChangeType::MkDir(path.to_path_buf()).apply()?;
 
         // Before: exists
         path.assert(predicate::path::exists());
 
-        let mut rmdir_action = Action::rmdir(&path);
+        let mut rmdir_change = Change::rmdir(&path);
 
-        rmdir_action.apply()?;
+        rmdir_change.apply()?;
 
         // Applied: doesn't exist
         path.assert(predicate::path::missing());
 
-        rmdir_action.undo()?;
+        rmdir_change.undo()?;
 
         // Undone: exists
         path.assert(predicate::path::exists());
@@ -294,7 +292,7 @@ mod tests {
         source.assert(predicate::path::exists());
         target.assert(predicate::path::missing());
 
-        let mut mv = Action::mv(&source, &target);
+        let mut mv = Change::mv(&source, &target);
 
         mv.apply()?;
 
@@ -319,7 +317,7 @@ mod tests {
 
         source.touch()?;
 
-        let mut mv = Action::mv(&source, target);
+        let mut mv = Change::mv(&source, target);
 
         mv.apply()?;
 

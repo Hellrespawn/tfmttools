@@ -2,39 +2,39 @@ use crate::cli::ui::table::Table;
 use crate::cli::Config;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use file_history::Action;
+use file_history::Change;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub(crate) fn validate_actions(
+pub(crate) fn validate_changes(
     config: &Config,
-    actions: &[Action],
+    changes: &[Change],
 ) -> Result<()> {
-    validate_double_separators(config, actions)?;
-    validate_collisions(config, actions)?;
-    validate_existing_files(config, actions)?;
+    validate_double_separators(config, changes)?;
+    validate_collisions(config, changes)?;
+    validate_existing_files(config, changes)?;
 
     Ok(())
 }
 
 fn validate_double_separators(
     config: &Config,
-    actions: &[Action],
+    changes: &[Change],
 ) -> Result<()> {
-    let double_actions = actions
+    let double_changes = changes
         .iter()
-        .filter(|a| {
-            a.get_src_tgt_unchecked()
-                .1
+        .filter(|change| {
+            change
+                .target()
                 .to_string_lossy()
                 .contains(&std::path::MAIN_SEPARATOR_STR.repeat(2))
         })
         .collect::<Vec<_>>();
 
-    let paths = double_actions
+    let paths = double_changes
         .iter()
         .take(config.preview_amount())
-        .map(|a| a.get_src_tgt_unchecked().1)
+        .map(|change| change.target())
         .collect::<Vec<_>>();
 
     if paths.is_empty() {
@@ -51,10 +51,10 @@ fn validate_double_separators(
             table.push_path(path);
         }
 
-        if double_actions.len() > paths.len() {
+        if double_changes.len() > paths.len() {
             table.push_string(format!(
                 "And {} more...",
-                double_actions.len() - paths.len()
+                double_changes.len() - paths.len()
             ));
         }
 
@@ -62,12 +62,17 @@ fn validate_double_separators(
     }
 }
 
-fn validate_collisions(config: &Config, actions: &[Action]) -> Result<()> {
+fn validate_collisions(config: &Config, changes: &[Change]) -> Result<()> {
     let mut map = HashMap::new();
 
-    for action in actions {
-        let (source, target) = action.get_src_tgt_unchecked();
-        map.entry(target).or_insert_with(Vec::new).push(source);
+    for change in changes {
+        let source = change
+            .source()
+            .expect("Can only validate collisions on move.");
+
+        map.entry(change.target())
+            .or_insert_with(Vec::new)
+            .push(source);
     }
 
     let collisions: HashMap<&Path, Vec<&Path>> =
@@ -138,11 +143,11 @@ fn format_collision(
     table.to_string()
 }
 
-fn validate_existing_files(config: &Config, actions: &[Action]) -> Result<()> {
-    let existing: Vec<&Path> = actions
+fn validate_existing_files(config: &Config, changes: &[Change]) -> Result<()> {
+    let existing: Vec<&Path> = changes
         .iter()
-        .filter_map(|action| {
-            let (_, target) = action.get_src_tgt_unchecked();
+        .filter_map(|change| {
+            let target = change.target();
             target.exists().then_some(target)
         })
         .collect();
@@ -190,7 +195,7 @@ mod test {
             ("/a/b/c.file", "/b/c/d.file"),
             ("/c/d/e.file", "/b/c/d.file"),
         ]
-        .map(|(source, target)| Action::mv(source, target));
+        .map(|(source, target)| Change::mv(source, target));
 
         if let Ok(()) = validate_collisions(&config, &reference) {
             return Err(eyre!(
@@ -202,7 +207,7 @@ mod test {
             ("/a/b/c.file", "/b/c/d.file"),
             ("/c/d/e.file", "/d/e/f.file"),
         ]
-        .map(|(source, target)| Action::mv(source, target));
+        .map(|(source, target)| Change::mv(source, target));
 
         if let Err(err) = validate_collisions(&config, &reference) {
             return Err(eyre!(

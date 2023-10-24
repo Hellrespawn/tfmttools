@@ -84,7 +84,7 @@ impl TestEnv {
     fn populate_templates(&self) -> Result<()> {
         let paths: Vec<PathBuf> =
             fs::read_dir(TestEnv::get_test_data_dir().join("template"))?
-                .flat_map(|r| r.map(|d| d.path()))
+                .flat_map(|result| result.map(|entry| entry.path()))
                 .collect();
 
         fs::create_dir(self.get_config_dir())?;
@@ -105,7 +105,7 @@ impl TestEnv {
     fn populate_files(&self) -> Result<()> {
         let paths: Vec<PathBuf> =
             fs::read_dir(TestEnv::get_test_data_dir().join("music"))?
-                .flat_map(|r| r.map(|d| d.path()))
+                .flat_map(|result| result.map(|entry| entry.path()))
                 .collect();
 
         fs::create_dir(self.get_files_dir())?;

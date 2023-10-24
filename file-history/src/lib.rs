@@ -10,20 +10,20 @@
 compile_error!("bincode and serde_json are mutually exclusive!");
 
 /// Contains [`Action`]
-pub mod action;
+pub mod change;
 /// Contains [`History`]
 pub mod history;
 
-mod actiongroup;
+mod changelist;
 mod disk;
 mod util;
 
-use actiongroup::ActionGroup;
+use changelist::ChangeList;
 use disk::DiskHandler;
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub use action::{Action, ActionType};
+pub use change::{Change, ChangeType};
 pub use history::History;
 
 /// Wrapper for Result
@@ -38,11 +38,11 @@ pub enum HistoryError {
 
     /// Action was already applied.
     #[error("This action has already been applied: {0}")]
-    AppliedTwice(Action),
+    AppliedTwice(Change),
 
     /// Action was already undone.
     #[error("This action has already been undone: {0}")]
-    NotYetApplied(Action),
+    NotYetApplied(Change),
 
     /// Represents std::io::Error
     #[error("I/O error: {0}")]

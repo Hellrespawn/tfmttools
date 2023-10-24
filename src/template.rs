@@ -43,22 +43,19 @@ impl<'s> Template<'s> {
 
         let syntax = self.environment.syntax();
 
-        let string = source
-            .lines()
-            .take_while(|l| l.starts_with(syntax.comment_start.as_ref()))
-            .map(|l| {
-                l.replace(syntax.comment_start.as_ref(), "")
-                    .replace(syntax.comment_end.as_ref(), "")
-                    .trim()
-                    .to_owned()
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+        if source.trim().starts_with(syntax.comment_start.as_ref()) {
+            let option = source.split_once(syntax.comment_end.as_ref()).map(
+                |(left, _)| {
+                    left.replace(syntax.comment_start.as_ref(), "")
+                        .replace(syntax.comment_end.as_ref(), "")
+                        .trim()
+                        .to_owned()
+                },
+            );
 
-        if string.is_empty() {
-            Ok(None)
+            Ok(option)
         } else {
-            Ok(Some(string))
+            Ok(None)
         }
     }
 
@@ -100,13 +97,17 @@ impl<'s> Template<'s> {
 
     fn create_context(&self, tags: &dyn Tags) -> Result<Value> {
         let albumsort: Option<usize> =
-            tags.albumsort().map(|s| s.parse()).transpose()?;
+            tags.albumsort().map(|string| string.parse()).transpose()?;
 
-        let track_number: Option<usize> =
-            tags.track_number().map(|s| s.parse()).transpose()?;
+        let track_number: Option<usize> = tags
+            .track_number()
+            .map(|string| string.parse())
+            .transpose()?;
 
-        let disc_number: Option<usize> =
-            tags.disc_number().map(|s| s.parse()).transpose()?;
+        let disc_number: Option<usize> = tags
+            .disc_number()
+            .map(|string| string.parse())
+            .transpose()?;
 
         let ctx = minijinja::context! {
             args => self.arguments,

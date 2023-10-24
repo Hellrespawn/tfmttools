@@ -16,10 +16,10 @@ static DEFAULT_FILES: [DefaultFile; 1] = [DefaultFile {
 
 pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
     if force {
-        fs::remove_dir_all(config.config_dir())?;
-    } else if config.config_dir().is_dir() {
+        fs::remove_dir_all(config.directory())?;
+    } else if config.directory().is_dir() {
         let has_files = config
-            .config_dir()
+            .directory()
             .read_dir()
             .map(|rd| rd.count() > 0)
             .unwrap_or(false);
@@ -27,15 +27,15 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
         if has_files {
             return Err(eyre!(
                 "Configuration folder already exists and is not empty: {}",
-                config.config_dir().display()
+                config.directory().display()
             ));
         }
     }
 
-    config.create_dir(config.config_dir())?;
+    config.create_dir(config.directory())?;
 
     for file in &DEFAULT_FILES {
-        let path = config.config_dir().join(file.name);
+        let path = config.directory().join(file.name);
 
         let prefix = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
@@ -45,7 +45,7 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
 
         println!(
             "{prefix}Wrote default files to {}",
-            config.config_dir().display()
+            config.directory().display()
         );
     }
 

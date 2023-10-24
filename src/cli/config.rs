@@ -14,7 +14,7 @@ const DEFAULT_PREVIEW_AMOUNT: usize = 8;
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 
 pub(crate) struct Config {
-    config_dir: PathBuf,
+    directory: PathBuf,
     current_dir: PathBuf,
     dry_run: bool,
     recursion_depth: usize,
@@ -22,9 +22,9 @@ pub(crate) struct Config {
 }
 
 impl Config {
-    pub(crate) fn new(config_dir: &Path, dry_run: bool) -> Result<Self> {
+    pub(crate) fn new(directory: &Path, dry_run: bool) -> Result<Self> {
         let config = Self {
-            config_dir: config_dir.to_owned(),
+            directory: directory.to_owned(),
             current_dir: std::env::current_dir()?,
             dry_run,
             recursion_depth: DEFAULT_RECURSION_DEPTH,
@@ -46,8 +46,8 @@ impl Config {
         Self::new(&path, dry_run)
     }
 
-    pub(crate) fn config_dir(&self) -> &Path {
-        &self.config_dir
+    pub(crate) fn directory(&self) -> &Path {
+        &self.directory
     }
 
     pub(crate) fn current_dir(&self) -> &Path {
@@ -137,8 +137,10 @@ impl Config {
     pub(crate) fn get_template(&self, name: &str) -> Result<Template> {
         let templates = self.get_templates()?;
 
-        let found_templates: Vec<Template> =
-            templates.into_iter().filter(|s| s.name() == name).collect();
+        let found_templates: Vec<Template> = templates
+            .into_iter()
+            .filter(|template| template.name() == name)
+            .collect();
 
         let length = found_templates.len();
 
@@ -185,14 +187,14 @@ impl Config {
     }
 
     fn get_template_paths(&self) -> Result<Vec<PathBuf>> {
-        let predicate: fn(&Path) -> bool = |p| {
-            p.extension().map_or(false, |s| {
-                TEMPLATE_EXTENSIONS.iter().any(|ext| s == *ext)
+        let predicate: fn(&Path) -> bool = |path| {
+            path.extension().map_or(false, |string| {
+                TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
             })
         };
 
         let mut paths =
-            Config::search_path(self.config_dir(), 0, &predicate, None);
+            Config::search_path(self.directory(), 0, &predicate, None);
         paths.extend(Config::search_path(
             &std::env::current_dir()?,
             0,

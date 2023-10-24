@@ -1,32 +1,32 @@
-use crate::actiongroup::ActionCount;
-use crate::{Action, ActionGroup, DiskHandler, Result};
+use crate::changelist::ChangeCount;
+use crate::{Change, ChangeList, DiskHandler, Result};
 use log::{debug, info};
 use std::fmt;
 use std::path::Path;
 
-/// History is responsible for saving and loading `ActionGroup`s
+/// History is responsible for saving and loading `ChangeLists`s
 #[derive(PartialEq, Debug)]
 pub struct History {
     disk_handler: DiskHandler,
-    current_group: ActionGroup,
-    applied_groups: Vec<ActionGroup>,
-    undone_groups: Vec<ActionGroup>,
+    current_list: ChangeList,
+    applied_lists: Vec<ChangeList>,
+    undone_lists: Vec<ChangeList>,
 }
 
 impl fmt::Display for History {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "History file at {}", self.disk_handler.path().display())?;
 
-        writeln!(f, "Applied actions ({}):", self.applied_groups.len())?;
+        writeln!(f, "Applied changes ({}):", self.applied_lists.len())?;
 
-        for group in &self.applied_groups {
-            writeln!(f, "{group}")?;
+        for list in &self.applied_lists {
+            writeln!(f, "{list}")?;
         }
 
-        writeln!(f, "Undone actions ({}):", self.undone_groups.len())?;
+        writeln!(f, "Undone changes ({}):", self.undone_lists.len())?;
 
-        for group in &self.undone_groups {
-            writeln!(f, "{group}")?;
+        for list in &self.undone_lists {
+            writeln!(f, "{list}")?;
         }
 
         Ok(())
@@ -37,23 +37,23 @@ impl History {
     /// Load or create history file at `path`
     pub fn load(directory: &Path, name: &str) -> Result<Self> {
         let disk_handler = DiskHandler::init_dir(directory, name);
-        let (applied_groups, undone_groups) = disk_handler.read()?;
+        let (applied_lists, undone_lists) = disk_handler.read()?;
 
         info!("Loading history from {}", disk_handler.path().display());
 
         Ok(History {
             disk_handler,
-            current_group: ActionGroup::new(),
-            applied_groups,
-            undone_groups,
+            current_list: ChangeList::new(),
+            applied_lists,
+            undone_lists,
         })
     }
 
     /// Clears history
     pub fn clear(&mut self) -> Result<()> {
-        self.current_group = ActionGroup::new();
-        self.applied_groups = Vec::new();
-        self.undone_groups = Vec::new();
+        self.current_list = ChangeList::new();
+        self.applied_lists = Vec::new();
+        self.undone_lists = Vec::new();
 
         self.clear_on_disk()?;
 
@@ -69,11 +69,11 @@ impl History {
             return Ok(false);
         }
 
-        if self.current_group.changed() {
-            debug!("Current group was changed");
-            let saved_group = std::mem::take(&mut self.current_group);
+        if self.current_list.changed() {
+            debug!("Current list was changed");
+            let saved_list = std::mem::take(&mut self.current_list);
 
-            self.applied_groups.push(saved_group);
+            self.applied_lists.push(saved_list);
         }
 
         self.update_hashes();
@@ -89,50 +89,50 @@ impl History {
         self.disk_handler.path()
     }
 
-    /// Apply an action to the current `ActionGroup`.
-    pub fn apply(&mut self, action: Action) -> Result<()> {
-        self.current_group.apply(action)?;
+    /// Apply a change to the current `ChangeList`.
+    pub fn apply(&mut self, change: Change) -> Result<()> {
+        self.current_list.apply(change)?;
         Ok(())
     }
 
-    /// Undo `n` amount of `ActionGroup`s. Returns amount actually undone
-    pub fn undo(&mut self, amount: usize) -> Result<Vec<ActionCount>> {
-        let action_counts = History::undo_redo(
-            &mut self.applied_groups,
-            &mut self.undone_groups,
+    /// Undo `n` amount of `ChangeList`s. Returns amount actually undone
+    pub fn undo(&mut self, amount: usize) -> Result<Vec<ChangeCount>> {
+        let change_counts = History::undo_redo(
+            &mut self.applied_lists,
+            &mut self.undone_lists,
             true,
             amount,
         )?;
 
         self.save()?;
 
-        Ok(action_counts)
+        Ok(change_counts)
     }
 
-    /// Redo `n` amount of `ActionGroup`s. Returns amount actually redone
-    pub fn redo(&mut self, amount: usize) -> Result<Vec<ActionCount>> {
-        let action_counts = History::undo_redo(
-            &mut self.undone_groups,
-            &mut self.applied_groups,
+    /// Redo `n` amount of `ChangeList`s. Returns amount actually redone
+    pub fn redo(&mut self, amount: usize) -> Result<Vec<ChangeCount>> {
+        let change_counts = History::undo_redo(
+            &mut self.undone_lists,
+            &mut self.applied_lists,
             false,
             amount,
         )?;
 
         self.save()?;
 
-        Ok(action_counts)
+        Ok(change_counts)
     }
 
     /// Returns true if the history was changed
     pub(crate) fn changed(&self) -> bool {
-        self.current_group.changed()
-            || self.applied_groups.iter().any(ActionGroup::changed)
-            || self.undone_groups.iter().any(ActionGroup::changed)
+        self.current_list.changed()
+            || self.applied_lists.iter().any(ChangeList::changed)
+            || self.undone_lists.iter().any(ChangeList::changed)
     }
 
     fn save_to_disk(&self) -> Result<()> {
         self.disk_handler
-            .write(&self.applied_groups, &self.undone_groups)
+            .write(&self.applied_lists, &self.undone_lists)
     }
 
     fn clear_on_disk(&self) -> Result<()> {
@@ -141,49 +141,49 @@ impl History {
     }
 
     fn update_hashes(&mut self) {
-        self.current_group.update_hash();
+        self.current_list.update_hash();
 
-        for group in &mut self.applied_groups {
-            group.update_hash();
+        for list in &mut self.applied_lists {
+            list.update_hash();
         }
-        for group in &mut self.undone_groups {
-            group.update_hash();
+        for list in &mut self.undone_lists {
+            list.update_hash();
         }
     }
 
     fn undo_redo(
-        source_group: &mut Vec<ActionGroup>,
-        target_group: &mut Vec<ActionGroup>,
+        source_list: &mut Vec<ChangeList>,
+        target_list: &mut Vec<ChangeList>,
         undo: bool,
         amount: usize,
-    ) -> Result<Vec<ActionCount>> {
+    ) -> Result<Vec<ChangeCount>> {
         if amount == 0 {
             return Ok(Vec::new());
         }
 
-        let mut processed_groups = Vec::new();
+        let mut processed_lists = Vec::new();
 
-        let mut action_counts = Vec::new();
+        let mut change_counts = Vec::new();
 
-        while let Some(mut group) = source_group.pop() {
-            let action_count = group.to_action_count();
+        while let Some(mut list) = source_list.pop() {
+            let change_count = list.to_change_count();
 
             if undo {
-                group.undo()?;
+                list.undo()?;
             } else {
-                group.redo()?;
+                list.redo()?;
             }
 
-            processed_groups.push(group);
+            processed_lists.push(list);
 
-            action_counts.push(action_count);
-            if action_counts.len() == amount {
+            change_counts.push(change_count);
+            if change_counts.len() == amount {
                 break;
             }
         }
 
-        target_group.extend(processed_groups);
+        target_list.extend(processed_lists);
 
-        Ok(action_counts)
+        Ok(change_counts)
     }
 }

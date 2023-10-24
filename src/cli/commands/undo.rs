@@ -14,7 +14,7 @@ pub(crate) fn undo(
     mode: UndoMode,
     times: usize,
 ) -> Result<()> {
-    let mut history = History::load(config.config_dir(), HISTORY_NAME)?;
+    let mut history = History::load(config.directory(), HISTORY_NAME)?;
 
     let mode_string = match mode {
         UndoMode::Undo => "Undid",

@@ -11,7 +11,7 @@ pub(crate) fn list_templates(config: &Config) -> Result<()> {
     if templates.is_empty() {
         table.set_heading(format!(
             "Couldn't find any templates at {} or in the current directory.",
-            config.config_dir().display()
+            config.directory().display()
         ));
     } else {
         table.set_heading(format!("Found {} templates", templates.len()));
