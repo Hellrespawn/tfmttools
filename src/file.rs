@@ -10,7 +10,7 @@ pub(crate) const FORBIDDEN_CHARACTERS: [char; 10] =
 
 pub(crate) struct AudioFile {
     path: PathBuf,
-    tag: SafeTag,
+    tag: Tag,
     extension: String,
 }
 
@@ -39,7 +39,7 @@ impl AudioFile {
 
         Ok(AudioFile {
             path,
-            tag: tag.into(),
+            tag,
             extension,
         })
     }
@@ -51,19 +51,9 @@ impl AudioFile {
     pub(crate) fn extension(&self) -> &str {
         self.extension.as_ref()
     }
-}
 
-struct SafeTag(Tag);
-
-impl From<Tag> for SafeTag {
-    fn from(value: Tag) -> Self {
-        Self(value)
-    }
-}
-
-impl SafeTag {
-    fn get_safe(&self, key: &ItemKey) -> Option<String> {
-        self.0.get_string(key).map(|string| {
+    fn get_tag_safe(&self, key: &ItemKey) -> Option<String> {
+        self.tag.get_string(key).map(|string| {
             FORBIDDEN_CHARACTERS
                 .iter()
                 .fold(string.to_owned(), |string, char| {
@@ -75,41 +65,40 @@ impl SafeTag {
 
 impl Tags for AudioFile {
     fn album(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::AlbumTitle)
+        self.get_tag_safe(&ItemKey::AlbumTitle)
     }
 
     fn album_artist(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::AlbumArtist)
+        self.get_tag_safe(&ItemKey::AlbumArtist)
     }
 
     fn albumsort(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::AlbumTitleSortOrder)
+        self.get_tag_safe(&ItemKey::AlbumTitleSortOrder)
     }
 
     fn artist(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::TrackArtist)
+        self.get_tag_safe(&ItemKey::TrackArtist)
     }
 
     fn genre(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::Genre)
+        self.get_tag_safe(&ItemKey::Genre)
     }
 
     fn title(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::TrackTitle)
+        self.get_tag_safe(&ItemKey::TrackTitle)
     }
 
     fn raw_disc_number(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::DiscNumber)
+        self.get_tag_safe(&ItemKey::DiscNumber)
     }
 
     fn raw_track_number(&self) -> Option<String> {
-        self.tag.get_safe(&ItemKey::TrackNumber)
+        self.get_tag_safe(&ItemKey::TrackNumber)
     }
 
     fn date(&self) -> Option<String> {
-        self.tag
-            .get_safe(&ItemKey::RecordingDate)
-            .or_else(|| self.tag.get_safe(&ItemKey::Year))
-            .or_else(|| self.tag.get_safe(&ItemKey::OriginalReleaseDate))
+        self.get_tag_safe(&ItemKey::RecordingDate)
+            .or_else(|| self.get_tag_safe(&ItemKey::Year))
+            .or_else(|| self.get_tag_safe(&ItemKey::OriginalReleaseDate))
     }
 }
