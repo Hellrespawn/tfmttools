@@ -3,10 +3,26 @@ use crate::tags::Tags;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-pub(crate) const FORBIDDEN_CHARACTERS: [char; 10] =
-    ['<', '>', ':', '\'', '|', '?', '*', '~', '/', '\\'];
+pub(crate) static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
+    Lazy::new(|| {
+        let mut map = HashMap::new();
+
+        map.insert('<', None);
+        map.insert('>', None);
+        map.insert(':', None);
+        map.insert('|', None);
+        map.insert('?', None);
+        map.insert('*', None);
+        map.insert('~', Some("-"));
+        map.insert('/', Some("-"));
+        map.insert('\\', Some("-"));
+
+        map
+    });
 
 pub(crate) struct AudioFile {
     path: PathBuf,
@@ -54,11 +70,12 @@ impl AudioFile {
 
     fn get_tag_safe(&self, key: &ItemKey) -> Option<String> {
         self.tag.get_string(key).map(|string| {
-            FORBIDDEN_CHARACTERS
-                .iter()
-                .fold(string.to_owned(), |string, char| {
-                    string.replace(*char, "")
-                })
+            FORBIDDEN_CHARACTERS.iter().fold(
+                string.to_owned(),
+                |string, (char, replacement)| {
+                    string.replace(*char, replacement.unwrap_or(""))
+                },
+            )
         })
     }
 }

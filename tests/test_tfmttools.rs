@@ -38,6 +38,7 @@ static SIMPLE_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
         "Damjan Mravunac/Welcome To Heaven.ogg",
         "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
         "MASTER BOOT RECORD/Dune.mp3",
+        "MASTER BOOT RECORD/MYTH.NFO.mp3",
         "MASTER BOOT RECORD/RAMDRIVE.SYS.mp3",
         "MASTER BOOT RECORD/SET MIDI=SYNTH1 MAPG MODE1.mp3",
         "Nightwish/Elvenpath (Live).mp3",
@@ -53,7 +54,8 @@ static TYPICAL_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     vec![
     "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
     "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-    "output_dir/MASTER BOOT RECORD/2016.03 - CEDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+    "output_dir/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+    "output_dir/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
     "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
     "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
     "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
