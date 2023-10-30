@@ -1,10 +1,12 @@
-use crate::tags::Tags;
+use std::path::Path;
+
 use color_eyre::Result;
 use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::path::Path;
+
+use crate::tags::Tags;
 
 #[derive(Debug)]
 pub(crate) struct Template<'s> {
@@ -99,15 +101,11 @@ impl<'s> Template<'s> {
         let albumsort: Option<usize> =
             tags.albumsort().map(|string| string.parse()).transpose()?;
 
-        let track_number: Option<usize> = tags
-            .track_number()
-            .map(|string| string.parse())
-            .transpose()?;
+        let track_number: Option<usize> =
+            tags.track_number().map(|string| string.parse()).transpose()?;
 
-        let disc_number: Option<usize> = tags
-            .disc_number()
-            .map(|string| string.parse())
-            .transpose()?;
+        let disc_number: Option<usize> =
+            tags.disc_number().map(|string| string.parse()).transpose()?;
 
         let ctx = minijinja::context! {
             args => self.arguments,

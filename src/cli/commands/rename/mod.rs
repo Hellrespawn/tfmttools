@@ -1,15 +1,17 @@
 mod validate;
 
-use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
-use crate::cli::{ui, Config};
-use crate::file::AudioFile;
-use crate::template::Template;
+use std::path::{Path, PathBuf};
+
 use color_eyre::Result;
 use file_history::{Change, History, HistoryError};
 use fs_err as fs;
 use indicatif::ProgressIterator;
-use std::path::{Path, PathBuf};
 use validate::validate_changes;
+
+use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
+use crate::cli::{ui, Config};
+use crate::file::AudioFile;
+use crate::template::Template;
 
 pub(crate) fn rename(
     config: &Config,
@@ -151,9 +153,8 @@ fn filter_unchanged_destinations(changes: Vec<Change>) -> Vec<Change> {
     changes
         .into_iter()
         .filter(|change| {
-            let source = change
-                .source()
-                .expect("Can only validate collisions on move.");
+            let source =
+                change.source().expect("Can only validate collisions on move.");
 
             source != change.target()
         })
@@ -171,9 +172,7 @@ fn perform_changes(
         &changes
             .iter()
             .map(|change| {
-                change
-                    .source()
-                    .expect("Can only validate collisions on move.")
+                change.source().expect("Can only validate collisions on move.")
             })
             .collect::<Vec<_>>(),
     );
@@ -316,9 +315,10 @@ fn normalize_separators(string: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use assert_fs::TempDir;
     use color_eyre::Result;
+
+    use super::*;
 
     #[test]
     fn test_remove_dir_error_codes() -> Result<()> {

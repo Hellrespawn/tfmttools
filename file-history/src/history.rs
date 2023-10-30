@@ -1,8 +1,10 @@
-use crate::changelist::ChangeCount;
-use crate::{Change, ChangeList, DiskHandler, Result};
-use log::{debug, info};
 use std::fmt;
 use std::path::Path;
+
+use log::{debug, info};
+
+use crate::changelist::ChangeCount;
+use crate::{Change, ChangeList, DiskHandler, Result};
 
 /// History is responsible for saving and loading `ChangeLists`s
 #[derive(PartialEq, Debug)]
@@ -131,8 +133,7 @@ impl History {
     }
 
     fn save_to_disk(&self) -> Result<()> {
-        self.disk_handler
-            .write(&self.applied_lists, &self.undone_lists)
+        self.disk_handler.write(&self.applied_lists, &self.undone_lists)
     }
 
     fn clear_on_disk(&self) -> Result<()> {

@@ -1,6 +1,7 @@
+use std::path::Path;
+
 use console::Term;
 use once_cell::sync::Lazy;
-use std::path::Path;
 
 static TERM: Lazy<Term> = Lazy::new(Term::stdout);
 // TODO? Accept all lines, but step through it like in actions preview?
@@ -13,9 +14,7 @@ pub(crate) struct Table {
 
 impl Table {
     pub(crate) fn new() -> Self {
-        Self {
-            ..Default::default()
-        }
+        Self { ..Default::default() }
     }
 
     pub(crate) fn set_heading(&mut self, string: String) {

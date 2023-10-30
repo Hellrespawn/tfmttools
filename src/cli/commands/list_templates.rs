@@ -1,7 +1,8 @@
+use color_eyre::Result;
+
 use crate::cli::ui::table::Table;
 use crate::cli::Config;
 use crate::template::Template;
-use color_eyre::Result;
 
 pub(crate) fn list_templates(config: &Config) -> Result<()> {
     let templates = config.get_templates()?;

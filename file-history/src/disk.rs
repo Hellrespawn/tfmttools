@@ -1,8 +1,10 @@
-use crate::{ChangeList, HistoryError, Result};
-use fs_err as fs;
-use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+
+use fs_err as fs;
+use serde::{Deserialize, Serialize};
+
+use crate::{ChangeList, HistoryError, Result};
 
 #[derive(Serialize, Deserialize)]
 struct HistoryDto {
@@ -19,9 +21,7 @@ pub(crate) struct DiskHandler {
 impl DiskHandler {
     pub(crate) fn init_dir(directory: &Path, name: &str) -> DiskHandler {
         DiskHandler {
-            path: directory
-                .join(name)
-                .with_extension(DiskHandler::extension()),
+            path: directory.join(name).with_extension(DiskHandler::extension()),
         }
     }
 
@@ -46,7 +46,7 @@ impl DiskHandler {
 
                     Err(err.into())
                 }
-            }
+            },
         }
     }
 
@@ -61,14 +61,14 @@ impl DiskHandler {
                     serde_json::from_slice(&file_contents)?;
 
                 Ok((history.applied_lists, history.undone_lists))
-            }
+            },
             Err(err) => {
                 if let ErrorKind::NotFound = err.kind() {
                     Ok((Vec::new(), Vec::new()))
                 } else {
                     Err(err.into())
                 }
-            }
+            },
         }
     }
 
@@ -116,19 +116,18 @@ impl DiskHandler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::change::Change;
     use assert_fs::prelude::*;
     use assert_fs::NamedTempFile;
     use color_eyre::Result;
     use predicates::prelude::*;
 
+    use super::*;
+    use crate::change::Change;
+
     static PREFIX: &str = "rust-file-history-disk-";
 
     fn init_file(path: &Path) -> DiskHandler {
-        DiskHandler {
-            path: path.to_owned(),
-        }
+        DiskHandler { path: path.to_owned() }
     }
 
     fn get_temporary_file(name: &str) -> Result<NamedTempFile> {
@@ -148,12 +147,7 @@ mod tests {
     }
 
     fn get_test_queue() -> Vec<ChangeList> {
-        vec![
-            get_test_list(),
-            get_test_list(),
-            get_test_list(),
-            get_test_list(),
-        ]
+        vec![get_test_list(), get_test_list(), get_test_list(), get_test_list()]
     }
 
     fn write_read_compare_test_data(disk_handler: &DiskHandler) -> Result<()> {

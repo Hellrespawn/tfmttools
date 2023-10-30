@@ -1,7 +1,8 @@
-use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
-use crate::cli::Config;
 use color_eyre::Result;
 use file_history::History;
+
+use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
+use crate::cli::Config;
 
 #[derive(Copy, Clone)]
 pub(crate) enum UndoMode {

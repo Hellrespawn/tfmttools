@@ -1,10 +1,12 @@
-use crate::cli::ui::table::Table;
-use crate::cli::Config;
+use std::collections::HashMap;
+use std::path::Path;
+
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use file_history::Change;
-use std::collections::HashMap;
-use std::path::Path;
+
+use crate::cli::ui::table::Table;
+use crate::cli::Config;
 
 pub(crate) fn validate_changes(
     config: &Config,
@@ -66,13 +68,10 @@ fn validate_collisions(config: &Config, changes: &[Change]) -> Result<()> {
     let mut map = HashMap::new();
 
     for change in changes {
-        let source = change
-            .source()
-            .expect("Can only validate collisions on move.");
+        let source =
+            change.source().expect("Can only validate collisions on move.");
 
-        map.entry(change.target())
-            .or_insert_with(Vec::new)
-            .push(source);
+        map.entry(change.target()).or_insert_with(Vec::new).push(source);
     }
 
     let collisions: HashMap<&Path, Vec<&Path>> =
@@ -191,11 +190,9 @@ mod test {
     fn validate_collisions_test() -> Result<()> {
         let config = Config::new(&PathBuf::new(), false)?;
 
-        let reference = [
-            ("/a/b/c.file", "/b/c/d.file"),
-            ("/c/d/e.file", "/b/c/d.file"),
-        ]
-        .map(|(source, target)| Change::mv(source, target));
+        let reference =
+            [("/a/b/c.file", "/b/c/d.file"), ("/c/d/e.file", "/b/c/d.file")]
+                .map(|(source, target)| Change::mv(source, target));
 
         if let Ok(()) = validate_collisions(&config, &reference) {
             return Err(eyre!(
@@ -203,11 +200,9 @@ mod test {
             ));
         }
 
-        let reference = [
-            ("/a/b/c.file", "/b/c/d.file"),
-            ("/c/d/e.file", "/d/e/f.file"),
-        ]
-        .map(|(source, target)| Change::mv(source, target));
+        let reference =
+            [("/a/b/c.file", "/b/c/d.file"), ("/c/d/e.file", "/d/e/f.file")]
+                .map(|(source, target)| Change::mv(source, target));
 
         if let Err(err) = validate_collisions(&config, &reference) {
             return Err(eyre!(

@@ -1,5 +1,6 @@
-use once_cell::sync::Lazy;
 use std::time::Duration;
+
+use once_cell::sync::Lazy;
 
 static DELAY: Lazy<Duration> = Lazy::new(|| {
     Duration::from_millis(

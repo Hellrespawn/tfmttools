@@ -1,10 +1,12 @@
-use super::Args;
-use crate::cli::ui;
-use crate::template::Template;
+use std::path::{Path, PathBuf};
+
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
-use std::path::{Path, PathBuf};
+
+use super::Args;
+use crate::cli::ui;
+use crate::template::Template;
 
 pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");
 pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";

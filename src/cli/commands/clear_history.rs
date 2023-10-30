@@ -1,7 +1,8 @@
-use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
-use crate::cli::Config;
 use color_eyre::Result;
 use file_history::History;
+
+use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
+use crate::cli::Config;
 
 pub(crate) fn clear_history(config: &Config) -> Result<()> {
     if config.dry_run() {

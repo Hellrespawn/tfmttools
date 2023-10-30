@@ -1,7 +1,9 @@
+use std::fmt;
+
+use serde::{Deserialize, Serialize};
+
 use crate::util::calculate_hash;
 use crate::{Change, ChangeType, Result};
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 pub struct ChangeCount {
     pub mv: u64,
@@ -60,11 +62,7 @@ impl ChangeList {
     }
 
     pub(crate) fn to_change_count(&self) -> ChangeCount {
-        let mut change_count = ChangeCount {
-            mv: 0,
-            mkdir: 0,
-            rmdir: 0,
-        };
+        let mut change_count = ChangeCount { mv: 0, mkdir: 0, rmdir: 0 };
 
         for change in &self.changes {
             match change.change_type() {

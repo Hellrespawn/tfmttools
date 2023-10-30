@@ -1,10 +1,11 @@
+use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
+
 use assert_cmd::Command;
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
 use color_eyre::Result;
 use fs_err as fs;
 use once_cell::sync::Lazy;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
 const TEST_DATA_DIRECTORY: &str = "tests/testdata/";
 
@@ -73,9 +74,7 @@ struct TestEnv {
 
 impl TestEnv {
     fn new() -> Result<Self> {
-        let env = TestEnv {
-            tempdir: TempDir::new()?,
-        };
+        let env = TestEnv { tempdir: TempDir::new()? };
 
         env.populate_templates()?;
         env.populate_files()?;
@@ -120,8 +119,7 @@ impl TestEnv {
 
             fs::copy(
                 audiofile_path,
-                self.get_files_dir()
-                    .join(audiofile_path.file_name().unwrap()),
+                self.get_files_dir().join(audiofile_path.file_name().unwrap()),
             )?;
         }
 

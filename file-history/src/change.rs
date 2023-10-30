@@ -1,8 +1,10 @@
-use crate::{HistoryError, Result};
-use log::trace;
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::{fmt, fs};
+
+use log::trace;
+use serde::{Deserialize, Serialize};
+
+use crate::{HistoryError, Result};
 
 /// Change is responsible for doing and undoing filesystem operations
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash)]
@@ -54,10 +56,7 @@ impl Change {
             target: target.as_ref().to_owned(),
         };
 
-        Self {
-            change_type,
-            applied: false,
-        }
+        Self { change_type, applied: false }
     }
 
     pub fn mkdir<P>(target: P) -> Self
@@ -66,10 +65,7 @@ impl Change {
     {
         let change_type = ChangeType::MkDir(target.as_ref().to_owned());
 
-        Self {
-            change_type,
-            applied: false,
-        }
+        Self { change_type, applied: false }
     }
 
     pub fn rmdir<P>(target: P) -> Self
@@ -78,10 +74,7 @@ impl Change {
     {
         let change_type = ChangeType::RmDir(target.as_ref().to_owned());
 
-        Self {
-            change_type,
-            applied: false,
-        }
+        Self { change_type, applied: false }
     }
 
     pub(crate) fn change_type(&self) -> &ChangeType {
@@ -152,17 +145,17 @@ impl ChangeType {
                     &source.display(),
                     &target.display()
                 );
-            }
+            },
 
             ChangeType::MkDir(path) => {
                 fs::create_dir(path)?;
                 trace!("Created directory {}", path.display());
-            }
+            },
 
             ChangeType::RmDir(path) => {
                 fs::remove_dir(path)?;
                 trace!("Removed directory {}", path.display());
-            }
+            },
         }
         Ok(())
     }
@@ -178,19 +171,19 @@ impl ChangeType {
                     &target.display(),
                     &source.display(),
                 );
-            }
+            },
 
             ChangeType::MkDir(path) => {
                 fs::remove_dir(path)?;
 
                 trace!("Undid directory {}", path.display());
-            }
+            },
 
             ChangeType::RmDir(path) => {
                 fs::create_dir(path)?;
 
                 trace!("Recreated directory {}", path.display());
-            }
+            },
         }
         Ok(())
     }
@@ -227,11 +220,12 @@ impl ChangeType {
 #[cfg(test)]
 mod tests {
     // TODO Write test for undoing file that's been moved
-    use super::*;
     use assert_fs::prelude::*;
     use assert_fs::TempDir;
     use color_eyre::Result;
     use predicates::prelude::*;
+
+    use super::*;
 
     #[test]
     fn test_make_dir() -> Result<()> {

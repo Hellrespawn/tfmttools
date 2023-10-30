@@ -1,13 +1,15 @@
-use super::config::DRY_RUN_PREFIX;
-use super::Config;
-use crate::cli::ui::table::Table;
+use std::path::Path;
+
 use color_eyre::Result;
 use file_history::Change;
 use indicatif::{
     ProgressBar as IProgressBar, ProgressDrawTarget, ProgressFinish,
     ProgressStyle,
 };
-use std::path::Path;
+
+use super::config::DRY_RUN_PREFIX;
+use super::Config;
+use crate::cli::ui::table::Table;
 
 pub(crate) mod table;
 

@@ -1,8 +1,9 @@
-use crate::cli::config::DRY_RUN_PREFIX;
-use crate::cli::Config;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
+
+use crate::cli::config::DRY_RUN_PREFIX;
+use crate::cli::Config;
 
 struct DefaultFile {
     name: &'static str,

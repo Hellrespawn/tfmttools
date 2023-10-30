@@ -1,11 +1,13 @@
 #![allow(clippy::upper_case_acronyms)]
-use crate::tags::Tags;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+
+use crate::tags::Tags;
 
 pub(crate) static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
     Lazy::new(|| {
@@ -53,11 +55,7 @@ impl AudioFile {
 
         let extension = path.extension().unwrap().to_string_lossy().to_string();
 
-        Ok(AudioFile {
-            path,
-            tag,
-            extension,
-        })
+        Ok(AudioFile { path, tag, extension })
     }
 
     pub(crate) fn path(&self) -> &Path {

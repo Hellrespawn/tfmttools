@@ -1,5 +1,6 @@
-use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, long_about = None)]

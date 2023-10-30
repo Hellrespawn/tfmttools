@@ -18,13 +18,13 @@ mod changelist;
 mod disk;
 mod util;
 
-use changelist::ChangeList;
-use disk::DiskHandler;
 use std::path::PathBuf;
-use thiserror::Error;
 
 pub use change::{Change, ChangeType};
+use changelist::ChangeList;
+use disk::DiskHandler;
 pub use history::History;
+use thiserror::Error;
 
 /// Wrapper for Result
 pub(crate) type Result<T> = std::result::Result<T, HistoryError>;

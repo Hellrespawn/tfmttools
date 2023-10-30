@@ -1,9 +1,11 @@
-use crate::cli::config::HISTORY_NAME;
-use crate::cli::Config;
+use std::path::PathBuf;
+
 use clap::Parser;
 use color_eyre::Result;
 use file_history::History;
-use std::path::PathBuf;
+
+use crate::cli::config::HISTORY_NAME;
+use crate::cli::Config;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(author, version, about, long_about = None)]
