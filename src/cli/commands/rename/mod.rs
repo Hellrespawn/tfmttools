@@ -1,16 +1,15 @@
 mod validate;
 
-use std::path::{Path, PathBuf};
-
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use file_history::{Change, History, HistoryError};
-use fs_err as fs;
 use indicatif::ProgressIterator;
 use validate::validate_changes;
 
-use crate::cli::config::{DRY_RUN_PREFIX, HISTORY_NAME};
-use crate::cli::{ui, Config};
+use crate::cli::ui::{self, create_spinner};
+use crate::config::{Config, DRY_RUN_PREFIX, HISTORY_NAME};
 use crate::file::AudioFile;
+use crate::fs::PathIterator;
 use crate::template::Template;
 
 pub(crate) fn rename(
@@ -39,30 +38,19 @@ pub(crate) fn rename(
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
-    let spinner = ui::AudioFileSpinner::new(
+    let spinner = create_spinner(
         "audio files",
         "total files",
         "Gathering files...",
+        "Gathered files.",
     )?;
 
-    let paths = Config::search_path(
-        config.current_dir(),
-        config.recursion_depth(),
-        &|path| {
-            path.extension().map_or(false, |extension| {
-                for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
-                    if extension == supported_extension {
-                        return true;
-                    }
-                }
-
-                false
-            })
-        },
-        Some(&spinner),
-    );
-
-    spinner.finish("Gathered files.");
+    let paths: Vec<Utf8PathBuf> =
+        PathIterator::recursive(config.current_dir(), config.recursion_depth())
+            .flatten()
+            .filter(|path| AudioFile::path_predicate(path))
+            .progress_with(spinner)
+            .collect();
 
     paths.iter().map(|path| AudioFile::new(path)).collect()
 }
@@ -76,7 +64,7 @@ fn create_changes(
         files.len() as u64,
         "Determining output paths...",
         "Determined output paths",
-        false,
+        config.dry_run(),
     )?;
 
     let changes: Result<Vec<Change>> = files
@@ -91,7 +79,7 @@ fn create_changes(
     changes
 }
 
-fn get_common_path(paths: &[&Path]) -> PathBuf {
+fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
     debug_assert!(!paths.is_empty());
 
     let mut iter = paths.iter();
@@ -101,7 +89,7 @@ fn get_common_path(paths: &[&Path]) -> PathBuf {
     let mut common_path = iter.next().unwrap().to_path_buf();
 
     for path in iter {
-        let mut new_common_path = PathBuf::new();
+        let mut new_common_path = Utf8PathBuf::new();
 
         for (left, right) in path.components().zip(common_path.components()) {
             if left == right {
@@ -140,8 +128,8 @@ fn create_target_path_from_string(
     config: &Config,
     string: &str,
     extension: &str,
-) -> PathBuf {
-    let target_path = PathBuf::from(format!("{string}.{extension}"));
+) -> Utf8PathBuf {
+    let target_path = Utf8PathBuf::from(format!("{string}.{extension}"));
 
     // If target_path has an absolute path, join will clobber the current_dir,
     // so this is always safe.
@@ -216,7 +204,11 @@ fn move_files(
     Ok(())
 }
 
-fn create_dir(dry_run: bool, history: &mut History, path: &Path) -> Result<()> {
+fn create_dir(
+    dry_run: bool,
+    history: &mut History,
+    path: &Utf8Path,
+) -> Result<()> {
     if path.is_dir() {
         return Ok(());
     }
@@ -237,7 +229,7 @@ fn create_dir(dry_run: bool, history: &mut History, path: &Path) -> Result<()> {
 fn clean_up_source_dirs(
     config: &Config,
     history: &mut History,
-    common_path: &Path,
+    common_path: &Utf8Path,
 ) -> Result<()> {
     let dirs = gather_dirs(common_path, config.recursion_depth());
 
@@ -256,18 +248,18 @@ fn clean_up_source_dirs(
     Ok(())
 }
 
-fn gather_dirs(path: &Path, depth: usize) -> Vec<PathBuf> {
+fn gather_dirs(path: &Utf8Path, depth: usize) -> Vec<Utf8PathBuf> {
     let mut dirs = Vec::new();
 
     if depth == 0 {
         return dirs;
     }
 
-    for entry in fs::read_dir(path).into_iter().flatten().flatten() {
+    for entry in path.read_dir_utf8().into_iter().flatten().flatten() {
         let dir = entry.path();
         if dir.is_dir() {
-            dirs.extend(gather_dirs(&dir, depth - 1));
-            dirs.push(dir);
+            dirs.extend(gather_dirs(dir, depth - 1));
+            dirs.push(dir.to_owned());
         }
     }
 
@@ -317,8 +309,7 @@ fn normalize_separators(string: &str) -> String {
 mod tests {
     use assert_fs::TempDir;
     use color_eyre::Result;
-
-    use super::*;
+    use fs_err as fs;
 
     #[test]
     fn test_remove_dir_error_codes() -> Result<()> {

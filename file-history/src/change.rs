@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
 use std::{fmt, fs};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use log::trace;
 use serde::{Deserialize, Serialize};
 
@@ -19,18 +19,16 @@ impl fmt::Display for Change {
         match &self.change_type {
             ChangeType::Mv { source, target } => write!(
                 f,
-                "Change::Move {{\n{indent}source: \"{}\",\n{indent}target: \"{}\"\n}}",
-                source.display(),
-                target.display(), indent=indent
+                "Change::Move {{\n{indent}source: \"{source}\",\n{indent}target: \"{target}\"\n}}"
             )?,
             ChangeType::MkDir(path) => {
                 write!(
-                    f, "Change::MakeDir(\n{}\"{}\"\n)", indent, path.display()
+                    f, "Change::MakeDir(\n{indent}\"{path}\"\n)"
                 )?;
             }
             ChangeType::RmDir(path) => {
                 write!(
-                    f, "Change::RemoveDir(\n{}\"{}\"\n)",indent,  path.display()
+                    f, "Change::RemoveDir(\n{indent}\"{path}\"\n)"
                 )?;
             }
         }
@@ -48,8 +46,8 @@ impl fmt::Display for Change {
 impl Change {
     pub fn mv<P, Q>(source: P, target: Q) -> Self
     where
-        P: AsRef<Path>,
-        Q: AsRef<Path>,
+        P: AsRef<Utf8Path>,
+        Q: AsRef<Utf8Path>,
     {
         let change_type = ChangeType::Mv {
             source: source.as_ref().to_owned(),
@@ -61,7 +59,7 @@ impl Change {
 
     pub fn mkdir<P>(target: P) -> Self
     where
-        P: AsRef<Path>,
+        P: AsRef<Utf8Path>,
     {
         let change_type = ChangeType::MkDir(target.as_ref().to_owned());
 
@@ -70,7 +68,7 @@ impl Change {
 
     pub fn rmdir<P>(target: P) -> Self
     where
-        P: AsRef<Path>,
+        P: AsRef<Utf8Path>,
     {
         let change_type = ChangeType::RmDir(target.as_ref().to_owned());
 
@@ -101,7 +99,7 @@ impl Change {
         }
     }
 
-    pub fn source(&self) -> Option<&Path> {
+    pub fn source(&self) -> Option<&Utf8Path> {
         if let ChangeType::Mv { source, .. } = &self.change_type {
             Some(source)
         } else {
@@ -109,7 +107,7 @@ impl Change {
         }
     }
 
-    pub fn target(&self) -> &Path {
+    pub fn target(&self) -> &Utf8Path {
         match self.change_type() {
             ChangeType::Mv { target, .. }
             | ChangeType::MkDir(target)
@@ -124,14 +122,14 @@ pub enum ChangeType {
     /// Represents the moving of a file.
     Mv {
         /// Source path
-        source: PathBuf,
+        source: Utf8PathBuf,
         /// Target path
-        target: PathBuf,
+        target: Utf8PathBuf,
     },
     /// Represents the creating of a directory
-    MkDir(PathBuf),
+    MkDir(Utf8PathBuf),
     /// Represents the deletion of a directory
-    RmDir(PathBuf),
+    RmDir(Utf8PathBuf),
 }
 impl ChangeType {
     /// Applies the change
@@ -140,21 +138,17 @@ impl ChangeType {
             ChangeType::Mv { source, target } => {
                 ChangeType::copy_or_move_file(source, target)?;
 
-                trace!(
-                    "Renamed:\n\"{}\"\n\"{}\"",
-                    &source.display(),
-                    &target.display()
-                );
+                trace!("Renamed:\n\"{}\"\n\"{}\"", &source, &target);
             },
 
             ChangeType::MkDir(path) => {
                 fs::create_dir(path)?;
-                trace!("Created directory {}", path.display());
+                trace!("Created directory {}", path);
             },
 
             ChangeType::RmDir(path) => {
                 fs::remove_dir(path)?;
-                trace!("Removed directory {}", path.display());
+                trace!("Removed directory {}", path);
             },
         }
         Ok(())
@@ -166,29 +160,25 @@ impl ChangeType {
             ChangeType::Mv { source, target } => {
                 ChangeType::copy_or_move_file(target, source)?;
 
-                trace!(
-                    "Undid:\n\"{}\"\n\"{}\"",
-                    &target.display(),
-                    &source.display(),
-                );
+                trace!("Undid:\n\"{}\"\n\"{}\"", &target, &source,);
             },
 
             ChangeType::MkDir(path) => {
                 fs::remove_dir(path)?;
 
-                trace!("Undid directory {}", path.display());
+                trace!("Undid directory {}", path);
             },
 
             ChangeType::RmDir(path) => {
                 fs::create_dir(path)?;
 
-                trace!("Recreated directory {}", path.display());
+                trace!("Recreated directory {}", path);
             },
         }
         Ok(())
     }
 
-    fn copy_or_move_file(source: &Path, target: &Path) -> Result<()> {
+    fn copy_or_move_file(source: &Utf8Path, target: &Utf8Path) -> Result<()> {
         if let Err(err) = fs::rename(source, target) {
             // Can't rename across filesystem boundaries. Checks for
             // the appropriate error and copies/deletes instead.
@@ -231,8 +221,9 @@ mod tests {
     fn test_make_dir() -> Result<()> {
         let dir = TempDir::new()?;
         let path = dir.child("test");
+        let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
 
-        let mut change = Change::mkdir(&path);
+        let mut change = Change::mkdir(utf8_path);
 
         // Before: doesn't exist
         path.assert(predicate::path::missing());
@@ -254,12 +245,14 @@ mod tests {
     fn test_remove_dir() -> Result<()> {
         let dir = TempDir::new()?;
         let path = dir.child("test");
-        ChangeType::MkDir(path.to_path_buf()).apply()?;
+        let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
+
+        ChangeType::MkDir(utf8_path.clone()).apply()?;
 
         // Before: exists
         path.assert(predicate::path::exists());
 
-        let mut rmdir_change = Change::rmdir(&path);
+        let mut rmdir_change = Change::rmdir(&utf8_path);
 
         rmdir_change.apply()?;
 
@@ -279,6 +272,8 @@ mod tests {
         let dir = TempDir::new()?;
         let source = dir.child("source");
         let target = dir.child("target");
+        let utf8_source: Utf8PathBuf = source.to_path_buf().try_into().unwrap();
+        let utf8_target: Utf8PathBuf = target.to_path_buf().try_into().unwrap();
 
         source.touch()?;
 
@@ -286,7 +281,7 @@ mod tests {
         source.assert(predicate::path::exists());
         target.assert(predicate::path::missing());
 
-        let mut mv = Change::mv(&source, &target);
+        let mut mv = Change::mv(utf8_source, utf8_target);
 
         mv.apply()?;
 
@@ -308,10 +303,12 @@ mod tests {
         let dir = TempDir::new()?;
         let source = dir.child("source");
         let target = dir.child("target");
+        let utf8_source: Utf8PathBuf = source.to_path_buf().try_into().unwrap();
+        let utf8_target: Utf8PathBuf = target.to_path_buf().try_into().unwrap();
 
         source.touch()?;
 
-        let mut mv = Change::mv(&source, target);
+        let mut mv = Change::mv(utf8_source, utf8_target);
 
         mv.apply()?;
 

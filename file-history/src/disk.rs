@@ -1,6 +1,6 @@
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
@@ -15,17 +15,17 @@ struct HistoryDto {
 #[allow(clippy::module_name_repetitions)]
 #[derive(PartialEq, Debug)]
 pub(crate) struct DiskHandler {
-    path: PathBuf,
+    path: Utf8PathBuf,
 }
 
 impl DiskHandler {
-    pub(crate) fn init_dir(directory: &Path, name: &str) -> DiskHandler {
+    pub(crate) fn init_dir(directory: &Utf8Path, name: &str) -> DiskHandler {
         DiskHandler {
             path: directory.join(name).with_extension(DiskHandler::extension()),
         }
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Utf8Path {
         &self.path
     }
 
@@ -126,7 +126,7 @@ mod tests {
 
     static PREFIX: &str = "rust-file-history-disk-";
 
-    fn init_file(path: &Path) -> DiskHandler {
+    fn init_file(path: &Utf8Path) -> DiskHandler {
         DiskHandler { path: path.to_owned() }
     }
 
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn test_write_and_read() -> Result<()> {
         let file = get_temporary_file("test_write_and_read")?;
-        let disk_handler = init_file(file.path());
+        let disk_handler = init_file(file.path().try_into().unwrap());
 
         write_read_compare_test_data(&disk_handler)?;
 
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn test_clear() -> Result<()> {
         let file = get_temporary_file("test_clear")?;
-        let disk_handler = init_file(file.path());
+        let disk_handler = init_file(file.path().try_into().unwrap());
 
         file.assert(predicate::path::missing());
 
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_write_and_read_from_clear() -> Result<()> {
         let file = get_temporary_file("test_write_and_read_from_clear()")?;
-        let disk_handler = init_file(file.path());
+        let disk_handler = init_file(file.path().try_into().unwrap());
 
         assert!(!disk_handler.clear()?);
 

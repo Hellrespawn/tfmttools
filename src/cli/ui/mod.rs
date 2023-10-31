@@ -3,13 +3,11 @@ use std::path::Path;
 use color_eyre::Result;
 use file_history::Change;
 use indicatif::{
-    ProgressBar as IProgressBar, ProgressDrawTarget, ProgressFinish,
-    ProgressStyle,
+    ProgressBar, ProgressDrawTarget, ProgressFinish, ProgressStyle,
 };
 
-use super::config::DRY_RUN_PREFIX;
-use super::Config;
 use crate::cli::ui::table::Table;
+use crate::config::{Config, DRY_RUN_PREFIX};
 
 pub(crate) mod table;
 
@@ -17,49 +15,25 @@ pub(crate) fn print_error(error: &color_eyre::Report) {
     println!("An error occurred:\n{error}");
 }
 
-pub(crate) struct AudioFileSpinner {
-    spinner: IProgressBar,
-}
+pub(crate) fn create_spinner(
+    found: &str,
+    total: &str,
+    msg: &'static str,
+    finished_msg: &'static str,
+) -> Result<ProgressBar> {
+    let spinner = ProgressBar::new(0)
+        .with_finish(ProgressFinish::AbandonWithMessage(finished_msg.into()));
 
-impl AudioFileSpinner {
-    pub(crate) fn new(
-        found: &str,
-        total: &str,
-        message: &'static str,
-    ) -> Result<AudioFileSpinner> {
-        let spinner = IProgressBar::new(0).with_finish(ProgressFinish::Abandon);
+    let template =
+        format!("[{{pos}}/{{len}} {found}/{total}] {{wide_msg}} {{spinner}}",);
 
-        let template = format!(
-            "[{{pos}}/{{len}} {found}/{total}] {{wide_msg}} {{spinner}}",
-        );
+    let style = ProgressStyle::default_spinner().template(&template)?;
 
-        let style = ProgressStyle::default_spinner().template(&template)?;
+    spinner.set_style(style);
+    spinner.set_draw_target(ProgressDrawTarget::stdout());
+    spinner.set_message(msg);
 
-        spinner.set_style(style);
-        spinner.set_draw_target(ProgressDrawTarget::stdout());
-        spinner.set_message(message);
-
-        Ok(AudioFileSpinner { spinner })
-    }
-
-    pub(crate) fn inner(&self) -> &IProgressBar {
-        &self.spinner
-    }
-
-    pub(crate) fn inc_found(&self) {
-        self.spinner.inc(1);
-    }
-
-    pub(crate) fn inc_total(&self) {
-        // std::thread::sleep(std::time::Duration::from_millis(100));
-        self.spinner.inc_length(1);
-        self.spinner.tick();
-    }
-
-    pub(crate) fn finish(&self, message: &'static str) {
-        self.spinner.finish_using_style();
-        self.spinner.set_message(message);
-    }
+    Ok(spinner)
 }
 
 pub(crate) fn create_progressbar(
@@ -67,8 +41,8 @@ pub(crate) fn create_progressbar(
     msg: &'static str,
     finished_msg: &'static str,
     dry_run: bool,
-) -> Result<IProgressBar> {
-    let bar = IProgressBar::new(len).with_finish(ProgressFinish::WithMessage(
+) -> Result<ProgressBar> {
+    let bar = ProgressBar::new(len).with_finish(ProgressFinish::WithMessage(
         std::borrow::Cow::Borrowed(finished_msg),
     ));
 

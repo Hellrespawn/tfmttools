@@ -1,7 +1,7 @@
 use color_eyre::Result;
 
 use crate::cli::ui::table::Table;
-use crate::cli::Config;
+use crate::config::Config;
 use crate::template::Template;
 
 pub(crate) fn list_templates(config: &Config) -> Result<()> {
@@ -12,7 +12,7 @@ pub(crate) fn list_templates(config: &Config) -> Result<()> {
     if templates.is_empty() {
         table.set_heading(format!(
             "Couldn't find any templates at {} or in the current directory.",
-            config.directory().display()
+            config.directory()
         ));
     } else {
         table.set_heading(format!("Found {} templates", templates.len()));

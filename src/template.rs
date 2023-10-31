@@ -1,5 +1,4 @@
-use std::path::Path;
-
+use camino::Utf8Path;
 use color_eyre::Result;
 use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
@@ -7,6 +6,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::tags::Tags;
+
+pub(crate) const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
 #[derive(Debug)]
 pub(crate) struct Template<'s> {
@@ -16,12 +17,9 @@ pub(crate) struct Template<'s> {
 }
 
 impl<'s> Template<'s> {
-    pub(crate) fn from_file(path: &Path) -> Result<Self> {
-        let name = path
-            .file_stem()
-            .map(std::ffi::OsStr::to_string_lossy)
-            .expect("File should have a file name.")
-            .to_string();
+    pub(crate) fn from_file(path: &Utf8Path) -> Result<Self> {
+        let name =
+            path.file_stem().expect("File should have a file name.").to_owned();
 
         let template = fs::read_to_string(path)?;
 
@@ -74,6 +72,12 @@ impl<'s> Template<'s> {
         let output = template.render(context)?;
 
         Ok(output)
+    }
+
+    pub(crate) fn path_predicate(path: &Utf8Path) -> bool {
+        path.extension().map_or(false, |string| {
+            TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
+        })
     }
 
     fn get_template(&self) -> Result<minijinja::Template> {

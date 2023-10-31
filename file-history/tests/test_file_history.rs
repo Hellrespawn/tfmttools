@@ -1,5 +1,6 @@
 use assert_fs::prelude::*;
 use assert_fs::TempDir;
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use file_history::{Change, History};
 use predicates::prelude::*;
@@ -12,7 +13,7 @@ const FILE_NAME: &str = "test.histfile";
 fn test_new_history_doesnt_create_file() -> Result<()> {
     let dir = TempDir::new()?;
 
-    let history = History::load(dir.path(), FILE_NAME)?;
+    let history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
     assert!(!history.path().exists());
 
@@ -23,7 +24,7 @@ fn test_new_history_doesnt_create_file() -> Result<()> {
 fn test_unchanged_history_doesnt_save() -> Result<()> {
     let dir = TempDir::new()?;
 
-    let mut history = History::load(dir.path(), FILE_NAME)?;
+    let mut history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
     assert!(matches!(history.save(), Ok(false)));
 
@@ -36,10 +37,11 @@ fn test_unchanged_history_doesnt_save() -> Result<()> {
 fn test_apply_action() -> Result<()> {
     let dir = TempDir::new()?;
     let path = dir.child("testdir");
+    let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
 
-    let mut history = History::load(dir.path(), FILE_NAME)?;
+    let mut history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
-    let action = Change::mkdir(&path);
+    let action = Change::mkdir(utf8_path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -55,10 +57,11 @@ fn test_apply_action() -> Result<()> {
 fn test_undo_action() -> Result<()> {
     let dir = TempDir::new()?;
     let path = dir.child("testdir");
+    let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
 
-    let mut history = History::load(dir.path(), FILE_NAME)?;
+    let mut history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
-    let action = Change::mkdir(&path);
+    let action = Change::mkdir(utf8_path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -80,10 +83,11 @@ fn test_undo_action() -> Result<()> {
 fn test_redo_action() -> Result<()> {
     let dir = TempDir::new()?;
     let path = dir.child("testdir");
+    let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
 
-    let mut history = History::load(dir.path(), FILE_NAME)?;
+    let mut history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
-    let action = Change::mkdir(&path);
+    let action = Change::mkdir(utf8_path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -109,10 +113,11 @@ fn test_redo_action() -> Result<()> {
 fn test_read_write_from_disk() -> Result<()> {
     let dir = TempDir::new()?;
     let path = dir.child("testdir");
+    let utf8_path: Utf8PathBuf = path.to_path_buf().try_into().unwrap();
 
-    let mut history = History::load(dir.path(), FILE_NAME)?;
+    let mut history = History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
-    let action = Change::mkdir(&path);
+    let action = Change::mkdir(utf8_path);
 
     // Before: doesn't exist
     path.assert(predicate::path::missing());
@@ -131,7 +136,8 @@ fn test_read_write_from_disk() -> Result<()> {
     history.redo(1)?;
     path.assert(predicate::path::exists());
 
-    let second_history = History::load(dir.path(), FILE_NAME)?;
+    let second_history =
+        History::load(dir.path().try_into().unwrap(), FILE_NAME)?;
 
     assert_eq!(history, second_history);
 

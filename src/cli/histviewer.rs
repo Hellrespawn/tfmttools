@@ -1,17 +1,15 @@
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use clap::Parser;
 use color_eyre::Result;
 use file_history::History;
 
-use crate::cli::config::HISTORY_NAME;
-use crate::cli::Config;
+use crate::config::{Config, HISTORY_NAME};
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Sets a custom config file
-    config_dir: Option<PathBuf>,
+    config_dir: Option<Utf8PathBuf>,
 }
 
 /// Entry point for histviewer

@@ -1,58 +1,31 @@
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use std::{
-    collections::VecDeque,
-    path::{Path, PathBuf},
-};
+use ignore::{Walk, WalkBuilder};
 
-pub struct PathIterator {
-    entries: VecDeque<(PathBuf, usize)>,
-    recursion_depth: usize,
+pub struct PathIterator(Walk);
+
+impl Iterator for PathIterator {
+    type Item = Result<Utf8PathBuf>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.0.next()?;
+
+        Some(Self::transform_iterator_result(result))
+    }
 }
 
 impl PathIterator {
-    pub fn new(path: PathBuf, recursion_depth: usize) -> Self {
-        Self { entries: vec![(path, 0)].into(), recursion_depth }
+    pub fn new(path: &Utf8Path) -> Self {
+        Self(WalkBuilder::new(path).max_depth(Some(1)).build())
     }
 
-    fn handle_dir(&mut self, path: &Path, depth: usize) -> Result<()> {
-        // println!("depth: {depth}\trd: {}", self.recursion_depth);
-        if depth >= self.recursion_depth {
-            let read_dir = path.read_dir()?;
-
-            let entries = read_dir
-                .map(|r| r.map(|d| (d.path(), depth + 1)))
-                .collect::<std::io::Result<Vec<_>>>()?;
-
-            self.entries.extend(entries);
-        }
-
-        Ok(())
+    pub fn recursive(path: &Utf8Path, recursion_depth: usize) -> Self {
+        Self(WalkBuilder::new(path).max_depth(Some(recursion_depth)).build())
     }
-}
 
-impl Iterator for PathIterator {
-    type Item = Result<PathBuf>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let entry = self.entries.pop_front();
-
-        if let Some((path, depth)) = entry {
-            // dbg!(&self.entries);
-            if path.is_file() {
-                // println!("Handling file {}", path.display());
-                Some(Ok(path))
-            } else if path.is_dir() {
-                println!("Handling dir {}", path.display());
-                if let Err(error) = self.handle_dir(&path, depth) {
-                    Some(Err(error))
-                } else {
-                    self.next()
-                }
-            } else {
-                self.next()
-            }
-        } else {
-            None
-        }
+    fn transform_iterator_result(
+        result: Result<ignore::DirEntry, ignore::Error>,
+    ) -> Result<Utf8PathBuf> {
+        Ok(result?.into_path().try_into()?)
     }
 }

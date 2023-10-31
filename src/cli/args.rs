@@ -1,6 +1,7 @@
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
+
+use crate::config::Config;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, long_about = None)]
@@ -8,7 +9,7 @@ use clap::{Parser, Subcommand};
 pub(crate) struct Args {
     /// Sets a custom config folder
     #[arg(short, long)]
-    pub(crate) config: Option<PathBuf>,
+    pub(crate) config: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
     /// Don't run command, only show what would happen.
@@ -80,6 +81,10 @@ pub(crate) enum Command {
 }
 
 impl Args {
+    pub(crate) fn parse() -> Args {
+        <Self as Parser>::parse()
+    }
+
     #[must_use]
     pub(crate) fn dry_run(&self) -> bool {
         self.dry_run
@@ -94,7 +99,18 @@ impl Args {
     }
 }
 
-/// Parses arguments
-pub(crate) fn parse_args() -> Args {
-    Args::parse()
+impl TryFrom<&Args> for Config {
+    type Error = color_eyre::Report;
+
+    fn try_from(args: &Args) -> Result<Self, Self::Error> {
+        let path = if let Some(path) = &args.config {
+            path.clone()
+        } else {
+            Self::default_path()?
+        };
+
+        let dry_run = args.dry_run();
+
+        Self::new(&path, dry_run)
+    }
 }

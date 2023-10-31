@@ -2,8 +2,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
 
-use crate::cli::config::DRY_RUN_PREFIX;
-use crate::cli::Config;
+use crate::config::{Config, DRY_RUN_PREFIX};
 
 struct DefaultFile {
     name: &'static str,
@@ -28,7 +27,7 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
         if has_files {
             return Err(eyre!(
                 "Configuration folder already exists and is not empty: {}",
-                config.directory().display()
+                config.directory()
             ));
         }
     }
@@ -44,10 +43,7 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
             fs::write(path, file.content)?;
         }
 
-        println!(
-            "{prefix}Wrote default files to {}",
-            config.directory().display()
-        );
+        println!("{prefix}Wrote default files to {}", config.directory());
     }
 
     Ok(())

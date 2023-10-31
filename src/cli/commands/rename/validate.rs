@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::path::Path;
 
+use camino::Utf8Path;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use file_history::Change;
 
 use crate::cli::ui::table::Table;
-use crate::cli::Config;
+use crate::config::Config;
 
 pub(crate) fn validate_changes(
     config: &Config,
@@ -28,7 +28,7 @@ fn validate_double_separators(
         .filter(|change| {
             change
                 .target()
-                .to_string_lossy()
+                .to_string()
                 .contains(&std::path::MAIN_SEPARATOR_STR.repeat(2))
         })
         .collect::<Vec<_>>();
@@ -74,7 +74,7 @@ fn validate_collisions(config: &Config, changes: &[Change]) -> Result<()> {
         map.entry(change.target()).or_insert_with(Vec::new).push(source);
     }
 
-    let collisions: HashMap<&Path, Vec<&Path>> =
+    let collisions: HashMap<&Utf8Path, Vec<&Utf8Path>> =
         map.into_iter().filter(|(_, v)| v.len() > 1).collect();
 
     if collisions.is_empty() {
@@ -86,7 +86,7 @@ fn validate_collisions(config: &Config, changes: &[Change]) -> Result<()> {
 
 fn format_collisions(
     config: &Config,
-    collisions_map: &HashMap<&Path, Vec<&Path>>,
+    collisions_map: &HashMap<&Utf8Path, Vec<&Utf8Path>>,
 ) -> String {
     let length = collisions_map.len();
 
@@ -112,8 +112,8 @@ fn format_collisions(
 
 fn format_collision(
     config: &Config,
-    path: &Path,
-    collisions: &[&Path],
+    path: &Utf8Path,
+    collisions: &[&Utf8Path],
 ) -> String {
     let mut table = Table::new();
 
@@ -121,7 +121,7 @@ fn format_collision(
 
     table.set_heading(format!(
         "{} is pointed to by {} file{}",
-        path.display(),
+        path,
         length,
         if length > 1 { "s" } else { "" },
     ));
@@ -143,7 +143,7 @@ fn format_collision(
 }
 
 fn validate_existing_files(config: &Config, changes: &[Change]) -> Result<()> {
-    let existing: Vec<&Path> = changes
+    let existing: Vec<&Utf8Path> = changes
         .iter()
         .filter_map(|change| {
             let target = change.target();
@@ -182,13 +182,13 @@ fn validate_existing_files(config: &Config, changes: &[Change]) -> Result<()> {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    use camino::Utf8PathBuf;
 
     use super::*;
 
     #[test]
     fn validate_collisions_test() -> Result<()> {
-        let config = Config::new(&PathBuf::new(), false)?;
+        let config = Config::new(&Utf8PathBuf::new(), false)?;
 
         let reference =
             [("/a/b/c.file", "/b/c/d.file"), ("/c/d/e.file", "/b/c/d.file")]

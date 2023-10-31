@@ -18,8 +18,7 @@ mod changelist;
 mod disk;
 mod util;
 
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 pub use change::{Change, ChangeType};
 use changelist::ChangeList;
 use disk::DiskHandler;
@@ -34,7 +33,7 @@ pub(crate) type Result<T> = std::result::Result<T, HistoryError>;
 pub enum HistoryError {
     /// File in use
     #[error("The process cannot access the file because it is being used by another process. (os error 32):\n{0}")]
-    FileInUse(PathBuf),
+    FileInUse(Utf8PathBuf),
 
     /// Action was already applied.
     #[error("This action has already been applied: {0}")]

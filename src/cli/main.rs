@@ -1,14 +1,26 @@
 use color_eyre::Result;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, registry, EnvFilter};
 
+use super::Args;
 use crate::cli::args::Command;
 use crate::cli::commands::{self, UndoMode};
-use crate::cli::{ui, Config};
+use crate::cli::ui;
+use crate::config::Config;
 
 /// Main entrypoint for tfmttools
 pub fn main(dry_run_override: bool) -> Result<()> {
-    let args = crate::cli::args::parse_args();
+    registry()
+        .with(fmt::layer().with_target(false))
+        .with(EnvFilter::from_default_env())
+        .init();
 
-    let config = Config::from_args(&args)?.aggregate_dry_run(dry_run_override);
+    let args = Args::parse();
+
+    let mut config: Config = (&args).try_into()?;
+
+    *config.dry_run_mut() = config.dry_run() || dry_run_override;
 
     if let Err(err) = select_command(config, args.command) {
         ui::print_error(&err);

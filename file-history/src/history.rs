@@ -1,6 +1,6 @@
 use std::fmt;
-use std::path::Path;
 
+use camino::Utf8Path;
 use log::{debug, info};
 
 use crate::changelist::ChangeCount;
@@ -17,7 +17,7 @@ pub struct History {
 
 impl fmt::Display for History {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "History file at {}", self.disk_handler.path().display())?;
+        writeln!(f, "History file at {}", self.disk_handler.path())?;
 
         writeln!(f, "Applied changes ({}):", self.applied_lists.len())?;
 
@@ -37,11 +37,11 @@ impl fmt::Display for History {
 
 impl History {
     /// Load or create history file at `path`
-    pub fn load(directory: &Path, name: &str) -> Result<Self> {
+    pub fn load(directory: &Utf8Path, name: &str) -> Result<Self> {
         let disk_handler = DiskHandler::init_dir(directory, name);
         let (applied_lists, undone_lists) = disk_handler.read()?;
 
-        info!("Loading history from {}", disk_handler.path().display());
+        info!("Loading history from {}", disk_handler.path());
 
         Ok(History {
             disk_handler,
@@ -87,7 +87,7 @@ impl History {
     }
 
     /// Gets the path of the current instance.
-    pub fn path(&self) -> &Path {
+    pub fn path(&self) -> &Utf8Path {
         self.disk_handler.path()
     }
 

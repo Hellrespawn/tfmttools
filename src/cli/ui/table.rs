@@ -1,5 +1,4 @@
-use std::path::Path;
-
+use camino::Utf8Path;
 use console::Term;
 use once_cell::sync::Lazy;
 
@@ -25,14 +24,14 @@ impl Table {
         self.body.push(string);
     }
 
-    pub(crate) fn push_path(&mut self, path: &Path) {
+    pub(crate) fn push_path(&mut self, path: &Utf8Path) {
         self.push_string(Self::truncate_path(path));
     }
 
-    fn truncate_path(path: &Path) -> String {
+    fn truncate_path(path: &Utf8Path) -> String {
         let width = Self::get_width() - 4;
 
-        let string = path.to_string_lossy();
+        let string = path.to_string();
 
         if console::measure_text_width(string.as_ref()) <= width {
             format!("{string:<width$}")

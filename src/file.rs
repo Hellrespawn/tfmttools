@@ -1,7 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
@@ -27,7 +27,7 @@ pub(crate) static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
     });
 
 pub(crate) struct AudioFile {
-    path: PathBuf,
+    path: Utf8PathBuf,
     tag: Tag,
     extension: String,
 }
@@ -43,26 +43,32 @@ impl std::fmt::Debug for AudioFile {
 impl AudioFile {
     pub(crate) const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
 
-    pub(crate) fn new(path: &Path) -> Result<AudioFile> {
+    pub(crate) fn new(path: &Utf8Path) -> Result<AudioFile> {
         let path = path.to_owned();
         let tagged_file = lofty::read_from_path(&path)?;
         let tag = tagged_file
             .primary_tag()
-            .ok_or_else(|| {
-                eyre!("Unable to read primary tag for '{}'", path.display())
-            })?
+            .ok_or_else(|| eyre!("Unable to read primary tag for '{}'", path))?
             .clone();
 
-        let extension = path.extension().unwrap().to_string_lossy().to_string();
+        let extension = path.extension().unwrap().to_string();
 
         Ok(AudioFile { path, tag, extension })
     }
 
-    pub(crate) fn read_path(path: &Path) -> Result<&dyn Iterator<Item = AudioFile>> {
-        todo!()
+    pub(crate) fn path_predicate(path: &Utf8Path) -> bool {
+        path.extension().map_or(false, |extension| {
+            for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
+                if extension == supported_extension {
+                    return true;
+                }
+            }
+
+            false
+        })
     }
 
-    pub(crate) fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Utf8Path {
         &self.path
     }
 
