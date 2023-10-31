@@ -42,6 +42,10 @@ impl AudioFileSpinner {
         Ok(AudioFileSpinner { spinner })
     }
 
+    pub(crate) fn inner(&self) -> &IProgressBar {
+        &self.spinner
+    }
+
     pub(crate) fn inc_found(&self) {
         self.spinner.inc(1);
     }

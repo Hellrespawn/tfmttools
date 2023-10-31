@@ -58,6 +58,10 @@ impl AudioFile {
         Ok(AudioFile { path, tag, extension })
     }
 
+    pub(crate) fn read_path(path: &Path) -> Result<&dyn Iterator<Item = AudioFile>> {
+        todo!()
+    }
+
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }

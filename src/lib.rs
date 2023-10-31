@@ -15,6 +15,7 @@ pub mod cli;
 mod file;
 mod tags;
 mod template;
+mod fs;
 
 #[cfg(debug_assertions)]
 mod debug;

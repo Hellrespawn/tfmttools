@@ -6,7 +6,9 @@ use fs_err as fs;
 
 use super::Args;
 use crate::cli::ui;
+use crate::fs::PathIterator;
 use crate::template::Template;
+use indicatif::ProgressIterator;
 
 pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");
 pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
@@ -88,40 +90,16 @@ impl Config {
     where
         P: Fn(&Path) -> bool,
     {
-        let mut found_paths = Vec::new();
+        let iter = PathIterator::new(path.to_owned(), depth);
 
-        if let Ok(iter) = fs::read_dir(path) {
-            for entry in iter.flatten() {
-                let entry_path = entry.path();
+        if let Some(spinner) = spinner {
+            let iter = iter.progress_with(spinner.inner().clone());
 
-                let matches_predicate = predicate(&entry_path);
+            iter.flatten().filter(|p| predicate(p)).collect()
+        } else {
 
-                if entry_path.is_file() {
-                    if let Some(spinner) = spinner {
-                        spinner.inc_total();
-                    }
-
-                    if matches_predicate {
-                        if let Some(spinner) = spinner {
-                            spinner.inc_found();
-                        }
-                        found_paths.push(entry_path);
-
-                        #[cfg(debug_assertions)]
-                        crate::debug::delay();
-                    }
-                } else if entry_path.is_dir() && depth > 0 {
-                    found_paths.extend(Config::search_path(
-                        &entry_path,
-                        depth - 1,
-                        predicate,
-                        spinner,
-                    ));
-                }
-            }
+            iter.flatten().filter(|p| predicate(p)).collect()
         }
-
-        found_paths
     }
 
     pub(crate) fn get_templates(&self) -> Result<Vec<Template>> {
