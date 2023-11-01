@@ -13,7 +13,7 @@
 /// Controls the command line interface
 pub mod cli;
 mod config;
-mod file;
+mod audiofile;
 mod fs;
 mod tags;
 mod template;

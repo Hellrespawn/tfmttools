@@ -8,7 +8,7 @@ use validate::validate_changes;
 
 use crate::cli::ui::{self, create_spinner};
 use crate::config::{Config, DRY_RUN_PREFIX, HISTORY_NAME};
-use crate::file::AudioFile;
+use crate::audiofile::AudioFile;
 use crate::fs::PathIterator;
 use crate::template::Template;
 
