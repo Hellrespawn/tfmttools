@@ -3,30 +3,15 @@ mod validate;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use indicatif::ProgressIterator;
-use validate::validate_changes;
+use validate::validate_move_actions;
 
+use crate::action::Move;
 use crate::audiofile::AudioFile;
 use crate::cli::ui::table::Table;
 use crate::cli::ui::{self, create_spinner};
 use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator};
 use crate::template::Template;
-
-pub(crate) struct Change(Utf8PathBuf, Utf8PathBuf);
-
-impl Change {
-    pub(crate) fn source(&self) -> &Utf8Path {
-        &self.0
-    }
-
-    pub(crate) fn target(&self) -> &Utf8Path {
-        &self.1
-    }
-
-    pub(crate) fn is_different(&self) -> bool {
-        self.source() != self.target()
-    }
-}
 
 pub(crate) fn rename(
     config: &Config,
@@ -39,16 +24,16 @@ pub(crate) fn rename(
 
     let files = gather_files(config)?;
 
-    let changes = create_changes(config, &template, &files)?;
-    let changes = filter_unchanged_destinations(changes);
+    let move_actions = create_move_actions(config, &template, &files)?;
+    let move_actions = filter_unchanged_destinations(move_actions);
 
-    if changes.is_empty() {
+    if move_actions.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        validate_changes(config, &changes)?;
+        validate_move_actions(config, &move_actions)?;
 
-        perform_changes(config, changes)
+        perform_move_actions(config, move_actions)
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
@@ -69,11 +54,11 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     paths.iter().map(|path| AudioFile::new(path)).collect()
 }
 
-fn create_changes(
+fn create_move_actions(
     config: &Config,
     template: &Template,
     files: &[AudioFile],
-) -> Result<Vec<Change>> {
+) -> Result<Vec<Move>> {
     let bar = ui::create_progressbar(
         files.len() as u64,
         "Determining output paths...",
@@ -81,10 +66,10 @@ fn create_changes(
         config.dry_run(),
     )?;
 
-    let changes: Result<Vec<Change>> = files
+    let move_actions: Result<Vec<Move>> = files
         .iter()
         .map(|audiofile| {
-            Ok(Change(
+            Ok(Move::new(
                 audiofile.path().to_owned(),
                 audiofile.create_target_path(template, config.current_dir())?,
             ))
@@ -95,7 +80,7 @@ fn create_changes(
     println!();
     println!();
 
-    changes
+    move_actions
 }
 
 fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
@@ -124,18 +109,21 @@ fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
 }
 
 // TODO? Refactor this into the `create_changes` progress bar?
-fn filter_unchanged_destinations(changes: Vec<Change>) -> Vec<Change> {
-    changes.into_iter().filter(Change::is_different).collect()
+fn filter_unchanged_destinations(move_actions: Vec<Move>) -> Vec<Move> {
+    move_actions.into_iter().filter(Move::source_differs_from_target).collect()
 }
 
-fn perform_changes(config: &Config, changes: Vec<Change>) -> Result<()> {
-    print_changes_preview(config, &changes);
+fn perform_move_actions(
+    config: &Config,
+    move_actions: Vec<Move>,
+) -> Result<()> {
+    print_move_actions_preview(config, &move_actions);
 
     let common_path = get_common_path(
-        &changes.iter().map(Change::source).collect::<Vec<_>>(),
+        &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
     );
 
-    move_files(config.dry_run(), changes)?;
+    move_files(config.dry_run(), move_actions)?;
 
     fs::remove_empty_subdirectories(
         config.dry_run(),
@@ -150,16 +138,16 @@ fn perform_changes(config: &Config, changes: Vec<Change>) -> Result<()> {
     Ok(())
 }
 
-fn move_files(dry_run: bool, changes: Vec<Change>) -> Result<()> {
+fn move_files(dry_run: bool, move_actions: Vec<Move>) -> Result<()> {
     let bar = ui::create_progressbar(
-        changes.len() as u64,
+        move_actions.len() as u64,
         "Moving files...",
         "Moved files",
         dry_run,
     )?;
 
-    for change in changes.into_iter().progress_with(bar) {
-        let target = change.target();
+    for move_action in move_actions.into_iter().progress_with(bar) {
+        let target = move_action.target();
 
         // Actions target are all files, and always have a parent.
         debug_assert!(target.parent().is_some());
@@ -167,7 +155,7 @@ fn move_files(dry_run: bool, changes: Vec<Change>) -> Result<()> {
         create_dir(dry_run, target.parent().unwrap())?;
 
         if !dry_run {
-            fs::copy_or_move_file(change.source(), change.target())?;
+            fs::copy_or_move_file(move_action.source(), move_action.target())?;
         }
 
         #[cfg(debug_assertions)]
@@ -193,15 +181,18 @@ fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn print_changes_preview(config: &Config, changes: &[Change]) {
-    let length = changes.len();
+pub(crate) fn print_move_actions_preview(
+    config: &Config,
+    move_actions: &[Move],
+) {
+    let length = move_actions.len();
 
-    let step = std::cmp::max(changes.len() / config.preview_amount(), 1);
+    let step = std::cmp::max(move_actions.len() / config.preview_amount(), 1);
 
-    let slice = changes
+    let slice = move_actions
         .iter()
         .step_by(step)
-        .map(Change::target)
+        .map(Move::target)
         .map(|path| path.strip_prefix(config.current_dir()).unwrap_or(path))
         .collect::<Vec<_>>();
 

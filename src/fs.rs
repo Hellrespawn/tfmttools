@@ -78,7 +78,13 @@ pub(crate) fn create_dir(path: &Utf8Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn remove_dir(path: &Utf8Path) -> Result<bool> {
+pub(crate) enum RemoveDir {
+    Removed,
+    NotEmpty,
+    DryRun
+}
+
+pub(crate) fn remove_dir(path: &Utf8Path) -> Result<RemoveDir> {
     let result = fs::remove_dir(path);
 
     if let Err(io_error) = result {
@@ -94,25 +100,25 @@ pub(crate) fn remove_dir(path: &Utf8Path) -> Result<bool> {
             let expected_code = 39;
 
             if error_code == expected_code {
-                return Ok(false);
+                return Ok(RemoveDir::NotEmpty);
             }
 
             return Err(io_error.into());
         }
     }
 
-    Ok(true)
+    Ok(RemoveDir::Removed)
 }
 
 pub(crate) fn remove_empty_subdirectories(
     dry_run: bool,
     path: &Utf8Path,
     recursion_depth: usize,
-) -> Result<Vec<(Utf8PathBuf, bool)>> {
+) -> Result<Vec<(Utf8PathBuf, RemoveDir)>> {
     let dirs = gather_subdirectories(path, recursion_depth)
         .into_iter()
         .map(|p| {
-            let removed = if dry_run { remove_dir(&p)? } else { false };
+            let removed = if dry_run { remove_dir(&p)? } else { RemoveDir::DryRun };
 
             Ok((p, removed))
         })

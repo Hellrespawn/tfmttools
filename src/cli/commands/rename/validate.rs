@@ -4,39 +4,39 @@ use camino::Utf8Path;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
-use super::Change;
+use crate::action::Move;
 use crate::cli::ui::table::Table;
 use crate::config::Config;
 
-pub(crate) fn validate_changes(
+pub(crate) fn validate_move_actions(
     config: &Config,
-    changes: &[Change],
+    move_actions: &[Move],
 ) -> Result<()> {
-    validate_double_separators(config, changes)?;
-    validate_collisions(config, changes)?;
-    validate_existing_files(config, changes)?;
+    validate_double_separators(config, move_actions)?;
+    validate_collisions(config, move_actions)?;
+    validate_existing_files(config, move_actions)?;
 
     Ok(())
 }
 
 fn validate_double_separators(
     config: &Config,
-    changes: &[Change],
+    move_actions: &[Move],
 ) -> Result<()> {
-    let double_changes = changes
+    let move_actions_with_double_separators = move_actions
         .iter()
-        .filter(|change| {
-            change
+        .filter(|move_action| {
+            move_action
                 .target()
                 .to_string()
                 .contains(&std::path::MAIN_SEPARATOR_STR.repeat(2))
         })
         .collect::<Vec<_>>();
 
-    let paths = double_changes
+    let paths = move_actions_with_double_separators
         .iter()
         .take(config.preview_amount())
-        .map(|change| change.target())
+        .map(|m| m.target())
         .collect::<Vec<_>>();
 
     if paths.is_empty() {
@@ -53,10 +53,10 @@ fn validate_double_separators(
             table.push_path(path);
         }
 
-        if double_changes.len() > paths.len() {
+        if move_actions_with_double_separators.len() > paths.len() {
             table.push_string(format!(
                 "And {} more...",
-                double_changes.len() - paths.len()
+                move_actions_with_double_separators.len() - paths.len()
             ));
         }
 
@@ -64,13 +64,13 @@ fn validate_double_separators(
     }
 }
 
-fn validate_collisions(config: &Config, changes: &[Change]) -> Result<()> {
+fn validate_collisions(config: &Config, move_actions: &[Move]) -> Result<()> {
     let mut map = HashMap::new();
 
-    for change in changes {
-        let source = change.source();
+    for move_action in move_actions {
+        let source = move_action.source();
 
-        map.entry(change.target()).or_insert_with(Vec::new).push(source);
+        map.entry(move_action.target()).or_insert_with(Vec::new).push(source);
     }
 
     let collisions: HashMap<&Utf8Path, Vec<&Utf8Path>> =
@@ -141,11 +141,14 @@ fn format_collision(
     table.to_string()
 }
 
-fn validate_existing_files(config: &Config, changes: &[Change]) -> Result<()> {
-    let existing: Vec<&Utf8Path> = changes
+fn validate_existing_files(
+    config: &Config,
+    move_actions: &[Move],
+) -> Result<()> {
+    let existing: Vec<&Utf8Path> = move_actions
         .iter()
-        .filter_map(|change| {
-            let target = change.target();
+        .filter_map(|move_action| {
+            let target = move_action.target();
             target.exists().then_some(target)
         })
         .collect();
@@ -192,7 +195,10 @@ mod test {
         let reference =
             [("/a/b/c.file", "/b/c/d.file"), ("/c/d/e.file", "/b/c/d.file")]
                 .map(|(source, target)| {
-                    Change(Utf8PathBuf::from(source), Utf8PathBuf::from(target))
+                    Move::new(
+                        Utf8PathBuf::from(source),
+                        Utf8PathBuf::from(target),
+                    )
                 });
 
         if let Ok(()) = validate_collisions(&config, &reference) {
@@ -204,7 +210,10 @@ mod test {
         let reference =
             [("/a/b/c.file", "/b/c/d.file"), ("/c/d/e.file", "/d/e/f.file")]
                 .map(|(source, target)| {
-                    Change(Utf8PathBuf::from(source), Utf8PathBuf::from(target))
+                    Move::new(
+                        Utf8PathBuf::from(source),
+                        Utf8PathBuf::from(target),
+                    )
                 });
 
         if let Err(err) = validate_collisions(&config, &reference) {

@@ -10,6 +10,7 @@
 //! The `TagFormat` utility lets you use templates to dynamically
 //! rename your music files based on their tags.
 
+mod action;
 mod audiofile;
 /// Controls the command line interface
 pub mod cli;
