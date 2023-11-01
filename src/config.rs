@@ -6,7 +6,6 @@ use fs_err as fs;
 use crate::fs::PathIterator;
 use crate::template::Template;
 
-pub(crate) const HISTORY_NAME: &str = env!("CARGO_PKG_NAME");
 pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
 
 const DEFAULT_PREVIEW_AMOUNT: usize = 8;
@@ -127,12 +126,13 @@ impl Config {
     }
 
     fn get_template_paths(&self) -> Result<Vec<Utf8PathBuf>> {
-        let mut paths =
-            PathIterator::new(self.directory()).collect::<Result<Vec<_>>>()?;
+        let mut paths = PathIterator::new(self.directory(), None)
+            .collect::<Result<Vec<_>>>()?;
 
         let cwd: Utf8PathBuf = std::env::current_dir()?.try_into()?;
 
-        paths.extend(PathIterator::new(&cwd).collect::<Result<Vec<_>>>()?);
+        paths
+            .extend(PathIterator::new(&cwd, None).collect::<Result<Vec<_>>>()?);
 
         Ok(paths.into_iter().filter(|p| Template::path_predicate(p)).collect())
     }

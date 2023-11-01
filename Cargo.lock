@@ -981,7 +981,6 @@ dependencies = [
  "color-eyre",
  "console",
  "dirs",
- "file-history",
  "fs-err",
  "ignore",
  "indicatif",

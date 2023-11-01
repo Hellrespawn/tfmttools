@@ -1,13 +1,9 @@
-use std::path::Path;
-
 use color_eyre::Result;
-use file_history::Change;
 use indicatif::{
     ProgressBar, ProgressDrawTarget, ProgressFinish, ProgressStyle,
 };
 
-use crate::cli::ui::table::Table;
-use crate::config::{Config, DRY_RUN_PREFIX};
+use crate::config::DRY_RUN_PREFIX;
 
 pub(crate) mod table;
 
@@ -55,35 +51,4 @@ pub(crate) fn create_progressbar(
     bar.set_message(msg);
 
     Ok(bar)
-}
-
-pub(crate) fn print_changes_preview(
-    config: &Config,
-    changes: &[Change],
-    common_path: &Path,
-) {
-    let length = changes.len();
-
-    let step = std::cmp::max(changes.len() / config.preview_amount(), 1);
-
-    let slice = changes
-        .iter()
-        .step_by(step)
-        .map(file_history::Change::target)
-        .map(|path| path.strip_prefix(common_path).unwrap_or(path))
-        .collect::<Vec<_>>();
-
-    let mut table = Table::new();
-
-    table.set_heading(if slice.len() <= config.preview_amount() {
-        format!("Previewing {} files", slice.len())
-    } else {
-        format!("Previewing {} of {} files", slice.len(), length)
-    });
-
-    for path in slice {
-        table.push_path(path);
-    }
-
-    println!("{table}");
 }

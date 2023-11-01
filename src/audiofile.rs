@@ -5,26 +5,11 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
-use once_cell::sync::Lazy;
+use once_cell::unsync::Lazy;
 
 use crate::tags::Tags;
-
-pub(crate) static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
-    Lazy::new(|| {
-        let mut map = HashMap::new();
-
-        map.insert('<', None);
-        map.insert('>', None);
-        map.insert(':', None);
-        map.insert('|', None);
-        map.insert('?', None);
-        map.insert('*', None);
-        map.insert('~', Some("-"));
-        map.insert('/', Some("-"));
-        map.insert('\\', Some("-"));
-
-        map
-    });
+use crate::template::Template;
+use crate::util::normalize_separators;
 
 pub(crate) struct AudioFile {
     path: Utf8PathBuf,
@@ -76,9 +61,43 @@ impl AudioFile {
         self.extension.as_ref()
     }
 
+    pub(crate) fn create_target_path(
+        &self,
+        template: &Template,
+        relative_path: &Utf8Path,
+    ) -> Result<Utf8PathBuf> {
+        let string = template.render(self)?;
+
+        let string = normalize_separators(&string);
+
+        let target_path =
+            Utf8PathBuf::from(format!("{string}.{}", self.extension()));
+
+        // If target_path is an absolute path, join will clobber the
+        // relative_path, so this is always safe.
+        Ok(relative_path.join(target_path))
+    }
+
     fn get_tag_safe(&self, key: &ItemKey) -> Option<String> {
+        let forbidden_characters: Lazy<HashMap<char, Option<&str>>> =
+            Lazy::new(|| {
+                let mut map = HashMap::new();
+
+                map.insert('<', None);
+                map.insert('>', None);
+                map.insert(':', None);
+                map.insert('|', None);
+                map.insert('?', None);
+                map.insert('*', None);
+                map.insert('~', Some("-"));
+                map.insert('/', Some("-"));
+                map.insert('\\', Some("-"));
+
+                map
+            });
+
         self.tag.get_string(key).map(|string| {
-            FORBIDDEN_CHARACTERS.iter().fold(
+            forbidden_characters.iter().fold(
                 string.to_owned(),
                 |string, (char, replacement)| {
                     string.replace(*char, replacement.unwrap_or(""))

@@ -2,15 +2,31 @@ mod validate;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use file_history::{Change, History, HistoryError};
 use indicatif::ProgressIterator;
 use validate::validate_changes;
 
-use crate::cli::ui::{self, create_spinner};
-use crate::config::{Config, DRY_RUN_PREFIX, HISTORY_NAME};
 use crate::audiofile::AudioFile;
-use crate::fs::PathIterator;
+use crate::cli::ui::table::Table;
+use crate::cli::ui::{self, create_spinner};
+use crate::config::{Config, DRY_RUN_PREFIX};
+use crate::fs::{self, PathIterator};
 use crate::template::Template;
+
+pub(crate) struct Change(Utf8PathBuf, Utf8PathBuf);
+
+impl Change {
+    pub(crate) fn source(&self) -> &Utf8Path {
+        &self.0
+    }
+
+    pub(crate) fn target(&self) -> &Utf8Path {
+        &self.1
+    }
+
+    pub(crate) fn is_different(&self) -> bool {
+        self.source() != self.target()
+    }
+}
 
 pub(crate) fn rename(
     config: &Config,
@@ -18,8 +34,6 @@ pub(crate) fn rename(
     arguments: Vec<String>,
 ) -> Result<()> {
     config.create_dir(config.directory())?;
-
-    let mut history = History::load(config.directory(), HISTORY_NAME)?;
 
     let template = config.get_template(name)?.with_arguments(arguments);
 
@@ -34,7 +48,7 @@ pub(crate) fn rename(
     } else {
         validate_changes(config, &changes)?;
 
-        perform_changes(config, &mut history, changes)
+        perform_changes(config, changes)
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
@@ -46,7 +60,7 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     )?;
 
     let paths: Vec<Utf8PathBuf> =
-        PathIterator::recursive(config.current_dir(), config.recursion_depth())
+        PathIterator::new(config.current_dir(), Some(config.recursion_depth()))
             .flatten()
             .filter(|path| AudioFile::path_predicate(path))
             .progress_with(spinner)
@@ -69,8 +83,13 @@ fn create_changes(
 
     let changes: Result<Vec<Change>> = files
         .iter()
+        .map(|audiofile| {
+            Ok(Change(
+                audiofile.path().to_owned(),
+                audiofile.create_target_path(template, config.current_dir())?,
+            ))
+        })
         .progress_with(bar)
-        .map(|audiofile| change_from_file(config, template, audiofile))
         .collect();
 
     println!();
@@ -104,81 +123,34 @@ fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
     common_path
 }
 
-fn change_from_file(
-    config: &Config,
-    template: &Template,
-    audiofile: &AudioFile,
-) -> Result<Change> {
-    let string = template.render(audiofile)?;
-
-    let string = normalize_separators(&string);
-
-    let target =
-        create_target_path_from_string(config, &string, audiofile.extension());
-
-    let change = Change::mv(audiofile.path(), target);
-
-    #[cfg(debug_assertions)]
-    crate::debug::delay();
-
-    Ok(change)
-}
-
-fn create_target_path_from_string(
-    config: &Config,
-    string: &str,
-    extension: &str,
-) -> Utf8PathBuf {
-    let target_path = Utf8PathBuf::from(format!("{string}.{extension}"));
-
-    // If target_path has an absolute path, join will clobber the current_dir,
-    // so this is always safe.
-    config.current_dir().join(target_path)
-}
-
 // TODO? Refactor this into the `create_changes` progress bar?
 fn filter_unchanged_destinations(changes: Vec<Change>) -> Vec<Change> {
-    changes
-        .into_iter()
-        .filter(|change| {
-            let source =
-                change.source().expect("Can only validate collisions on move.");
-
-            source != change.target()
-        })
-        .collect()
+    changes.into_iter().filter(Change::is_different).collect()
 }
 
-fn perform_changes(
-    config: &Config,
-    history: &mut History,
-    changes: Vec<Change>,
-) -> Result<()> {
-    ui::print_changes_preview(config, &changes, &std::env::current_dir()?);
+fn perform_changes(config: &Config, changes: Vec<Change>) -> Result<()> {
+    print_changes_preview(config, &changes);
 
     let common_path = get_common_path(
-        &changes
-            .iter()
-            .map(|change| {
-                change.source().expect("Can only validate collisions on move.")
-            })
-            .collect::<Vec<_>>(),
+        &changes.iter().map(Change::source).collect::<Vec<_>>(),
     );
 
-    move_files(config.dry_run(), history, changes)?;
+    move_files(config.dry_run(), changes)?;
 
-    clean_up_source_dirs(config, history, &common_path)?;
+    fs::remove_empty_subdirectories(
+        config.dry_run(),
+        &common_path,
+        config.recursion_depth(),
+    )?;
 
-    history.save()?;
+    let prefix: &str = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
+
+    println!("{prefix}Removed leftover folders.");
 
     Ok(())
 }
 
-fn move_files(
-    dry_run: bool,
-    history: &mut History,
-    changes: Vec<Change>,
-) -> Result<()> {
+fn move_files(dry_run: bool, changes: Vec<Change>) -> Result<()> {
     let bar = ui::create_progressbar(
         changes.len() as u64,
         "Moving files...",
@@ -192,9 +164,10 @@ fn move_files(
         // Actions target are all files, and always have a parent.
         debug_assert!(target.parent().is_some());
 
-        create_dir(dry_run, history, target.parent().unwrap())?;
+        create_dir(dry_run, target.parent().unwrap())?;
+
         if !dry_run {
-            history.apply(change)?;
+            fs::copy_or_move_file(change.source(), change.target())?;
         }
 
         #[cfg(debug_assertions)]
@@ -204,105 +177,47 @@ fn move_files(
     Ok(())
 }
 
-fn create_dir(
-    dry_run: bool,
-    history: &mut History,
-    path: &Utf8Path,
-) -> Result<()> {
+fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<()> {
     if path.is_dir() {
         return Ok(());
     }
 
     if let Some(parent) = path.parent() {
-        create_dir(dry_run, history, parent)?;
+        create_dir(dry_run, parent)?;
     }
-
-    let change = Change::mkdir(path);
 
     if !dry_run {
-        history.apply(change)?;
+        fs::create_dir(path)?;
     }
 
     Ok(())
 }
 
-fn clean_up_source_dirs(
-    config: &Config,
-    history: &mut History,
-    common_path: &Utf8Path,
-) -> Result<()> {
-    let dirs = gather_dirs(common_path, config.recursion_depth());
+pub(crate) fn print_changes_preview(config: &Config, changes: &[Change]) {
+    let length = changes.len();
 
-    let changes: Vec<Change> = dirs.into_iter().map(Change::rmdir).collect();
+    let step = std::cmp::max(changes.len() / config.preview_amount(), 1);
 
-    if !config.dry_run() {
-        for change in changes {
-            remove_dir(history, change)?;
-        }
+    let slice = changes
+        .iter()
+        .step_by(step)
+        .map(Change::target)
+        .map(|path| path.strip_prefix(config.current_dir()).unwrap_or(path))
+        .collect::<Vec<_>>();
+
+    let mut table = Table::new();
+
+    table.set_heading(if slice.len() <= config.preview_amount() {
+        format!("Previewing {} files", slice.len())
+    } else {
+        format!("Previewing {} of {} files", slice.len(), length)
+    });
+
+    for path in slice {
+        table.push_path(path);
     }
 
-    let prefix: &str = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
-
-    println!("{prefix}Removed leftover folders.");
-
-    Ok(())
-}
-
-fn gather_dirs(path: &Utf8Path, depth: usize) -> Vec<Utf8PathBuf> {
-    let mut dirs = Vec::new();
-
-    if depth == 0 {
-        return dirs;
-    }
-
-    for entry in path.read_dir_utf8().into_iter().flatten().flatten() {
-        let dir = entry.path();
-        if dir.is_dir() {
-            dirs.extend(gather_dirs(dir, depth - 1));
-            dirs.push(dir.to_owned());
-        }
-    }
-
-    dirs
-}
-
-fn remove_dir(history: &mut History, change: Change) -> Result<()> {
-    let result = history.apply(change);
-
-    if let Err(err) = result {
-        let mut is_expected_error = false;
-
-        if let HistoryError::IO(io_error) = &err {
-            if let Some(error_code) = io_error.raw_os_error() {
-                #[cfg(windows)]
-                // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-                // 145: Directory not empty
-                let expected_code = 145;
-
-                // https://nuetzlich.net/errno.html
-                // 39: Directory not empty
-                #[cfg(unix)]
-                let expected_code = 39;
-
-                if error_code == expected_code {
-                    is_expected_error = true;
-                }
-            }
-        }
-
-        if !is_expected_error {
-            return Err(err.into());
-        }
-    }
-
-    Ok(())
-}
-
-fn normalize_separators(string: &str) -> String {
-    string
-        .split(['\\', '/'])
-        .collect::<Vec<&str>>()
-        .join(std::path::MAIN_SEPARATOR_STR)
+    println!("{table}");
 }
 
 #[cfg(test)]

@@ -302,7 +302,7 @@ fn test_rename_typical_input() -> Result<()> {
     Ok(())
 }
 
-#[test]
+// #[test]
 fn test_undo_typical_input() -> Result<()> {
     let env = TestEnv::new()?;
 
@@ -329,7 +329,7 @@ fn test_undo_typical_input() -> Result<()> {
     Ok(())
 }
 
-#[test]
+// #[test]
 fn test_redo_typical_input() -> Result<()> {
     let env = TestEnv::new()?;
 

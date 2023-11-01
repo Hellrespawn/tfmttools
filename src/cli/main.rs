@@ -5,8 +5,7 @@ use tracing_subscriber::{fmt, registry, EnvFilter};
 
 use super::Args;
 use crate::cli::args::Command;
-use crate::cli::commands::{self, UndoMode};
-use crate::cli::ui;
+use crate::cli::{commands, ui};
 use crate::config::Config;
 
 /// Main entrypoint for tfmttools
@@ -31,14 +30,7 @@ pub fn main(dry_run_override: bool) -> Result<()> {
 
 fn select_command(config: Config, command: Command) -> Result<()> {
     match command {
-        Command::ClearHistory { .. } => commands::clear_history(&config),
         Command::ListTemplates => commands::list_templates(&config),
-        Command::Undo { times, .. } => {
-            commands::undo(&config, UndoMode::Undo, times)
-        },
-        Command::Redo { times, .. } => {
-            commands::undo(&config, UndoMode::Redo, times)
-        },
         Command::Rename { name, arguments, recurse, .. } => {
             let config = config.with_recursion_depth(recurse);
             commands::rename(&config, &name, arguments)
