@@ -1,8 +1,5 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::{
-    eyre::{self, eyre},
-    Result,
-};
+use color_eyre::{eyre::eyre, Result};
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
 
