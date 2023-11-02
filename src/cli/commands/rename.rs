@@ -1,66 +1,72 @@
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
+use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use indicatif::ProgressIterator;
 
 use crate::action::Move;
 use crate::audiofile::AudioFile;
 use crate::cli::ui::table::Table;
-use crate::cli::ui::{self, create_spinner};
+use crate::cli::ui::{self, PathFilterSpinner};
 use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator};
-use crate::template::Template;
+use crate::template::{Template, Templates};
 
-pub struct RenameOptions<'o> {
-    dry_run: bool,
-    working_directory: &'o Utf8Path,
-    recursion_depth: usize,
-    template_directory: &'o Utf8Path,
-    template_name: &'o str,
+pub(crate) fn rename(
+    config: &Config,
+    template_name: &str,
     arguments: Vec<String>,
-}
+) -> Result<()> {
+    let templates = Templates::read_directory(config.template_directory())?;
 
-pub(crate) fn rename(options: RenameOptions) -> Result<()> {
-    let template = Template::get_template_from_dir(
-        &options.template_directory,
-        &options.template_name,
-    )?;
+    let template = templates
+        .get_template(template_name, arguments)
+        .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
-    let files = gather_files(&options)?;
+    let files = gather_files(config)?;
 
-    let move_actions = create_move_actions(&options, &template, &files)?;
+    let move_actions = create_move_actions(config, &template, &files)?;
     let move_actions = Move::filter_unchanged_destinations(move_actions);
 
     if move_actions.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        validate_move_actions(options, &move_actions)?;
+        validate_move_actions(config, &move_actions)?;
 
-        perform_move_actions(options, move_actions)
+        perform_move_actions(config, move_actions)
     }
 }
-fn gather_files(options: &RenameOptions) -> Result<Vec<AudioFile>> {
-    let spinner = create_spinner(
-        "audio files",
-        "total files",
+fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
+    let spinner = PathFilterSpinner::new(
+        "audio",
+        "total",
         "Gathering files...",
         "Gathered files.",
     )?;
 
-    let paths: Vec<Utf8PathBuf> = PathIterator::new(
-        options.working_directory,
-        Some(options.recursion_depth),
+    let file_paths = PathIterator::new(
+        config.working_directory(),
+        Some(config.recursion_depth()),
     )
     .flatten()
+    .inspect(|_| spinner.inc_total())
     .filter(|path| AudioFile::path_predicate(path))
-    .progress_with(spinner)
-    .collect();
+    .inspect(|_| {
+        spinner.inc_found();
 
-    paths.iter().map(|path| AudioFile::new(path)).collect()
+        #[cfg(debug_assertions)]
+        crate::debug::delay();
+    })
+    .map(|path| AudioFile::new(&path))
+    .collect::<Result<Vec<_>>>();
+
+    spinner.finish();
+
+    file_paths
 }
 
 fn create_move_actions(
-    options: &RenameOptions,
+    config: &Config,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Move>> {
@@ -68,7 +74,7 @@ fn create_move_actions(
         files.len() as u64,
         "Determining output paths...",
         "Determined output paths",
-        options.dry_run,
+        config.dry_run(),
     )?;
 
     let move_actions: Result<Vec<Move>> = files
@@ -78,7 +84,7 @@ fn create_move_actions(
                 audiofile.path().to_owned(),
                 audiofile.construct_target_path(
                     template,
-                    options.working_directory,
+                    config.working_directory(),
                 )?,
             ))
         })
@@ -89,6 +95,20 @@ fn create_move_actions(
     println!();
 
     move_actions
+}
+
+fn validate_move_actions(
+    _config: &Config,
+    move_actions: &[Move],
+) -> Result<()> {
+    let validation_errors =
+        crate::validation::validate_move_actions(move_actions);
+
+    if validation_errors.is_empty() {
+        Ok(())
+    } else {
+        Err(eyre!("Had validation errors:"))
+    }
 }
 
 fn perform_move_actions(
@@ -169,7 +189,9 @@ pub(crate) fn print_move_actions_preview(
         .iter()
         .step_by(step)
         .map(Move::target)
-        .map(|path| path.strip_prefix(config.current_dir()).unwrap_or(path))
+        .map(|path| {
+            path.strip_prefix(config.working_directory()).unwrap_or(path)
+        })
         .collect::<Vec<_>>();
 
     let mut table = Table::new();

@@ -189,7 +189,7 @@ mod test {
             "/a/b/h/j.mp3",
         ];
 
-        let reference = ["/a/b/h", "/a/b/c", "/a/b", "/a"]
+        let reference = ["/a/b/h", "/a/b/c", "/a/b", "/a", "/"]
             .into_iter()
             .map(Utf8PathBuf::from)
             .collect::<Vec<_>>();

@@ -1,5 +1,6 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::eyre::eyre;
+use color_eyre::Result;
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
 
@@ -125,6 +126,23 @@ pub(crate) fn remove_dir(dry_run: bool, path: &Utf8Path) -> Result<RemoveDir> {
         }
 
         Ok(RemoveDir::Removed)
+    }
+}
+
+pub(crate) enum RemoveDirAll {
+    Removed,
+    DryRun,
+}
+
+pub(crate) fn remove_dir_all(
+    dry_run: bool,
+    path: &Utf8Path,
+) -> Result<RemoveDirAll> {
+    if dry_run {
+        Ok(RemoveDirAll::DryRun)
+    } else {
+        fs::remove_dir_all(path)?;
+        Ok(RemoveDirAll::Removed)
     }
 }
 

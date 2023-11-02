@@ -81,6 +81,6 @@ impl TryFrom<&Args> for Config {
 
         let dry_run = args.dry_run();
 
-        Self::new(&path, dry_run)
+        Self::new(dry_run, &path)
     }
 }

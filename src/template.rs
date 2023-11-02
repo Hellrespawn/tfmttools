@@ -5,40 +5,69 @@ use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use crate::fs::PathIterator;
 use crate::tags::Tags;
 
 pub(crate) const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
 #[derive(Debug)]
-pub(crate) struct Template<'s> {
-    name: String,
-    environment: Environment<'s>,
-    arguments: Vec<String>,
+pub(crate) struct Templates<'t> {
+    template_names: Vec<String>,
+    environment: Environment<'t>,
 }
 
-impl<'s> Template<'s> {
-    pub(crate) fn from_file(path: &Utf8Path) -> Result<Self> {
-        let name =
-            path.file_stem().expect("File should have a file name.").to_owned();
-
-        let template = fs::read_to_string(path)?;
-
+impl<'t> Templates<'t> {
+    pub(crate) fn read_directory(
+        template_directory: &Utf8Path,
+    ) -> Result<Self> {
+        let mut template_names = Vec::new();
         let mut environment = Self::create_environment();
-        environment.add_template_owned(name.clone(), template)?;
 
-        Ok(Template {
-            name: name.to_string(),
-            environment,
-            arguments: Vec::new(),
-        })
+        let iter = PathIterator::new(template_directory, None)
+            .flatten()
+            .filter(|path| Self::path_predicate(path));
+
+        for template_path in iter {
+            let name = template_path
+                .file_stem()
+                .expect("Template::path_predicate should only return files.")
+                .to_owned();
+
+            template_names.push(name.clone());
+            environment
+                .add_template_owned(name, fs::read_to_string(template_path)?)?;
+        }
+
+        Ok(Self { template_names, environment })
     }
 
-    pub(crate) fn name(&self) -> &str {
-        &self.name
+    pub(crate) fn get_template(
+        &self,
+        name: &str,
+        arguments: Vec<String>,
+    ) -> Option<Template> {
+        let minijinja_template: minijinja::Template<'_, '_> =
+            self.environment.get_template(name).ok()?;
+
+        let description = self.description(&minijinja_template);
+
+        let template = Template::new(
+            minijinja_template,
+            name.to_owned(),
+            description,
+            arguments,
+        );
+
+        Some(template)
     }
 
-    pub(crate) fn description(&self) -> Result<Option<String>> {
-        let template = self.get_template()?;
+    pub(crate) fn get_all_templates(&self) -> Vec<Template> {
+        self.template_names
+            .iter()
+            .map(|name| self.get_template(name, Vec::new()).expect("Templates::template_names should not contain names of non-existent templates.")).collect()
+    }
+
+    fn description(&self, template: &minijinja::Template) -> Option<String> {
         let source = template.source();
 
         let syntax = self.environment.syntax();
@@ -53,38 +82,19 @@ impl<'s> Template<'s> {
                 },
             );
 
-            Ok(option)
+            option
         } else {
-            Ok(None)
+            None
         }
     }
 
-    pub(crate) fn with_arguments(mut self, arguments: Vec<String>) -> Self {
-        self.arguments = arguments;
-        self
-    }
-
-    pub(crate) fn render(&self, tags: &dyn Tags) -> Result<String> {
-        let template = self.get_template()?;
-
-        let context = self.create_context(tags)?;
-
-        let output = template.render(context)?;
-
-        Ok(output)
-    }
-
-    pub(crate) fn path_predicate(path: &Utf8Path) -> bool {
+    fn path_predicate(path: &Utf8Path) -> bool {
         path.extension().map_or(false, |string| {
             TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
         })
     }
 
-    fn get_template(&self) -> Result<minijinja::Template> {
-        Ok(self.environment.get_template(&self.name)?)
-    }
-
-    fn create_environment() -> Environment<'s> {
+    fn create_environment() -> Environment<'t> {
         let mut env = Environment::new();
 
         env.set_formatter(|out, state, value| {
@@ -95,10 +105,73 @@ impl<'s> Template<'s> {
             )
         });
 
-        env.add_filter("year", year);
-        env.add_filter("zero_pad", zero_pad);
+        env.add_filter("year", Self::year);
+        env.add_filter("zero_pad", Self::zero_pad);
 
         env
+    }
+
+    fn year(date: &str) -> Result<String, minijinja::Error> {
+        static RE_ISO: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
+
+        static RE_AMBIGUOUS: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"\d{2}-\d{2}-(\d{4})").unwrap());
+
+        static RE_YEAR: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"(\d{4})").unwrap());
+
+        if let Some(m) = RE_ISO.find(date) {
+            Ok(m.as_str().to_owned())
+        } else if let Some(m) = RE_AMBIGUOUS.find(date) {
+            Ok(m.as_str().to_owned())
+        } else if let Some(m) = RE_YEAR.find(date) {
+            Ok(m.as_str().to_owned())
+        } else {
+            Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Unable to parse date: {date}",
+            ))
+        }
+    }
+
+    fn zero_pad(value: usize, width: usize) -> String {
+        format!("{value:0>width$}")
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Template<'templates, 'source> {
+    inner: minijinja::Template<'templates, 'source>,
+    name: String,
+    description: Option<String>,
+    arguments: Vec<String>,
+}
+
+impl<'templates, 'source> Template<'templates, 'source> {
+    pub(crate) fn new(
+        inner: minijinja::Template<'templates, 'source>,
+        name: String,
+        description: Option<String>,
+        arguments: Vec<String>,
+    ) -> Self {
+        Self { inner, name, description, arguments }
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+
+    pub(crate) fn description(&self) -> Option<&String> {
+        self.description.as_ref()
+    }
+
+    pub(crate) fn render(&self, tags: &dyn Tags) -> Result<String> {
+        let context = self.create_context(tags)?;
+
+        let output = self.inner.render(context)?;
+
+        Ok(output)
     }
 
     fn create_context(&self, tags: &dyn Tags) -> Result<Value> {
@@ -143,31 +216,4 @@ impl<'s> Template<'s> {
 
         Ok(ctx)
     }
-}
-
-fn year(date: &str) -> Result<String, minijinja::Error> {
-    static RE_ISO: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
-
-    static RE_AMBIGUOUS: Lazy<Regex> =
-        Lazy::new(|| Regex::new(r"\d{2}-\d{2}-(\d{4})").unwrap());
-
-    static RE_YEAR: Lazy<Regex> = Lazy::new(|| Regex::new(r"(\d{4})").unwrap());
-
-    if let Some(m) = RE_ISO.find(date) {
-        Ok(m.as_str().to_owned())
-    } else if let Some(m) = RE_AMBIGUOUS.find(date) {
-        Ok(m.as_str().to_owned())
-    } else if let Some(m) = RE_YEAR.find(date) {
-        Ok(m.as_str().to_owned())
-    } else {
-        Err(minijinja::Error::new(
-            minijinja::ErrorKind::InvalidOperation,
-            "Unable to parse date: {date}",
-        ))
-    }
-}
-
-fn zero_pad(value: usize, width: usize) -> String {
-    format!("{value:0>width$}")
 }
