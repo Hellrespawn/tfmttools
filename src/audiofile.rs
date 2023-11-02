@@ -61,7 +61,7 @@ impl AudioFile {
         self.extension.as_ref()
     }
 
-    pub(crate) fn create_target_path(
+    pub(crate) fn construct_target_path(
         &self,
         template: &Template,
         relative_path: &Utf8Path,

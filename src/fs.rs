@@ -1,5 +1,8 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::Result;
+use color_eyre::{
+    eyre::{self, eyre},
+    Result,
+};
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
 
@@ -72,42 +75,60 @@ pub(crate) fn copy_or_move_file(
     }
 }
 
-pub(crate) fn create_dir(path: &Utf8Path) -> Result<()> {
-    fs::create_dir(path)?;
+pub(crate) enum CreateDir {
+    Created,
+    Exists,
+    DryRun,
+}
 
-    Ok(())
+pub(crate) fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<CreateDir> {
+    if dry_run {
+        Ok(CreateDir::DryRun)
+    } else if path.is_dir() {
+        Ok(CreateDir::Exists)
+    } else if path.exists() {
+        Err(eyre!("Path exists but is not a directory: {}", path))
+    } else {
+        fs::create_dir(path)?;
+
+        Ok(CreateDir::Created)
+    }
 }
 
 pub(crate) enum RemoveDir {
     Removed,
     NotEmpty,
-    DryRun
+    DryRun,
 }
 
-pub(crate) fn remove_dir(path: &Utf8Path) -> Result<RemoveDir> {
-    let result = fs::remove_dir(path);
+pub(crate) fn remove_dir(dry_run: bool, path: &Utf8Path) -> Result<RemoveDir> {
+    if dry_run {
+        Ok(RemoveDir::DryRun)
+    } else {
+        let result = fs::remove_dir(path);
 
-    if let Err(io_error) = result {
-        if let Some(error_code) = io_error.raw_os_error() {
-            #[cfg(windows)]
-            // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-            // 145: Directory not empty
-            let expected_code = 145;
+        if let Err(io_error) = result {
+            if let Some(error_code) = io_error.raw_os_error() {
+                #[cfg(windows)]
+                // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
+                // 145: Directory not empty
+                let expected_code = 145;
 
-            // https://nuetzlich.net/errno.html
-            // 39: Directory not empty
-            #[cfg(unix)]
-            let expected_code = 39;
+                // https://nuetzlich.net/errno.html
+                // 39: Directory not empty
+                #[cfg(unix)]
+                let expected_code = 39;
 
-            if error_code == expected_code {
-                return Ok(RemoveDir::NotEmpty);
+                if error_code == expected_code {
+                    return Ok(RemoveDir::NotEmpty);
+                }
+
+                return Err(io_error.into());
             }
-
-            return Err(io_error.into());
         }
-    }
 
-    Ok(RemoveDir::Removed)
+        Ok(RemoveDir::Removed)
+    }
 }
 
 pub(crate) fn remove_empty_subdirectories(
@@ -118,11 +139,35 @@ pub(crate) fn remove_empty_subdirectories(
     let dirs = gather_subdirectories(path, recursion_depth)
         .into_iter()
         .map(|p| {
-            let removed = if dry_run { remove_dir(&p)? } else { RemoveDir::DryRun };
-
+            let removed = remove_dir(dry_run, &p)?;
             Ok((p, removed))
         })
         .collect::<Result<Vec<_>>>()?;
 
     Ok(dirs)
+}
+
+pub(crate) fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
+    debug_assert!(!paths.is_empty());
+
+    let mut iter = paths.iter();
+
+    // We have already returned if no files were found, so this unwrap
+    // should be safe.
+    let mut common_path = iter.next().unwrap().to_path_buf();
+
+    for path in iter {
+        let mut new_common_path = Utf8PathBuf::new();
+
+        for (left, right) in path.components().zip(common_path.components()) {
+            if left == right {
+                new_common_path.push(left);
+            } else {
+                break;
+            }
+        }
+        common_path = new_common_path;
+    }
+
+    common_path
 }

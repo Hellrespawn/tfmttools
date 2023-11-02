@@ -19,6 +19,7 @@ mod fs;
 mod tags;
 mod template;
 mod util;
+mod validation;
 
 #[cfg(debug_assertions)]
 mod debug;

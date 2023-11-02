@@ -1,9 +1,6 @@
-mod validate;
-
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use indicatif::ProgressIterator;
-use validate::validate_move_actions;
 
 use crate::action::Move;
 use crate::audiofile::AudioFile;
@@ -13,30 +10,36 @@ use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator};
 use crate::template::Template;
 
-pub(crate) fn rename(
-    config: &Config,
-    name: &str,
+pub struct RenameOptions<'o> {
+    dry_run: bool,
+    working_directory: &'o Utf8Path,
+    recursion_depth: usize,
+    template_directory: &'o Utf8Path,
+    template_name: &'o str,
     arguments: Vec<String>,
-) -> Result<()> {
-    config.create_dir(config.directory())?;
+}
 
-    let template = config.get_template(name)?.with_arguments(arguments);
+pub(crate) fn rename(options: RenameOptions) -> Result<()> {
+    let template = Template::get_template_from_dir(
+        &options.template_directory,
+        &options.template_name,
+    )?;
 
-    let files = gather_files(config)?;
+    let files = gather_files(&options)?;
 
-    let move_actions = create_move_actions(config, &template, &files)?;
-    let move_actions = filter_unchanged_destinations(move_actions);
+    let move_actions = create_move_actions(&options, &template, &files)?;
+    let move_actions = Move::filter_unchanged_destinations(move_actions);
 
     if move_actions.is_empty() {
         println!("There are no audio files to rename.");
         Ok(())
     } else {
-        validate_move_actions(config, &move_actions)?;
+        validate_move_actions(options, &move_actions)?;
 
-        perform_move_actions(config, move_actions)
+        perform_move_actions(options, move_actions)
     }
 }
-fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
+fn gather_files(options: &RenameOptions) -> Result<Vec<AudioFile>> {
     let spinner = create_spinner(
         "audio files",
         "total files",
@@ -44,18 +47,20 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
         "Gathered files.",
     )?;
 
-    let paths: Vec<Utf8PathBuf> =
-        PathIterator::new(config.current_dir(), Some(config.recursion_depth()))
-            .flatten()
-            .filter(|path| AudioFile::path_predicate(path))
-            .progress_with(spinner)
-            .collect();
+    let paths: Vec<Utf8PathBuf> = PathIterator::new(
+        options.working_directory,
+        Some(options.recursion_depth),
+    )
+    .flatten()
+    .filter(|path| AudioFile::path_predicate(path))
+    .progress_with(spinner)
+    .collect();
 
     paths.iter().map(|path| AudioFile::new(path)).collect()
 }
 
 fn create_move_actions(
-    config: &Config,
+    options: &RenameOptions,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Move>> {
@@ -63,7 +68,7 @@ fn create_move_actions(
         files.len() as u64,
         "Determining output paths...",
         "Determined output paths",
-        config.dry_run(),
+        options.dry_run,
     )?;
 
     let move_actions: Result<Vec<Move>> = files
@@ -71,7 +76,10 @@ fn create_move_actions(
         .map(|audiofile| {
             Ok(Move::new(
                 audiofile.path().to_owned(),
-                audiofile.create_target_path(template, config.current_dir())?,
+                audiofile.construct_target_path(
+                    template,
+                    options.working_directory,
+                )?,
             ))
         })
         .progress_with(bar)
@@ -83,43 +91,13 @@ fn create_move_actions(
     move_actions
 }
 
-fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
-    debug_assert!(!paths.is_empty());
-
-    let mut iter = paths.iter();
-
-    // We have already returned if no files were found, so this unwrap
-    // should be safe.
-    let mut common_path = iter.next().unwrap().to_path_buf();
-
-    for path in iter {
-        let mut new_common_path = Utf8PathBuf::new();
-
-        for (left, right) in path.components().zip(common_path.components()) {
-            if left == right {
-                new_common_path.push(left);
-            } else {
-                break;
-            }
-        }
-        common_path = new_common_path;
-    }
-
-    common_path
-}
-
-// TODO? Refactor this into the `create_changes` progress bar?
-fn filter_unchanged_destinations(move_actions: Vec<Move>) -> Vec<Move> {
-    move_actions.into_iter().filter(Move::source_differs_from_target).collect()
-}
-
 fn perform_move_actions(
     config: &Config,
     move_actions: Vec<Move>,
 ) -> Result<()> {
     print_move_actions_preview(config, &move_actions);
 
-    let common_path = get_common_path(
+    let common_path = fs::get_common_path(
         &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
     );
 
@@ -174,9 +152,7 @@ fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<()> {
         create_dir(dry_run, parent)?;
     }
 
-    if !dry_run {
-        fs::create_dir(path)?;
-    }
+    fs::create_dir(dry_run, path)?;
 
     Ok(())
 }
