@@ -161,9 +161,11 @@ fn perform_move_actions(
             .map(|(p, _)| Action::RemoveDir(p.clone())),
     );
 
-    let prefix: &str = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
+    if config.dry_run() {
+        print!("{DRY_RUN_PREFIX}");
+    }
 
-    println!("{prefix}Removed leftover folders.");
+    println!("Removed leftover folders.");
 
     Ok(actions)
 }

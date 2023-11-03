@@ -8,9 +8,9 @@ use crate::util::PathOrString;
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
 pub(crate) struct Args {
-    /// Sets a custom config folder
-    #[arg(short, long)]
-    pub(crate) config: Option<Utf8PathBuf>,
+    /// Sets a custom template_directory
+    #[arg(short, long, alias = "config")]
+    pub(crate) template_directory: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
     /// Don't run command, only show what would happen.
@@ -23,6 +23,14 @@ pub(crate) struct Args {
 #[derive(Subcommand, Debug, PartialEq)]
 /// Holds per-subcommand command line arguments.
 pub(crate) enum Command {
+    /// Clear undo/redo history.
+    #[command(name = "clear")]
+    ClearHistory {
+        #[arg(short, long)]
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
+    },
+
     /// Lists all available templates.
     #[command(name = "list")]
     ListTemplates,
@@ -63,7 +71,8 @@ impl Args {
     pub(crate) fn dry_run(&self) -> bool {
         self.dry_run
             || match self.command {
-                Command::Rename { dry_run, .. }
+                Command::ClearHistory { dry_run }
+                | Command::Rename { dry_run, .. }
                 | Command::Seed { dry_run, .. } => dry_run,
                 Command::ListTemplates => false,
             }
@@ -74,7 +83,7 @@ impl TryFrom<&Args> for Config {
     type Error = color_eyre::Report;
 
     fn try_from(args: &Args) -> Result<Self, Self::Error> {
-        let path = if let Some(path) = &args.config {
+        let path = if let Some(path) = &args.template_directory {
             path.clone()
         } else {
             Self::default_path()?
@@ -82,6 +91,12 @@ impl TryFrom<&Args> for Config {
 
         let dry_run = args.dry_run();
 
-        Self::new(dry_run, &path)
+        let mut config = Self::new(dry_run, &path)?;
+
+        if let Command::Rename { recurse, .. } = &args.command {
+            config.set_recursion_depth(*recurse);
+        }
+
+        Ok(config)
     }
 }

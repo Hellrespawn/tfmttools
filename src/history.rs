@@ -1,12 +1,14 @@
 #[cfg(all(feature = "serde_json", feature = "bincode"))]
 compile_error!("Features `serde_json` and `bincode` are mutually exclusive.");
 
-use crate::action::Action;
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::eyre::eyre;
+use color_eyre::Result;
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+
+use crate::action::Action;
 
 pub(crate) enum SaveHistoryResult {
     Saved,

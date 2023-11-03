@@ -24,7 +24,7 @@ pub fn main(dry_run_override: bool) -> Result<()> {
 
     hide_cursor();
 
-    if let Err(err) = select_command(config, args.command) {
+    if let Err(err) = select_command(&config, args.command) {
         ui::print_error(&err);
     }
 
@@ -44,14 +44,14 @@ fn hide_cursor() {
     let _ = TERM.hide_cursor();
 }
 
-fn select_command(config: Config, command: Command) -> Result<()> {
+fn select_command(config: &Config, command: Command) -> Result<()> {
     match command {
-        Command::ListTemplates => commands::list_templates(&config),
-        Command::Rename { name, arguments, recurse, .. } => {
-            let config = config.with_recursion_depth(recurse);
-            commands::rename(&config, &name, arguments)
+        Command::ClearHistory { .. } => commands::clear_history(config),
+        Command::ListTemplates => commands::list_templates(config),
+        Command::Rename { name, arguments, .. } => {
+            commands::rename(config, &name, arguments)
         },
 
-        Command::Seed { force, .. } => commands::seed(&config, force),
+        Command::Seed { force, .. } => commands::seed(config, force),
     }
 }

@@ -40,16 +40,13 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
     for file in &DEFAULT_FILES {
         let path = config.template_directory().join(file.name);
 
-        let prefix = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
-
-        if !config.dry_run() {
+        if config.dry_run() {
+            print!("{DRY_RUN_PREFIX}");
+        } else {
             fs::write(path, file.content)?;
         }
 
-        println!(
-            "{prefix}Wrote default files to {}",
-            config.template_directory()
-        );
+        println!("Wrote default files to {}", config.template_directory());
     }
 
     Ok(())

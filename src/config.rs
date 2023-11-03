@@ -63,9 +63,8 @@ impl Config {
         self.preview_amount
     }
 
-    pub(crate) fn with_recursion_depth(mut self, depth: Option<usize>) -> Self {
-        self.recursion_depth = depth.unwrap_or(self.recursion_depth);
-        self
+    pub(crate) fn set_recursion_depth(&mut self, depth: Option<usize>) {
+        self.recursion_depth = depth.unwrap_or(DEFAULT_RECURSION_DEPTH);
     }
 
     pub(crate) fn default_path() -> Result<Utf8PathBuf> {
