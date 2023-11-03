@@ -6,6 +6,8 @@ pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
 
 const DEFAULT_PREVIEW_AMOUNT: usize = 8;
 const DEFAULT_RECURSION_DEPTH: usize = 4;
+const DEFAULT_HISTORY_FILENAME: &str =
+    concat!(env!("CARGO_PKG_NAME"), ".history.json");
 
 pub(crate) struct Config {
     template_directory: Utf8PathBuf,
@@ -24,7 +26,7 @@ impl Config {
         let config = Self {
             template_directory: template_directory.to_owned(),
             working_directory: std::env::current_dir()?.try_into()?,
-            history_file: template_directory.join("history.json"),
+            history_file: template_directory.join(DEFAULT_HISTORY_FILENAME),
             dry_run,
             recursion_depth: DEFAULT_RECURSION_DEPTH,
             preview_amount: DEFAULT_PREVIEW_AMOUNT,
