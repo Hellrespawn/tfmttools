@@ -1,9 +1,10 @@
 use color_eyre::Result;
 use indicatif::{
-    ProgressBar, ProgressDrawTarget, ProgressFinish, ProgressStyle,
+    ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressFinish,
+    ProgressStyle,
 };
 
-use crate::config::DRY_RUN_PREFIX;
+use crate::config::{Config, DRY_RUN_PREFIX};
 
 pub(crate) mod table;
 
@@ -11,66 +12,111 @@ pub(crate) fn print_error(error: &color_eyre::Report) {
     println!("An error occurred:\n{error}");
 }
 
-pub(crate) struct PathFilterSpinner {
-    spinner: ProgressBar,
+pub(crate) struct ProgressBarOptions {
+    style: ProgressStyle,
+    draw_target: ProgressDrawTarget,
+    working_message: &'static str,
     finished_message: &'static str,
 }
 
-impl PathFilterSpinner {
-    pub(crate) fn new(
+impl ProgressBarOptions {
+    pub(crate) fn bar(
+        config: &Config,
+        working_message: &'static str,
+        finished_message: &'static str,
+    ) -> Result<Self> {
+        Self::new(
+            config,
+            ProgressStyle::default_bar(),
+            &format!("[{{pos}}/{{len}}] {{msg}} {{wide_bar}}"),
+            working_message,
+            finished_message,
+        )
+    }
+
+    pub(crate) fn spinner(
+        config: &Config,
         found: &str,
         total: &str,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
-        let spinner = ProgressBar::new(0).with_finish(ProgressFinish::Abandon);
-
-        let template = format!(
-            "[{{pos}}/{{len}} {found}/{total} files] {{wide_msg}} {{spinner}}",
-        );
-
-        let style = ProgressStyle::default_spinner().template(&template)?;
-
-        spinner.set_style(style);
-        spinner.set_draw_target(ProgressDrawTarget::stdout());
-        spinner.set_message(working_message);
-
-        Ok(Self { spinner, finished_message })
+        Self::new(
+            config,
+            ProgressStyle::default_spinner(),
+            &format!(
+                "[{{pos}}/{{len}} {found}/{total} files] {{wide_msg}} {{spinner}}",
+            ),
+            working_message,
+            finished_message,
+        )
     }
 
-    pub(crate) fn inc_found(&self) {
-        self.spinner.inc(1);
-    }
+    pub(crate) fn new(
+        config: &Config,
+        style: ProgressStyle,
+        template: &str,
+        working_message: &'static str,
+        finished_message: &'static str,
+    ) -> Result<Self> {
+        let prefix = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
-    pub(crate) fn inc_total(&self) {
-        // std::thread::sleep(std::time::Duration::from_millis(100));
-        self.spinner.inc_length(1);
-        self.spinner.tick();
-    }
+        let template = format!("{prefix}{template}");
 
-    pub(crate) fn finish(&self) {
-        self.spinner.finish_using_style();
-        self.spinner.set_message(self.finished_message);
+        let style = style.template(&template)?;
+
+        #[cfg(test)]
+        let draw_target = ProgressDrawTarget::stdout();
+
+        #[cfg(not(test))]
+        let draw_target = ProgressDrawTarget::stderr();
+
+        Ok(Self { style, draw_target, working_message, finished_message })
     }
 }
 
-pub(crate) fn create_progressbar(
-    len: u64,
-    msg: &'static str,
-    finished_msg: &'static str,
-    dry_run: bool,
-) -> Result<ProgressBar> {
-    let bar = ProgressBar::new(len).with_finish(ProgressFinish::WithMessage(
-        std::borrow::Cow::Borrowed(finished_msg),
-    ));
+pub(crate) struct ProgressBar {
+    inner: IndicatifProgressBar,
+    finished_message: &'static str,
+}
 
-    let prefix = if dry_run { DRY_RUN_PREFIX } else { "" };
+impl ProgressBar {
+    pub(crate) fn new(options: ProgressBarOptions) -> Self {
+        Self::with_length(options, 0)
+    }
 
-    let template = format!("{prefix}[{{pos}}/{{len}}] {{msg}} {{wide_bar}}");
+    pub(crate) fn with_length(
+        options: ProgressBarOptions,
+        length: u64,
+    ) -> Self {
+        let inner = IndicatifProgressBar::new(length)
+            .with_finish(ProgressFinish::Abandon);
 
-    bar.set_style(ProgressStyle::default_bar().template(&template)?);
-    bar.set_draw_target(ProgressDrawTarget::stdout());
-    bar.set_message(msg);
+        let ProgressBarOptions {
+            style,
+            working_message,
+            finished_message,
+            draw_target,
+        } = options;
 
-    Ok(bar)
+        inner.set_style(style);
+        inner.set_message(working_message);
+        inner.set_draw_target(draw_target);
+
+        Self { inner, finished_message }
+    }
+
+    pub(crate) fn inc_found(&self) {
+        self.inner.inc(1);
+    }
+
+    pub(crate) fn inc_total(&self) {
+        self.inner.inc_length(1);
+        self.inner.tick();
+    }
+
+    pub(crate) fn finish(&self) {
+        self.inner.set_message(self.finished_message);
+        self.inner.finish();
+    }
 }

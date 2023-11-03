@@ -1,12 +1,11 @@
 use camino::Utf8Path;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use indicatif::ProgressIterator;
 
 use crate::action::Move;
 use crate::audiofile::AudioFile;
 use crate::cli::ui::table::Table;
-use crate::cli::ui::{self, PathFilterSpinner};
+use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator};
 use crate::template::{Template, Templates};
@@ -37,12 +36,15 @@ pub(crate) fn rename(
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
-    let spinner = PathFilterSpinner::new(
+    let options = ProgressBarOptions::spinner(
+        config,
         "audio",
         "total",
         "Gathering files...",
         "Gathered files.",
     )?;
+
+    let spinner = ProgressBar::new(options);
 
     let file_paths = PathIterator::new(
         config.working_directory(),
@@ -70,12 +72,13 @@ fn create_move_actions(
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Move>> {
-    let bar = ui::create_progressbar(
-        files.len() as u64,
+    let options = ProgressBarOptions::bar(
+        config,
         "Determining output paths...",
         "Determined output paths",
-        config.dry_run(),
     )?;
+
+    let bar = ProgressBar::with_length(options, files.len() as u64);
 
     let move_actions: Result<Vec<Move>> = files
         .iter()
@@ -88,8 +91,10 @@ fn create_move_actions(
                 )?,
             ))
         })
-        .progress_with(bar)
+        .inspect(|_| bar.inc_found())
         .collect();
+
+    bar.finish();
 
     println!();
     println!();
@@ -121,7 +126,7 @@ fn perform_move_actions(
         &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
     );
 
-    move_files(config.dry_run(), move_actions)?;
+    move_files(config, move_actions)?;
 
     fs::remove_empty_subdirectories(
         config.dry_run(),
@@ -136,29 +141,31 @@ fn perform_move_actions(
     Ok(())
 }
 
-fn move_files(dry_run: bool, move_actions: Vec<Move>) -> Result<()> {
-    let bar = ui::create_progressbar(
-        move_actions.len() as u64,
-        "Moving files...",
-        "Moved files",
-        dry_run,
-    )?;
+fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<()> {
+    let options =
+        ProgressBarOptions::bar(config, "Moving files...", "Moved files")?;
 
-    for move_action in move_actions.into_iter().progress_with(bar) {
+    let bar = ProgressBar::with_length(options, move_actions.len() as u64);
+
+    for move_action in move_actions {
         let target = move_action.target();
 
         // Actions target are all files, and always have a parent.
         debug_assert!(target.parent().is_some());
 
-        create_dir(dry_run, target.parent().unwrap())?;
+        create_dir(config.dry_run(), target.parent().unwrap())?;
 
-        if !dry_run {
+        if !config.dry_run() {
             fs::copy_or_move_file(move_action.source(), move_action.target())?;
         }
 
         #[cfg(debug_assertions)]
         crate::debug::delay();
+
+        bar.inc_found();
     }
+
+    bar.finish();
 
     Ok(())
 }
