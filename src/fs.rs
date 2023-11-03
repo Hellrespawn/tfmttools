@@ -3,6 +3,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
+use tracing::debug;
 
 pub struct PathIterator(Walk);
 
@@ -63,14 +64,13 @@ pub(crate) fn copy_or_move_file(
             if expected_error_code == error_code {
                 fs::copy(source, target)?;
                 fs::remove_file(source)?;
-                return Ok(());
+            } else {
+                return Err(err.into());
             };
         }
-
-        Err(err.into())
-    } else {
-        Ok(())
     }
+
+    Ok(())
 }
 
 pub(crate) enum CreateDir {
@@ -155,6 +155,8 @@ pub(crate) fn remove_empty_subdirectories(
         .into_iter()
         .map(|p| {
             let removed = remove_dir(dry_run, &p)?;
+            debug!("Removed folder: {}", &p);
+
             Ok((p, removed))
         })
         .collect::<Result<Vec<_>>>()?;

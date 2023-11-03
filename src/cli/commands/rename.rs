@@ -1,21 +1,30 @@
-use camino::Utf8Path;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
-use crate::action::Move;
+use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
 use crate::cli::ui::table::Table;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
-use crate::fs::{self, PathIterator};
+use crate::fs::{self, PathIterator, RemoveDir};
 use crate::template::{Template, Templates};
+use crate::util::PathOrString;
 
 pub(crate) fn rename(
     config: &Config,
-    template_name: &str,
+    template_path_or_name: &PathOrString,
     arguments: Vec<String>,
 ) -> Result<()> {
-    let templates = Templates::read_directory(config.template_directory())?;
+    let templates = match template_path_or_name {
+        PathOrString::Path(path, string) => {
+            Templates::read_filename(path, string)
+        },
+        PathOrString::String(_) => {
+            Templates::read_directory(config.template_directory())
+        },
+    }?;
+
+    let template_name = template_path_or_name.as_str();
 
     let template = templates
         .get_template(template_name, arguments)
@@ -32,7 +41,11 @@ pub(crate) fn rename(
     } else {
         validate_move_actions(config, &move_actions)?;
 
-        perform_move_actions(config, move_actions)
+        print_move_actions_preview(config, &move_actions);
+
+        let _actions = perform_move_actions(config, move_actions)?;
+
+        Ok(())
     }
 }
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
@@ -74,8 +87,8 @@ fn create_move_actions(
 ) -> Result<Vec<Move>> {
     let options = ProgressBarOptions::bar(
         config,
-        "Determining output paths...",
-        "Determined output paths",
+        "Determining output paths:",
+        "Determined output paths.",
     )?;
 
     let bar = ProgressBar::with_length(options, files.len() as u64);
@@ -91,7 +104,12 @@ fn create_move_actions(
                 )?,
             ))
         })
-        .inspect(|_| bar.inc_found())
+        .inspect(|_| {
+            bar.inc_found();
+
+            #[cfg(debug_assertions)]
+            crate::debug::delay();
+        })
         .collect();
 
     bar.finish();
@@ -119,45 +137,43 @@ fn validate_move_actions(
 fn perform_move_actions(
     config: &Config,
     move_actions: Vec<Move>,
-) -> Result<()> {
-    print_move_actions_preview(config, &move_actions);
-
+) -> Result<Vec<Action>> {
     let common_path = fs::get_common_path(
         &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
     );
 
-    move_files(config, move_actions)?;
+    let mut actions = move_files(config, move_actions)?;
 
-    fs::remove_empty_subdirectories(
+    let removed = fs::remove_empty_subdirectories(
         config.dry_run(),
         &common_path,
         config.recursion_depth(),
     )?;
 
+    actions.extend(
+        removed
+            .iter()
+            .filter(|(_, r)| matches!(r, RemoveDir::Removed))
+            .map(|(p, _)| Action::RemoveDir(p.clone())),
+    );
+
     let prefix: &str = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
 
     println!("{prefix}Removed leftover folders.");
 
-    Ok(())
+    Ok(actions)
 }
 
-fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<()> {
+fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
     let options =
-        ProgressBarOptions::bar(config, "Moving files...", "Moved files")?;
+        ProgressBarOptions::bar(config, "Moving files:", "Moved files.")?;
 
     let bar = ProgressBar::with_length(options, move_actions.len() as u64);
 
+    let mut actions = Vec::new();
+
     for move_action in move_actions {
-        let target = move_action.target();
-
-        // Actions target are all files, and always have a parent.
-        debug_assert!(target.parent().is_some());
-
-        create_dir(config.dry_run(), target.parent().unwrap())?;
-
-        if !config.dry_run() {
-            fs::copy_or_move_file(move_action.source(), move_action.target())?;
-        }
+        actions.extend(move_action.apply(config.dry_run())?);
 
         #[cfg(debug_assertions)]
         crate::debug::delay();
@@ -167,21 +183,7 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<()> {
 
     bar.finish();
 
-    Ok(())
-}
-
-fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<()> {
-    if path.is_dir() {
-        return Ok(());
-    }
-
-    if let Some(parent) = path.parent() {
-        create_dir(dry_run, parent)?;
-    }
-
-    fs::create_dir(dry_run, path)?;
-
-    Ok(())
+    Ok(actions)
 }
 
 pub(crate) fn print_move_actions_preview(

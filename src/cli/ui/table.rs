@@ -1,8 +1,6 @@
 use camino::Utf8Path;
-use console::Term;
-use once_cell::sync::Lazy;
 
-static TERM: Lazy<Term> = Lazy::new(Term::stdout);
+use crate::TERM;
 // TODO? Accept all lines, but step through it like in actions preview?
 #[derive(Default)]
 pub(crate) struct Table {

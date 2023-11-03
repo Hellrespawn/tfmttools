@@ -41,6 +41,16 @@ impl<'t> Templates<'t> {
         Ok(Self { template_names, environment })
     }
 
+    pub(crate) fn read_filename(path: &Utf8Path, name: &str) -> Result<Self> {
+        let mut environment = Self::create_environment();
+
+        let template = fs_err::read_to_string(path)?;
+
+        environment.add_template_owned(name.to_owned(), template)?;
+
+        Ok(Self { template_names: vec![name.to_owned()], environment })
+    }
+
     pub(crate) fn get_template(
         &self,
         name: &str,

@@ -28,7 +28,7 @@ impl ProgressBarOptions {
         Self::new(
             config,
             ProgressStyle::default_bar(),
-            &format!("[{{pos}}/{{len}}] {{msg}} {{wide_bar}}"),
+            "[{pos}/{len}] {msg} {wide_bar}",
             working_message,
             finished_message,
         )
@@ -89,9 +89,6 @@ impl ProgressBar {
         options: ProgressBarOptions,
         length: u64,
     ) -> Self {
-        let inner = IndicatifProgressBar::new(length)
-            .with_finish(ProgressFinish::Abandon);
-
         let ProgressBarOptions {
             style,
             working_message,
@@ -99,9 +96,11 @@ impl ProgressBar {
             draw_target,
         } = options;
 
-        inner.set_style(style);
-        inner.set_message(working_message);
-        inner.set_draw_target(draw_target);
+        let inner =
+            IndicatifProgressBar::with_draw_target(Some(length), draw_target)
+                .with_finish(ProgressFinish::Abandon)
+                .with_style(style)
+                .with_message(working_message);
 
         Self { inner, finished_message }
     }
@@ -112,7 +111,6 @@ impl ProgressBar {
 
     pub(crate) fn inc_total(&self) {
         self.inner.inc_length(1);
-        self.inner.tick();
     }
 
     pub(crate) fn finish(&self) {

@@ -2,6 +2,7 @@ use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand};
 
 use crate::config::Config;
+use crate::util::PathOrString;
 
 #[derive(Parser, Debug, PartialEq)]
 #[command(version, about, long_about = None)]
@@ -36,7 +37,7 @@ pub(crate) enum Command {
         recurse: Option<usize>,
 
         /// Name or path of desired template.
-        name: String,
+        name: PathOrString,
 
         /// Arguments array to pass to template.
         arguments: Vec<String>,

@@ -52,7 +52,7 @@ impl Move {
             actions.extend(self.copy_or_move_file()?);
         }
 
-        todo!()
+        Ok(actions)
     }
 
     pub(crate) fn get_unique_source_directories(
@@ -87,28 +87,7 @@ impl Move {
         if self.source_equals_target() {
             Ok(None)
         } else {
-            if let Err(err) = fs::rename(self.source(), self.target()) {
-                // Can't rename across filesystem boundaries. Checks for
-                // the appropriate error and copies/deletes instead.
-                // Error codes are correct on Windows 10 20H2 and Arch
-                // Linux.
-                // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
-
-                if let Some(error_code) = err.raw_os_error() {
-                    #[cfg(windows)]
-                    let expected_error_code = 17;
-
-                    #[cfg(unix)]
-                    let expected_error_code = 18;
-
-                    if expected_error_code == error_code {
-                        fs::copy(self.source(), self.target())?;
-                        fs::remove_file(self.source())?;
-                    } else {
-                        return Err(err.into());
-                    }
-                }
-            }
+            crate::fs::copy_or_move_file(self.source(), self.target())?;
 
             let action = Action::Move(self);
 
