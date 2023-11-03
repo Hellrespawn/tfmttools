@@ -3,6 +3,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, registry, EnvFilter};
 
+use super::commands::HistoryMode;
 use super::Args;
 use crate::cli::args::Command;
 use crate::cli::{commands, ui};
@@ -51,7 +52,12 @@ fn select_command(config: &Config, command: Command) -> Result<()> {
         Command::Rename { name, arguments, .. } => {
             commands::rename(config, &name, arguments)
         },
-
         Command::Seed { force, .. } => commands::seed(config, force),
+        Command::Undo { amount, .. } => {
+            commands::undo_redo(config, HistoryMode::Undo(amount.unwrap_or(1)))
+        },
+        Command::Redo { amount, .. } => {
+            commands::undo_redo(config, HistoryMode::Redo(amount.unwrap_or(1)))
+        },
     }
 }

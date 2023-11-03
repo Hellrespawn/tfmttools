@@ -10,6 +10,20 @@ use time::OffsetDateTime;
 
 use crate::action::Action;
 
+pub(crate) enum LoadHistoryResult {
+    Loaded(History),
+    New(History),
+}
+
+impl LoadHistoryResult {
+    pub(crate) fn into_inner(self) -> History {
+        match self {
+            LoadHistoryResult::Loaded(history)
+            | LoadHistoryResult::New(history) => history,
+        }
+    }
+}
+
 pub(crate) enum SaveHistoryResult {
     Saved,
     Exists(Utf8PathBuf),
@@ -21,21 +35,27 @@ pub(crate) struct History {
 }
 
 impl History {
-    pub(crate) fn load(path: &Utf8Path) -> Result<History> {
-        let stack = if path.is_file() {
+    pub(crate) fn load(path: &Utf8Path) -> Result<LoadHistoryResult> {
+        let result = if path.is_file() {
             let body = fs::read(path)?;
 
-            Self::deserialize(&body)?
+            LoadHistoryResult::Loaded(Self {
+                path: path.to_owned(),
+                stack: Self::deserialize(&body)?,
+            })
         } else if path.exists() {
             return Err(eyre!(
                 "History file path exists, but is not a file: {}",
                 path
             ));
         } else {
-            RefStack::new()
+            LoadHistoryResult::New(Self {
+                path: path.to_owned(),
+                stack: RefStack::new(),
+            })
         };
 
-        Ok(Self { path: path.to_owned(), stack })
+        Ok(result)
     }
 
     #[cfg(feature = "serde_json")]
@@ -91,8 +111,18 @@ impl History {
         self.stack.push(record);
     }
 
-    pub(crate) fn pop_ref(&mut self) -> Option<&Record> {
-        self.stack.pop_ref()
+    pub(crate) fn get_records_to_undo(
+        &mut self,
+        n: usize,
+    ) -> Option<&[Record]> {
+        self.stack.refs_before_cursor(n)
+    }
+
+    pub(crate) fn get_records_to_redo(
+        &mut self,
+        n: usize,
+    ) -> Option<&[Record]> {
+        self.stack.refs_after_cursor(n)
     }
 
     pub(crate) fn path(&self) -> &str {
@@ -112,17 +142,57 @@ impl<T> RefStack<T> {
     }
 
     pub(crate) fn push(&mut self, item: T) {
-        self.inner.truncate(self.inner.len() - self.cursor);
-        self.cursor = 0;
+        self.inner.truncate(self.cursor);
         self.inner.push(item);
+        self.cursor = self.inner.len();
     }
 
-    pub(crate) fn pop_ref(&mut self) -> Option<&T> {
-        let item = self.inner.get(self.inner.len() - self.cursor - 1)?;
+    #[cfg(test)]
+    pub(crate) fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>,
+    {
+        self.inner.truncate(self.cursor);
+        self.inner.extend(iter);
+        self.cursor = self.inner.len();
+    }
 
-        self.cursor += 1;
+    pub(crate) fn refs_after_cursor(&mut self, n: usize) -> Option<&[T]> {
+        let start = self.cursor;
+        let end = std::cmp::min(self.cursor + n, self.inner.len());
 
-        Some(item)
+        let range = start..end;
+
+        if range.is_empty() {
+            None
+        } else {
+            let amount = end - start;
+
+            let items = self.inner.get(start..end);
+
+            self.cursor += amount;
+
+            items
+        }
+    }
+
+    pub(crate) fn refs_before_cursor(&mut self, n: usize) -> Option<&[T]> {
+        let start = self.cursor.saturating_sub(n);
+        let end = self.cursor;
+
+        let range = start..end;
+
+        if range.is_empty() {
+            None
+        } else {
+            let amount = end - start;
+
+            let items = self.inner.get(start..end);
+
+            self.cursor = self.cursor.saturating_sub(amount);
+
+            items
+        }
     }
 }
 
@@ -136,6 +206,10 @@ impl Record {
     pub fn new(actions: Vec<Action>) -> Result<Self> {
         Ok(Self { actions, timestamp: Some(OffsetDateTime::now_local()?) })
     }
+
+    pub(crate) fn iter(&self) -> impl DoubleEndedIterator<Item = &Action> {
+        self.actions.iter()
+    }
 }
 
 #[cfg(test)]
@@ -143,7 +217,22 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_ref_stack() {
+    fn test_empty_ref_stack() {
+        let mut stack: RefStack<usize> = RefStack::new();
+
+        assert_eq!(stack.refs_before_cursor(1), None);
+        assert_eq!(stack.cursor, 0);
+        assert_eq!(stack.refs_before_cursor(3), None);
+        assert_eq!(stack.cursor, 0);
+
+        assert_eq!(stack.refs_after_cursor(1), None);
+        assert_eq!(stack.cursor, 0);
+        assert_eq!(stack.refs_after_cursor(3), None);
+        assert_eq!(stack.cursor, 0);
+    }
+
+    #[test]
+    fn test_ref_stack_before_cursor() {
         let mut stack = RefStack::new();
 
         stack.push("a");
@@ -151,17 +240,57 @@ mod test {
         stack.push("c");
 
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
-        assert_eq!(stack.cursor, 0);
+        assert_eq!(stack.cursor, 3);
 
-        assert_eq!(stack.pop_ref(), Some(&"c"));
-        assert_eq!(stack.pop_ref(), Some(&"b"));
+        assert_eq!(stack.refs_before_cursor(1), Some(&["c"][..]));
+        assert_eq!(stack.refs_before_cursor(1), Some(&["b"][..]));
 
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
-        assert_eq!(stack.cursor, 2);
+        assert_eq!(stack.cursor, 1);
 
         stack.push("d");
 
         assert_eq!(stack.inner, vec!["a", "d"]);
+        assert_eq!(stack.cursor, 2);
+    }
+
+    #[test]
+    fn test_ref_stack_after_cursor() {
+        let mut stack = RefStack::new();
+
+        stack.push("a");
+        stack.push("b");
+        stack.push("c");
+
+        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.cursor, 3);
+
+        assert_eq!(stack.refs_before_cursor(1), Some(&["c"][..]));
+        assert_eq!(stack.refs_before_cursor(1), Some(&["b"][..]));
+
+        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.cursor, 1);
+
+        assert_eq!(stack.refs_after_cursor(2), Some(&["b", "c"][..]));
+        assert_eq!(stack.cursor, 3);
+    }
+
+    #[test]
+    fn test_ref_stack_too_big_n() {
+        let mut stack = RefStack::new();
+
+        stack.extend(["a", "b", "c"]);
+
+        assert_eq!(stack.refs_after_cursor(5), None);
+        assert_eq!(stack.cursor, 3);
+
+        assert_eq!(stack.refs_before_cursor(5), Some(&["a", "b", "c"][..]));
         assert_eq!(stack.cursor, 0);
+
+        assert_eq!(stack.refs_before_cursor(5), None);
+        assert_eq!(stack.cursor, 0);
+
+        assert_eq!(stack.refs_after_cursor(5), Some(&["a", "b", "c"][..]));
+        assert_eq!(stack.cursor, 3);
     }
 }

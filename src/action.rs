@@ -130,6 +130,44 @@ pub(crate) enum Action {
     RemoveDir(Utf8PathBuf),
 }
 
+impl Action {
+    pub(crate) fn undo(&self, dry_run: bool) -> Result<()> {
+        if !dry_run {
+            match self {
+                Action::Move { source, target } => {
+                    crate::fs::copy_or_move_file(target, source)?;
+                },
+                Action::MakeDir(path) => {
+                    fs::remove_dir(path)?;
+                },
+                Action::RemoveDir(path) => {
+                    fs::create_dir(path)?;
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn redo(&self, dry_run: bool) -> Result<()> {
+        if !dry_run {
+            match self {
+                Action::Move { source, target } => {
+                    crate::fs::copy_or_move_file(source, target)?;
+                },
+                Action::MakeDir(path) => {
+                    fs::create_dir(path)?;
+                },
+                Action::RemoveDir(path) => {
+                    fs::remove_dir(path)?;
+                },
+            }
+        }
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

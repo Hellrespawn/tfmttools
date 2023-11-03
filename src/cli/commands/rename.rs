@@ -226,7 +226,7 @@ pub(crate) fn print_move_actions_preview(
 
 fn store_history(config: &Config, actions: Vec<Action>) -> Result<()> {
     if !config.dry_run() {
-        let mut history = History::load(config.history_file())?;
+        let mut history = History::load(config.history_file())?.into_inner();
 
         let record = Record::new(actions)?;
 

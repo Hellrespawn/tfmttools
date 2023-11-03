@@ -60,6 +60,20 @@ pub(crate) enum Command {
         /// Overwrite existing files.
         force: bool,
     },
+    Undo {
+        #[arg(short, long)]
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
+
+        amount: Option<usize>,
+    },
+    Redo {
+        #[arg(short, long)]
+        /// Don't run command, only show what would happen.
+        dry_run: bool,
+
+        amount: Option<usize>,
+    },
 }
 
 impl Args {
@@ -73,7 +87,9 @@ impl Args {
             || match self.command {
                 Command::ClearHistory { dry_run }
                 | Command::Rename { dry_run, .. }
-                | Command::Seed { dry_run, .. } => dry_run,
+                | Command::Seed { dry_run, .. }
+                | Command::Undo { dry_run, .. }
+                | Command::Redo { dry_run, .. } => dry_run,
                 Command::ListTemplates => false,
             }
     }
