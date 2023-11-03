@@ -7,6 +7,7 @@ use crate::cli::ui::table::Table;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator, RemoveDir};
+use crate::history::{History, Record, SaveHistoryResult};
 use crate::template::{Template, Templates};
 use crate::util::PathOrString;
 
@@ -43,11 +44,14 @@ pub(crate) fn rename(
 
         print_move_actions_preview(config, &move_actions);
 
-        let _actions = perform_move_actions(config, move_actions)?;
+        let actions = perform_move_actions(config, move_actions)?;
+
+        store_history(config, actions)?;
 
         Ok(())
     }
 }
+
 fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     let options = ProgressBarOptions::spinner(
         config,
@@ -216,6 +220,26 @@ pub(crate) fn print_move_actions_preview(
     }
 
     println!("{table}");
+}
+
+fn store_history(config: &Config, actions: Vec<Action>) -> Result<()> {
+    if !config.dry_run() {
+        let mut history = History::load(config.history_file())?;
+
+        let record = Record::new(actions)?;
+
+        history.push(record);
+
+        if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
+            eprintln!(
+                "History file path exists, but is not a file: {}",
+                history.path()
+            );
+            eprintln!("Backed up history to: {tmp_file}");
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

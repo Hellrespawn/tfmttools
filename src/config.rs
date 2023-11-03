@@ -10,6 +10,7 @@ const DEFAULT_RECURSION_DEPTH: usize = 4;
 pub(crate) struct Config {
     template_directory: Utf8PathBuf,
     working_directory: Utf8PathBuf,
+    history_file: Utf8PathBuf,
     dry_run: bool,
     recursion_depth: usize,
     preview_amount: usize,
@@ -23,6 +24,7 @@ impl Config {
         let config = Self {
             template_directory: template_directory.to_owned(),
             working_directory: std::env::current_dir()?.try_into()?,
+            history_file: template_directory.join("history.json"),
             dry_run,
             recursion_depth: DEFAULT_RECURSION_DEPTH,
             preview_amount: DEFAULT_PREVIEW_AMOUNT,
@@ -37,6 +39,10 @@ impl Config {
 
     pub(crate) fn working_directory(&self) -> &Utf8Path {
         &self.working_directory
+    }
+
+    pub(crate) fn history_file(&self) -> &Utf8Path {
+        &self.history_file
     }
 
     pub(crate) fn dry_run(&self) -> bool {
