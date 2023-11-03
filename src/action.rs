@@ -3,8 +3,9 @@ use std::collections::HashSet;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use fs_err as fs;
+use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Serialize, Deserialize)]
 pub(crate) struct Move {
     source: Utf8PathBuf,
     target: Utf8PathBuf,
@@ -89,7 +90,8 @@ impl Move {
         } else {
             crate::fs::copy_or_move_file(self.source(), self.target())?;
 
-            let action = Action::Move(self);
+            let action =
+                Action::Move { source: self.source, target: self.target };
 
             Ok(Some(action))
         }
@@ -121,8 +123,9 @@ impl Move {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) enum Action {
-    Move(Move),
+    Move { source: Utf8PathBuf, target: Utf8PathBuf },
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
 }

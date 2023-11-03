@@ -21,6 +21,7 @@ mod audiofile;
 pub mod cli;
 mod config;
 mod fs;
+mod history;
 mod tags;
 mod template;
 mod util;
