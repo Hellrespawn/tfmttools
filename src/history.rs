@@ -1,3 +1,6 @@
+#[cfg(all(feature = "serde_json", feature = "bincode"))]
+compile_error!("Features `serde_json` and `bincode` are mutually exclusive.");
+
 use crate::action::Action;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::{eyre::eyre, Result};
@@ -18,9 +21,9 @@ pub(crate) struct History {
 impl History {
     pub(crate) fn load(path: &Utf8Path) -> Result<History> {
         let stack = if path.is_file() {
-            let body = fs::read_to_string(path)?;
+            let body = fs::read(path)?;
 
-            serde_json::from_str(&body)?
+            Self::deserialize(&body)?
         } else if path.exists() {
             return Err(eyre!(
                 "History file path exists, but is not a file: {}",
@@ -31,6 +34,16 @@ impl History {
         };
 
         Ok(Self { path: path.to_owned(), stack })
+    }
+
+    #[cfg(feature = "serde_json")]
+    fn deserialize(bytes: &[u8]) -> Result<RefStack<Record>> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
+
+    #[cfg(feature = "bincode")]
+    fn deserialize(bytes: &[u8]) -> Result<RefStack<Record>> {
+        Ok(bincode::deserialize(bytes)?)
     }
 
     pub(crate) fn save(&self) -> Result<SaveHistoryResult> {
@@ -54,9 +67,22 @@ impl History {
         fs::create_dir_all(
             path.parent().expect("Path to file should always have a parent."),
         )?;
-        fs::write(path, serde_json::to_string(&self.stack)?)?;
+
+        let bytes = self.serialize()?;
+
+        fs::write(path, bytes)?;
 
         Ok(result)
+    }
+
+    #[cfg(feature = "serde_json")]
+    fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(&self.stack)?)
+    }
+
+    #[cfg(feature = "bincode")]
+    fn serialize(&self) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(&self.stack)?)
     }
 
     pub(crate) fn push(&mut self, record: Record) {
