@@ -43,34 +43,46 @@ pub(crate) fn gather_subdirectories(
         .collect()
 }
 
-pub(crate) fn copy_or_move_file(
+pub(crate) enum MoveFileResult {
+    Moved,
+    CopiedAndRemoved,
+    DryRun,
+}
+
+pub(crate) fn move_file(
+    dry_run: bool,
     source: &Utf8Path,
     target: &Utf8Path,
-) -> Result<()> {
-    if let Err(err) = fs::rename(source, target) {
-        // Can't rename across filesystem boundaries. Checks for
-        // the appropriate error and copies/deletes instead.
-        // Error codes are correct on Windows 10 20H2 and Arch
-        // Linux.
-        // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
+) -> Result<MoveFileResult> {
+    if dry_run {
+        Ok(MoveFileResult::DryRun)
+    } else {
+        if let Err(err) = fs::rename(source, target) {
+            // Can't rename across filesystem boundaries. Checks for
+            // the appropriate error and copies/deletes instead.
+            // Error codes are correct on Windows 10 20H2 and Arch
+            // Linux.
+            // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
 
-        if let Some(error_code) = err.raw_os_error() {
-            #[cfg(windows)]
-            let expected_error_code = 17;
+            if let Some(error_code) = err.raw_os_error() {
+                #[cfg(windows)]
+                let expected_error_code = 17;
 
-            #[cfg(unix)]
-            let expected_error_code = 18;
+                #[cfg(unix)]
+                let expected_error_code = 18;
 
-            if expected_error_code == error_code {
-                fs::copy(source, target)?;
-                fs::remove_file(source)?;
-            } else {
+                if expected_error_code == error_code {
+                    fs::copy(source, target)?;
+                    fs::remove_file(source)?;
+                    return Ok(MoveFileResult::CopiedAndRemoved);
+                }
+
                 return Err(err.into());
-            };
+            }
         }
-    }
 
-    Ok(())
+        Ok(MoveFileResult::Moved)
+    }
 }
 
 pub(crate) enum CreateDir {
@@ -164,27 +176,32 @@ pub(crate) fn remove_empty_subdirectories(
     Ok(dirs)
 }
 
-pub(crate) fn get_common_path(paths: &[&Utf8Path]) -> Utf8PathBuf {
-    debug_assert!(!paths.is_empty());
+pub(crate) fn get_longest_common_prefix(
+    paths: &[&Utf8Path],
+) -> Option<Utf8PathBuf> {
+    if paths.is_empty() {
+        None
+    } else {
+        let mut iter = paths.iter();
 
-    let mut iter = paths.iter();
+        // We have already returned if no files were found, so this unwrap
+        // should be safe.
+        let mut common_path = iter.next().unwrap().to_path_buf();
 
-    // We have already returned if no files were found, so this unwrap
-    // should be safe.
-    let mut common_path = iter.next().unwrap().to_path_buf();
+        for path in iter {
+            let mut new_common_path = Utf8PathBuf::new();
 
-    for path in iter {
-        let mut new_common_path = Utf8PathBuf::new();
-
-        for (left, right) in path.components().zip(common_path.components()) {
-            if left == right {
-                new_common_path.push(left);
-            } else {
-                break;
+            for (left, right) in path.components().zip(common_path.components())
+            {
+                if left == right {
+                    new_common_path.push(left);
+                } else {
+                    break;
+                }
             }
+            common_path = new_common_path;
         }
-        common_path = new_common_path;
-    }
 
-    common_path
+        Some(common_path)
+    }
 }

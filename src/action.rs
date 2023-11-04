@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use fs_err as fs;
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Serialize, Deserialize)]
@@ -33,41 +32,37 @@ impl Move {
         &self.target
     }
 
-    pub(crate) fn source_equals_target(&self) -> bool {
-        self.source() == self.target()
-    }
-
     pub(crate) fn source_differs_from_target(&self) -> bool {
-        !self.source_equals_target()
+        self.source() != self.target()
     }
 
-    pub(crate) fn apply(self, dry_run: bool) -> Result<Vec<Action>> {
-        let mut actions = Self::create_directory_if_not_exists(
-            dry_run,
-            self.target()
-                .parent()
-                .expect("Move target should always be a file with a parent."),
-        )?;
+    pub(crate) fn create_actions(move_actions: Vec<Move>) -> Vec<Action> {
+        let target_paths =
+            move_actions.iter().map(Move::target).collect::<Vec<_>>();
 
-        if !dry_run {
-            actions.extend(self.copy_or_move_file()?);
-        }
+        let mut actions =
+            Self::list_all_intermediate_paths_of_files(&target_paths)
+                .into_iter()
+                .filter(|p| !p.is_dir())
+                .map(Action::MakeDir)
+                .collect::<Vec<_>>();
 
-        Ok(actions)
+        actions.extend(
+            move_actions
+                .into_iter()
+                .map(|m| Action::Move { source: m.source, target: m.target }),
+        );
+
+        actions
     }
 
-    pub(crate) fn get_unique_source_directories(
-        move_actions: &[Move],
+    fn list_all_intermediate_paths_of_files(
+        paths: &[&Utf8Path],
     ) -> Vec<Utf8PathBuf> {
-        // let common_path = crate::fs::get_common_path(
-        //     &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
-        // );
-
-        let mut directories = move_actions
+        let mut directories = paths
             .iter()
-            .flat_map(|m| {
-                m.source()
-                    .parent()
+            .flat_map(|p| {
+                p.parent()
                     .expect("Move::source() should always refer to a file.")
                     .ancestors()
                     .filter(|p| !p.as_str().is_empty())
@@ -79,47 +74,8 @@ impl Move {
             .collect::<Vec<_>>();
 
         directories.sort();
-        directories.reverse();
 
         directories
-    }
-
-    fn copy_or_move_file(self) -> Result<Option<Action>> {
-        if self.source_equals_target() {
-            Ok(None)
-        } else {
-            crate::fs::copy_or_move_file(self.source(), self.target())?;
-
-            let action =
-                Action::Move { source: self.source, target: self.target };
-
-            Ok(Some(action))
-        }
-    }
-
-    fn create_directory_if_not_exists(
-        dry_run: bool,
-        path: &Utf8Path,
-    ) -> Result<Vec<Action>> {
-        if path.is_dir() {
-            Ok(Vec::new())
-        } else {
-            let mut actions = Vec::new();
-
-            if let Some(parent) = path.parent() {
-                actions.extend(Self::create_directory_if_not_exists(
-                    dry_run, parent,
-                )?);
-            }
-
-            if !dry_run {
-                fs::create_dir(path)?;
-            }
-
-            actions.push(Action::MakeDir(path.to_owned()));
-
-            Ok(actions)
-        }
     }
 }
 
@@ -131,40 +87,44 @@ pub(crate) enum Action {
 }
 
 impl Action {
+    pub(crate) fn is_move(&self) -> bool {
+        matches!(self, Self::Move { .. })
+    }
+
+    pub(crate) fn apply(&self, dry_run: bool) -> Result<()> {
+        match self {
+            Action::Move { source, target } => {
+                crate::fs::move_file(dry_run, source, target)?;
+            },
+            Action::MakeDir(path) => {
+                crate::fs::create_dir(dry_run, path)?;
+            },
+            Action::RemoveDir(path) => {
+                crate::fs::remove_dir(dry_run, path)?;
+            },
+        }
+
+        Ok(())
+    }
+
     pub(crate) fn undo(&self, dry_run: bool) -> Result<()> {
-        if !dry_run {
-            match self {
-                Action::Move { source, target } => {
-                    crate::fs::copy_or_move_file(target, source)?;
-                },
-                Action::MakeDir(path) => {
-                    fs::remove_dir(path)?;
-                },
-                Action::RemoveDir(path) => {
-                    fs::create_dir(path)?;
-                },
-            }
+        match self {
+            Action::Move { source, target } => {
+                crate::fs::move_file(dry_run, target, source)?;
+            },
+            Action::MakeDir(path) => {
+                crate::fs::remove_dir(dry_run, path)?;
+            },
+            Action::RemoveDir(path) => {
+                crate::fs::create_dir(dry_run, path)?;
+            },
         }
 
         Ok(())
     }
 
     pub(crate) fn redo(&self, dry_run: bool) -> Result<()> {
-        if !dry_run {
-            match self {
-                Action::Move { source, target } => {
-                    crate::fs::copy_or_move_file(source, target)?;
-                },
-                Action::MakeDir(path) => {
-                    fs::create_dir(path)?;
-                },
-                Action::RemoveDir(path) => {
-                    fs::remove_dir(path)?;
-                },
-            }
-        }
-
-        Ok(())
+        self.apply(dry_run)
     }
 }
 
@@ -183,17 +143,19 @@ mod test {
             "a/b/h/j.mp3",
         ];
 
-        let reference = ["a/b/h", "a/b/c", "a/b", "a"]
+        let reference = ["a", "a/b", "a/b/c", "a/b/h"]
             .into_iter()
             .map(Utf8PathBuf::from)
             .collect::<Vec<_>>();
 
-        let move_actions: Vec<Move> = paths
-            .iter()
-            .map(|s| Move::new(Utf8PathBuf::from(s), Utf8PathBuf::new()))
-            .collect();
+        let paths: Vec<Utf8PathBuf> =
+            paths.iter().map(Utf8PathBuf::from).collect();
 
-        let directories = Move::get_unique_source_directories(&move_actions);
+        let paths_ref =
+            paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
+
+        let directories =
+            Move::list_all_intermediate_paths_of_files(&paths_ref);
 
         assert_eq!(directories, reference);
     }
@@ -209,17 +171,19 @@ mod test {
             "/a/b/h/j.mp3",
         ];
 
-        let reference = ["/a/b/h", "/a/b/c", "/a/b", "/a", "/"]
+        let reference = ["/", "/a", "/a/b", "/a/b/c", "/a/b/h"]
             .into_iter()
             .map(Utf8PathBuf::from)
             .collect::<Vec<_>>();
 
-        let move_actions: Vec<Move> = paths
-            .iter()
-            .map(|s| Move::new(Utf8PathBuf::from(s), Utf8PathBuf::new()))
-            .collect();
+        let paths: Vec<Utf8PathBuf> =
+            paths.iter().map(Utf8PathBuf::from).collect();
 
-        let directories = Move::get_unique_source_directories(&move_actions);
+        let paths_ref =
+            paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
+
+        let directories =
+            Move::list_all_intermediate_paths_of_files(&paths_ref);
 
         assert_eq!(directories, reference);
     }

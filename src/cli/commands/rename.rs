@@ -42,7 +42,7 @@ pub(crate) fn rename(
     } else {
         validate_move_actions(config, &move_actions)?;
 
-        print_move_actions_preview(config, &move_actions);
+        preview_move_actions(config, &move_actions);
 
         let actions = perform_move_actions(config, move_actions)?;
 
@@ -142,30 +142,34 @@ fn perform_move_actions(
     config: &Config,
     move_actions: Vec<Move>,
 ) -> Result<Vec<Action>> {
-    let common_path = fs::get_common_path(
+    let common_prefix = fs::get_longest_common_prefix(
         &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
     );
 
     let mut actions = move_files(config, move_actions)?;
 
-    let removed = fs::remove_empty_subdirectories(
-        config.dry_run(),
-        &common_path,
-        config.recursion_depth(),
-    )?;
-
-    actions.extend(
-        removed
-            .iter()
-            .filter(|(_, r)| matches!(r, RemoveDir::Removed))
-            .map(|(p, _)| Action::RemoveDir(p.clone())),
-    );
-
     if config.dry_run() {
         print!("{DRY_RUN_PREFIX}");
     }
 
-    println!("Removed leftover folders.");
+    if let Some(common_path) = common_prefix {
+        let removed = fs::remove_empty_subdirectories(
+            config.dry_run(),
+            &common_path,
+            config.recursion_depth(),
+        )?;
+
+        actions.extend(
+            removed
+                .iter()
+                .filter(|(_, r)| matches!(r, RemoveDir::Removed))
+                .map(|(p, _)| Action::RemoveDir(p.clone())),
+        );
+
+        println!("Removed leftover folders.");
+    } else {
+        println!("Unable to remove leftover folders.");
+    }
 
     Ok(actions)
 }
@@ -176,15 +180,17 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
 
     let bar = ProgressBar::with_length(options, move_actions.len() as u64);
 
-    let mut actions = Vec::new();
+    let actions = Move::create_actions(move_actions);
 
-    for move_action in move_actions {
-        actions.extend(move_action.apply(config.dry_run())?);
+    for action in &actions {
+        action.apply(config.dry_run())?;
 
-        #[cfg(debug_assertions)]
-        crate::debug::delay();
+        if action.is_move() {
+            bar.inc_found();
 
-        bar.inc_found();
+            #[cfg(debug_assertions)]
+            crate::debug::delay();
+        }
     }
 
     bar.finish();
@@ -192,10 +198,7 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
     Ok(actions)
 }
 
-pub(crate) fn print_move_actions_preview(
-    config: &Config,
-    move_actions: &[Move],
-) {
+pub(crate) fn preview_move_actions(config: &Config, move_actions: &[Move]) {
     let length = move_actions.len();
 
     let step = std::cmp::max(move_actions.len() / config.preview_amount(), 1);
