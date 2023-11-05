@@ -3,7 +3,6 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
-use tracing::debug;
 
 pub struct PathIterator(Walk);
 
@@ -85,35 +84,41 @@ pub(crate) fn move_file(
     }
 }
 
-pub(crate) enum CreateDir {
+pub(crate) enum CreateDirResult {
     Created,
     Exists,
     DryRun,
 }
 
-pub(crate) fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<CreateDir> {
+pub(crate) fn create_dir(
+    dry_run: bool,
+    path: &Utf8Path,
+) -> Result<CreateDirResult> {
     if dry_run {
-        Ok(CreateDir::DryRun)
+        Ok(CreateDirResult::DryRun)
     } else if path.is_dir() {
-        Ok(CreateDir::Exists)
+        Ok(CreateDirResult::Exists)
     } else if path.exists() {
         Err(eyre!("Path exists but is not a directory: {}", path))
     } else {
         fs::create_dir(path)?;
 
-        Ok(CreateDir::Created)
+        Ok(CreateDirResult::Created)
     }
 }
 
-pub(crate) enum RemoveDir {
+pub(crate) enum RemoveDirResult {
     Removed,
     NotEmpty,
     DryRun,
 }
 
-pub(crate) fn remove_dir(dry_run: bool, path: &Utf8Path) -> Result<RemoveDir> {
+pub(crate) fn remove_dir(
+    dry_run: bool,
+    path: &Utf8Path,
+) -> Result<RemoveDirResult> {
     if dry_run {
-        Ok(RemoveDir::DryRun)
+        Ok(RemoveDirResult::DryRun)
     } else {
         let result = fs::remove_dir(path);
 
@@ -130,18 +135,18 @@ pub(crate) fn remove_dir(dry_run: bool, path: &Utf8Path) -> Result<RemoveDir> {
                 let expected_code = 39;
 
                 if error_code == expected_code {
-                    return Ok(RemoveDir::NotEmpty);
+                    return Ok(RemoveDirResult::NotEmpty);
                 }
 
                 return Err(io_error.into());
             }
         }
 
-        Ok(RemoveDir::Removed)
+        Ok(RemoveDirResult::Removed)
     }
 }
 
-pub(crate) enum RemoveDirAll {
+pub(crate) enum RemoveDirAllResult {
     Removed,
     DryRun,
 }
@@ -149,12 +154,12 @@ pub(crate) enum RemoveDirAll {
 pub(crate) fn remove_dir_all(
     dry_run: bool,
     path: &Utf8Path,
-) -> Result<RemoveDirAll> {
+) -> Result<RemoveDirAllResult> {
     if dry_run {
-        Ok(RemoveDirAll::DryRun)
+        Ok(RemoveDirAllResult::DryRun)
     } else {
         fs::remove_dir_all(path)?;
-        Ok(RemoveDirAll::Removed)
+        Ok(RemoveDirAllResult::Removed)
     }
 }
 
@@ -162,12 +167,11 @@ pub(crate) fn remove_empty_subdirectories(
     dry_run: bool,
     path: &Utf8Path,
     recursion_depth: usize,
-) -> Result<Vec<(Utf8PathBuf, RemoveDir)>> {
+) -> Result<Vec<(Utf8PathBuf, RemoveDirResult)>> {
     let dirs = gather_subdirectories(path, recursion_depth)
         .into_iter()
         .map(|p| {
             let removed = remove_dir(dry_run, &p)?;
-            debug!("Removed folder: {}", &p);
 
             Ok((p, removed))
         })

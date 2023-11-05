@@ -1,8 +1,3 @@
 /target
 
-doc/todo.txt
-doc/clippy.txt
-
-log/
-
-*-ast.png
+*.log

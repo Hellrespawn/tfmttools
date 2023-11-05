@@ -10,11 +10,6 @@
 //! The `TagFormat` utility lets you use templates to dynamically
 //! rename your music files based on their tags.
 
-use console::Term;
-use once_cell::sync::Lazy;
-
-pub(crate) static TERM: Lazy<Term> = Lazy::new(Term::stdout);
-
 mod action;
 mod audiofile;
 /// Controls the command line interface

@@ -6,7 +6,7 @@ use crate::audiofile::AudioFile;
 use crate::cli::ui::table::Table;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
-use crate::fs::{self, PathIterator, RemoveDir};
+use crate::fs::{self, PathIterator, RemoveDirResult};
 use crate::history::{History, Record, SaveHistoryResult};
 use crate::template::{Template, Templates};
 use crate::util::PathOrString;
@@ -162,7 +162,7 @@ fn perform_move_actions(
         actions.extend(
             removed
                 .iter()
-                .filter(|(_, r)| matches!(r, RemoveDir::Removed))
+                .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
                 .map(|(p, _)| Action::RemoveDir(p.clone())),
         );
 

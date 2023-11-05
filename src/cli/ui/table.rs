@@ -1,6 +1,7 @@
 use camino::Utf8Path;
 
-use crate::TERM;
+use crate::cli::TERM;
+
 // TODO? Accept all lines, but step through it like in actions preview?
 #[derive(Default)]
 pub(crate) struct Table {

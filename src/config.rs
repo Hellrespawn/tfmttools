@@ -9,6 +9,7 @@ const DEFAULT_RECURSION_DEPTH: usize = 4;
 const DEFAULT_HISTORY_FILENAME: &str =
     concat!(env!("CARGO_PKG_NAME"), ".history.json");
 
+#[derive(Debug)]
 pub(crate) struct Config {
     template_directory: Utf8PathBuf,
     working_directory: Utf8PathBuf,
