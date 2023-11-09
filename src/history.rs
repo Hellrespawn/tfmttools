@@ -1,6 +1,3 @@
-#[cfg(all(feature = "serde_json", feature = "bincode"))]
-compile_error!("Features `serde_json` and `bincode` are mutually exclusive.");
-
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -9,6 +6,38 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::action::Action;
+
+struct HistorySerde;
+
+impl HistorySerde {
+    #[cfg(feature = "debug")]
+    fn serialize(stack: &RefStack<Record>) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(stack)?)
+    }
+
+    #[cfg(not(feature = "debug"))]
+    fn serialize(stack: &RefStack<Record>) -> Result<Vec<u8>> {
+        Ok(bincode::serialize(stack)?)
+    }
+
+    fn deserialize(bytes: &[u8]) -> Result<RefStack<Record>> {
+        let bincode_result = bincode::deserialize(bytes);
+
+        let json_result = serde_json::from_slice(bytes);
+
+        if let Ok(stack) = bincode_result {
+            Ok(stack)
+        } else if let Ok(stack) = json_result {
+            Ok(stack)
+        } else {
+            Err(eyre!(
+                "Unable to deserialize history:\nbincode: {}\njson: {}",
+                bincode_result.unwrap_err(),
+                json_result.unwrap_err()
+            ))
+        }
+    }
+}
 
 pub(crate) enum LoadHistoryResult {
     Loaded(History),
@@ -41,7 +70,7 @@ impl History {
 
             LoadHistoryResult::Loaded(Self {
                 path: path.to_owned(),
-                stack: Self::deserialize(&body)?,
+                stack: HistorySerde::deserialize(&body)?,
             })
         } else if path.exists() {
             return Err(eyre!(
@@ -56,16 +85,6 @@ impl History {
         };
 
         Ok(result)
-    }
-
-    #[cfg(feature = "serde_json")]
-    fn deserialize(bytes: &[u8]) -> Result<RefStack<Record>> {
-        Ok(serde_json::from_slice(bytes)?)
-    }
-
-    #[cfg(feature = "bincode")]
-    fn deserialize(bytes: &[u8]) -> Result<RefStack<Record>> {
-        Ok(bincode::deserialize(bytes)?)
     }
 
     pub(crate) fn save(&self) -> Result<SaveHistoryResult> {
@@ -90,21 +109,11 @@ impl History {
             path.parent().expect("Path to file should always have a parent."),
         )?;
 
-        let bytes = self.serialize()?;
+        let bytes = HistorySerde::serialize(&self.stack)?;
 
         fs::write(path, bytes)?;
 
         Ok(result)
-    }
-
-    #[cfg(feature = "serde_json")]
-    fn serialize(&self) -> Result<Vec<u8>> {
-        Ok(serde_json::to_vec(&self.stack)?)
-    }
-
-    #[cfg(feature = "bincode")]
-    fn serialize(&self) -> Result<Vec<u8>> {
-        Ok(bincode::serialize(&self.stack)?)
     }
 
     pub(crate) fn push(&mut self, record: Record) {
@@ -130,7 +139,7 @@ impl History {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct RefStack<T> {
     inner: Vec<T>,
     cursor: usize,
@@ -196,7 +205,7 @@ impl<T> RefStack<T> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Record {
     actions: Vec<Action>,
     timestamp: Option<OffsetDateTime>,

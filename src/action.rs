@@ -79,7 +79,7 @@ impl Move {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) enum Action {
     Move { source: Utf8PathBuf, target: Utf8PathBuf },
     MakeDir(Utf8PathBuf),

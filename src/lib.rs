@@ -22,7 +22,7 @@ mod template;
 mod util;
 mod validation;
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "debug")]
 mod debug;
 
 // TODO Check if leftovers are images and offer to delete.

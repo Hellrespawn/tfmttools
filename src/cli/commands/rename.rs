@@ -73,7 +73,7 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
     .inspect(|_| {
         spinner.inc_found();
 
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "debug")]
         crate::debug::delay();
     })
     .map(|path| AudioFile::new(&path))
@@ -111,7 +111,7 @@ fn create_move_actions(
         .inspect(|_| {
             bar.inc_found();
 
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug")]
             crate::debug::delay();
         })
         .collect();
@@ -188,7 +188,7 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
         if action.is_move() {
             bar.inc_found();
 
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "debug")]
             crate::debug::delay();
         }
     }
