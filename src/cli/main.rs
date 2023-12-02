@@ -43,20 +43,31 @@ pub fn main(dry_run_override: bool) -> Result<()> {
     Ok(())
 }
 
-fn select_command(config: &Config, command: Command) -> Result<()> {
-    match command {
-        Command::ClearHistory { .. } => commands::clear_history(config),
-        Command::ListTemplates => commands::list_templates(config),
-        Command::Rename { name, arguments, .. } => {
-            commands::rename(config, &name, arguments)
-        },
-        Command::Seed { force, .. } => commands::seed(config, force),
-        Command::Undo { amount, .. } => {
-            commands::undo_redo(config, HistoryMode::Undo(amount.unwrap_or(1)))
-        },
-        Command::Redo { amount, .. } => {
-            commands::undo_redo(config, HistoryMode::Redo(amount.unwrap_or(1)))
-        },
+fn select_command(config: &Config, command: Option<Command>) -> Result<()> {
+    if let Some(command) = command {
+        match command {
+            Command::ClearHistory { .. } => commands::clear_history(config),
+            Command::ListTemplates => commands::list_templates(config),
+            Command::Rename { name, arguments, .. } => {
+                commands::rename(config, &name, arguments)
+            },
+            Command::Seed { force, .. } => commands::seed(config, force),
+            Command::Undo { amount, .. } => {
+                commands::undo_redo(
+                    config,
+                    HistoryMode::Undo(amount.unwrap_or(1)),
+                )
+            },
+            Command::Redo { amount, .. } => {
+                commands::undo_redo(
+                    config,
+                    HistoryMode::Redo(amount.unwrap_or(1)),
+                )
+            },
+        }
+    } else {
+        commands::tui()?;
+        Ok(())
     }
 }
 

@@ -17,7 +17,7 @@ pub(crate) struct Args {
     dry_run: bool,
 
     #[command(subcommand)]
-    pub(crate) command: Command,
+    pub(crate) command: Option<Command>,
 }
 
 #[derive(Subcommand, Debug, PartialEq)]
@@ -85,12 +85,14 @@ impl Args {
     pub(crate) fn dry_run(&self) -> bool {
         self.dry_run
             || match self.command {
-                Command::ClearHistory { dry_run }
-                | Command::Rename { dry_run, .. }
-                | Command::Seed { dry_run, .. }
-                | Command::Undo { dry_run, .. }
-                | Command::Redo { dry_run, .. } => dry_run,
-                Command::ListTemplates => false,
+                Some(
+                    Command::ClearHistory { dry_run }
+                    | Command::Rename { dry_run, .. }
+                    | Command::Seed { dry_run, .. }
+                    | Command::Undo { dry_run, .. }
+                    | Command::Redo { dry_run, .. },
+                ) => dry_run,
+                _ => false,
             }
     }
 }
@@ -109,7 +111,7 @@ impl TryFrom<&Args> for Config {
 
         let mut config = Self::new(dry_run, &path)?;
 
-        if let Command::Rename { recurse, .. } = &args.command {
+        if let Some(Command::Rename { recurse, .. }) = &args.command {
             config.set_recursion_depth(*recurse);
         }
 
