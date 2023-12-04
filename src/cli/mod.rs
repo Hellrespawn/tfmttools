@@ -1,6 +1,7 @@
 mod args;
 mod commands;
 mod main;
+mod preview;
 mod ui;
 
 use console::Term;

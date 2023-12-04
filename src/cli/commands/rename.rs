@@ -3,6 +3,7 @@ use color_eyre::Result;
 
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
+use crate::cli::preview::preview;
 use crate::cli::ui::table::Table;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
@@ -42,11 +43,15 @@ pub(crate) fn rename(
     } else {
         validate_move_actions(config, &move_actions)?;
 
-        preview_move_actions(config, &move_actions);
+        let confirmation = preview_move_actions(config, &move_actions)?;
 
-        let actions = perform_move_actions(config, move_actions)?;
+        if confirmation {
+            let actions = perform_move_actions(config, move_actions)?;
 
-        store_history(config, actions)?;
+            store_history(config, actions)?;
+        } else {
+            println!("Aborting!")
+        }
 
         Ok(())
     }
@@ -198,8 +203,11 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
     Ok(actions)
 }
 
-pub(crate) fn preview_move_actions(config: &Config, move_actions: &[Move]) {
-    let length = move_actions.len();
+pub(crate) fn preview_move_actions(
+    config: &Config,
+    move_actions: &[Move],
+) -> Result<bool> {
+    // let length = move_actions.len();
 
     let step = std::cmp::max(move_actions.len() / config.preview_amount(), 1);
 
@@ -212,19 +220,21 @@ pub(crate) fn preview_move_actions(config: &Config, move_actions: &[Move]) {
         })
         .collect::<Vec<_>>();
 
-    let mut table = Table::new();
+    preview(&slice)
 
-    table.set_heading(if slice.len() <= config.preview_amount() {
-        format!("Previewing {} files", slice.len())
-    } else {
-        format!("Previewing {} of {} files", slice.len(), length)
-    });
+    // let mut table = Table::new();
 
-    for path in slice {
-        table.push_path(path);
-    }
+    // table.set_heading(if slice.len() <= config.preview_amount() {
+    //     format!("Previewing {} files", slice.len())
+    // } else {
+    //     format!("Previewing {} of {} files", slice.len(), length)
+    // });
 
-    println!("{table}");
+    // for path in slice {
+    //     table.push_path(path);
+    // }
+
+    // println!("{table}");
 }
 
 fn store_history(config: &Config, actions: Vec<Action>) -> Result<()> {

@@ -1,7 +1,8 @@
+use camino::Utf8Path;
 use color_eyre::Result;
 use ratatui::prelude::{CrosstermBackend, Terminal as CrosstermTerminal};
 
-use self::app::App;
+use self::app::PreviewApp;
 use self::event::{Event, EventHandler};
 use self::terminal::Tui;
 
@@ -11,13 +12,14 @@ mod handler;
 mod terminal;
 mod ui;
 
-pub(crate) fn tui() -> Result<()> {
+pub(crate) fn preview(move_actions: &[&Utf8Path]) -> Result<bool> {
     // Create an application.
-    let mut app = App::new();
+    let mut app = PreviewApp::new(move_actions);
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(std::io::stderr());
-    let terminal = CrosstermTerminal::new(backend)?;
+    let terminal: CrosstermTerminal<CrosstermBackend<std::io::Stderr>> =
+        CrosstermTerminal::new(backend)?;
     let events = EventHandler::new(250);
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
@@ -28,7 +30,7 @@ pub(crate) fn tui() -> Result<()> {
         tui.draw(&mut app)?;
         // Handle events.
         match tui.events.next()? {
-            Event::Key(key_event) => handler::update(&mut app, key_event)?,
+            Event::Key(key_event) => handler::update(&mut app, key_event),
             Event::Tick
             | Event::Mouse(_)
             | Event::Paste(_)
@@ -38,5 +40,5 @@ pub(crate) fn tui() -> Result<()> {
 
     // Exit the user interface.
     tui.exit()?;
-    Ok(())
+    Ok(app.confirmed())
 }

@@ -4,7 +4,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Serialize, Deserialize)]
+#[derive(PartialEq, Serialize, Deserialize, Debug)]
 pub(crate) struct Move {
     source: Utf8PathBuf,
     target: Utf8PathBuf,
