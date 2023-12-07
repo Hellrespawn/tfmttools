@@ -18,11 +18,11 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
     if force {
         crate::fs::remove_dir_all(
             config.dry_run(),
-            config.template_directory(),
+            config.config_and_template_directory(),
         )?;
-    } else if config.template_directory().is_dir() {
+    } else if config.config_and_template_directory().is_dir() {
         let has_files = config
-            .template_directory()
+            .config_and_template_directory()
             .read_dir()
             .map(|rd| rd.count() > 0)
             .unwrap_or(false);
@@ -30,15 +30,18 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
         if has_files {
             return Err(eyre!(
                 "Configuration folder already exists and is not empty: {}",
-                config.template_directory()
+                config.config_and_template_directory()
             ));
         }
     }
 
-    crate::fs::create_dir(config.dry_run(), config.template_directory())?;
+    crate::fs::create_dir(
+        config.dry_run(),
+        config.config_and_template_directory(),
+    )?;
 
     for file in &DEFAULT_FILES {
-        let path = config.template_directory().join(file.name);
+        let path = config.config_and_template_directory().join(file.name);
 
         if config.dry_run() {
             print!("{DRY_RUN_PREFIX}");
@@ -46,7 +49,10 @@ pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
             fs::write(path, file.content)?;
         }
 
-        println!("Wrote default files to {}", config.template_directory());
+        println!(
+            "Wrote default files to {}",
+            config.config_and_template_directory()
+        );
     }
 
     Ok(())

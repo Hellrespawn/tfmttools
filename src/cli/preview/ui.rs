@@ -1,46 +1,128 @@
-use ratatui::layout::{Alignment, Direction, Layout, Margin};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{
     Block, BorderType, Borders, List, ListItem, Paragraph, Wrap,
 };
-use ratatui::Frame;
+use ratatui::{symbols, Frame};
 
 use super::app::PreviewApp;
+use crate::cli::util::rows_required_for_string;
+
+const PRESS_Y_NOTIF: &str = "Press 'y' to rename or any other key to cancel.";
+
+const INTERMEDIATE_BORDER_SET: symbols::border::Set = symbols::border::Set {
+    top_left: symbols::line::THICK.vertical_right,
+    top_right: symbols::line::THICK.vertical_left,
+    ..symbols::border::THICK
+};
 
 /// Renders the user interface widgets.
 pub(crate) fn render(app: &mut PreviewApp, frame: &mut Frame) {
-    frame.render_widget(
-        Block::default()
-            .title(app.title())
-            .title_alignment(Alignment::Center)
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .style(Style::default()),
-        frame.size(),
-    );
+    let arguments_string = create_arguments_string(app.arguments());
+    let arguments_string_rows = calculate_string_rows(frame, &arguments_string);
 
-    let inner = frame.size().inner(&Margin::new(2, 2));
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![
+            // border + blank + heading + arguments + blank
+            Constraint::Length(1 + 1 + 1 + arguments_string_rows + 1),
+            Constraint::Min(8),
+            // border + notif + blank
+            Constraint::Length(calculate_string_rows(frame, PRESS_Y_NOTIF) + 2),
+        ])
+        .split(frame.size());
 
+    let arguments_pane = layout[0];
+    let preview_pane = layout[1];
+    let notification_pane = layout[2];
+
+    render_title_and_arguments(app, frame, arguments_pane, &arguments_string);
+    render_preview(app, frame, preview_pane);
+    render_notification(frame, notification_pane);
+}
+
+fn render_title_and_arguments(
+    app: &PreviewApp,
+    frame: &mut Frame,
+    pane: Rect,
+    arguments_string: &str,
+) {
+    let p = Paragraph::new(format!("\nArguments:\n{arguments_string}\n"))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::TOP | Borders::RIGHT)
+                .border_type(BorderType::Thick)
+                .title(app.title())
+                .title_alignment(Alignment::Center),
+        );
+
+    frame.render_widget(p, pane);
+}
+
+fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
+    // height - 2 borders - 2 rows
+    let amount_of_items = pane.height as usize - 2;
+
+    let step = app.move_actions().len() / amount_of_items;
+
+    // TODO Scroll these left-to-right
     let items = app
         .move_actions()
         .iter()
-        .map(|p| ListItem::new(p.to_string()))
+        .step_by(step)
+        .take(amount_of_items)
+        .map(|move_action| {
+            move_action
+                .target()
+                .strip_prefix(app.working_directory())
+                .unwrap_or(move_action.target())
+        })
+        .map(|path| ListItem::new(format!(" {path} ")))
         .collect::<Vec<_>>();
 
-    let list = List::new(items)
-        .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">>");
+    let list = List::new(items).block(
+        Block::default()
+            .border_set(INTERMEDIATE_BORDER_SET)
+            .borders(Borders::ALL)
+            .title(format!(
+                " Previewing {} of {} ",
+                amount_of_items,
+                app.move_actions().len()
+            ))
+            .title_alignment(Alignment::Center),
+    );
 
-    frame.render_widget(list, inner);
+    frame.render_widget(list, pane);
+}
 
-    // frame.render_widget(
-    //     Paragraph::new("Press 'y', to move files.")
-    //         .style(Style::default())
-    //         .alignment(Alignment::Center)
-    //         .wrap(Wrap { trim: true }),
-    //     inner,
-    // );
+fn render_notification(frame: &mut Frame, pane: Rect) {
+    let p = Paragraph::new(PRESS_Y_NOTIF)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: false })
+        .block(
+            Block::default()
+                .border_type(BorderType::Thick)
+                .borders(Borders::ALL),
+        );
 
-    // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
+    frame.render_widget(p, pane);
+}
+
+fn create_arguments_string(arguments: &[String]) -> String {
+    let elements = arguments
+        .iter()
+        .enumerate()
+        .map(|(i, a)| format!("{i} => \"{a}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("[{elements}]")
+}
+
+fn calculate_string_rows(frame: &Frame, string: &str) -> u16 {
+    let width = frame.size().width as usize;
+
+    rows_required_for_string(string, width)
+        .try_into()
+        .expect("String requires more than u17 rows.")
 }

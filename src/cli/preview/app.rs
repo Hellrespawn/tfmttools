@@ -1,39 +1,37 @@
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 
-use crate::template::Template;
+use crate::action::Move;
 
 #[derive(Debug)]
-pub(crate) struct PreviewApp<'templates, 'source, 'move_actions> {
+pub(crate) struct PreviewApp<'pa> {
     is_running: bool,
     confirmed: bool,
 
-    // recurse: usize,
-    // source_directory: Option<Utf8PathBuf>,
-    // target_directory: Option<Utf8PathBuf>,
-    template: Option<Template<'templates, 'source>>,
-    // arguments: Vec<String>,
-    move_actions: &'move_actions [&'move_actions Utf8Path],
+    title: &'pa str,
+    arguments: &'pa [String],
+    move_actions: &'pa [Move],
+    working_directory: &'pa Utf8Path,
 }
-impl<'templates, 'source, 'move_actions>
-    PreviewApp<'templates, 'source, 'move_actions>
-{
+impl<'pa> PreviewApp<'pa> {
     /// Constructs a new instance of [`App`].
-    pub fn new(move_actions: &'move_actions [&'move_actions Utf8Path]) -> Self {
+    pub(crate) fn new(
+        title: &'pa str,
+        arguments: &'pa [String],
+        move_actions: &'pa [Move],
+        working_directory: &'pa Utf8Path,
+    ) -> Self {
         Self {
             is_running: true,
             confirmed: false,
-            // recurse: 0,
-            // source_directory: None,
-            // target_directory: None,
-            template: None,
-            // arguments: Vec::new(),
+            title,
+            arguments,
             move_actions,
+            working_directory,
         }
     }
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {
-    }
+    // pub fn tick(&self) {}
 
     pub fn is_running(&self) -> bool {
         self.is_running
@@ -50,20 +48,22 @@ impl<'templates, 'source, 'move_actions>
     }
 
     pub(crate) fn title(&self) -> String {
-        format!(
-            " {} ",
-            self.template
-                .as_ref()
-                .map_or(env!("CARGO_PKG_NAME"), |t| t.name())
-                .to_owned()
-        )
+        format!(" {} ", self.title)
+    }
+
+    pub(crate) fn arguments(&self) -> &[String] {
+        self.arguments
     }
 
     pub(crate) fn confirmed(&self) -> bool {
         self.confirmed
     }
 
-    pub(crate) fn move_actions(&self) -> &[&Utf8Path] {
+    pub(crate) fn move_actions(&self) -> &[Move] {
         self.move_actions
+    }
+
+    pub(crate) fn working_directory(&self) -> &Utf8Path {
+        self.working_directory
     }
 }

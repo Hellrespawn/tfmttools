@@ -6,7 +6,7 @@ edition = "2021"
 license = "BSD-3-Clause"
 name = "tfmttools"
 rust-version = "1.70"
-version = "0.14.0"
+version = "0.15.0"
 
 [features]
 debug = []

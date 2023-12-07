@@ -47,8 +47,8 @@ fn select_command(config: &Config, command: Command) -> Result<()> {
     match command {
         Command::ClearHistory { .. } => commands::clear_history(config),
         Command::ListTemplates => commands::list_templates(config),
-        Command::Rename { name, arguments, .. } => {
-            commands::rename(config, &name, arguments)
+        Command::Rename { input_directory, name, arguments, .. } => {
+            commands::rename(config, &input_directory, &name, &arguments)
         },
         Command::Seed { force, .. } => commands::seed(config, force),
         Command::Undo { amount, .. } => {

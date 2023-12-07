@@ -4,40 +4,42 @@ use color_eyre::Result;
 
 pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
 
-const DEFAULT_PREVIEW_AMOUNT: usize = 8;
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 const DEFAULT_HISTORY_FILENAME: &str =
     concat!(env!("CARGO_PKG_NAME"), ".history.json");
 
 #[derive(Debug)]
 pub(crate) struct Config {
-    template_directory: Utf8PathBuf,
+    config_and_template_directory: Utf8PathBuf,
     working_directory: Utf8PathBuf,
     history_file: Utf8PathBuf,
     dry_run: bool,
+    force: bool,
     recursion_depth: usize,
-    preview_amount: usize,
 }
 
 impl Config {
     pub(crate) fn new(
         dry_run: bool,
-        template_directory: &Utf8Path,
+        force: bool,
+        config_and_template_directory: &Utf8Path,
     ) -> Result<Self> {
         let config = Self {
-            template_directory: template_directory.to_owned(),
+            config_and_template_directory: config_and_template_directory
+                .to_owned(),
             working_directory: std::env::current_dir()?.try_into()?,
-            history_file: template_directory.join(DEFAULT_HISTORY_FILENAME),
+            history_file: config_and_template_directory
+                .join(DEFAULT_HISTORY_FILENAME),
             dry_run,
+            force,
             recursion_depth: DEFAULT_RECURSION_DEPTH,
-            preview_amount: DEFAULT_PREVIEW_AMOUNT,
         };
 
         Ok(config)
     }
 
-    pub(crate) fn template_directory(&self) -> &Utf8Path {
-        &self.template_directory
+    pub(crate) fn config_and_template_directory(&self) -> &Utf8Path {
+        &self.config_and_template_directory
     }
 
     pub(crate) fn working_directory(&self) -> &Utf8Path {
@@ -56,12 +58,12 @@ impl Config {
         &mut self.dry_run
     }
 
-    pub(crate) fn recursion_depth(&self) -> usize {
-        self.recursion_depth
+    pub(crate) fn force(&self) -> bool {
+        self.force
     }
 
-    pub(crate) fn preview_amount(&self) -> usize {
-        self.preview_amount
+    pub(crate) fn recursion_depth(&self) -> usize {
+        self.recursion_depth
     }
 
     pub(crate) fn set_recursion_depth(&mut self, depth: Option<usize>) {

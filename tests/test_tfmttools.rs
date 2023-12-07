@@ -208,6 +208,7 @@ fn rename_typical_input(env: &TestEnv) {
         .arg("--config")
         .arg(config_dir)
         .arg("rename")
+        .arg("--force")
         .arg("typical_input")
         .arg("output_dir/")
         .current_dir(env.tempdir.path())
@@ -264,6 +265,7 @@ fn test_rename_simple_input() -> Result<()> {
         .arg("--config")
         .arg(config_dir)
         .arg("rename")
+        .arg("--force")
         .arg("simple_input")
         .current_dir(env.tempdir.path())
         .assert();

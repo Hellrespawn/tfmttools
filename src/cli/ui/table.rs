@@ -1,8 +1,5 @@
-use camino::Utf8Path;
-
 use crate::cli::TERM;
 
-// TODO? Accept all lines, but step through it like in actions preview?
 #[derive(Default)]
 pub(crate) struct Table {
     heading: String,
@@ -21,36 +18,6 @@ impl Table {
 
     pub(crate) fn push_string(&mut self, string: String) {
         self.body.push(string);
-    }
-
-    pub(crate) fn push_path(&mut self, path: &Utf8Path) {
-        self.push_string(Self::truncate_path(path));
-    }
-
-    fn truncate_path(path: &Utf8Path) -> String {
-        let width = Self::get_width() - 4;
-
-        let string = path.to_string();
-
-        if console::measure_text_width(string.as_ref()) <= width {
-            format!("{string:<width$}")
-        } else {
-            let ellipsis = format!("...{}", std::path::MAIN_SEPARATOR,);
-
-            let mut truncated = string.to_string();
-
-            while console::measure_text_width(&truncated)
-                > width - console::measure_text_width(&ellipsis)
-            {
-                truncated = truncated
-                    .split(std::path::MAIN_SEPARATOR)
-                    .skip(1)
-                    .collect::<Vec<_>>()
-                    .join(std::path::MAIN_SEPARATOR_STR);
-            }
-
-            format!("{}{truncated:<width$}", ellipsis, width = width - 4)
-        }
     }
 
     fn get_width() -> usize {

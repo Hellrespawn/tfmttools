@@ -1,10 +1,10 @@
+use camino::Utf8Path;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
 use crate::cli::preview::preview;
-use crate::cli::ui::table::Table;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator, RemoveDirResult};
@@ -14,27 +14,29 @@ use crate::util::PathOrString;
 
 pub(crate) fn rename(
     config: &Config,
+    input_directory: &Utf8Path,
     template_path_or_name: &PathOrString,
-    arguments: Vec<String>,
+    arguments: &[String],
 ) -> Result<()> {
     let templates = match template_path_or_name {
         PathOrString::Path(path, string) => {
             Templates::read_filename(path, string)
         },
         PathOrString::String(_) => {
-            Templates::read_directory(config.template_directory())
+            Templates::read_directory(config.config_and_template_directory())
         },
     }?;
 
     let template_name = template_path_or_name.as_str();
 
     let template = templates
-        .get_template(template_name, arguments)
+        .get_template(template_name, arguments.to_owned())
         .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
-    let files = gather_files(config)?;
+    let files = gather_files(config, input_directory)?;
 
-    let move_actions = create_move_actions(config, &template, &files)?;
+    let move_actions =
+        create_move_actions(config, input_directory, &template, &files)?;
     let move_actions = Move::filter_unchanged_destinations(move_actions);
 
     if move_actions.is_empty() {
@@ -43,21 +45,30 @@ pub(crate) fn rename(
     } else {
         validate_move_actions(config, &move_actions)?;
 
-        let confirmation = preview_move_actions(config, &move_actions)?;
+        let confirmation = config.force()
+            || preview(
+                template_name,
+                arguments,
+                &move_actions,
+                config.working_directory(),
+            )?;
 
         if confirmation {
             let actions = perform_move_actions(config, move_actions)?;
 
             store_history(config, actions)?;
         } else {
-            println!("Aborting!")
+            println!("Aborting!");
         }
 
         Ok(())
     }
 }
 
-fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
+fn gather_files(
+    config: &Config,
+    input_directory: &Utf8Path,
+) -> Result<Vec<AudioFile>> {
     let options = ProgressBarOptions::spinner(
         config,
         "audio",
@@ -68,21 +79,19 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
 
     let spinner = ProgressBar::new(options);
 
-    let file_paths = PathIterator::new(
-        config.working_directory(),
-        Some(config.recursion_depth()),
-    )
-    .flatten()
-    .inspect(|_| spinner.inc_total())
-    .filter(|path| AudioFile::path_predicate(path))
-    .inspect(|_| {
-        spinner.inc_found();
+    let file_paths =
+        PathIterator::new(input_directory, Some(config.recursion_depth()))
+            .flatten()
+            .inspect(|_| spinner.inc_total())
+            .filter(|path| AudioFile::path_predicate(path))
+            .inspect(|_| {
+                spinner.inc_found();
 
-        #[cfg(feature = "debug")]
-        crate::debug::delay();
-    })
-    .map(|path| AudioFile::new(&path))
-    .collect::<Result<Vec<_>>>();
+                #[cfg(feature = "debug")]
+                crate::debug::delay();
+            })
+            .map(|path| AudioFile::new(&path))
+            .collect::<Result<Vec<_>>>();
 
     spinner.finish();
 
@@ -91,6 +100,7 @@ fn gather_files(config: &Config) -> Result<Vec<AudioFile>> {
 
 fn create_move_actions(
     config: &Config,
+    input_directory: &Utf8Path,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<Move>> {
@@ -107,10 +117,7 @@ fn create_move_actions(
         .map(|audiofile| {
             Ok(Move::new(
                 audiofile.path().to_owned(),
-                audiofile.construct_target_path(
-                    template,
-                    config.working_directory(),
-                )?,
+                audiofile.construct_target_path(template, input_directory)?,
             ))
         })
         .inspect(|_| {
@@ -201,40 +208,6 @@ fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
     bar.finish();
 
     Ok(actions)
-}
-
-pub(crate) fn preview_move_actions(
-    config: &Config,
-    move_actions: &[Move],
-) -> Result<bool> {
-    // let length = move_actions.len();
-
-    let step = std::cmp::max(move_actions.len() / config.preview_amount(), 1);
-
-    let slice = move_actions
-        .iter()
-        .step_by(step)
-        .map(Move::target)
-        .map(|path| {
-            path.strip_prefix(config.working_directory()).unwrap_or(path)
-        })
-        .collect::<Vec<_>>();
-
-    preview(&slice)
-
-    // let mut table = Table::new();
-
-    // table.set_heading(if slice.len() <= config.preview_amount() {
-    //     format!("Previewing {} files", slice.len())
-    // } else {
-    //     format!("Previewing {} of {} files", slice.len(), length)
-    // });
-
-    // for path in slice {
-    //     table.push_path(path);
-    // }
-
-    // println!("{table}");
 }
 
 fn store_history(config: &Config, actions: Vec<Action>) -> Result<()> {

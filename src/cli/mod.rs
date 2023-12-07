@@ -3,6 +3,7 @@ mod commands;
 mod main;
 mod preview;
 mod ui;
+mod util;
 
 use console::Term;
 use once_cell::sync::Lazy;
