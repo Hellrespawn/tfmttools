@@ -4,15 +4,13 @@ use camino::Utf8Path;
 
 use crate::action::Move;
 
-pub(crate) enum ValidationError<'e> {
+pub enum ValidationError<'e> {
     DoubleSeparators(&'e Move),
     Collision(Vec<&'e Move>),
     TargetExists(&'e Move),
 }
 
-pub(crate) fn validate_move_actions(
-    move_actions: &[Move],
-) -> Vec<ValidationError> {
+pub fn validate_move_actions(move_actions: &[Move]) -> Vec<ValidationError> {
     let mut errors = Vec::new();
 
     errors.extend(validate_double_separators(move_actions));

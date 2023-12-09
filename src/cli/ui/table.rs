@@ -1,22 +1,22 @@
 use crate::cli::TERM;
 
 #[derive(Default)]
-pub(crate) struct Table {
+pub struct Table {
     heading: String,
     body: Vec<String>,
     separate_lines: bool,
 }
 
 impl Table {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self { ..Default::default() }
     }
 
-    pub(crate) fn set_heading(&mut self, string: String) {
+    pub fn set_heading(&mut self, string: String) {
         self.heading = string;
     }
 
-    pub(crate) fn push_string(&mut self, string: String) {
+    pub fn push_string(&mut self, string: String) {
         self.body.push(string);
     }
 

@@ -1,15 +1,12 @@
 use color_eyre::Result;
-use tracing::{debug, info, trace};
+use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, registry, EnvFilter};
 
-use super::commands::HistoryMode;
-use super::{Args, TERM};
-use crate::cli::args::Command;
-use crate::cli::{commands, ui};
-use crate::config::Config;
+use super::config::Config;
+use super::TERM;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
@@ -24,40 +21,18 @@ pub fn main(dry_run_override: bool) -> Result<()> {
         std::env::args().next().unwrap_or("Unknown".to_owned())
     );
 
-    let args = Args::parse();
-    trace!("Parsed command-line arguments:\n{:#?}", args);
+    let mut config = Config::parse_from_args();
+    config.command_mut().override_dry_run(dry_run_override);
 
-    let mut config: Config = (&args).try_into()?;
-
-    *config.dry_run_mut() = config.dry_run() || dry_run_override;
     debug!("Configuration:\n{:#?}", config);
 
     hide_cursor();
 
-    if let Err(err) = select_command(&config, args.command) {
-        ui::print_error(&err);
-    }
+    let result = config.command().run(&config);
 
     show_cursor();
 
-    Ok(())
-}
-
-fn select_command(config: &Config, command: Command) -> Result<()> {
-    match command {
-        Command::ClearHistory { .. } => commands::clear_history(config),
-        Command::ListTemplates => commands::list_templates(config),
-        Command::Rename { input_directory, name, arguments, .. } => {
-            commands::rename(config, &input_directory, &name, &arguments)
-        },
-        Command::Seed { force, .. } => commands::seed(config, force),
-        Command::Undo { amount, .. } => {
-            commands::undo_redo(config, HistoryMode::Undo(amount.unwrap_or(1)))
-        },
-        Command::Redo { amount, .. } => {
-            commands::undo_redo(config, HistoryMode::Redo(amount.unwrap_or(1)))
-        },
-    }
+    result
 }
 
 // Initialize logger. if `TFMT_LOG` is set, write the log to the current

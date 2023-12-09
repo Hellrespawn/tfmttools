@@ -4,15 +4,11 @@ use indicatif::{
     ProgressStyle,
 };
 
-use crate::config::{Config, DRY_RUN_PREFIX};
+use super::config::DRY_RUN_PREFIX;
 
-pub(crate) mod table;
+pub mod table;
 
-pub(crate) fn print_error(error: &color_eyre::Report) {
-    println!("An error occurred:\n{error}");
-}
-
-pub(crate) struct ProgressBarOptions {
+pub struct ProgressBarOptions {
     style: ProgressStyle,
     draw_target: ProgressDrawTarget,
     working_message: &'static str,
@@ -20,13 +16,13 @@ pub(crate) struct ProgressBarOptions {
 }
 
 impl ProgressBarOptions {
-    pub(crate) fn bar(
-        config: &Config,
+    pub fn bar(
+        dry_run: bool,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
         Self::new(
-            config,
+            dry_run,
             ProgressStyle::default_bar(),
             "[{pos}/{len}] {msg} {wide_bar}",
             working_message,
@@ -34,15 +30,15 @@ impl ProgressBarOptions {
         )
     }
 
-    pub(crate) fn spinner(
-        config: &Config,
+    pub fn spinner(
+        dry_run: bool,
         found: &str,
         total: &str,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
         Self::new(
-            config,
+            dry_run,
             ProgressStyle::default_spinner(),
             &format!(
                 "[{{pos}}/{{len}} {found}/{total} files] {{wide_msg}} {{spinner}}",
@@ -52,14 +48,14 @@ impl ProgressBarOptions {
         )
     }
 
-    pub(crate) fn new(
-        config: &Config,
+    pub fn new(
+        dry_run: bool,
         style: ProgressStyle,
         template: &str,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
-        let prefix = if config.dry_run() { DRY_RUN_PREFIX } else { "" };
+        let prefix = if dry_run { DRY_RUN_PREFIX } else { "" };
 
         let template = format!("{prefix}{template}");
 
@@ -75,20 +71,17 @@ impl ProgressBarOptions {
     }
 }
 
-pub(crate) struct ProgressBar {
+pub struct ProgressBar {
     inner: IndicatifProgressBar,
     finished_message: &'static str,
 }
 
 impl ProgressBar {
-    pub(crate) fn new(options: ProgressBarOptions) -> Self {
+    pub fn new(options: ProgressBarOptions) -> Self {
         Self::with_length(options, 0)
     }
 
-    pub(crate) fn with_length(
-        options: ProgressBarOptions,
-        length: u64,
-    ) -> Self {
+    pub fn with_length(options: ProgressBarOptions, length: u64) -> Self {
         let ProgressBarOptions {
             style,
             working_message,
@@ -105,15 +98,15 @@ impl ProgressBar {
         Self { inner, finished_message }
     }
 
-    pub(crate) fn inc_found(&self) {
+    pub fn inc_found(&self) {
         self.inner.inc(1);
     }
 
-    pub(crate) fn inc_total(&self) {
+    pub fn inc_total(&self) {
         self.inner.inc_length(1);
     }
 
-    pub(crate) fn finish(&self) {
+    pub fn finish(&self) {
         self.inner.set_message(self.finished_message);
         self.inner.finish();
     }

@@ -11,7 +11,7 @@ static DELAY: Lazy<Duration> = Lazy::new(|| {
     )
 });
 
-pub(crate) fn delay() {
+pub fn delay() {
     if !DELAY.is_zero() {
         std::thread::sleep(*DELAY);
     }

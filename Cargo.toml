@@ -1,5 +1,5 @@
 [package]
-authors = ["Stef Korporaal <stefkorporaal@gmail.com>"]
+authors = ["Stef Korporaal <stef@skorporaal.com>"]
 default-run = "tfmt"
 description = "Tag Formatting Tools. Renames audio files according to their tags."
 edition = "2021"

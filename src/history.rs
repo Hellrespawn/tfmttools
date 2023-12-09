@@ -39,13 +39,13 @@ impl HistorySerde {
     }
 }
 
-pub(crate) enum LoadHistoryResult {
+pub enum LoadHistoryResult {
     Loaded(History),
     New(History),
 }
 
 impl LoadHistoryResult {
-    pub(crate) fn into_inner(self) -> History {
+    pub fn into_inner(self) -> History {
         match self {
             LoadHistoryResult::Loaded(history)
             | LoadHistoryResult::New(history) => history,
@@ -53,18 +53,18 @@ impl LoadHistoryResult {
     }
 }
 
-pub(crate) enum SaveHistoryResult {
+pub enum SaveHistoryResult {
     Saved,
     Exists(Utf8PathBuf),
 }
 
-pub(crate) struct History {
+pub struct History {
     path: Utf8PathBuf,
     stack: RefStack<Record>,
 }
 
 impl History {
-    pub(crate) fn load(path: &Utf8Path) -> Result<LoadHistoryResult> {
+    pub fn load(path: &Utf8Path) -> Result<LoadHistoryResult> {
         let result = if path.is_file() {
             let body = fs::read(path)?;
 
@@ -87,7 +87,7 @@ impl History {
         Ok(result)
     }
 
-    pub(crate) fn save(&self) -> Result<SaveHistoryResult> {
+    pub fn save(&self) -> Result<SaveHistoryResult> {
         let result = if !self.path.is_file() && self.path.exists() {
             let tmp_dir: Utf8PathBuf = std::env::temp_dir().try_into()?;
 
@@ -116,48 +116,42 @@ impl History {
         Ok(result)
     }
 
-    pub(crate) fn push(&mut self, record: Record) {
+    pub fn push(&mut self, record: Record) {
         self.stack.push(record);
     }
 
-    pub(crate) fn get_records_to_undo(
-        &mut self,
-        n: usize,
-    ) -> Option<&[Record]> {
+    pub fn get_records_to_undo(&mut self, n: usize) -> Option<&[Record]> {
         self.stack.refs_before_cursor(n)
     }
 
-    pub(crate) fn get_records_to_redo(
-        &mut self,
-        n: usize,
-    ) -> Option<&[Record]> {
+    pub fn get_records_to_redo(&mut self, n: usize) -> Option<&[Record]> {
         self.stack.refs_after_cursor(n)
     }
 
-    pub(crate) fn path(&self) -> &str {
+    pub fn path(&self) -> &str {
         self.path.as_ref()
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct RefStack<T> {
+pub struct RefStack<T> {
     inner: Vec<T>,
     cursor: usize,
 }
 
 impl<T> RefStack<T> {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self { inner: Vec::new(), cursor: 0 }
     }
 
-    pub(crate) fn push(&mut self, item: T) {
+    pub fn push(&mut self, item: T) {
         self.inner.truncate(self.cursor);
         self.inner.push(item);
         self.cursor = self.inner.len();
     }
 
     #[cfg(test)]
-    pub(crate) fn extend<I>(&mut self, iter: I)
+    pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = T>,
     {
@@ -166,7 +160,7 @@ impl<T> RefStack<T> {
         self.cursor = self.inner.len();
     }
 
-    pub(crate) fn refs_after_cursor(&mut self, n: usize) -> Option<&[T]> {
+    pub fn refs_after_cursor(&mut self, n: usize) -> Option<&[T]> {
         let start = self.cursor;
         let end = std::cmp::min(self.cursor + n, self.inner.len());
 
@@ -185,7 +179,7 @@ impl<T> RefStack<T> {
         }
     }
 
-    pub(crate) fn refs_before_cursor(&mut self, n: usize) -> Option<&[T]> {
+    pub fn refs_before_cursor(&mut self, n: usize) -> Option<&[T]> {
         let start = self.cursor.saturating_sub(n);
         let end = self.cursor;
 
@@ -206,7 +200,7 @@ impl<T> RefStack<T> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct Record {
+pub struct Record {
     actions: Vec<Action>,
     timestamp: Option<OffsetDateTime>,
 }
@@ -216,7 +210,7 @@ impl Record {
         Ok(Self { actions, timestamp: Some(OffsetDateTime::now_local()?) })
     }
 
-    pub(crate) fn iter(&self) -> impl DoubleEndedIterator<Item = &Action> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Action> {
         self.actions.iter()
     }
 }

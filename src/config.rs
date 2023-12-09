@@ -2,14 +2,14 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
-pub(crate) const DRY_RUN_PREFIX: &str = "[D] ";
+pub const DRY_RUN_PREFIX: &str = "[D] ";
 
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 const DEFAULT_HISTORY_FILENAME: &str =
     concat!(env!("CARGO_PKG_NAME"), ".history.json");
 
 #[derive(Debug)]
-pub(crate) struct Config {
+pub struct Config {
     config_and_template_directory: Utf8PathBuf,
     working_directory: Utf8PathBuf,
     history_file: Utf8PathBuf,
@@ -19,7 +19,7 @@ pub(crate) struct Config {
 }
 
 impl Config {
-    pub(crate) fn new(
+    pub fn new(
         dry_run: bool,
         force: bool,
         config_and_template_directory: &Utf8Path,
@@ -38,39 +38,39 @@ impl Config {
         Ok(config)
     }
 
-    pub(crate) fn config_and_template_directory(&self) -> &Utf8Path {
+    pub fn config_and_template_directory(&self) -> &Utf8Path {
         &self.config_and_template_directory
     }
 
-    pub(crate) fn working_directory(&self) -> &Utf8Path {
+    pub fn working_directory(&self) -> &Utf8Path {
         &self.working_directory
     }
 
-    pub(crate) fn history_file(&self) -> &Utf8Path {
+    pub fn history_file(&self) -> &Utf8Path {
         &self.history_file
     }
 
-    pub(crate) fn dry_run(&self) -> bool {
+    pub fn dry_run(&self) -> bool {
         self.dry_run
     }
 
-    pub(crate) fn dry_run_mut(&mut self) -> &mut bool {
+    pub fn dry_run_mut(&mut self) -> &mut bool {
         &mut self.dry_run
     }
 
-    pub(crate) fn force(&self) -> bool {
+    pub fn force(&self) -> bool {
         self.force
     }
 
-    pub(crate) fn recursion_depth(&self) -> usize {
+    pub fn recursion_depth(&self) -> usize {
         self.recursion_depth
     }
 
-    pub(crate) fn set_recursion_depth(&mut self, depth: Option<usize>) {
+    pub fn set_recursion_depth(&mut self, depth: Option<usize>) {
         self.recursion_depth = depth.unwrap_or(DEFAULT_RECURSION_DEPTH);
     }
 
-    pub(crate) fn default_path() -> Result<Utf8PathBuf> {
+    pub fn default_path() -> Result<Utf8PathBuf> {
         if let Some(home) = dirs::home_dir() {
             let path = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
 

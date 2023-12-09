@@ -148,6 +148,10 @@ impl TestEnv {
         self.path().join("config")
     }
 
+    fn get_template_dir(&self) -> PathBuf {
+        self.path().join("config")
+    }
+
     fn get_files_dir(&self) -> PathBuf {
         self.path().join("files")
     }
@@ -197,18 +201,23 @@ impl TestEnv {
         inner(self.tempdir.path(), 4);
         println!("-----------\n");
     }
+
+    fn add_default_rename_args(&self, cmd: &mut Command) {
+        cmd.arg("--config")
+            .arg(self.get_config_dir())
+            .arg("rename")
+            .arg("--template-directory")
+            .arg(self.get_template_dir())
+            .arg("--force");
+    }
 }
 
 fn rename_typical_input(env: &TestEnv) {
-    let config_dir = env.get_config_dir();
-
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
+    env.add_default_rename_args(&mut cmd);
+
     let assert = cmd
-        .arg("--config")
-        .arg(config_dir)
-        .arg("rename")
-        .arg("--force")
         .arg("typical_input")
         .arg("output_dir/")
         .current_dir(env.tempdir.path())
@@ -257,18 +266,12 @@ fn redo(env: &TestEnv) {
 fn test_rename_simple_input() -> Result<()> {
     let env = TestEnv::new()?;
 
-    let config_dir = env.get_config_dir();
-
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
-    let assert = cmd
-        .arg("--config")
-        .arg(config_dir)
-        .arg("rename")
-        .arg("--force")
-        .arg("simple_input")
-        .current_dir(env.tempdir.path())
-        .assert();
+    env.add_default_rename_args(&mut cmd);
+
+    let assert =
+        cmd.arg("simple_input").current_dir(env.tempdir.path()).assert();
 
     println!("{}", String::from_utf8_lossy(&assert.get_output().stdout));
 
@@ -369,7 +372,7 @@ fn test_redo_typical_input() -> Result<()> {
 }
 
 /// Normalizes separators for the platform in `string`.
-pub(crate) fn normalize_separators(string: &str) -> String {
+pub fn normalize_separators(string: &str) -> String {
     string.replace(
         if MAIN_SEPARATOR == '/' { '\\' } else { '/' },
         MAIN_SEPARATOR_STR,

@@ -1,8 +1,12 @@
+use camino::Utf8PathBuf;
+use clap::Args;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
 
-use crate::config::{Config, DRY_RUN_PREFIX};
+use super::super::config::{Config, DRY_RUN_PREFIX};
+use super::Command;
+use crate::cli::config::default_template_and_config_dir;
 
 struct DefaultFile {
     name: &'static str,
@@ -14,46 +18,57 @@ static DEFAULT_FILES: [DefaultFile; 1] = [DefaultFile {
     content: include_str!("../../../examples/stef.tfmt"),
 }];
 
-pub(crate) fn seed(config: &Config, force: bool) -> Result<()> {
-    if force {
-        crate::fs::remove_dir_all(
-            config.dry_run(),
-            config.config_and_template_directory(),
-        )?;
-    } else if config.config_and_template_directory().is_dir() {
-        let has_files = config
-            .config_and_template_directory()
-            .read_dir()
-            .map(|rd| rd.count() > 0)
-            .unwrap_or(false);
+#[derive(Args, Debug)]
+pub struct Seed {
+    #[arg(short, long, default_value_t = default_template_and_config_dir())]
+    template_directory: Utf8PathBuf,
 
-        if has_files {
-            return Err(eyre!(
-                "Configuration folder already exists and is not empty: {}",
-                config.config_and_template_directory()
-            ));
-        }
-    }
+    #[arg(short, long)]
+    dry_run: bool,
 
-    crate::fs::create_dir(
-        config.dry_run(),
-        config.config_and_template_directory(),
-    )?;
+    #[arg(short, long)]
+    force: bool,
+}
 
-    for file in &DEFAULT_FILES {
-        let path = config.config_and_template_directory().join(file.name);
+impl Command for Seed {
+    fn run(&self, config: &Config) -> Result<()> {
+        if self.force {
+            crate::fs::remove_dir_all(self.dry_run, &config.config_directory)?;
+        } else if config.config_directory.is_dir() {
+            let has_files = config
+                .config_directory
+                .read_dir()
+                .map(|rd| rd.count() > 0)
+                .unwrap_or(false);
 
-        if config.dry_run() {
-            print!("{DRY_RUN_PREFIX}");
-        } else {
-            fs::write(path, file.content)?;
+            if has_files {
+                return Err(eyre!(
+                    "Configuration folder already exists and is not empty: {}",
+                    config.config_directory
+                ));
+            }
         }
 
-        println!(
-            "Wrote default files to {}",
-            config.config_and_template_directory()
-        );
+        crate::fs::create_dir(self.dry_run, &config.config_directory)?;
+
+        for file in &DEFAULT_FILES {
+            let path = config.config_directory.join(file.name);
+
+            if self.dry_run {
+                print!("{DRY_RUN_PREFIX}");
+            } else {
+                fs::write(path, file.content)?;
+            }
+
+            println!("Wrote default files to {}", config.config_directory);
+        }
+
+        Ok(())
     }
 
-    Ok(())
+    fn override_dry_run(&mut self, dry_run: bool) {
+        if dry_run {
+            self.dry_run = true;
+        }
+    }
 }

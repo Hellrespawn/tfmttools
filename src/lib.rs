@@ -4,6 +4,7 @@
 //#![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+#![allow(clippy::module_name_repetitions)]
 
 //! Tools to manage your music library using the `minijina` templating language.
 //!
@@ -14,7 +15,6 @@ mod action;
 mod audiofile;
 /// Controls the command line interface
 pub mod cli;
-mod config;
 mod fs;
 mod history;
 mod tags;

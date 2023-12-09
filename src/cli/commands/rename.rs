@@ -1,233 +1,275 @@
-use camino::Utf8Path;
+use camino::Utf8PathBuf;
+use clap::Args;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
+use super::super::config::{Config, DRY_RUN_PREFIX};
+use super::Command;
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
+use crate::cli::config::{default_input_dir, default_template_and_config_dir};
 use crate::cli::preview::preview;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
-use crate::config::{Config, DRY_RUN_PREFIX};
 use crate::fs::{self, PathIterator, RemoveDirResult};
 use crate::history::{History, Record, SaveHistoryResult};
 use crate::template::{Template, Templates};
 use crate::util::PathOrString;
 
-pub(crate) fn rename(
-    config: &Config,
-    input_directory: &Utf8Path,
-    template_path_or_name: &PathOrString,
-    arguments: &[String],
-) -> Result<()> {
-    let templates = match template_path_or_name {
-        PathOrString::Path(path, string) => {
-            Templates::read_filename(path, string)
-        },
-        PathOrString::String(_) => {
-            Templates::read_directory(config.config_and_template_directory())
-        },
-    }?;
+const DEFAULT_RECURSION_DEPTH: usize = 4;
 
-    let template_name = template_path_or_name.as_str();
+#[derive(Args, Debug)]
+pub struct Rename {
+    #[arg(short, long, alias = "input", default_value_t = default_input_dir())]
+    input_directory: Utf8PathBuf,
 
-    let template = templates
-        .get_template(template_name, arguments.to_owned())
-        .ok_or(eyre!("Unable to find template: {}", template_name))?;
+    #[arg(short, long, default_value_t = default_template_and_config_dir())]
+    template_directory: Utf8PathBuf,
 
-    let files = gather_files(config, input_directory)?;
+    #[arg(short, long)]
+    dry_run: bool,
 
-    let move_actions =
-        create_move_actions(config, input_directory, &template, &files)?;
-    let move_actions = Move::filter_unchanged_destinations(move_actions);
+    #[arg(short, long)]
+    force: bool,
 
-    if move_actions.is_empty() {
-        println!("There are no audio files to rename.");
-        Ok(())
-    } else {
-        validate_move_actions(config, &move_actions)?;
+    #[arg(short, long, default_value_t = DEFAULT_RECURSION_DEPTH)]
+    recursion_depth: usize,
 
-        let confirmation = config.force()
-            || preview(
-                template_name,
-                arguments,
-                &move_actions,
-                config.working_directory(),
-            )?;
+    name_or_path: PathOrString,
 
-        if confirmation {
-            let actions = perform_move_actions(config, move_actions)?;
+    arguments: Vec<String>,
+}
 
-            store_history(config, actions)?;
-        } else {
-            println!("Aborting!");
+struct InnerRename<'a> {
+    options: &'a Rename,
+    config: &'a Config,
+}
+
+impl Command for Rename {
+    fn run(&self, config: &Config) -> Result<()> {
+        InnerRename { options: self, config }.rename()
+    }
+
+    fn override_dry_run(&mut self, dry_run: bool) {
+        if dry_run {
+            self.dry_run = true;
         }
-
-        Ok(())
     }
 }
 
-fn gather_files(
-    config: &Config,
-    input_directory: &Utf8Path,
-) -> Result<Vec<AudioFile>> {
-    let options = ProgressBarOptions::spinner(
-        config,
-        "audio",
-        "total",
-        "Gathering files...",
-        "Gathered files.",
-    )?;
+impl<'a> InnerRename<'a> {
+    pub fn rename(&self) -> Result<()> {
+        let templates = match &self.options.name_or_path {
+            PathOrString::Path(path, string) => {
+                Templates::read_filename(path, string)
+            },
+            PathOrString::String(_) => {
+                Templates::read_directory(&self.options.template_directory)
+            },
+        }?;
 
-    let spinner = ProgressBar::new(options);
+        let template_name = self.options.name_or_path.as_str();
 
-    let file_paths =
-        PathIterator::new(input_directory, Some(config.recursion_depth()))
-            .flatten()
-            .inspect(|_| spinner.inc_total())
-            .filter(|path| AudioFile::path_predicate(path))
+        let template = templates
+            .get_template(template_name, self.options.arguments.clone())
+            .ok_or(eyre!("Unable to find template: {}", template_name))?;
+
+        let files = self.gather_files()?;
+
+        let move_actions = self.create_move_actions(&template, &files)?;
+        let move_actions = Move::filter_unchanged_destinations(move_actions);
+
+        if move_actions.is_empty() {
+            println!("There are no audio files to rename.");
+            Ok(())
+        } else {
+            Self::validate_move_actions(&move_actions)?;
+
+            let confirmation = self.options.force
+                || preview(
+                    template_name,
+                    &self.options.arguments,
+                    &move_actions,
+                    &self.config.working_directory()?,
+                )?;
+
+            if confirmation {
+                let actions = self.perform_move_actions(move_actions)?;
+
+                self.store_history(actions)?;
+            } else {
+                println!("Aborting!");
+            }
+
+            Ok(())
+        }
+    }
+
+    fn gather_files(&self) -> Result<Vec<AudioFile>> {
+        let options = ProgressBarOptions::spinner(
+            self.options.dry_run,
+            "audio",
+            "total",
+            "Gathering files...",
+            "Gathered files.",
+        )?;
+
+        let spinner = ProgressBar::new(options);
+
+        let file_paths = PathIterator::new(
+            &self.options.input_directory,
+            Some(self.options.recursion_depth),
+        )
+        .flatten()
+        .inspect(|_| spinner.inc_total())
+        .filter(|path| AudioFile::path_predicate(path))
+        .inspect(|_| {
+            spinner.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .map(|path| AudioFile::new(&path))
+        .collect::<Result<Vec<_>>>();
+
+        spinner.finish();
+
+        file_paths
+    }
+
+    fn create_move_actions(
+        &self,
+        template: &Template,
+        files: &[AudioFile],
+    ) -> Result<Vec<Move>> {
+        let options = ProgressBarOptions::bar(
+            self.options.dry_run,
+            "Determining output paths:",
+            "Determined output paths.",
+        )?;
+
+        let bar = ProgressBar::with_length(options, files.len() as u64);
+
+        let move_actions: Result<Vec<Move>> = files
+            .iter()
+            .map(|audiofile| {
+                Ok(Move::new(
+                    audiofile.path().to_owned(),
+                    audiofile.construct_target_path(
+                        template,
+                        &self.options.input_directory,
+                    )?,
+                ))
+            })
             .inspect(|_| {
-                spinner.inc_found();
+                bar.inc_found();
 
                 #[cfg(feature = "debug")]
                 crate::debug::delay();
             })
-            .map(|path| AudioFile::new(&path))
-            .collect::<Result<Vec<_>>>();
+            .collect();
 
-    spinner.finish();
+        bar.finish();
 
-    file_paths
-}
+        println!();
+        println!();
 
-fn create_move_actions(
-    config: &Config,
-    input_directory: &Utf8Path,
-    template: &Template,
-    files: &[AudioFile],
-) -> Result<Vec<Move>> {
-    let options = ProgressBarOptions::bar(
-        config,
-        "Determining output paths:",
-        "Determined output paths.",
-    )?;
-
-    let bar = ProgressBar::with_length(options, files.len() as u64);
-
-    let move_actions: Result<Vec<Move>> = files
-        .iter()
-        .map(|audiofile| {
-            Ok(Move::new(
-                audiofile.path().to_owned(),
-                audiofile.construct_target_path(template, input_directory)?,
-            ))
-        })
-        .inspect(|_| {
-            bar.inc_found();
-
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
-        })
-        .collect();
-
-    bar.finish();
-
-    println!();
-    println!();
-
-    move_actions
-}
-
-fn validate_move_actions(
-    _config: &Config,
-    move_actions: &[Move],
-) -> Result<()> {
-    let validation_errors =
-        crate::validation::validate_move_actions(move_actions);
-
-    if validation_errors.is_empty() {
-        Ok(())
-    } else {
-        Err(eyre!("Had validation errors:"))
-    }
-}
-
-fn perform_move_actions(
-    config: &Config,
-    move_actions: Vec<Move>,
-) -> Result<Vec<Action>> {
-    let common_prefix = fs::get_longest_common_prefix(
-        &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
-    );
-
-    let mut actions = move_files(config, move_actions)?;
-
-    if config.dry_run() {
-        print!("{DRY_RUN_PREFIX}");
+        move_actions
     }
 
-    if let Some(common_path) = common_prefix {
-        let removed = fs::remove_empty_subdirectories(
-            config.dry_run(),
-            &common_path,
-            config.recursion_depth(),
-        )?;
+    fn validate_move_actions(move_actions: &[Move]) -> Result<()> {
+        let validation_errors =
+            crate::validation::validate_move_actions(move_actions);
 
-        actions.extend(
-            removed
-                .iter()
-                .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
-                .map(|(p, _)| Action::RemoveDir(p.clone())),
+        if validation_errors.is_empty() {
+            Ok(())
+        } else {
+            Err(eyre!("Had validation errors:"))
+        }
+    }
+
+    fn perform_move_actions(
+        &self,
+        move_actions: Vec<Move>,
+    ) -> Result<Vec<Action>> {
+        let common_prefix = fs::get_longest_common_prefix(
+            &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
         );
 
-        println!("Removed leftover folders.");
-    } else {
-        println!("Unable to remove leftover folders.");
-    }
+        let mut actions = self.move_files(move_actions)?;
 
-    Ok(actions)
-}
-
-fn move_files(config: &Config, move_actions: Vec<Move>) -> Result<Vec<Action>> {
-    let options =
-        ProgressBarOptions::bar(config, "Moving files:", "Moved files.")?;
-
-    let bar = ProgressBar::with_length(options, move_actions.len() as u64);
-
-    let actions = Move::create_actions(move_actions);
-
-    for action in &actions {
-        action.apply(config.dry_run())?;
-
-        if action.is_move() {
-            bar.inc_found();
-
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
+        if self.options.dry_run {
+            print!("{DRY_RUN_PREFIX}");
         }
-    }
 
-    bar.finish();
+        if let Some(common_path) = common_prefix {
+            let removed = fs::remove_empty_subdirectories(
+                self.options.dry_run,
+                &common_path,
+                self.options.recursion_depth,
+            )?;
 
-    Ok(actions)
-}
-
-fn store_history(config: &Config, actions: Vec<Action>) -> Result<()> {
-    if !config.dry_run() {
-        let mut history = History::load(config.history_file())?.into_inner();
-
-        let record = Record::new(actions)?;
-
-        history.push(record);
-
-        if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
-            eprintln!(
-                "History file path exists, but is not a file: {}",
-                history.path()
+            actions.extend(
+                removed
+                    .iter()
+                    .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
+                    .map(|(p, _)| Action::RemoveDir(p.clone())),
             );
-            eprintln!("Backed up history to: {tmp_file}");
+
+            println!("Removed leftover folders.");
+        } else {
+            println!("Unable to remove leftover folders.");
         }
+
+        Ok(actions)
     }
 
-    Ok(())
+    fn move_files(&self, move_actions: Vec<Move>) -> Result<Vec<Action>> {
+        let options = ProgressBarOptions::bar(
+            self.options.dry_run,
+            "Moving files:",
+            "Moved files.",
+        )?;
+
+        let bar = ProgressBar::with_length(options, move_actions.len() as u64);
+
+        let actions = Move::create_actions(move_actions);
+
+        for action in &actions {
+            action.apply(self.options.dry_run)?;
+
+            if action.is_move() {
+                bar.inc_found();
+
+                #[cfg(feature = "debug")]
+                crate::debug::delay();
+            }
+        }
+
+        bar.finish();
+
+        Ok(actions)
+    }
+
+    fn store_history(&self, actions: Vec<Action>) -> Result<()> {
+        if !self.options.dry_run {
+            let mut history =
+                History::load(&self.config.history_file())?.into_inner();
+
+            let record = Record::new(actions)?;
+
+            history.push(record);
+
+            if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
+                eprintln!(
+                    "History file path exists, but is not a file: {}",
+                    history.path()
+                );
+                eprintln!("Backed up history to: {tmp_file}");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

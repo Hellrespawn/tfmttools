@@ -3,7 +3,7 @@ use camino::Utf8Path;
 use crate::action::Move;
 
 #[derive(Debug)]
-pub(crate) struct PreviewApp<'pa> {
+pub struct PreviewApp<'pa> {
     is_running: bool,
     confirmed: bool,
 
@@ -14,7 +14,7 @@ pub(crate) struct PreviewApp<'pa> {
 }
 impl<'pa> PreviewApp<'pa> {
     /// Constructs a new instance of [`App`].
-    pub(crate) fn new(
+    pub fn new(
         title: &'pa str,
         arguments: &'pa [String],
         move_actions: &'pa [Move],
@@ -47,23 +47,23 @@ impl<'pa> PreviewApp<'pa> {
         self.confirmed = true;
     }
 
-    pub(crate) fn title(&self) -> String {
+    pub fn title(&self) -> String {
         format!(" {} ", self.title)
     }
 
-    pub(crate) fn arguments(&self) -> &[String] {
+    pub fn arguments(&self) -> &[String] {
         self.arguments
     }
 
-    pub(crate) fn confirmed(&self) -> bool {
+    pub fn confirmed(&self) -> bool {
         self.confirmed
     }
 
-    pub(crate) fn move_actions(&self) -> &[Move] {
+    pub fn move_actions(&self) -> &[Move] {
         self.move_actions
     }
 
-    pub(crate) fn working_directory(&self) -> &Utf8Path {
+    pub fn working_directory(&self) -> &Utf8Path {
         self.working_directory
     }
 }

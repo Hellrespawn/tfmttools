@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 use super::app::PreviewApp;
 
-pub(crate) fn update(app: &mut PreviewApp, key_event: KeyEvent) {
+pub fn update(app: &mut PreviewApp, key_event: KeyEvent) {
     match key_event.code {
         // Exit application on `ESC` or `q`
         KeyCode::Esc | KeyCode::Char('y' | 'Y') => app.confirm(),

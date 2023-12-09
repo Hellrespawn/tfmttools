@@ -13,15 +13,19 @@ mod handler;
 mod terminal;
 mod ui;
 
-pub(crate) fn preview(
+pub fn preview(
     title: &str,
     arguments: &[String],
     move_actions: &[Move],
     working_directory: &Utf8Path,
 ) -> Result<bool> {
     // Create an application.
-    let mut app =
-        PreviewApp::new(title, arguments, move_actions, working_directory);
+    let mut app = PreviewApp::new(
+        title,
+        arguments,
+        move_actions,
+        working_directory,
+    );
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(std::io::stderr());

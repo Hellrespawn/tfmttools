@@ -16,7 +16,7 @@ const INTERMEDIATE_BORDER_SET: symbols::border::Set = symbols::border::Set {
 };
 
 /// Renders the user interface widgets.
-pub(crate) fn render(app: &mut PreviewApp, frame: &mut Frame) {
+pub fn render(app: &mut PreviewApp, frame: &mut Frame) {
     let arguments_string = create_arguments_string(app.arguments());
     let arguments_string_rows = calculate_string_rows(frame, &arguments_string);
 

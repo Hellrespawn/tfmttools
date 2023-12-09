@@ -1,5 +1,5 @@
 /// Common functions for reading audio file tags.
-pub(crate) trait Tags: std::fmt::Debug + Send + Sync {
+pub trait Tags: std::fmt::Debug + Send + Sync {
     /// The current `[AudioFile]`s album, if any.
     fn album(&self) -> Option<String>;
 

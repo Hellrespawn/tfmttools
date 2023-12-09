@@ -1,6 +1,6 @@
 use camino::Utf8PathBuf;
 
-pub(crate) fn normalize_separators(string: &str) -> String {
+pub fn normalize_separators(string: &str) -> String {
     string
         .split(['\\', '/'])
         .collect::<Vec<&str>>()
@@ -8,7 +8,7 @@ pub(crate) fn normalize_separators(string: &str) -> String {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum PathOrString {
+pub enum PathOrString {
     Path(Utf8PathBuf, String),
     String(String),
 }
@@ -26,7 +26,7 @@ impl From<String> for PathOrString {
 }
 
 impl PathOrString {
-    pub(crate) fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             PathOrString::String(s) | PathOrString::Path(_, s) => s,
         }

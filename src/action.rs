@@ -5,38 +5,36 @@ use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug)]
-pub(crate) struct Move {
+pub struct Move {
     source: Utf8PathBuf,
     target: Utf8PathBuf,
 }
 
 impl Move {
-    pub(crate) fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
+    pub fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
         Self { source, target }
     }
 
-    pub(crate) fn filter_unchanged_destinations(
-        move_actions: Vec<Move>,
-    ) -> Vec<Move> {
+    pub fn filter_unchanged_destinations(move_actions: Vec<Move>) -> Vec<Move> {
         move_actions
             .into_iter()
             .filter(Move::source_differs_from_target)
             .collect()
     }
 
-    pub(crate) fn source(&self) -> &Utf8Path {
+    pub fn source(&self) -> &Utf8Path {
         &self.source
     }
 
-    pub(crate) fn target(&self) -> &Utf8Path {
+    pub fn target(&self) -> &Utf8Path {
         &self.target
     }
 
-    pub(crate) fn source_differs_from_target(&self) -> bool {
+    pub fn source_differs_from_target(&self) -> bool {
         self.source() != self.target()
     }
 
-    pub(crate) fn create_actions(move_actions: Vec<Move>) -> Vec<Action> {
+    pub fn create_actions(move_actions: Vec<Move>) -> Vec<Action> {
         let target_paths =
             move_actions.iter().map(Move::target).collect::<Vec<_>>();
 
@@ -80,18 +78,18 @@ impl Move {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum Action {
+pub enum Action {
     Move { source: Utf8PathBuf, target: Utf8PathBuf },
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
 }
 
 impl Action {
-    pub(crate) fn is_move(&self) -> bool {
+    pub fn is_move(&self) -> bool {
         matches!(self, Self::Move { .. })
     }
 
-    pub(crate) fn apply(&self, dry_run: bool) -> Result<()> {
+    pub fn apply(&self, dry_run: bool) -> Result<()> {
         match self {
             Action::Move { source, target } => {
                 crate::fs::move_file(dry_run, source, target)?;
@@ -107,7 +105,7 @@ impl Action {
         Ok(())
     }
 
-    pub(crate) fn undo(&self, dry_run: bool) -> Result<()> {
+    pub fn undo(&self, dry_run: bool) -> Result<()> {
         match self {
             Action::Move { source, target } => {
                 crate::fs::move_file(dry_run, target, source)?;
@@ -123,7 +121,7 @@ impl Action {
         Ok(())
     }
 
-    pub(crate) fn redo(&self, dry_run: bool) -> Result<()> {
+    pub fn redo(&self, dry_run: bool) -> Result<()> {
         self.apply(dry_run)
     }
 }

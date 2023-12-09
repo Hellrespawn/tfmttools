@@ -32,7 +32,7 @@ impl PathIterator {
     }
 }
 
-pub(crate) fn gather_subdirectories(
+pub fn gather_subdirectories(
     path: &Utf8Path,
     depth: usize,
 ) -> Vec<Utf8PathBuf> {
@@ -42,13 +42,13 @@ pub(crate) fn gather_subdirectories(
         .collect()
 }
 
-pub(crate) enum MoveFileResult {
+pub enum MoveFileResult {
     Moved,
     CopiedAndRemoved,
     DryRun,
 }
 
-pub(crate) fn move_file(
+pub fn move_file(
     dry_run: bool,
     source: &Utf8Path,
     target: &Utf8Path,
@@ -84,16 +84,13 @@ pub(crate) fn move_file(
     }
 }
 
-pub(crate) enum CreateDirResult {
+pub enum CreateDirResult {
     Created,
     Exists,
     DryRun,
 }
 
-pub(crate) fn create_dir(
-    dry_run: bool,
-    path: &Utf8Path,
-) -> Result<CreateDirResult> {
+pub fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<CreateDirResult> {
     if dry_run {
         Ok(CreateDirResult::DryRun)
     } else if path.is_dir() {
@@ -107,16 +104,13 @@ pub(crate) fn create_dir(
     }
 }
 
-pub(crate) enum RemoveDirResult {
+pub enum RemoveDirResult {
     Removed,
     NotEmpty,
     DryRun,
 }
 
-pub(crate) fn remove_dir(
-    dry_run: bool,
-    path: &Utf8Path,
-) -> Result<RemoveDirResult> {
+pub fn remove_dir(dry_run: bool, path: &Utf8Path) -> Result<RemoveDirResult> {
     if dry_run {
         Ok(RemoveDirResult::DryRun)
     } else {
@@ -146,12 +140,12 @@ pub(crate) fn remove_dir(
     }
 }
 
-pub(crate) enum RemoveDirAllResult {
+pub enum RemoveDirAllResult {
     Removed,
     DryRun,
 }
 
-pub(crate) fn remove_dir_all(
+pub fn remove_dir_all(
     dry_run: bool,
     path: &Utf8Path,
 ) -> Result<RemoveDirAllResult> {
@@ -163,7 +157,7 @@ pub(crate) fn remove_dir_all(
     }
 }
 
-pub(crate) fn remove_empty_subdirectories(
+pub fn remove_empty_subdirectories(
     dry_run: bool,
     path: &Utf8Path,
     recursion_depth: usize,
@@ -180,9 +174,7 @@ pub(crate) fn remove_empty_subdirectories(
     Ok(dirs)
 }
 
-pub(crate) fn get_longest_common_prefix(
-    paths: &[&Utf8Path],
-) -> Option<Utf8PathBuf> {
+pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
     if paths.is_empty() {
         None
     } else {

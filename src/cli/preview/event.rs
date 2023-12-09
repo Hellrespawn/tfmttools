@@ -7,7 +7,7 @@ use crossterm::event::{self, Event as CrosstermEvent, KeyEvent, MouseEvent};
 
 /// Terminal events.
 #[derive(Clone, Debug)]
-pub(crate) enum Event {
+pub enum Event {
     /// Terminal tick.
     Tick,
     /// Key press.
@@ -22,7 +22,7 @@ pub(crate) enum Event {
 
 /// Terminal event handler.
 #[derive(Debug)]
-pub(crate) struct EventHandler {
+pub struct EventHandler {
     // /// Event sender channel.
     // sender: mpsc::Sender<Event>,
     /// Event receiver channel.

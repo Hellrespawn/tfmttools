@@ -1,31 +1,92 @@
+use clap::Args;
 use color_eyre::Result;
 
-use crate::config::Config;
+use super::super::config::Config;
+use super::Command;
 use crate::history::{History, LoadHistoryResult};
 
 // TODO Summarize actions undone/redone
+// TODO Add interactive preview
 
 #[derive(Copy, Clone)]
-pub(crate) enum HistoryMode {
-    Undo(usize),
-    Redo(usize),
+pub enum HistoryMode {
+    Undo,
+    Redo,
 }
 
-impl HistoryMode {
-    fn amount(&self) -> usize {
-        match self {
-            Self::Undo(n) | Self::Redo(n) => *n,
+#[derive(Args, Debug)]
+pub struct Undo {
+    #[arg(short, long)]
+    dry_run: bool,
+
+    #[arg(short, long)]
+    force: bool,
+
+    #[arg(default_value_t = 1)]
+    amount: usize,
+}
+
+#[derive(Args, Debug)]
+pub struct Redo {
+    #[arg(short, long)]
+    dry_run: bool,
+
+    #[arg(short, long)]
+    force: bool,
+
+    #[arg(default_value_t = 1)]
+    amount: usize,
+}
+
+impl Command for Undo {
+    fn run(&self, config: &Config) -> Result<()> {
+        undo_redo(
+            config,
+            self.dry_run,
+            self.force,
+            self.amount,
+            HistoryMode::Undo,
+        )
+    }
+
+    fn override_dry_run(&mut self, dry_run: bool) {
+        if dry_run {
+            self.dry_run = true;
         }
     }
 }
 
-pub(crate) fn undo_redo(config: &Config, mode: HistoryMode) -> Result<()> {
+impl Command for Redo {
+    fn run(&self, config: &Config) -> Result<()> {
+        undo_redo(
+            config,
+            self.dry_run,
+            self.force,
+            self.amount,
+            HistoryMode::Redo,
+        )
+    }
+
+    fn override_dry_run(&mut self, dry_run: bool) {
+        if dry_run {
+            self.dry_run = true;
+        }
+    }
+}
+
+fn undo_redo(
+    config: &Config,
+    dry_run: bool,
+    _force: bool,
+    amount: usize,
+    mode: HistoryMode,
+) -> Result<()> {
     let verb = match mode {
-        HistoryMode::Undo(_) => "undo",
-        HistoryMode::Redo(_) => "redo",
+        HistoryMode::Undo => "undo",
+        HistoryMode::Redo => "redo",
     };
 
-    let result = History::load(config.history_file())?;
+    let result = History::load(&config.history_file())?;
 
     match result {
         LoadHistoryResult::New(_) => {
@@ -34,12 +95,11 @@ pub(crate) fn undo_redo(config: &Config, mode: HistoryMode) -> Result<()> {
         },
         LoadHistoryResult::Loaded(mut history) => {
             let records = match mode {
-                HistoryMode::Undo(n) => history.get_records_to_undo(n),
-                HistoryMode::Redo(n) => history.get_records_to_redo(n),
+                HistoryMode::Undo => history.get_records_to_undo(amount),
+                HistoryMode::Redo => history.get_records_to_redo(amount),
             };
 
             if let Some(records) = records {
-                let amount = mode.amount();
                 let delta = amount - records.len();
 
                 if delta > 0 {
@@ -47,17 +107,17 @@ pub(crate) fn undo_redo(config: &Config, mode: HistoryMode) -> Result<()> {
                 }
 
                 match mode {
-                    HistoryMode::Undo(_) => {
+                    HistoryMode::Undo => {
                         for record in records.iter().rev() {
                             for action in record.iter().rev() {
-                                action.undo(config.dry_run())?;
+                                action.undo(dry_run)?;
                             }
                         }
                     },
-                    HistoryMode::Redo(_) => {
+                    HistoryMode::Redo => {
                         for record in records {
                             for action in record.iter() {
-                                action.redo(config.dry_run())?;
+                                action.redo(dry_run)?;
                             }
                         }
                     },

@@ -1,11 +1,15 @@
-mod clear_history;
-mod list_templates;
-mod rename;
-mod seed;
-mod undo_redo;
+pub mod clear_history;
+pub mod list_templates;
+pub mod rename;
+pub mod seed;
+pub mod undo_redo;
 
-pub(crate) use clear_history::clear_history;
-pub(crate) use list_templates::list_templates;
-pub(crate) use rename::rename;
-pub(crate) use seed::seed;
-pub(crate) use undo_redo::{undo_redo, HistoryMode};
+use color_eyre::Result;
+
+use super::config::Config;
+
+pub trait Command {
+    fn run(&self, config: &Config) -> Result<()>;
+
+    fn override_dry_run(&mut self, dry_run: bool);
+}

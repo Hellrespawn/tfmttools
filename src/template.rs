@@ -8,18 +8,16 @@ use regex::Regex;
 use crate::fs::PathIterator;
 use crate::tags::Tags;
 
-pub(crate) const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
+pub const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
 #[derive(Debug)]
-pub(crate) struct Templates<'t> {
+pub struct Templates<'t> {
     template_names: Vec<String>,
     environment: Environment<'t>,
 }
 
 impl<'t> Templates<'t> {
-    pub(crate) fn read_directory(
-        template_directory: &Utf8Path,
-    ) -> Result<Self> {
+    pub fn read_directory(template_directory: &Utf8Path) -> Result<Self> {
         let mut template_names = Vec::new();
         let mut environment = Self::create_environment();
 
@@ -41,7 +39,7 @@ impl<'t> Templates<'t> {
         Ok(Self { template_names, environment })
     }
 
-    pub(crate) fn read_filename(path: &Utf8Path, name: &str) -> Result<Self> {
+    pub fn read_filename(path: &Utf8Path, name: &str) -> Result<Self> {
         let mut environment = Self::create_environment();
 
         let template = fs_err::read_to_string(path)?;
@@ -51,7 +49,7 @@ impl<'t> Templates<'t> {
         Ok(Self { template_names: vec![name.to_owned()], environment })
     }
 
-    pub(crate) fn get_template(
+    pub fn get_template(
         &self,
         name: &str,
         arguments: Vec<String>,
@@ -71,7 +69,7 @@ impl<'t> Templates<'t> {
         Some(template)
     }
 
-    pub(crate) fn get_all_templates(&self) -> Vec<Template> {
+    pub fn get_all_templates(&self) -> Vec<Template> {
         self.template_names
             .iter()
             .map(|name| self.get_template(name, Vec::new()).expect("Templates::template_names should not contain names of non-existent templates.")).collect()
@@ -151,7 +149,7 @@ impl<'t> Templates<'t> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Template<'templates, 'source> {
+pub struct Template<'templates, 'source> {
     inner: minijinja::Template<'templates, 'source>,
     name: String,
     description: Option<String>,
@@ -159,7 +157,7 @@ pub(crate) struct Template<'templates, 'source> {
 }
 
 impl<'templates, 'source> Template<'templates, 'source> {
-    pub(crate) fn new(
+    pub fn new(
         inner: minijinja::Template<'templates, 'source>,
         name: String,
         description: Option<String>,
@@ -168,15 +166,15 @@ impl<'templates, 'source> Template<'templates, 'source> {
         Self { inner, name, description, arguments }
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         self.name.as_ref()
     }
 
-    pub(crate) fn description(&self) -> Option<&String> {
+    pub fn description(&self) -> Option<&String> {
         self.description.as_ref()
     }
 
-    pub(crate) fn render(&self, tags: &dyn Tags) -> Result<String> {
+    pub fn render(&self, tags: &dyn Tags) -> Result<String> {
         let context = self.create_context(tags)?;
 
         let output = self.inner.render(context)?;

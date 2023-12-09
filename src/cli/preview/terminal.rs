@@ -15,11 +15,11 @@ use super::ui;
 /// It is responsible for setting up the terminal,
 /// initializing the interface and handling the draw events.
 #[derive(Debug)]
-pub(crate) struct Tui<B: Backend> {
+pub struct Tui<B: Backend> {
     /// Interface to the Terminal.
     terminal: Terminal<B>,
     /// Terminal event handler.
-    pub(crate) events: EventHandler,
+    pub events: EventHandler,
 }
 
 impl<B: Backend> Tui<B> {
@@ -56,7 +56,7 @@ impl<B: Backend> Tui<B> {
     ///
     /// [`Draw`]: ratatui::Terminal::draw
     /// [`rendering`]: crate::ui:render
-    pub(crate) fn draw(&mut self, app: &mut PreviewApp) -> Result<()> {
+    pub fn draw(&mut self, app: &mut PreviewApp) -> Result<()> {
         self.terminal.draw(|frame| ui::render(app, frame))?;
         Ok(())
     }

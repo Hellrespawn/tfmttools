@@ -11,7 +11,7 @@ use crate::tags::Tags;
 use crate::template::Template;
 use crate::util::normalize_separators;
 
-pub(crate) struct AudioFile {
+pub struct AudioFile {
     path: Utf8PathBuf,
     tag: Tag,
     extension: String,
@@ -26,9 +26,9 @@ impl std::fmt::Debug for AudioFile {
 }
 
 impl AudioFile {
-    pub(crate) const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
+    pub const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
 
-    pub(crate) fn new(path: &Utf8Path) -> Result<AudioFile> {
+    pub fn new(path: &Utf8Path) -> Result<AudioFile> {
         let path = path.to_owned();
         let tagged_file = lofty::read_from_path(&path)?;
         let tag = tagged_file
@@ -41,7 +41,7 @@ impl AudioFile {
         Ok(AudioFile { path, tag, extension })
     }
 
-    pub(crate) fn path_predicate(path: &Utf8Path) -> bool {
+    pub fn path_predicate(path: &Utf8Path) -> bool {
         path.extension().map_or(false, |extension| {
             for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
                 if extension == supported_extension {
@@ -53,15 +53,15 @@ impl AudioFile {
         })
     }
 
-    pub(crate) fn path(&self) -> &Utf8Path {
+    pub fn path(&self) -> &Utf8Path {
         &self.path
     }
 
-    pub(crate) fn extension(&self) -> &str {
+    pub fn extension(&self) -> &str {
         self.extension.as_ref()
     }
 
-    pub(crate) fn construct_target_path(
+    pub fn construct_target_path(
         &self,
         template: &Template,
         relative_path: &Utf8Path,
