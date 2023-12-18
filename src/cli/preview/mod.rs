@@ -1,32 +1,18 @@
-use camino::Utf8Path;
 use color_eyre::Result;
 use ratatui::prelude::{CrosstermBackend, Terminal as CrosstermTerminal};
 
 use self::app::PreviewApp;
 use self::event::{Event, EventHandler};
 use self::terminal::Tui;
-use crate::action::Move;
 
-mod app;
 mod event;
 mod handler;
 mod terminal;
 mod ui;
 
-pub fn preview(
-    title: &str,
-    arguments: &[String],
-    move_actions: &[Move],
-    working_directory: &Utf8Path,
-) -> Result<bool> {
-    // Create an application.
-    let mut app = PreviewApp::new(
-        title,
-        arguments,
-        move_actions,
-        working_directory,
-    );
+pub mod app;
 
+pub fn preview(mut app: PreviewApp<'_>) -> Result<bool> {
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(std::io::stderr());
     let terminal: CrosstermTerminal<CrosstermBackend<std::io::Stderr>> =

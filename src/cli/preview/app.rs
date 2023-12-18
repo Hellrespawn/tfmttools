@@ -1,20 +1,54 @@
 use camino::Utf8Path;
 
-use crate::action::Move;
+use crate::action::{Action, Move};
+
+#[derive(Debug)]
+pub enum PreviewMode<'pm> {
+    Rename(RenameMode<'pm>),
+    Undo,
+    Redo,
+}
+
+#[derive(Debug)]
+pub struct RenameMode<'rm> {
+    template_name: &'rm str,
+    arguments: &'rm [String],
+    move_actions: &'rm [Move],
+    working_directory: &'rm Utf8Path,
+}
+
+impl<'rm> RenameMode<'rm> {
+    pub fn title(&self) -> String {
+        format!(" {} ", self.template_name)
+    }
+
+    pub fn arguments(&self) -> &[String] {
+        self.arguments
+    }
+
+    pub fn move_actions(&self) -> &[Move] {
+        self.move_actions
+    }
+
+    pub fn working_directory(&self) -> &Utf8Path {
+        self.working_directory
+    }
+}
+
+#[derive(Debug)]
+pub struct UndoRedoMode<'urm> {
+    actions: &'urm [Action],
+}
 
 #[derive(Debug)]
 pub struct PreviewApp<'pa> {
     is_running: bool,
     confirmed: bool,
-
-    title: &'pa str,
-    arguments: &'pa [String],
-    move_actions: &'pa [Move],
-    working_directory: &'pa Utf8Path,
+    mode: PreviewMode<'pa>,
 }
 impl<'pa> PreviewApp<'pa> {
     /// Constructs a new instance of [`App`].
-    pub fn new(
+    pub fn rename(
         title: &'pa str,
         arguments: &'pa [String],
         move_actions: &'pa [Move],
@@ -23,10 +57,12 @@ impl<'pa> PreviewApp<'pa> {
         Self {
             is_running: true,
             confirmed: false,
-            title,
-            arguments,
-            move_actions,
-            working_directory,
+            mode: PreviewMode::Rename(RenameMode {
+                template_name: title,
+                arguments,
+                move_actions,
+                working_directory,
+            }),
         }
     }
 
@@ -47,23 +83,19 @@ impl<'pa> PreviewApp<'pa> {
         self.confirmed = true;
     }
 
-    pub fn title(&self) -> String {
-        format!(" {} ", self.title)
-    }
-
-    pub fn arguments(&self) -> &[String] {
-        self.arguments
-    }
-
     pub fn confirmed(&self) -> bool {
         self.confirmed
     }
 
-    pub fn move_actions(&self) -> &[Move] {
-        self.move_actions
+    pub fn mode(&self) -> &PreviewMode<'pa> {
+        &self.mode
     }
 
-    pub fn working_directory(&self) -> &Utf8Path {
-        self.working_directory
+    pub fn as_rename(&self) -> &RenameMode<'pa> {
+        if let PreviewMode::Rename(rename) = &self.mode {
+            rename
+        } else {
+            panic!("Unchecked as_rename")
+        }
     }
 }

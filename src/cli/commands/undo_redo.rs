@@ -1,9 +1,10 @@
 use clap::Args;
 use color_eyre::Result;
+use history::{History, LoadHistoryResult};
 
 use super::super::config::Config;
 use super::Command;
-use crate::history::{History, LoadHistoryResult};
+use crate::action::Action;
 
 // TODO Summarize actions undone/redone
 // TODO Add interactive preview
@@ -86,7 +87,7 @@ fn undo_redo(
         HistoryMode::Redo => "redo",
     };
 
-    let result = History::load(&config.history_file())?;
+    let result = History::<Action>::load(&config.history_file())?;
 
     match result {
         LoadHistoryResult::New(_) => {

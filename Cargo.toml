@@ -8,11 +8,15 @@ name = "tfmttools"
 rust-version = "1.70"
 version = "0.15.0"
 
+[workspace]
+members = [".", "history"]
+
 [features]
 debug = []
 
 [dependencies]
-bincode = "1.3"
+history = { path = "./history" }
+
 camino = { version = "1.1", features = ["serde", "serde1"] }
 clap = { version = "4.4", features = ["derive", "wrap_help"] }
 color-eyre = "0.6"
@@ -23,12 +27,11 @@ fs-err = "2.9"
 ignore = "0.4"
 indicatif = { version = "0.17", features = ["improved_unicode"] }
 lofty = "0.15"
-once_cell = "1"
 minijinja = { version = "1.0", features = ["loader", "custom_syntax", "debug"] }
+once_cell = "1"
 ratatui = "0.24"
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 textwrap = "0.16"
 time = { version = "0.3", features = ["local-offset", "serde"] }
 tracing = "0.1"

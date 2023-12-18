@@ -2,16 +2,17 @@ use camino::Utf8PathBuf;
 use clap::Args;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use history::{History, SaveHistoryResult};
 
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
 use crate::cli::config::{default_input_dir, default_template_and_config_dir};
+use crate::cli::preview::app::PreviewApp;
 use crate::cli::preview::preview;
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::fs::{self, PathIterator, RemoveDirResult};
-use crate::history::{History, Record, SaveHistoryResult};
 use crate::template::{Template, Templates};
 use crate::util::PathOrString;
 
@@ -84,13 +85,16 @@ impl<'a> InnerRename<'a> {
         } else {
             Self::validate_move_actions(&move_actions)?;
 
-            let confirmation = self.options.force
-                || preview(
-                    template_name,
-                    &self.options.arguments,
-                    &move_actions,
-                    &self.config.working_directory()?,
-                )?;
+            let cwd = self.config.working_directory()?;
+
+            let preview_app = PreviewApp::rename(
+                template_name,
+                &self.options.arguments,
+                &move_actions,
+                &cwd,
+            );
+
+            let confirmation = self.options.force || preview(preview_app)?;
 
             if confirmation {
                 let actions = self.perform_move_actions(move_actions)?;
@@ -252,12 +256,9 @@ impl<'a> InnerRename<'a> {
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
         if !self.options.dry_run {
-            let mut history =
-                History::load(&self.config.history_file())?.into_inner();
+            let mut history = History::load(&self.config.history_file())?;
 
-            let record = Record::new(actions)?;
-
-            history.push(record);
+            history.push(actions)?;
 
             if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
                 eprintln!(

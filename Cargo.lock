@@ -539,6 +539,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "history"
+version = "0.15.0"
+dependencies = [
+ "bincode",
+ "camino",
+ "color-eyre",
+ "fs-err",
+ "serde",
+ "serde_json",
+ "time",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ignore"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1209,7 +1225,6 @@ version = "0.15.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
- "bincode",
  "camino",
  "clap",
  "color-eyre",
@@ -1217,6 +1232,7 @@ dependencies = [
  "crossterm",
  "dirs",
  "fs-err",
+ "history",
  "ignore",
  "indicatif",
  "lofty",
@@ -1225,7 +1241,6 @@ dependencies = [
  "ratatui",
  "regex",
  "serde",
- "serde_json",
  "textwrap",
  "time",
  "tracing",

@@ -1,9 +1,10 @@
 mod commands;
 mod config;
 mod main;
-mod preview;
 mod ui;
 mod util;
+
+pub mod preview;
 
 use console::Term;
 use once_cell::sync::Lazy;

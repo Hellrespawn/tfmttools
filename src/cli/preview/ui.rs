@@ -4,7 +4,7 @@ use ratatui::widgets::{
 };
 use ratatui::{symbols, Frame};
 
-use super::app::PreviewApp;
+use super::app::{PreviewApp, PreviewMode};
 use crate::cli::util::rows_required_for_string;
 
 const PRESS_Y_NOTIF: &str = "Press 'y' to rename or any other key to cancel.";
@@ -17,7 +17,16 @@ const INTERMEDIATE_BORDER_SET: symbols::border::Set = symbols::border::Set {
 
 /// Renders the user interface widgets.
 pub fn render(app: &mut PreviewApp, frame: &mut Frame) {
-    let arguments_string = create_arguments_string(app.arguments());
+    match app.mode() {
+        PreviewMode::Rename(_) => render_rename(app, frame),
+        PreviewMode::Undo => todo!(),
+        PreviewMode::Redo => todo!(),
+    }
+}
+
+/// Renders the user interface widgets.
+pub fn render_rename(app: &mut PreviewApp, frame: &mut Frame) {
+    let arguments_string = create_arguments_string(app.as_rename().arguments());
     let arguments_string_rows = calculate_string_rows(frame, &arguments_string);
 
     let layout = Layout::default()
@@ -52,7 +61,7 @@ fn render_title_and_arguments(
             Block::default()
                 .borders(Borders::LEFT | Borders::TOP | Borders::RIGHT)
                 .border_type(BorderType::Thick)
-                .title(app.title())
+                .title(app.as_rename().title())
                 .title_alignment(Alignment::Center),
         );
 
@@ -63,10 +72,11 @@ fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
     // height - 2 borders - 2 rows
     let amount_of_items = pane.height as usize - 2;
 
-    let step = app.move_actions().len() / amount_of_items;
+    let step = app.as_rename().move_actions().len() / amount_of_items;
 
     // TODO Scroll these left-to-right
     let items = app
+        .as_rename()
         .move_actions()
         .iter()
         .step_by(step)
@@ -74,7 +84,7 @@ fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
         .map(|move_action| {
             move_action
                 .target()
-                .strip_prefix(app.working_directory())
+                .strip_prefix(app.as_rename().working_directory())
                 .unwrap_or(move_action.target())
         })
         .map(|path| ListItem::new(format!(" {path} ")))
@@ -87,7 +97,7 @@ fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
             .title(format!(
                 " Previewing {} of {} ",
                 amount_of_items,
-                app.move_actions().len()
+                app.as_rename().move_actions().len()
             ))
             .title_alignment(Alignment::Center),
     );
