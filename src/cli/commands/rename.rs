@@ -9,8 +9,7 @@ use super::Command;
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
 use crate::cli::config::{default_input_dir, default_template_and_config_dir};
-use crate::cli::preview::app::PreviewApp;
-use crate::cli::preview::preview;
+use crate::cli::preview::{preview, PreviewData};
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
 use crate::fs::{self, PathIterator, RemoveDirResult};
 use crate::template::{Template, Templates};
@@ -87,14 +86,14 @@ impl<'a> InnerRename<'a> {
 
             let cwd = self.config.working_directory()?;
 
-            let preview_app = PreviewApp::rename(
+            let app_data = PreviewData::rename(
                 template_name,
                 &self.options.arguments,
                 &move_actions,
                 &cwd,
             );
 
-            let confirmation = self.options.force || preview(preview_app)?;
+            let confirmation = self.options.force || preview(&app_data)?;
 
             if confirmation {
                 let actions = self.perform_move_actions(move_actions)?;

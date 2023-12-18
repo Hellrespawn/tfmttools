@@ -6,7 +6,8 @@ use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
 use ratatui::Terminal;
 
-use super::app::PreviewApp;
+use super::app_data::PreviewData;
+use super::app_state::AppState;
 use super::event::EventHandler;
 use super::ui;
 
@@ -56,8 +57,12 @@ impl<B: Backend> Tui<B> {
     ///
     /// [`Draw`]: ratatui::Terminal::draw
     /// [`rendering`]: crate::ui:render
-    pub fn draw(&mut self, app: &mut PreviewApp) -> Result<()> {
-        self.terminal.draw(|frame| ui::render(app, frame))?;
+    pub fn draw(
+        &mut self,
+        state: &mut AppState,
+        data: &PreviewData,
+    ) -> Result<()> {
+        self.terminal.draw(|frame| ui::render(state, data, frame))?;
         Ok(())
     }
 

@@ -1,18 +1,20 @@
 use color_eyre::Result;
 use ratatui::prelude::{CrosstermBackend, Terminal as CrosstermTerminal};
 
-use self::app::PreviewApp;
+use self::app_state::AppState;
 use self::event::{Event, EventHandler};
 use self::terminal::Tui;
 
+mod app_data;
+mod app_state;
 mod event;
 mod handler;
 mod terminal;
 mod ui;
 
-pub mod app;
+pub use app_data::{PreviewData, RenameData, UndoRedoData};
 
-pub fn preview(mut app: PreviewApp<'_>) -> Result<bool> {
+pub fn preview(data: &PreviewData) -> Result<bool> {
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(std::io::stderr());
     let terminal: CrosstermTerminal<CrosstermBackend<std::io::Stderr>> =
@@ -21,13 +23,15 @@ pub fn preview(mut app: PreviewApp<'_>) -> Result<bool> {
     let mut tui = Tui::new(terminal, events);
     tui.init()?;
 
+    let mut state = AppState::new();
+
     // Start the main loop.
-    while app.is_running() {
+    while state.is_running() {
         // Render the user interface.
-        tui.draw(&mut app)?;
+        tui.draw(&mut state, data)?;
         // Handle events.
         match tui.events.next()? {
-            Event::Key(key_event) => handler::update(&mut app, key_event),
+            Event::Key(key_event) => handler::update(&mut state, key_event),
             Event::Tick
             | Event::Mouse(_)
             | Event::Paste(_)
@@ -37,5 +41,5 @@ pub fn preview(mut app: PreviewApp<'_>) -> Result<bool> {
 
     // Exit the user interface.
     tui.exit()?;
-    Ok(app.confirmed())
+    Ok(state.confirmed())
 }

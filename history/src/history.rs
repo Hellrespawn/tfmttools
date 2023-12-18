@@ -1,11 +1,11 @@
 use std::ops::{Deref, DerefMut};
 
-use ::serde::de::DeserializeOwned;
-use ::serde::Serialize;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use super::record::Record;
 use super::serde::HistorySerde;

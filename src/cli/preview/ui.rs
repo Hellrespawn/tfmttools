@@ -4,7 +4,8 @@ use ratatui::widgets::{
 };
 use ratatui::{symbols, Frame};
 
-use super::app::{PreviewApp, PreviewMode};
+use super::app_data::{PreviewData, RenameData};
+use super::app_state::AppState;
 use crate::cli::util::rows_required_for_string;
 
 const PRESS_Y_NOTIF: &str = "Press 'y' to rename or any other key to cancel.";
@@ -16,17 +17,17 @@ const INTERMEDIATE_BORDER_SET: symbols::border::Set = symbols::border::Set {
 };
 
 /// Renders the user interface widgets.
-pub fn render(app: &mut PreviewApp, frame: &mut Frame) {
-    match app.mode() {
-        PreviewMode::Rename(_) => render_rename(app, frame),
-        PreviewMode::Undo => todo!(),
-        PreviewMode::Redo => todo!(),
+pub fn render(_app: &mut AppState, data: &PreviewData, frame: &mut Frame) {
+    match data {
+        PreviewData::Rename(data) => render_rename(data, frame),
+        PreviewData::Undo(_) => todo!(),
+        PreviewData::Redo(_) => todo!(),
     }
 }
 
 /// Renders the user interface widgets.
-pub fn render_rename(app: &mut PreviewApp, frame: &mut Frame) {
-    let arguments_string = create_arguments_string(app.as_rename().arguments());
+pub fn render_rename(data: &RenameData, frame: &mut Frame) {
+    let arguments_string = create_arguments_string(data.arguments());
     let arguments_string_rows = calculate_string_rows(frame, &arguments_string);
 
     let layout = Layout::default()
@@ -44,13 +45,13 @@ pub fn render_rename(app: &mut PreviewApp, frame: &mut Frame) {
     let preview_pane = layout[1];
     let notification_pane = layout[2];
 
-    render_title_and_arguments(app, frame, arguments_pane, &arguments_string);
-    render_preview(app, frame, preview_pane);
+    render_title_and_arguments(data, frame, arguments_pane, &arguments_string);
+    render_preview(data, frame, preview_pane);
     render_notification(frame, notification_pane);
 }
 
 fn render_title_and_arguments(
-    app: &PreviewApp,
+    data: &RenameData,
     frame: &mut Frame,
     pane: Rect,
     arguments_string: &str,
@@ -61,22 +62,21 @@ fn render_title_and_arguments(
             Block::default()
                 .borders(Borders::LEFT | Borders::TOP | Borders::RIGHT)
                 .border_type(BorderType::Thick)
-                .title(app.as_rename().title())
+                .title(data.title())
                 .title_alignment(Alignment::Center),
         );
 
     frame.render_widget(p, pane);
 }
 
-fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
+fn render_preview(data: &RenameData, frame: &mut Frame, pane: Rect) {
     // height - 2 borders - 2 rows
     let amount_of_items = pane.height as usize - 2;
 
-    let step = app.as_rename().move_actions().len() / amount_of_items;
+    let step = data.move_actions().len() / amount_of_items;
 
     // TODO Scroll these left-to-right
-    let items = app
-        .as_rename()
+    let items = data
         .move_actions()
         .iter()
         .step_by(step)
@@ -84,7 +84,7 @@ fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
         .map(|move_action| {
             move_action
                 .target()
-                .strip_prefix(app.as_rename().working_directory())
+                .strip_prefix(data.working_directory())
                 .unwrap_or(move_action.target())
         })
         .map(|path| ListItem::new(format!(" {path} ")))
@@ -97,7 +97,7 @@ fn render_preview(app: &mut PreviewApp, frame: &mut Frame, pane: Rect) {
             .title(format!(
                 " Previewing {} of {} ",
                 amount_of_items,
-                app.as_rename().move_actions().len()
+                data.move_actions().len()
             ))
             .title_alignment(Alignment::Center),
     );

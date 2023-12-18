@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 /// A stack which preserves popped items
-///
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefStack<T> {
     inner: Vec<T>,
