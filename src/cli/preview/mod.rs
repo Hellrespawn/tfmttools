@@ -1,5 +1,6 @@
 use color_eyre::Result;
 use ratatui::prelude::{CrosstermBackend, Terminal as CrosstermTerminal};
+use tracing::trace;
 
 use self::app_state::AppState;
 use self::event::{Event, EventHandler};
@@ -15,6 +16,8 @@ mod ui;
 pub use app_data::{PreviewData, RenameData, UndoRedoData};
 
 pub fn preview(data: &PreviewData) -> Result<bool> {
+    trace!("Running preview TUI:\n{:#?}", data);
+
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(std::io::stderr());
     let terminal: CrosstermTerminal<CrosstermBackend<std::io::Stderr>> =

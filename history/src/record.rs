@@ -10,10 +10,26 @@ pub struct Record<T> {
 
 impl<T> Record<T> {
     pub fn new(items: Vec<T>) -> Result<Self> {
-        Ok(Self { items, timestamp: Some(OffsetDateTime::now_local()?) })
+        Ok(Self { items, timestamp: Some(OffsetDateTime::now_utc()) })
     }
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> {
         self.items.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn items(&self) -> &[T] {
+        &self.items
+    }
+
+    pub fn timestamp(&self) -> Option<OffsetDateTime> {
+        self.timestamp
     }
 }

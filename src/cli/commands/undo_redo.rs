@@ -1,10 +1,11 @@
 use clap::Args;
 use color_eyre::Result;
-use history::{History, LoadHistoryResult};
+use history::{History, LoadHistoryResult, Record};
 
 use super::super::config::Config;
 use super::Command;
 use crate::action::Action;
+use crate::cli::preview::{preview, PreviewData};
 
 // TODO Summarize actions undone/redone
 // TODO Add interactive preview
@@ -13,6 +14,22 @@ use crate::action::Action;
 pub enum HistoryMode {
     Undo,
     Redo,
+}
+
+impl HistoryMode {
+    pub fn verb(&self) -> &str {
+        match self {
+            HistoryMode::Undo => "undo",
+            HistoryMode::Redo => "redo",
+        }
+    }
+
+    pub fn verb_capitalized(&self) -> &str {
+        match self {
+            HistoryMode::Undo => "Undo",
+            HistoryMode::Redo => "Redo",
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -49,12 +66,6 @@ impl Command for Undo {
             HistoryMode::Undo,
         )
     }
-
-    fn override_dry_run(&mut self, dry_run: bool) {
-        if dry_run {
-            self.dry_run = true;
-        }
-    }
 }
 
 impl Command for Redo {
@@ -67,18 +78,12 @@ impl Command for Redo {
             HistoryMode::Redo,
         )
     }
-
-    fn override_dry_run(&mut self, dry_run: bool) {
-        if dry_run {
-            self.dry_run = true;
-        }
-    }
 }
 
 fn undo_redo(
     config: &Config,
     dry_run: bool,
-    _force: bool,
+    force: bool,
     amount: usize,
     mode: HistoryMode,
 ) -> Result<()> {
@@ -101,36 +106,59 @@ fn undo_redo(
             };
 
             if let Some(records) = records {
-                let delta = amount - records.len();
+                let confirmation =
+                    force || preview_undo_redo(records, amount, mode)?;
 
-                if delta > 0 {
-                    println!("Tried to {verb} {amount} runs, but only {delta} can be {verb}ne.");
+                if confirmation {
+                    perform_undo_redo_actions(records, dry_run, mode)?;
+
+                    history.save()?;
+                } else {
+                    println!("Aborting!");
                 }
-
-                match mode {
-                    HistoryMode::Undo => {
-                        for record in records.iter().rev() {
-                            for action in record.iter().rev() {
-                                action.undo(dry_run)?;
-                            }
-                        }
-                    },
-                    HistoryMode::Redo => {
-                        for record in records {
-                            for action in record.iter() {
-                                action.redo(dry_run)?;
-                            }
-                        }
-                    },
-                }
-
-                history.save()?;
-
-                Ok(())
             } else {
                 eprintln!("There are no runs to {verb}.");
-                Ok(())
+            }
+
+            Ok(())
+        },
+    }
+}
+
+fn preview_undo_redo(
+    records: &[Record<Action>],
+    amount: usize,
+    mode: HistoryMode,
+) -> Result<bool> {
+    let data = match mode {
+        HistoryMode::Undo => PreviewData::undo(records, amount),
+        HistoryMode::Redo => PreviewData::redo(records, amount),
+    };
+
+    preview(&data)
+}
+
+fn perform_undo_redo_actions(
+    records: &[Record<Action>],
+    dry_run: bool,
+    mode: HistoryMode,
+) -> Result<()> {
+    match mode {
+        HistoryMode::Undo => {
+            for record in records.iter().rev() {
+                for action in record.iter().rev() {
+                    action.undo(dry_run)?;
+                }
+            }
+        },
+        HistoryMode::Redo => {
+            for record in records {
+                for action in record.iter() {
+                    action.redo(dry_run)?;
+                }
             }
         },
     }
+
+    Ok(())
 }

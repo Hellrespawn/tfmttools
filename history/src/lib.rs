@@ -4,3 +4,4 @@ mod serde;
 mod stack;
 
 pub use history::{History, LoadHistoryResult, SaveHistoryResult};
+pub use record::Record;

@@ -41,9 +41,6 @@ impl Command for ListTemplates {
 
         Ok(())
     }
-
-    fn override_dry_run(&mut self, _dry_run: bool) {
-    }
 }
 
 impl ListTemplates {

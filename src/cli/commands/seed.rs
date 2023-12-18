@@ -8,6 +8,8 @@ use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 use crate::cli::config::default_template_and_config_dir;
 
+// TODO? Interactive screen for seed?
+
 struct DefaultFile {
     name: &'static str,
     content: &'static str,
@@ -31,28 +33,29 @@ pub struct Seed {
 }
 
 impl Command for Seed {
-    fn run(&self, config: &Config) -> Result<()> {
+    fn run(&self, _config: &Config) -> Result<()> {
+        let template_directory = &self.template_directory;
+
         if self.force {
-            crate::fs::remove_dir_all(self.dry_run, &config.config_directory)?;
-        } else if config.config_directory.is_dir() {
-            let has_files = config
-                .config_directory
+            crate::fs::remove_dir_all(self.dry_run, template_directory)?;
+        } else if self.template_directory.is_dir() {
+            let has_files = template_directory
                 .read_dir()
                 .map(|rd| rd.count() > 0)
                 .unwrap_or(false);
 
             if has_files {
                 return Err(eyre!(
-                    "Configuration folder already exists and is not empty: {}",
-                    config.config_directory
+                    "Template directory already exists and is not empty: {}",
+                    template_directory
                 ));
             }
         }
 
-        crate::fs::create_dir(self.dry_run, &config.config_directory)?;
+        crate::fs::create_dir(self.dry_run, template_directory)?;
 
         for file in &DEFAULT_FILES {
-            let path = config.config_directory.join(file.name);
+            let path = template_directory.join(file.name);
 
             if self.dry_run {
                 print!("{DRY_RUN_PREFIX}");
@@ -60,15 +63,9 @@ impl Command for Seed {
                 fs::write(path, file.content)?;
             }
 
-            println!("Wrote default files to {}", config.config_directory);
+            println!("Wrote default files to {template_directory}");
         }
 
         Ok(())
-    }
-
-    fn override_dry_run(&mut self, dry_run: bool) {
-        if dry_run {
-            self.dry_run = true;
-        }
     }
 }

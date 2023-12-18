@@ -31,10 +31,4 @@ impl Command for ClearHistory {
 
         Ok(())
     }
-
-    fn override_dry_run(&mut self, dry_run: bool) {
-        if dry_run {
-            self.dry_run = true;
-        }
-    }
 }

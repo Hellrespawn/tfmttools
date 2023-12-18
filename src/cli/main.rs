@@ -11,7 +11,7 @@ use super::TERM;
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
 /// Main entrypoint for tfmttools
-pub fn main(dry_run_override: bool) -> Result<()> {
+pub fn main() -> Result<()> {
     let _guard = init_tracing();
 
     info!("Initialized tracing.");
@@ -21,8 +21,7 @@ pub fn main(dry_run_override: bool) -> Result<()> {
         std::env::args().next().unwrap_or("Unknown".to_owned())
     );
 
-    let mut config = Config::parse_from_args();
-    config.command_mut().override_dry_run(dry_run_override);
+    let config = Config::parse_from_args();
 
     debug!("Configuration:\n{:#?}", config);
 

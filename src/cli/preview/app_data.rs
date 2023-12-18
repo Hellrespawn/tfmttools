@@ -1,4 +1,5 @@
 use camino::Utf8Path;
+use history::Record;
 
 use crate::action::{Action, Move};
 
@@ -22,6 +23,14 @@ impl<'pd> PreviewData<'pd> {
             move_actions,
             working_directory,
         })
+    }
+
+    pub fn undo(records: &'pd [Record<Action>], amount: usize) -> Self {
+        PreviewData::Undo(UndoRedoData { records, amount })
+    }
+
+    pub fn redo(records: &'pd [Record<Action>], amount: usize) -> Self {
+        PreviewData::Redo(UndoRedoData { records, amount })
     }
 
     pub fn title(&self) -> String {
@@ -61,5 +70,24 @@ impl<'rm> RenameData<'rm> {
 
 #[derive(Debug)]
 pub struct UndoRedoData<'urd> {
-    _actions: &'urd [Action],
+    records: &'urd [Record<Action>],
+    amount: usize,
+}
+
+impl<'urd> UndoRedoData<'urd> {
+    pub fn records(&self) -> &[Record<Action>] {
+        self.records
+    }
+
+    pub fn amount(&self) -> usize {
+        self.amount
+    }
+
+    pub fn actual(&self) -> usize {
+        if self.amount > self.records.len() {
+            self.records.len()
+        } else {
+            self.amount
+        }
+    }
 }

@@ -48,12 +48,6 @@ impl Command for Rename {
     fn run(&self, config: &Config) -> Result<()> {
         InnerRename { options: self, config }.rename()
     }
-
-    fn override_dry_run(&mut self, dry_run: bool) {
-        if dry_run {
-            self.dry_run = true;
-        }
-    }
 }
 
 impl<'a> InnerRename<'a> {

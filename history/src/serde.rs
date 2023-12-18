@@ -2,6 +2,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tracing::trace;
 
 use super::record::Record;
 use super::stack::RefStack;
@@ -9,15 +10,6 @@ use super::stack::RefStack;
 pub struct HistorySerde;
 
 impl HistorySerde {
-    #[cfg(feature = "debug")]
-    pub fn serialize<T>(stack: &RefStack<Record<T>>) -> Result<Vec<u8>>
-    where
-        T: std::fmt::Debug + Serialize + DeserializeOwned,
-    {
-        Ok(serde_json::to_vec(stack)?)
-    }
-
-    #[cfg(not(feature = "debug"))]
     pub fn serialize<T>(stack: &RefStack<Record<T>>) -> Result<Vec<u8>>
     where
         T: std::fmt::Debug + Serialize + DeserializeOwned,
@@ -29,20 +21,11 @@ impl HistorySerde {
     where
         T: std::fmt::Debug + Serialize + DeserializeOwned,
     {
-        let bincode_result = bincode::deserialize(bytes);
+        let stack = bincode::deserialize(bytes)
+            .map_err(|err| eyre!("Unable to deserialize history: {}", err,))?;
 
-        let json_result = serde_json::from_slice(bytes);
+        trace!("Deserialized history:\n{:#?}", stack);
 
-        if let Ok(stack) = bincode_result {
-            Ok(stack)
-        } else if let Ok(stack) = json_result {
-            Ok(stack)
-        } else {
-            Err(eyre!(
-                "Unable to deserialize history:\nbincode: {}\njson: {}",
-                bincode_result.unwrap_err(),
-                json_result.unwrap_err()
-            ))
-        }
+        Ok(stack)
     }
 }

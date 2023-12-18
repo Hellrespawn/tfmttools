@@ -11,8 +11,7 @@ use super::commands::Command;
 
 pub const DRY_RUN_PREFIX: &str = "[D] ";
 
-const DEFAULT_HISTORY_FILENAME: &str =
-    concat!(env!("CARGO_PKG_NAME"), ".history.json");
+const DEFAULT_HISTORY_FILENAME: &str = concat!(env!("CARGO_PKG_NAME"), ".hist");
 
 pub fn default_input_dir() -> Utf8PathBuf {
     let path =
@@ -64,17 +63,6 @@ impl Config {
 
     pub fn command(&self) -> &dyn Command {
         match &self.command {
-            CommandOptions::ClearHistory(c) => c,
-            CommandOptions::ListTemplates(l) => l,
-            CommandOptions::Rename(r) => r,
-            CommandOptions::Seed(s) => s,
-            CommandOptions::Undo(u) => u,
-            CommandOptions::Redo(r) => r,
-        }
-    }
-
-    pub fn command_mut(&mut self) -> &mut dyn Command {
-        match &mut self.command {
             CommandOptions::ClearHistory(c) => c,
             CommandOptions::ListTemplates(l) => l,
             CommandOptions::Rename(r) => r,
