@@ -8,6 +8,6 @@ use color_eyre::Result;
 
 use super::config::Config;
 
-pub trait Command {
+pub trait Command: std::fmt::Debug {
     fn run(&self, config: &Config) -> Result<()>;
 }

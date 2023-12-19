@@ -7,6 +7,7 @@ use tracing_subscriber::{fmt, registry, EnvFilter};
 
 use super::config::Config;
 use super::TERM;
+use crate::cli::args::Args;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
@@ -21,7 +22,9 @@ pub fn main() -> Result<()> {
         std::env::args().next().unwrap_or("Unknown".to_owned())
     );
 
-    let config = Config::parse_from_args();
+    let args = Args::parse();
+
+    let config = Config::from_args(args)?;
 
     debug!("Configuration:\n{:#?}", config);
 

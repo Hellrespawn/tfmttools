@@ -237,6 +237,7 @@ fn undo(env: &TestEnv) {
         .arg("--config")
         .arg(config_dir)
         .arg("undo")
+        .arg("--force")
         .current_dir(env.tempdir.path())
         .assert();
 
@@ -254,6 +255,7 @@ fn redo(env: &TestEnv) {
         .arg("--config")
         .arg(config_dir)
         .arg("redo")
+        .arg("--force")
         .current_dir(env.tempdir.path())
         .assert();
 

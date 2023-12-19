@@ -1,12 +1,9 @@
-#![allow(clippy::upper_case_acronyms)]
-use std::collections::HashMap;
-
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use lofty::{ItemKey, Tag, TaggedFileExt};
-use once_cell::unsync::Lazy;
 
+use crate::fs::FORBIDDEN_CHARACTERS;
 use crate::tags::Tags;
 use crate::template::Template;
 use crate::util::normalize_separators;
@@ -79,25 +76,8 @@ impl AudioFile {
     }
 
     fn get_tag_safe(&self, key: &ItemKey) -> Option<String> {
-        let forbidden_characters: Lazy<HashMap<char, Option<&str>>> =
-            Lazy::new(|| {
-                let mut map = HashMap::new();
-
-                map.insert('<', None);
-                map.insert('>', None);
-                map.insert(':', None);
-                map.insert('|', None);
-                map.insert('?', None);
-                map.insert('*', None);
-                map.insert('~', Some("-"));
-                map.insert('/', Some("-"));
-                map.insert('\\', Some("-"));
-
-                map
-            });
-
         self.tag.get_string(key).map(|string| {
-            forbidden_characters.iter().fold(
+            FORBIDDEN_CHARACTERS.iter().fold(
                 string.to_owned(),
                 |string, (char, replacement)| {
                     string.replace(*char, replacement.unwrap_or(""))

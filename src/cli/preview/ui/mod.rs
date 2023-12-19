@@ -7,8 +7,8 @@ use tracing::debug;
 
 use super::app_data::PreviewData;
 use super::app_state::AppState;
-use crate::cli::commands::undo_redo::HistoryMode;
 use crate::cli::util::rows_required_for_string;
+use crate::cli::HistoryMode;
 
 mod rename;
 mod undo_redo;

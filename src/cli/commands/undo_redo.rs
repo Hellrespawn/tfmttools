@@ -1,4 +1,3 @@
-use clap::Args;
 use color_eyre::Result;
 use history::{History, LoadHistoryResult, Record};
 
@@ -6,83 +5,32 @@ use super::super::config::Config;
 use super::Command;
 use crate::action::Action;
 use crate::cli::preview::{preview, PreviewData};
+use crate::cli::HistoryMode;
 
 // TODO Summarize actions undone/redone
-// TODO Add interactive preview
 
-#[derive(Copy, Clone)]
-pub enum HistoryMode {
-    Undo,
-    Redo,
-}
-
-impl HistoryMode {
-    pub fn verb(&self) -> &str {
-        match self {
-            HistoryMode::Undo => "undo",
-            HistoryMode::Redo => "redo",
-        }
-    }
-
-    pub fn verb_capitalized(&self) -> &str {
-        match self {
-            HistoryMode::Undo => "Undo",
-            HistoryMode::Redo => "Redo",
-        }
-    }
-}
-
-#[derive(Args, Debug)]
-pub struct Undo {
-    #[arg(short, long)]
-    dry_run: bool,
-
-    #[arg(short, long)]
+#[derive(Debug)]
+pub struct UndoRedo {
     force: bool,
 
-    #[arg(default_value_t = 1)]
     amount: usize,
+    mode: HistoryMode,
 }
 
-#[derive(Args, Debug)]
-pub struct Redo {
-    #[arg(short, long)]
-    dry_run: bool,
-
-    #[arg(short, long)]
-    force: bool,
-
-    #[arg(default_value_t = 1)]
-    amount: usize,
-}
-
-impl Command for Undo {
-    fn run(&self, config: &Config) -> Result<()> {
-        undo_redo(
-            config,
-            self.dry_run,
-            self.force,
-            self.amount,
-            HistoryMode::Undo,
-        )
+impl UndoRedo {
+    pub fn new(force: bool, amount: usize, mode: HistoryMode) -> Self {
+        Self { force, amount, mode }
     }
 }
 
-impl Command for Redo {
+impl Command for UndoRedo {
     fn run(&self, config: &Config) -> Result<()> {
-        undo_redo(
-            config,
-            self.dry_run,
-            self.force,
-            self.amount,
-            HistoryMode::Redo,
-        )
+        undo_redo(config, self.force, self.amount, self.mode)
     }
 }
 
 fn undo_redo(
     config: &Config,
-    dry_run: bool,
     force: bool,
     amount: usize,
     mode: HistoryMode,
@@ -105,19 +53,19 @@ fn undo_redo(
                 HistoryMode::Redo => history.get_records_to_redo(amount),
             };
 
-            if let Some(records) = records {
+            if records.is_empty() {
+                println!("There are no runs to {verb}.");
+            } else {
                 let confirmation =
                     force || preview_undo_redo(records, amount, mode)?;
 
                 if confirmation {
-                    perform_undo_redo_actions(records, dry_run, mode)?;
+                    perform_undo_redo_actions(records, config.dry_run(), mode)?;
 
                     history.save()?;
                 } else {
                     println!("Aborting!");
                 }
-            } else {
-                eprintln!("There are no runs to {verb}.");
             }
 
             Ok(())

@@ -4,6 +4,10 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 
+mod validation;
+
+pub use validation::validate_move_actions;
+
 #[derive(PartialEq, Serialize, Deserialize, Debug)]
 pub struct Move {
     source: Utf8PathBuf,

@@ -120,12 +120,12 @@ where
         Ok(())
     }
 
-    pub fn get_records_to_undo(&mut self, n: usize) -> Option<&[Record<T>]> {
-        self.stack.popn(n)
+    pub fn get_records_to_undo(&mut self, n: usize) -> &[Record<T>] {
+        self.stack.pop_refs(n)
     }
 
-    pub fn get_records_to_redo(&mut self, n: usize) -> Option<&[Record<T>]> {
-        self.stack.unpopn(n)
+    pub fn get_records_to_redo(&mut self, n: usize) -> &[Record<T>] {
+        self.stack.unpop_refs(n)
     }
 
     pub fn path(&self) -> &str {

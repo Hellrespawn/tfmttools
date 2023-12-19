@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-/// A stack which preserves popped items
+/// A stack which pops references.
+///
+/// Popped references can be unpopped until a new element is pushed, at which point all elements whose references where popped are discarded. The new element is pushed on top of these.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefStack<T> {
     inner: Vec<T>,
@@ -8,10 +10,12 @@ pub struct RefStack<T> {
 }
 
 impl<T> RefStack<T> {
+    /// Create a new `RefStack`
     pub fn new() -> Self {
         Self { inner: Vec::new(), cursor: 0 }
     }
 
+    /// Push a new item onto the stack. This removes any unpopped items.
     pub fn push(&mut self, item: T) {
         self.inner.truncate(self.cursor);
         self.inner.push(item);
@@ -28,18 +32,15 @@ impl<T> RefStack<T> {
         self.cursor = self.inner.len();
     }
 
-    pub fn pop(&mut self) -> Option<&T> {
-        self.popn(1).map(|s| &s[0])
-    }
-
-    pub fn popn(&mut self, n: usize) -> Option<&[T]> {
+    /// Pop up to `n` references
+    pub fn pop_refs(&mut self, n: usize) -> &[T] {
         let start = self.cursor.saturating_sub(n);
         let end = self.cursor;
 
         let range = start..end;
 
         if range.is_empty() {
-            None
+            &[]
         } else {
             let amount = end - start;
 
@@ -47,22 +48,19 @@ impl<T> RefStack<T> {
 
             self.cursor = self.cursor.saturating_sub(amount);
 
-            items
+            items.unwrap_or_default()
         }
     }
 
-    pub fn unpop(&mut self) -> Option<&T> {
-        self.unpopn(1).map(|s| &s[0])
-    }
-
-    pub fn unpopn(&mut self, n: usize) -> Option<&[T]> {
+    /// Unpop up to `n` references
+    pub fn unpop_refs(&mut self, n: usize) -> &[T] {
         let start = self.cursor;
         let end = std::cmp::min(self.cursor + n, self.inner.len());
 
         let range = start..end;
 
         if range.is_empty() {
-            None
+            &[]
         } else {
             let amount = end - start;
 
@@ -70,7 +68,7 @@ impl<T> RefStack<T> {
 
             self.cursor += amount;
 
-            items
+            items.unwrap_or_default()
         }
     }
 }
@@ -83,14 +81,14 @@ mod test {
     fn test_empty_ref_stack() {
         let mut stack: RefStack<usize> = RefStack::new();
 
-        assert_eq!(stack.popn(1), None);
+        assert_eq!(stack.pop_refs(1), &[][..]);
         assert_eq!(stack.cursor, 0);
-        assert_eq!(stack.popn(3), None);
+        assert_eq!(stack.pop_refs(3), &[][..]);
         assert_eq!(stack.cursor, 0);
 
-        assert_eq!(stack.unpopn(1), None);
+        assert_eq!(stack.unpop_refs(1), &[][..]);
         assert_eq!(stack.cursor, 0);
-        assert_eq!(stack.unpopn(3), None);
+        assert_eq!(stack.unpop_refs(3), &[][..]);
         assert_eq!(stack.cursor, 0);
     }
 
@@ -105,8 +103,8 @@ mod test {
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 3);
 
-        assert_eq!(stack.popn(1), Some(&["c"][..]));
-        assert_eq!(stack.popn(1), Some(&["b"][..]));
+        assert_eq!(stack.pop_refs(1), &["c"][..]);
+        assert_eq!(stack.pop_refs(1), &["b"][..]);
 
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 1);
@@ -128,13 +126,13 @@ mod test {
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 3);
 
-        assert_eq!(stack.popn(1), Some(&["c"][..]));
-        assert_eq!(stack.popn(1), Some(&["b"][..]));
+        assert_eq!(stack.pop_refs(1), &["c"][..]);
+        assert_eq!(stack.pop_refs(1), &["b"][..]);
 
         assert_eq!(stack.inner, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 1);
 
-        assert_eq!(stack.unpopn(2), Some(&["b", "c"][..]));
+        assert_eq!(stack.unpop_refs(2), &["b", "c"][..]);
         assert_eq!(stack.cursor, 3);
     }
 
@@ -144,16 +142,18 @@ mod test {
 
         stack.extend(["a", "b", "c"]);
 
-        assert_eq!(stack.unpopn(5), None);
+        let empty: &[&str] = &[];
+
+        assert_eq!(stack.unpop_refs(5), empty);
         assert_eq!(stack.cursor, 3);
 
-        assert_eq!(stack.popn(5), Some(&["a", "b", "c"][..]));
+        assert_eq!(stack.pop_refs(5), &["a", "b", "c"][..]);
         assert_eq!(stack.cursor, 0);
 
-        assert_eq!(stack.popn(5), None);
+        assert_eq!(stack.pop_refs(5), empty);
         assert_eq!(stack.cursor, 0);
 
-        assert_eq!(stack.unpopn(5), Some(&["a", "b", "c"][..]));
+        assert_eq!(stack.unpop_refs(5), &["a", "b", "c"][..]);
         assert_eq!(stack.cursor, 3);
     }
 }

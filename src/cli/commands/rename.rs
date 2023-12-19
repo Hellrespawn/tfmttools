@@ -1,5 +1,4 @@
 use camino::Utf8PathBuf;
-use clap::Args;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use history::{History, SaveHistoryResult};
@@ -8,40 +7,43 @@ use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 use crate::action::{Action, Move};
 use crate::audiofile::AudioFile;
-use crate::cli::config::{default_input_dir, default_template_and_config_dir};
 use crate::cli::preview::{preview, PreviewData};
 use crate::cli::ui::{ProgressBar, ProgressBarOptions};
+use crate::cli::util::PathOrString;
 use crate::fs::{self, PathIterator, RemoveDirResult};
 use crate::template::{Template, Templates};
-use crate::util::PathOrString;
 
-const DEFAULT_RECURSION_DEPTH: usize = 4;
-
-#[derive(Args, Debug)]
+#[derive(Debug)]
 pub struct Rename {
-    #[arg(short, long, alias = "input", default_value_t = default_input_dir())]
     input_directory: Utf8PathBuf,
-
-    #[arg(short, long, default_value_t = default_template_and_config_dir())]
     template_directory: Utf8PathBuf,
 
-    #[arg(short, long)]
-    dry_run: bool,
-
-    #[arg(short, long)]
     force: bool,
 
-    #[arg(short, long, default_value_t = DEFAULT_RECURSION_DEPTH)]
     recursion_depth: usize,
 
-    name_or_path: PathOrString,
-
+    template: PathOrString,
     arguments: Vec<String>,
 }
 
-struct InnerRename<'a> {
-    options: &'a Rename,
-    config: &'a Config,
+impl Rename {
+    pub fn new(
+        input_directory: Utf8PathBuf,
+        template_directory: Utf8PathBuf,
+        force: bool,
+        recursion_depth: usize,
+        template: PathOrString,
+        arguments: Vec<String>,
+    ) -> Self {
+        Self {
+            input_directory,
+            template_directory,
+            force,
+            recursion_depth,
+            template,
+            arguments,
+        }
+    }
 }
 
 impl Command for Rename {
@@ -50,9 +52,14 @@ impl Command for Rename {
     }
 }
 
+struct InnerRename<'ir> {
+    options: &'ir Rename,
+    config: &'ir Config,
+}
+
 impl<'a> InnerRename<'a> {
     pub fn rename(&self) -> Result<()> {
-        let templates = match &self.options.name_or_path {
+        let templates = match &self.options.template {
             PathOrString::Path(path, string) => {
                 Templates::read_filename(path, string)
             },
@@ -61,7 +68,7 @@ impl<'a> InnerRename<'a> {
             },
         }?;
 
-        let template_name = self.options.name_or_path.as_str();
+        let template_name = self.options.template.as_str();
 
         let template = templates
             .get_template(template_name, self.options.arguments.clone())
@@ -81,7 +88,7 @@ impl<'a> InnerRename<'a> {
             let cwd = self.config.working_directory()?;
 
             let app_data = PreviewData::rename(
-                template_name,
+                template.name(),
                 &self.options.arguments,
                 &move_actions,
                 &cwd,
@@ -103,7 +110,7 @@ impl<'a> InnerRename<'a> {
 
     fn gather_files(&self) -> Result<Vec<AudioFile>> {
         let options = ProgressBarOptions::spinner(
-            self.options.dry_run,
+            self.config.dry_run(),
             "audio",
             "total",
             "Gathering files...",
@@ -139,7 +146,7 @@ impl<'a> InnerRename<'a> {
         files: &[AudioFile],
     ) -> Result<Vec<Move>> {
         let options = ProgressBarOptions::bar(
-            self.options.dry_run,
+            self.config.dry_run(),
             "Determining output paths:",
             "Determined output paths.",
         )?;
@@ -175,7 +182,7 @@ impl<'a> InnerRename<'a> {
 
     fn validate_move_actions(move_actions: &[Move]) -> Result<()> {
         let validation_errors =
-            crate::validation::validate_move_actions(move_actions);
+            crate::action::validate_move_actions(move_actions);
 
         if validation_errors.is_empty() {
             Ok(())
@@ -194,13 +201,13 @@ impl<'a> InnerRename<'a> {
 
         let mut actions = self.move_files(move_actions)?;
 
-        if self.options.dry_run {
+        if self.config.dry_run() {
             print!("{DRY_RUN_PREFIX}");
         }
 
         if let Some(common_path) = common_prefix {
             let removed = fs::remove_empty_subdirectories(
-                self.options.dry_run,
+                self.config.dry_run(),
                 &common_path,
                 self.options.recursion_depth,
             )?;
@@ -222,7 +229,7 @@ impl<'a> InnerRename<'a> {
 
     fn move_files(&self, move_actions: Vec<Move>) -> Result<Vec<Action>> {
         let options = ProgressBarOptions::bar(
-            self.options.dry_run,
+            self.config.dry_run(),
             "Moving files:",
             "Moved files.",
         )?;
@@ -232,7 +239,7 @@ impl<'a> InnerRename<'a> {
         let actions = Move::create_actions(move_actions);
 
         for action in &actions {
-            action.apply(self.options.dry_run)?;
+            action.apply(self.config.dry_run())?;
 
             if action.is_move() {
                 bar.inc_found();
@@ -248,7 +255,7 @@ impl<'a> InnerRename<'a> {
     }
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
-        if !self.options.dry_run {
+        if !self.config.dry_run() {
             let mut history = History::load(&self.config.history_file())?;
 
             history.push(actions)?;

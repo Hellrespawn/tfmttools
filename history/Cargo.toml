@@ -12,8 +12,5 @@ camino = { version = "1.1", features = ["serde", "serde1"] }
 color-eyre = "0.6"
 fs-err = "2.9"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 time = { version = "0.3", features = ["local-offset", "serde"] }
 tracing = "0.1"
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }

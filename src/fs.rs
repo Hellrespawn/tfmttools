@@ -1,8 +1,28 @@
+use std::collections::HashMap;
+
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
+use once_cell::sync::Lazy;
+
+pub static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
+    Lazy::new(|| {
+        let mut map = HashMap::new();
+
+        map.insert('<', None);
+        map.insert('>', None);
+        map.insert(':', None);
+        map.insert('|', None);
+        map.insert('?', None);
+        map.insert('*', None);
+        map.insert('~', Some("-"));
+        map.insert('/', Some("-"));
+        map.insert('\\', Some("-"));
+
+        map
+    });
 
 pub struct PathIterator(Walk);
 

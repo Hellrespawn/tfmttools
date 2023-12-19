@@ -32,14 +32,6 @@ impl<'pd> PreviewData<'pd> {
     pub fn redo(records: &'pd [Record<Action>], amount: usize) -> Self {
         PreviewData::Redo(UndoRedoData { records, amount })
     }
-
-    pub fn title(&self) -> String {
-        match self {
-            PreviewData::Rename(data) => data.title(),
-            PreviewData::Undo(_) => unimplemented!(),
-            PreviewData::Redo(_) => unimplemented!(),
-        }
-    }
 }
 
 #[derive(Debug)]

@@ -6,8 +6,8 @@ use super::{
     add_top_border_to_paragraph, calculate_string_rows, create_layout,
     render_list, render_notification,
 };
-use crate::cli::commands::undo_redo::HistoryMode;
 use crate::cli::preview::UndoRedoData;
+use crate::cli::HistoryMode;
 
 /// Renders the user interface widgets.
 pub fn render_undo_redo(

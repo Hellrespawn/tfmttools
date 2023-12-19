@@ -1,16 +1,30 @@
 use camino::Utf8PathBuf;
-use clap::Args;
 use color_eyre::Result;
 
 use super::Command;
-use crate::cli::config::{default_template_and_config_dir, Config};
+use crate::cli::config::Config;
 use crate::cli::ui::table::Table;
 use crate::template::{Template, Templates};
 
-#[derive(Args, Debug)]
+#[derive(Debug)]
 pub struct ListTemplates {
-    #[arg(short, long, default_value_t = default_template_and_config_dir())]
-    pub template_directory: Utf8PathBuf,
+    template_directory: Utf8PathBuf,
+}
+
+impl ListTemplates {
+    pub fn new(template_directory: Utf8PathBuf) -> Self {
+        Self { template_directory }
+    }
+
+    fn format_template(template: &Template) -> String {
+        let name = template.name();
+
+        if let Some(description) = template.description() {
+            format!("{name}: {description}")
+        } else {
+            name.to_owned()
+        }
+    }
 }
 
 impl Command for ListTemplates {
@@ -40,17 +54,5 @@ impl Command for ListTemplates {
         println!("{table}");
 
         Ok(())
-    }
-}
-
-impl ListTemplates {
-    fn format_template(template: &Template) -> String {
-        let name = template.name();
-
-        if let Some(description) = template.description() {
-            format!("{name}: {description}")
-        } else {
-            name.to_owned()
-        }
     }
 }

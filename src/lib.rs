@@ -7,20 +7,21 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
-//! Tools to manage your music library using the `minijina` templating language.
+//! Tools to manage your music library using the `minijinja`
+//! templating language.
 //!
 //! The `TagFormat` utility lets you use templates to dynamically
 //! rename your music files based on their tags.
 
 mod action;
 mod audiofile;
-/// Controls the command line interface
-pub mod cli;
 mod fs;
 mod tags;
 mod template;
 mod util;
-mod validation;
+
+/// Controls the command line interface
+pub mod cli;
 
 #[cfg(feature = "debug")]
 mod debug;
