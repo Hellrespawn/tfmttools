@@ -5,10 +5,8 @@ use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use super::{Template, TEMPLATE_EXTENSIONS};
 use crate::fs::PathIterator;
-use crate::tags::Tags;
-
-pub const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
 #[derive(Debug)]
 pub struct Templates<'t> {
@@ -145,83 +143,5 @@ impl<'t> Templates<'t> {
 
     fn zero_pad(value: usize, width: usize) -> String {
         format!("{value:0>width$}")
-    }
-}
-
-#[derive(Debug)]
-pub struct Template<'templates, 'source> {
-    inner: minijinja::Template<'templates, 'source>,
-    name: String,
-    description: Option<String>,
-    arguments: Vec<String>,
-}
-
-impl<'templates, 'source> Template<'templates, 'source> {
-    pub fn new(
-        inner: minijinja::Template<'templates, 'source>,
-        name: String,
-        description: Option<String>,
-        arguments: Vec<String>,
-    ) -> Self {
-        Self { inner, name, description, arguments }
-    }
-
-    pub fn name(&self) -> &str {
-        self.name.as_ref()
-    }
-
-    pub fn description(&self) -> Option<&String> {
-        self.description.as_ref()
-    }
-
-    pub fn render(&self, tags: &dyn Tags) -> Result<String> {
-        let context = self.create_context(tags)?;
-
-        let output = self.inner.render(context)?;
-
-        Ok(output)
-    }
-
-    fn create_context(&self, tags: &dyn Tags) -> Result<Value> {
-        let albumsort: Option<usize> =
-            tags.albumsort().map(|string| string.parse()).transpose()?;
-
-        let track_number: Option<usize> =
-            tags.track_number().map(|string| string.parse()).transpose()?;
-
-        let disc_number: Option<usize> =
-            tags.disc_number().map(|string| string.parse()).transpose()?;
-
-        let ctx = minijinja::context! {
-            args => self.arguments,
-
-            album => &tags.album(),
-
-            albumartist => &tags.album_artist(),
-            album_artist => &tags.album_artist(),
-
-            albumsort => albumsort,
-            album_sort => albumsort,
-
-            artist => &tags.artist(),
-
-            genre => &tags.genre(),
-
-            title => &tags.title(),
-
-            date => &tags.date(),
-
-            year => &tags.year(),
-
-            tracknumber => track_number,
-            track_number => track_number,
-
-            discnumber => disc_number,
-            disc_number => disc_number,
-            disknumber => disc_number,
-            disk_number => disc_number,
-        };
-
-        Ok(ctx)
     }
 }

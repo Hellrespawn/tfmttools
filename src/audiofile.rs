@@ -1,17 +1,16 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use lofty::{ItemKey, Tag, TaggedFileExt};
+use lofty::{Tag, TaggedFileExt};
 
-use crate::fs::FORBIDDEN_CHARACTERS;
-use crate::tags::Tags;
 use crate::template::Template;
 use crate::util::normalize_separators;
 
+#[derive(Clone)]
 pub struct AudioFile {
     path: Utf8PathBuf,
-    tag: Tag,
     extension: String,
+    tag: Tag,
 }
 
 impl std::fmt::Debug for AudioFile {
@@ -35,7 +34,7 @@ impl AudioFile {
 
         let extension = path.extension().unwrap().to_string();
 
-        Ok(AudioFile { path, tag, extension })
+        Ok(AudioFile { path, extension, tag })
     }
 
     pub fn path_predicate(path: &Utf8Path) -> bool {
@@ -58,6 +57,10 @@ impl AudioFile {
         self.extension.as_ref()
     }
 
+    pub fn tag(&self) -> &Tag {
+        &self.tag
+    }
+
     pub fn construct_target_path(
         &self,
         template: &Template,
@@ -73,56 +76,5 @@ impl AudioFile {
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
         Ok(relative_path.join(target_path))
-    }
-
-    fn get_tag_safe(&self, key: &ItemKey) -> Option<String> {
-        self.tag.get_string(key).map(|string| {
-            FORBIDDEN_CHARACTERS.iter().fold(
-                string.to_owned(),
-                |string, (char, replacement)| {
-                    string.replace(*char, replacement.unwrap_or(""))
-                },
-            )
-        })
-    }
-}
-
-impl Tags for AudioFile {
-    fn album(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::AlbumTitle)
-    }
-
-    fn album_artist(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::AlbumArtist)
-    }
-
-    fn albumsort(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::AlbumTitleSortOrder)
-    }
-
-    fn artist(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::TrackArtist)
-    }
-
-    fn genre(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::Genre)
-    }
-
-    fn title(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::TrackTitle)
-    }
-
-    fn raw_disc_number(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::DiscNumber)
-    }
-
-    fn raw_track_number(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::TrackNumber)
-    }
-
-    fn date(&self) -> Option<String> {
-        self.get_tag_safe(&ItemKey::RecordingDate)
-            .or_else(|| self.get_tag_safe(&ItemKey::Year))
-            .or_else(|| self.get_tag_safe(&ItemKey::OriginalReleaseDate))
     }
 }

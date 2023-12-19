@@ -16,7 +16,6 @@
 mod action;
 mod audiofile;
 mod fs;
-mod tags;
 mod template;
 mod util;
 
