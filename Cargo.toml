@@ -29,7 +29,7 @@ indicatif = { version = "0.17", features = ["improved_unicode"] }
 lofty = "0.15"
 minijinja = { version = "1.0", features = ["loader", "custom_syntax", "debug"] }
 once_cell = "1"
-ratatui = "0.24"
+ratatui = "0.25"
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }
 textwrap = "0.16"

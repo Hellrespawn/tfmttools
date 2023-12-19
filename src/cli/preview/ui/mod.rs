@@ -38,16 +38,14 @@ fn create_layout(
     top_rows: u16,
     bottom_rows: u16,
 ) -> (Rect, Rect, Rect) {
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vec![
-            // border + blank + heading + arguments + blank
-            Constraint::Length(top_rows),
-            Constraint::Min(8),
-            // border + notif + blank
-            Constraint::Length(bottom_rows),
-        ])
-        .split(frame.size());
+    let layout = Layout::new(Direction::Vertical, vec![
+        // border + blank + heading + arguments + blank
+        Constraint::Length(top_rows),
+        Constraint::Min(8),
+        // border + notif + blank
+        Constraint::Length(bottom_rows),
+    ])
+    .split(frame.size());
 
     let top_pane = layout[0];
     let preview_pane = layout[1];
