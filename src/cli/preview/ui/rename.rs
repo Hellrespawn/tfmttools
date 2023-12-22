@@ -8,7 +8,8 @@ use super::{
 };
 use crate::cli::preview::RenameData;
 
-const PRESS_Y_NOTIF: &str = "Press 'y' to rename or any other key to cancel.";
+const PRESS_Y_NOTIF: &str =
+    "Press Enter/return or 'y' to rename, or any other key to cancel.";
 
 /// Renders the user interface widgets.
 pub fn render_rename(data: &RenameData, frame: &mut Frame) {

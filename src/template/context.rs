@@ -7,6 +7,7 @@ use crate::audiofile::AudioFile;
 use crate::fs::FORBIDDEN_CHARACTERS;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum InterpolationMode {
     Normal,
     Safe,

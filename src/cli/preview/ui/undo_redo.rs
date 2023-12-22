@@ -6,6 +6,7 @@ use super::{
     add_top_border_to_paragraph, calculate_string_rows, create_layout,
     render_list, render_notification,
 };
+use crate::cli::commands::undo_redo::format_record;
 use crate::cli::preview::UndoRedoData;
 use crate::cli::HistoryMode;
 
@@ -66,13 +67,7 @@ fn render_title_and_arguments(
 }
 
 fn render_preview(data: &UndoRedoData, frame: &mut Frame, pane: Rect) {
-    let iter = data.records().iter().map(|record| {
-        if let Some(timestamp) = record.timestamp() {
-            format!("{} actions ({})", record.len(), timestamp)
-        } else {
-            format!("{} actions", record.len())
-        }
-    });
+    let iter = data.records().iter().map(format_record);
 
     render_list(frame, pane, data.actual(), iter);
 }

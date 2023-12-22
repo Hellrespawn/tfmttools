@@ -93,6 +93,14 @@ impl Action {
         matches!(self, Self::Move { .. })
     }
 
+    pub fn is_mk_dir(&self) -> bool {
+        matches!(self, Self::MakeDir(_))
+    }
+
+    pub fn is_rm_dir(&self) -> bool {
+        matches!(self, Self::RemoveDir(_))
+    }
+
     pub fn apply(&self, dry_run: bool) -> Result<()> {
         match self {
             Action::Move { source, target } => {
