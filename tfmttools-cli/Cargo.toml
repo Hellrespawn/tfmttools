@@ -1,0 +1,34 @@
+[package]
+authors = ["Stef Korporaal <stef@skorporaal.com>"]
+edition = "2021"
+license = "BSD-3-Clause"
+name = "tfmttools-cli"
+rust-version = "1.70"
+version = "0.15.0"
+
+[[bin]]
+name = "tfmt"
+path = "src/main.rs"
+
+[dependencies]
+tfmttools-core = { path = "../tfmttools-core" }
+tfmttools-history = { path = "../tfmttools-history" }
+tfmttools-tui = { path = "../tfmttools-tui" }
+
+camino = { version = "1.1", features = ["serde", "serde1"] }
+clap = { version = "4.4", features = ["derive", "wrap_help"] }
+color-eyre = "0.6"
+console = "0.15"
+dirs = "5.0"
+fs-err = "2.9"
+indicatif = { version = "0.17", features = ["improved_unicode"] }
+once_cell = "1"
+textwrap = "0.16"
+time = { version = "0.3", features = ["formatting"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+assert_cmd = "2.0"
+assert_fs = "1.0"

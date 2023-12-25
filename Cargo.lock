@@ -539,19 +539,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
-name = "history"
-version = "0.15.0"
-dependencies = [
- "bincode",
- "camino",
- "color-eyre",
- "fs-err",
- "serde",
- "time",
- "tracing",
-]
-
-[[package]]
 name = "ignore"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -667,9 +654,9 @@ dependencies = [
 
 [[package]]
 name = "lofty"
-version = "0.15.0"
+version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8143c1ac799df98778738e48e403990dcae27c9843f89ae0bd79967ddd512448"
+checksum = "e9d514acc39ec2bee7392e451db35e5f5eb06ab26e1cae83746c3017e8c95099"
 dependencies = [
  "base64",
  "byteorder",
@@ -1231,7 +1218,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tfmttools"
+name = "tfmttools-cli"
 version = "0.15.0"
 dependencies = [
  "assert_cmd",
@@ -1240,23 +1227,64 @@ dependencies = [
  "clap",
  "color-eyre",
  "console",
- "crossterm",
  "dirs",
  "fs-err",
- "history",
- "ignore",
  "indicatif",
- "lofty",
- "minijinja",
  "once_cell",
- "ratatui",
- "regex",
- "serde",
  "textwrap",
+ "tfmttools-core",
+ "tfmttools-history",
+ "tfmttools-tui",
  "time",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "tfmttools-core"
+version = "0.15.0"
+dependencies = [
+ "camino",
+ "color-eyre",
+ "fs-err",
+ "ignore",
+ "lofty",
+ "minijinja",
+ "once_cell",
+ "regex",
+ "serde",
+ "tfmttools-history",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "tfmttools-history"
+version = "0.15.0"
+dependencies = [
+ "bincode",
+ "camino",
+ "color-eyre",
+ "fs-err",
+ "serde",
+ "time",
+ "tracing",
+]
+
+[[package]]
+name = "tfmttools-tui"
+version = "0.15.0"
+dependencies = [
+ "camino",
+ "color-eyre",
+ "console",
+ "crossterm",
+ "ratatui",
+ "tfmttools-core",
+ "tfmttools-history",
+ "time",
+ "tracing",
 ]
 
 [[package]]

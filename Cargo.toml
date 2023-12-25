@@ -1,43 +1,9 @@
-[package]
-authors = ["Stef Korporaal <stef@skorporaal.com>"]
-default-run = "tfmt"
-description = "Tag Formatting Tools. Renames audio files according to their tags."
-edition = "2021"
-license = "BSD-3-Clause"
-name = "tfmttools"
-rust-version = "1.70"
-version = "0.15.0"
-
 [workspace]
-members = [".", "history"]
-
-[features]
-debug = []
-
-[dependencies]
-history = { path = "./history" }
-
-camino = { version = "1.1", features = ["serde", "serde1"] }
-clap = { version = "4.4", features = ["derive", "wrap_help"] }
-color-eyre = "0.6"
-console = "0.15"
-crossterm = "0.27"
-dirs = "5.0"
-fs-err = "2.9"
-ignore = "0.4"
-indicatif = { version = "0.17", features = ["improved_unicode"] }
-lofty = "0.15"
-minijinja = { version = "1.0", features = ["loader", "custom_syntax", "debug"] }
-once_cell = "1"
-ratatui = "0.25"
-regex = "1.10"
-serde = { version = "1.0", features = ["derive"] }
-textwrap = "0.16"
-time = { version = "0.3", features = ["formatting"] }
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[dev-dependencies]
-assert_cmd = "2.0"
-assert_fs = "1.0"
+members = [
+    "tfmttools-core",
+    "tfmttools-history",
+    "tfmttools-tui",
+    "tfmttools-cli",
+]
+default-members = ["tfmttools-cli"]
+resolver = "2"
