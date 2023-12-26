@@ -14,9 +14,6 @@ use crate::commands::clear_history::ClearHistory;
 
 pub const DRY_RUN_PREFIX: &str = "[D] ";
 
-const DEFAULT_RECURSION_DEPTH: usize = 4;
-const DEFAULT_HISTORY_FILENAME: &str = concat!(env!("CARGO_PKG_NAME"), ".hist");
-
 pub fn default_input_dir() -> Result<Utf8PathBuf> {
     let path = std::env::current_dir()?;
 
@@ -27,7 +24,7 @@ pub fn default_template_and_config_dir() -> Result<Utf8PathBuf> {
     let home =
         dirs::home_dir().ok_or(eyre!("Unable to determine home directory."))?;
 
-    let path = home.join(format!(".{}", env!("CARGO_PKG_NAME")));
+    let path = home.join(format!(".{}", crate::PKG_NAME));
 
     Ok(path.clone().try_into()?)
 }
@@ -68,14 +65,11 @@ impl Config {
                     rename.custom_template_directory,
                 )?;
 
-                let recursion_depth =
-                    rename.recursion_depth.unwrap_or(DEFAULT_RECURSION_DEPTH);
-
                 Box::new(Rename::new(
                     input_dir,
                     template_directory,
                     rename.force,
-                    recursion_depth,
+                    rename.recursion_depth,
                     rename.template,
                     rename.arguments,
                 ))
@@ -114,7 +108,8 @@ impl Config {
     }
 
     pub fn history_file(&self) -> Utf8PathBuf {
-        self.config_directory.join(DEFAULT_HISTORY_FILENAME)
+        let filename = format!("{}.hist", crate::PKG_NAME);
+        self.config_directory.join(filename)
     }
 
     fn get_input_directory(

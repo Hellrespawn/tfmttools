@@ -1,4 +1,4 @@
-{# Stef's personal script. `args[0]` is a directory prefix. #}
+{# Stef's personal script. `args[0]` should be a directory prefix with trailing slash. #}
 {{- args[0] -}}
 {{- albumartist or artist -}}
 /

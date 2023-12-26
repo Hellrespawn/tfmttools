@@ -13,6 +13,8 @@ use super::Command;
 use crate::ui::{ProgressBar, ProgressBarOptions};
 use crate::util::PathOrString;
 
+const DEFAULT_RECURSION_DEPTH: usize = 4;
+
 #[derive(Debug)]
 pub struct Rename {
     input_directory: Utf8PathBuf,
@@ -31,7 +33,7 @@ impl Rename {
         input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
         force: bool,
-        recursion_depth: usize,
+        recursion_depth: Option<usize>,
         template: PathOrString,
         arguments: Vec<String>,
     ) -> Self {
@@ -39,7 +41,7 @@ impl Rename {
             input_directory,
             template_directory,
             force,
-            recursion_depth,
+            recursion_depth: recursion_depth.unwrap_or(DEFAULT_RECURSION_DEPTH),
             template,
             arguments,
         }

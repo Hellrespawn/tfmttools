@@ -19,6 +19,7 @@ use console::Term;
 use once_cell::sync::Lazy;
 
 pub static TERM: Lazy<Term> = Lazy::new(Term::stdout);
+pub const PKG_NAME: &str = "tfmttools";
 
 #[cfg(feature = "debug")]
 mod debug;

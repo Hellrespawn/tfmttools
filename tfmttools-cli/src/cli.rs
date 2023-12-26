@@ -6,8 +6,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, registry, EnvFilter};
 
 use super::config::Config;
-use super::TERM;
 use crate::args::Args;
+use crate::TERM;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
@@ -43,7 +43,7 @@ fn init_tracing() -> Option<WorkerGuard> {
     if std::env::var_os(LOG_ENV_VAR).is_some() {
         let file_appender = tracing_appender::rolling::never(
             std::env::current_dir().expect("Unable to get current directory."),
-            format!("{}.log", env!("CARGO_PKG_NAME")),
+            format!("{}.log", crate::PKG_NAME),
         );
 
         let (non_blocking, guard) =

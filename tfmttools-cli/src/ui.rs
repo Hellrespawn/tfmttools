@@ -6,8 +6,6 @@ use indicatif::{
 
 use super::config::DRY_RUN_PREFIX;
 
-pub mod table;
-
 pub struct ProgressBarOptions {
     style: ProgressStyle,
     draw_target: ProgressDrawTarget,

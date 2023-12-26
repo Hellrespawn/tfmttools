@@ -1,4 +1,9 @@
+use std::io::Write;
+
 use camino::Utf8PathBuf;
+use color_eyre::Result;
+
+use crate::TERM;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PathOrString {

@@ -1,10 +1,10 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
+use textwrap::Options;
 use tfmttools_core::templates::{Template, TemplateLoader};
 
 use super::Command;
-use crate::config::Config;
-use crate::ui::table::Table;
+use crate::{config::Config, TERM};
 
 #[derive(Debug)]
 pub struct ListTemplates {
@@ -19,11 +19,17 @@ impl ListTemplates {
     fn format_template(template: &Template) -> String {
         let name = template.name();
 
-        if let Some(description) = template.description() {
+        let string = if let Some(description) = template.description() {
             format!("{name}: {description}")
         } else {
             name.to_owned()
-        }
+        };
+
+        textwrap::fill(
+            &string,
+            Options::new(TERM.size().1 as usize)
+                .subsequent_indent(&" ".repeat(name.len() + 2)),
+        )
     }
 }
 
@@ -34,25 +40,15 @@ impl Command for ListTemplates {
 
         let all_templates = templates.get_all_templates();
 
-        let mut table = Table::new();
-
-        if all_templates.is_empty() {
-            table.set_heading(format!(
-                "Couldn't find any templates at {} or in the current directory.",
-                self.template_directory
-            ));
-        } else {
-            table.set_heading(format!(
-                "Found {} templates",
-                all_templates.len()
-            ));
+        match all_templates.len() {
+            0 => println!("Couldn't find any templates at {} or in the current directory.", self.template_directory),
+            1 => println!("Found 1 template:"),
+            other => println!("Found {other} templates:")
         }
 
         for template in all_templates {
-            table.push_string(Self::format_template(&template));
+            println!("{}", Self::format_template(&template));
         }
-
-        println!("{table}");
 
         Ok(())
     }
