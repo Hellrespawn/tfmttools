@@ -35,10 +35,10 @@ impl ListTemplates {
 
 impl Command for ListTemplates {
     fn run(&self, _config: &Config) -> Result<()> {
-        let templates =
+        let loader =
             TemplateLoader::read_directory(&self.template_directory)?;
 
-        let all_templates = templates.get_all_templates();
+        let all_templates = loader.get_all_templates();
 
         match all_templates.len() {
             0 => println!("Couldn't find any templates at {} or in the current directory.", self.template_directory),

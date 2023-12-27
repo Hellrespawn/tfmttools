@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use clap::{Args as ClapArgs, Parser, Subcommand as ClapSubcommand};
 
-use crate::util::PathOrString;
+use crate::util::FileOrName;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -60,7 +60,7 @@ pub struct Rename {
     #[arg(short, long)]
     pub recursion_depth: Option<usize>,
 
-    pub template: PathOrString,
+    pub template: FileOrName,
 
     pub arguments: Vec<String>,
 }

@@ -21,12 +21,12 @@ impl<'tl> TemplateLoader<'tl> {
 
         let iter = PathIterator::new(template_directory, None)
             .flatten()
-            .filter(|path| Self::path_predicate(path));
+            .filter(|path| Self::path_is_template(path));
 
         for template_path in iter {
             let name = template_path
                 .file_stem()
-                .expect("Template::path_predicate should only return files.")
+                .expect("Template::path_is_template should only return files.")
                 .to_owned();
 
             template_names.push(name.clone());
@@ -94,7 +94,7 @@ impl<'tl> TemplateLoader<'tl> {
         }
     }
 
-    fn path_predicate(path: &Utf8Path) -> bool {
+    fn path_is_template(path: &Utf8Path) -> bool {
         path.extension().map_or(false, |string| {
             TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
         })

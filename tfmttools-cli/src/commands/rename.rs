@@ -11,7 +11,7 @@ use tfmttools_tui::{preview, PreviewData};
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 use crate::ui::{ProgressBar, ProgressBarOptions};
-use crate::util::PathOrString;
+use crate::util::FileOrName;
 
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 
@@ -24,7 +24,7 @@ pub struct Rename {
 
     recursion_depth: usize,
 
-    template: PathOrString,
+    template: FileOrName,
     arguments: Vec<String>,
 }
 
@@ -34,7 +34,7 @@ impl Rename {
         template_directory: Utf8PathBuf,
         force: bool,
         recursion_depth: Option<usize>,
-        template: PathOrString,
+        template: FileOrName,
         arguments: Vec<String>,
     ) -> Self {
         Self {
@@ -61,18 +61,18 @@ struct InnerRename<'ir> {
 
 impl<'a> InnerRename<'a> {
     pub fn rename(&self) -> Result<()> {
-        let templates = match &self.options.template {
-            PathOrString::Path(path, string) => {
+        let loader = match &self.options.template {
+            FileOrName::File(path, string) => {
                 TemplateLoader::read_filename(path, string)
             },
-            PathOrString::String(_) => {
+            FileOrName::Name(_) => {
                 TemplateLoader::read_directory(&self.options.template_directory)
             },
         }?;
 
         let template_name = self.options.template.as_str();
 
-        let template = templates
+        let template = loader
             .get_template(template_name, self.options.arguments.clone())
             .ok_or(eyre!("Unable to find template: {}", template_name))?;
 

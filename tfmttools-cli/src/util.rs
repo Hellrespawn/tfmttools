@@ -1,32 +1,27 @@
-use std::io::Write;
-
 use camino::Utf8PathBuf;
-use color_eyre::Result;
-
-use crate::TERM;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum PathOrString {
-    Path(Utf8PathBuf, String),
-    String(String),
+pub enum FileOrName {
+    File(Utf8PathBuf, String),
+    Name(String),
 }
 
-impl From<String> for PathOrString {
+impl From<String> for FileOrName {
     fn from(string: String) -> Self {
         let path = Utf8PathBuf::from(&string);
 
         if path.is_file() {
-            Self::Path(path, string)
+            Self::File(path, string)
         } else {
-            Self::String(string)
+            Self::Name(string)
         }
     }
 }
 
-impl PathOrString {
+impl FileOrName {
     pub fn as_str(&self) -> &str {
         match self {
-            PathOrString::String(s) | PathOrString::Path(_, s) => s,
+            FileOrName::Name(s) | FileOrName::File(_, s) => s,
         }
     }
 }
