@@ -70,6 +70,13 @@ fn hide_cursor() {
         default_panic(info);
     }));
 
+    ctrlc::set_handler(|| {
+        show_cursor();
+        println!();
+        std::process::exit(-1);
+    })
+    .expect("Unable to intercept Ctrl-c.");
+
     let _ = TERM.hide_cursor();
 }
 
