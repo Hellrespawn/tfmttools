@@ -1,10 +1,12 @@
+use std::io::{BufRead, Write};
+
 use color_eyre::Result;
 use indicatif::{
-    ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressFinish,
-    ProgressStyle,
+    ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
 
 use super::config::DRY_RUN_PREFIX;
+use crate::TERM;
 
 pub struct ProgressBarOptions {
     style: ProgressStyle,
@@ -89,7 +91,6 @@ impl ProgressBar {
 
         let inner =
             IndicatifProgressBar::with_draw_target(Some(length), draw_target)
-                .with_finish(ProgressFinish::Abandon)
                 .with_style(style)
                 .with_message(working_message);
 
@@ -106,6 +107,115 @@ impl ProgressBar {
 
     pub fn finish(&self) {
         self.inner.set_message(self.finished_message);
-        self.inner.finish();
+        self.inner.abandon();
+    }
+}
+
+pub struct ConfirmationPrompt<'cp> {
+    prompt: &'cp str,
+    error_prompt: &'cp str,
+    default: bool,
+}
+
+impl<'cp> ConfirmationPrompt<'cp> {
+    const ERROR_PROMPT: &'static str = "Please enter 'y' or 'n' (y/N)";
+
+    pub fn new(prompt: &'cp str) -> Self {
+        Self { prompt, error_prompt: Self::ERROR_PROMPT, default: false }
+    }
+
+    pub fn prompt(&self) -> Result<bool> {
+        let stdin = std::io::stdin();
+        let mut stdout = std::io::stdout();
+
+        print!("{} {} ", self.prompt, self.get_options());
+        stdout.flush()?;
+
+        loop {
+            let mut input = String::new();
+
+            stdin.lock().read_line(&mut input)?;
+
+            match input.trim().to_lowercase().as_str() {
+                "y" | "yes" => return Ok(true),
+                "n" | "no" => return Ok(false),
+                "" => return Ok(self.default),
+                _ => {
+                    print!("{} {} ", self.error_prompt, self.get_options());
+                    stdout.flush()?;
+                },
+            }
+        }
+    }
+
+    fn get_options(&self) -> &'static str {
+        if self.default {
+            "(Y/n)"
+        } else {
+            "(y/N)"
+        }
+    }
+}
+
+pub struct PreviewList<S, I>
+where
+    S: ToString,
+    I: Iterator<Item = S>,
+{
+    iter: I,
+    total: usize,
+    leading_lines: usize,
+    trailing_lines: usize,
+}
+
+impl<S, I> PreviewList<S, I>
+where
+    S: ToString,
+    I: Iterator<Item = S>,
+{
+    const MIN_PREVIEW_AMOUNT: usize = 8;
+
+    pub fn new(
+        iter: I,
+        total: usize,
+        leading_lines: usize,
+        trailing_lines: usize,
+    ) -> Self {
+        Self { iter, total, leading_lines, trailing_lines }
+    }
+
+    pub fn print(self) {
+        let padding = self.leading_lines + self.trailing_lines;
+
+        let preview_amount = std::cmp::max(
+            Self::MIN_PREVIEW_AMOUNT,
+            TERM.size().0 as usize
+                - self.leading_lines
+                - self.trailing_lines
+                - padding,
+        );
+
+        if self.total > preview_amount {
+            println!("Previewing {} of {} items:", preview_amount, self.total);
+        } else {
+            println!("Previewing {} items:", self.total);
+        };
+
+        let step = self.total.div_ceil(preview_amount);
+
+        let iter = self
+            .iter
+            .enumerate()
+            .map(|(index, item)| (index + 1, item))
+            .step_by(step)
+            .take(preview_amount);
+
+        let enumeration_width = self.total.to_string().len();
+
+        for (index, item) in iter {
+            print!("{index:>enumeration_width$}) ");
+
+            println!("{}", item.to_string());
+        }
     }
 }

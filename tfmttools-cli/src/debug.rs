@@ -7,7 +7,7 @@ static DELAY: Lazy<Duration> = Lazy::new(|| {
         std::env::var("DEBUG_DELAY_MS")
             .unwrap_or_default()
             .parse::<u64>()
-            .unwrap_or(0),
+            .unwrap_or(200),
     )
 });
 

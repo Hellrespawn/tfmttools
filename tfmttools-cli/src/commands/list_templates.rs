@@ -4,7 +4,8 @@ use textwrap::Options;
 use tfmttools_core::templates::{Template, TemplateLoader};
 
 use super::Command;
-use crate::{config::Config, TERM};
+use crate::config::Config;
+use crate::TERM;
 
 #[derive(Debug)]
 pub struct ListTemplates {
@@ -35,8 +36,7 @@ impl ListTemplates {
 
 impl Command for ListTemplates {
     fn run(&self, _config: &Config) -> Result<()> {
-        let loader =
-            TemplateLoader::read_directory(&self.template_directory)?;
+        let loader = TemplateLoader::read_directory(&self.template_directory)?;
 
         let all_templates = loader.get_all_templates();
 

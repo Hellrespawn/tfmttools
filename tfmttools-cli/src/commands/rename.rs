@@ -1,4 +1,4 @@
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use tfmttools_core::action::{validate_move_actions, Action, Move};
@@ -6,11 +6,12 @@ use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::fs::{self, PathIterator, RemoveDirResult};
 use tfmttools_core::templates::{Template, TemplateLoader};
 use tfmttools_history::{History, SaveHistoryResult};
-use tfmttools_tui::{preview, PreviewData};
 
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
-use crate::ui::{ProgressBar, ProgressBarOptions};
+use crate::ui::{
+    ConfirmationPrompt, PreviewList, ProgressBar, ProgressBarOptions,
+};
 use crate::util::FileOrName;
 
 const DEFAULT_RECURSION_DEPTH: usize = 4;
@@ -87,16 +88,8 @@ impl<'a> InnerRename<'a> {
         } else {
             Self::validate_move_actions(&move_actions)?;
 
-            let cwd = self.config.working_directory()?;
-
-            let app_data = PreviewData::rename(
-                template.name(),
-                &self.options.arguments,
-                &move_actions,
-                &cwd,
-            );
-
-            let confirmation = self.options.force || preview(&app_data)?;
+            let confirmation = self.options.force
+                || self.confirm_move_actions(&move_actions)?;
 
             if confirmation {
                 let actions = self.perform_move_actions(move_actions)?;
@@ -147,6 +140,8 @@ impl<'a> InnerRename<'a> {
         template: &Template,
         files: &[AudioFile],
     ) -> Result<Vec<Move>> {
+        let cwd = self.config.working_directory()?;
+
         let options = ProgressBarOptions::bar(
             self.config.dry_run(),
             "Determining output paths:",
@@ -160,10 +155,7 @@ impl<'a> InnerRename<'a> {
             .map(|audiofile| {
                 Ok(Move::new(
                     audiofile.path().to_owned(),
-                    audiofile.construct_target_path(
-                        template,
-                        &self.options.input_directory,
-                    )?,
+                    audiofile.construct_target_path(template, &cwd)?,
                 ))
             })
             .inspect(|_| {
@@ -177,7 +169,6 @@ impl<'a> InnerRename<'a> {
         bar.finish();
 
         println!();
-        println!();
 
         move_actions
     }
@@ -190,6 +181,44 @@ impl<'a> InnerRename<'a> {
         } else {
             Err(eyre!("Had validation errors:"))
         }
+    }
+
+    fn confirm_move_actions(&self, move_actions: &[Move]) -> Result<bool> {
+        let cwd = self.config.working_directory()?;
+
+        Self::preview_move_actions(move_actions, &cwd);
+
+        let confirmation_prompt = ConfirmationPrompt::new("Move files?");
+
+        confirmation_prompt.prompt()
+    }
+
+    fn preview_move_actions(
+        move_actions: &[Move],
+        working_directory: &Utf8Path,
+    ) {
+        const LEADING_LINES: usize = 3;
+        const TRAILING_LINES: usize = 3;
+
+        let iter = move_actions.iter().map(|move_action| {
+            let path = move_action
+                .target()
+                .strip_prefix(working_directory)
+                .unwrap_or(move_action.target());
+
+            if path.is_relative() {
+                format!(".{}{path}", std::path::MAIN_SEPARATOR)
+            } else {
+                format!("{path}")
+            }
+        });
+
+        let total_items = move_actions.len();
+
+        let preview_list =
+            PreviewList::new(iter, total_items, LEADING_LINES, TRAILING_LINES);
+
+        preview_list.print();
     }
 
     fn perform_move_actions(

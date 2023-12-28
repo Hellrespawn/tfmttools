@@ -10,6 +10,9 @@ version = "0.15.0"
 name = "tfmt"
 path = "src/main.rs"
 
+[features]
+debug = []
+
 [dependencies]
 tfmttools-core = { path = "../tfmttools-core" }
 tfmttools-history = { path = "../tfmttools-history" }
