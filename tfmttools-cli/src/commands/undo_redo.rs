@@ -1,10 +1,10 @@
 use color_eyre::Result;
 use tfmttools_core::action::Action;
-use tfmttools_core::util::format_record;
-use tfmttools_history::{History, HistoryMode, LoadHistoryResult, Record};
+use tfmttools_history::{History, HistoryMode, LoadHistoryResult};
 
 use super::super::config::Config;
 use super::Command;
+use crate::history::ActionRecord;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
@@ -85,15 +85,17 @@ fn get_records(
     history: &mut History<Action>,
     mode: HistoryMode,
     amount: usize,
-) -> Vec<&Record<Action>> {
-    match mode {
+) -> Vec<ActionRecord> {
+    let records: Vec<_> = match mode {
         HistoryMode::Undo => history.get_records_to_undo(amount).collect(),
         HistoryMode::Redo => history.get_records_to_redo(amount).collect(),
-    }
+    };
+
+    records.into_iter().map(ActionRecord::from_record).collect()
 }
 
 fn confirm_undo_redo(
-    records: &[&Record<Action>],
+    records: &[ActionRecord],
     amount: usize,
     mode: HistoryMode,
 ) -> Result<bool> {
@@ -113,11 +115,11 @@ fn confirm_undo_redo(
     confirmation_prompt.prompt()
 }
 
-fn preview_undo_redo(records: &[&Record<Action>]) {
+fn preview_undo_redo(records: &[ActionRecord]) {
     const LEADING_LINES: usize = 3;
     const TRAILING_LINES: usize = 3;
 
-    let iter = records.iter().map(|r| format_record(r));
+    let iter = records.iter().map(std::string::ToString::to_string);
 
     let preview_list = PreviewList::new(iter)
         .leading(LEADING_LINES)
@@ -128,33 +130,26 @@ fn preview_undo_redo(records: &[&Record<Action>]) {
 }
 
 fn perform_undo_redo_actions(
-    records: &[&Record<Action>],
+    records: &[ActionRecord],
     dry_run: bool,
     mode: HistoryMode,
 ) -> Result<()> {
-    match mode {
-        HistoryMode::Undo => {
-            for record in records {
-                println!("Undoing {}...", format_record(record));
+    for record in records {
+        println!("{}ing {}...", mode.verb_capitalized(), record);
 
-                for action in record.iter().rev() {
-                    action.undo(dry_run)?;
-                }
+        let actions: Vec<&Action> = match mode {
+            HistoryMode::Undo => record.iter().rev().collect(),
+            HistoryMode::Redo => record.iter().collect(),
+        };
+
+        for action in actions {
+            match mode {
+                HistoryMode::Undo => action.undo(dry_run)?,
+                HistoryMode::Redo => action.redo(dry_run)?,
             }
+        }
 
-            println!("Done.");
-        },
-        HistoryMode::Redo => {
-            for record in records {
-                println!("Redoing {}...", format_record(record));
-
-                for action in record.iter() {
-                    action.redo(dry_run)?;
-                }
-            }
-
-            println!("Done.");
-        },
+        println!("Done.");
     }
 
     Ok(())

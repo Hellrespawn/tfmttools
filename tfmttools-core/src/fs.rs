@@ -188,7 +188,7 @@ pub fn remove_empty_subdirectories(
         .map(|p| {
             let removed = remove_dir(dry_run, &p)?;
 
-            trace!("Removing dir: {p}\n{removed:?}");
+            trace!("Removing dir: {p} => {removed:?}");
 
             Ok((p, removed))
         })

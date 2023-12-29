@@ -32,7 +32,7 @@ pub fn default_template_and_config_dir() -> Result<Utf8PathBuf> {
 /// Holds application-wide command line arguments.
 #[derive(Debug)]
 pub struct Config {
-    config_directory: Utf8PathBuf,
+    directory: Utf8PathBuf,
     dry_run: bool,
     command: Box<dyn Command>,
 }
@@ -97,7 +97,7 @@ impl Config {
             },
         };
 
-        Ok(Config { config_directory, dry_run, command })
+        Ok(Config { directory: config_directory, dry_run, command })
     }
 
     #[allow(clippy::unused_self)]
@@ -109,7 +109,7 @@ impl Config {
 
     pub fn history_file(&self) -> Utf8PathBuf {
         let filename = format!("{}.hist", crate::PKG_NAME);
-        self.config_directory.join(filename)
+        self.directory.join(filename)
     }
 
     fn get_input_directory(

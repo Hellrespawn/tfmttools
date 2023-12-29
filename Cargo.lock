@@ -1097,7 +1097,6 @@ name = "tfmttools-core"
 version = "0.15.0"
 dependencies = [
  "camino",
- "chrono",
  "color-eyre",
  "fs-err",
  "ignore",
