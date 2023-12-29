@@ -2,7 +2,6 @@
 members = [
     "tfmttools-core",
     "tfmttools-history",
-    "tfmttools-tui",
     "tfmttools-cli",
 ]
 default-members = ["tfmttools-cli"]
