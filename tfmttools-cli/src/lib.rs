@@ -1,11 +1,10 @@
-// #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
 //#![warn(clippy::cargo)]
-//#![allow(clippy::must_use_candidate)]
+// #![warn(missing_docs)]
+
 #![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::module_name_repetitions)]
-#![allow(clippy::must_use_candidate)]
+// #![allow(dead_code)]
 
 mod args;
 mod commands;

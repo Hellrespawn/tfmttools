@@ -6,11 +6,12 @@ use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::fs::{self, PathIterator, RemoveDirResult};
 use tfmttools_core::templates::{Template, TemplateLoader};
 use tfmttools_history::{History, SaveHistoryResult};
+use tracing::debug;
 
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 use crate::ui::{
-    ConfirmationPrompt, PreviewList, ProgressBar, ProgressBarOptions,
+    ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
 };
 use crate::util::FileOrName;
 
@@ -213,10 +214,10 @@ impl<'a> InnerRename<'a> {
             }
         });
 
-        let total_items = move_actions.len();
-
-        let preview_list =
-            PreviewList::new(iter, total_items, LEADING_LINES, TRAILING_LINES);
+        let preview_list = PreviewList::new(iter)
+            .leading(LEADING_LINES)
+            .trailing(TRAILING_LINES)
+            .item_name(ItemName::simple("file"));
 
         preview_list.print();
     }
@@ -234,6 +235,8 @@ impl<'a> InnerRename<'a> {
         if self.config.dry_run() {
             print!("{DRY_RUN_PREFIX}");
         }
+
+        debug!("Common prefix of path: {:?}", common_prefix);
 
         if let Some(common_path) = common_prefix {
             let removed = fs::remove_empty_subdirectories(

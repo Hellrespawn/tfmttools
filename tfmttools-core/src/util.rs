@@ -17,36 +17,40 @@ pub fn normalize_separators(string: &str) -> String {
 }
 
 pub fn format_record(record: &Record<Action>) -> String {
+    let summary = format_action_summary(record);
+
+    if let Some(timestamp) = record.timestamp() {
+        format!(
+            "{} ({summary}) ",
+            timestamp
+                .format(&DATE_FORMAT)
+                .expect("Unable to format timestamp.")
+        )
+    } else {
+        summary
+    }
+}
+
+fn format_action_summary(record: &Record<Action>) -> String {
     let no_of_moves = record.items().iter().filter(|a| a.is_move()).count();
 
     let no_of_mk_dirs = record.items().iter().filter(|a| a.is_mk_dir()).count();
 
     let no_of_rm_dirs = record.items().iter().filter(|a| a.is_rm_dir()).count();
 
-    let mut string = format!("[{}] ", record.len());
+    let mut strings = Vec::new();
 
     if no_of_mk_dirs > 1 {
-        string += &format!("{no_of_mk_dirs} created directories, ");
+        strings.push(format!("{no_of_mk_dirs} created directories"));
     }
 
     if no_of_moves > 1 {
-        string += &format!("{no_of_moves} moved files, ");
+        strings.push(format!("{no_of_moves} moved files"));
     }
 
     if no_of_rm_dirs > 1 {
-        string += &format!("{no_of_rm_dirs} removed directories, ");
+        strings.push(format!("{no_of_rm_dirs} removed directories"));
     }
 
-    string = string[0..string.len() - 2].to_owned();
-
-    if let Some(timestamp) = record.timestamp() {
-        string += &format!(
-            " ({})",
-            timestamp
-                .format(&DATE_FORMAT)
-                .expect("Unable to format timestamp.")
-        );
-    }
-
-    string
+    strings.join(", ")
 }

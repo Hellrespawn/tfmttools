@@ -6,8 +6,6 @@ use fs_err as fs;
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
 
-// TODO? Interactive screen for seed?
-
 struct DefaultFile {
     name: &'static str,
     content: &'static str,

@@ -6,6 +6,7 @@ use color_eyre::Result;
 use fs_err as fs;
 use ignore::{Walk, WalkBuilder};
 use once_cell::sync::Lazy;
+use tracing::trace;
 
 pub static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
     Lazy::new(|| {
@@ -122,6 +123,7 @@ pub fn create_dir(dry_run: bool, path: &Utf8Path) -> Result<CreateDirResult> {
     }
 }
 
+#[derive(Debug)]
 pub enum RemoveDirResult {
     Removed,
     NotEmpty,
@@ -182,8 +184,11 @@ pub fn remove_empty_subdirectories(
 ) -> Result<Vec<(Utf8PathBuf, RemoveDirResult)>> {
     let dirs = gather_subdirectories(path, recursion_depth)
         .into_iter()
+        .rev()
         .map(|p| {
             let removed = remove_dir(dry_run, &p)?;
+
+            trace!("Removing dir: {p}\n{removed:?}");
 
             Ok((p, removed))
         })

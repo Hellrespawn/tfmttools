@@ -1,30 +1,85 @@
 use crate::TERM;
 
-pub struct PreviewList<S, I>
+pub struct ItemName<'i> {
+    single: &'i str,
+    plural: Option<&'i str>,
+}
+
+impl<'i> ItemName<'i> {
+    pub fn simple(single: &'i str) -> Self {
+        Self { single, plural: None }
+    }
+
+    pub fn new(single: &'i str, plural: &'i str) -> Self {
+        Self { single, plural: Some(plural) }
+    }
+
+    pub fn single(&self) -> String {
+        self.single.to_owned()
+    }
+
+    pub fn plural(&self) -> String {
+        self.plural.map_or(
+            format!("{}s", self.single()),
+            std::borrow::ToOwned::to_owned,
+        )
+    }
+
+    pub fn by_amount(&self, amount: usize) -> String {
+        if amount == 1 {
+            self.single()
+        } else {
+            self.plural()
+        }
+    }
+}
+
+impl<'i> Default for ItemName<'i> {
+    fn default() -> Self {
+        Self { single: "item", plural: None }
+    }
+}
+
+pub struct PreviewList<'s, S, I>
 where
     S: ToString,
-    I: Iterator<Item = S>,
+    I: ExactSizeIterator<Item = S>,
 {
     iter: I,
-    total: usize,
+    item_name: ItemName<'s>,
     leading_lines: usize,
     trailing_lines: usize,
 }
 
-impl<S, I> PreviewList<S, I>
+impl<'s, S, I> PreviewList<'s, S, I>
 where
     S: ToString,
-    I: Iterator<Item = S>,
+    I: ExactSizeIterator<Item = S>,
 {
     const MIN_PREVIEW_AMOUNT: usize = 8;
 
-    pub fn new(
-        iter: I,
-        total: usize,
-        leading_lines: usize,
-        trailing_lines: usize,
-    ) -> Self {
-        Self { iter, total, leading_lines, trailing_lines }
+    pub fn new(iter: I) -> Self {
+        Self {
+            iter,
+            item_name: ItemName::default(),
+            leading_lines: 0,
+            trailing_lines: 0,
+        }
+    }
+
+    pub fn leading(mut self, leading_lines: usize) -> Self {
+        self.leading_lines = leading_lines;
+        self
+    }
+
+    pub fn trailing(mut self, trailing_lines: usize) -> Self {
+        self.trailing_lines = trailing_lines;
+        self
+    }
+
+    pub fn item_name(mut self, item_name: ItemName<'s>) -> Self {
+        self.item_name = item_name;
+        self
     }
 
     pub fn print(self) {
@@ -38,13 +93,18 @@ where
                 - padding,
         );
 
-        if self.total > preview_amount {
-            println!("Previewing {} of {} items:", preview_amount, self.total);
+        let total = self.iter.len();
+
+        if total > preview_amount {
+            println!(
+                "Previewing {preview_amount} of {total} {}:",
+                self.item_name.by_amount(total)
+            );
         } else {
-            println!("Previewing {} items:", self.total);
+            println!("Previewing {total} {}:", self.item_name.by_amount(total));
         };
 
-        let step = self.total.div_ceil(preview_amount);
+        let step = total.div_ceil(preview_amount);
 
         let iter = self
             .iter
@@ -53,7 +113,7 @@ where
             .step_by(step)
             .take(preview_amount);
 
-        let enumeration_width = self.total.to_string().len();
+        let enumeration_width = total.to_string().len();
 
         for (index, item) in iter {
             print!("{index:>enumeration_width$}) ");

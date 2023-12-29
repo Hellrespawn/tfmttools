@@ -28,13 +28,9 @@ pub fn main() -> Result<()> {
 
     debug!("Configuration:\n{:#?}", config);
 
-    hide_cursor();
+    install_restore_cursor_hooks();
 
-    let result = config.command().run(&config);
-
-    show_cursor();
-
-    result
+    config.command().run(&config)
 }
 
 // Initialize logger. if `TFMT_LOG` is set, write the log to the current
@@ -60,9 +56,8 @@ fn init_tracing() -> Option<WorkerGuard> {
     }
 }
 
-/// Add a custom hook that restores the cursor on panic, then hide the cursor.
-/// Ignore the result.
-fn hide_cursor() {
+/// Add a custom hook that restores the cursor on panic or SIGINT
+fn install_restore_cursor_hooks() {
     let default_panic = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |info| {
@@ -76,8 +71,6 @@ fn hide_cursor() {
         std::process::exit(-1);
     })
     .expect("Unable to intercept Ctrl-c.");
-
-    let _ = TERM.hide_cursor();
 }
 
 /// Make the cursor visible again, ignoring the result.

@@ -3,6 +3,8 @@ use indicatif::{
     ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
 
+use crate::TERM;
+
 use super::super::config::DRY_RUN_PREFIX;
 
 pub struct ProgressBarOptions {
@@ -64,6 +66,8 @@ impl ProgressBarOptions {
         #[cfg(not(test))]
         let draw_target = ProgressDrawTarget::stderr();
 
+        let _ = TERM.hide_cursor();
+
         Ok(Self { style, draw_target, working_message, finished_message })
     }
 }
@@ -105,5 +109,7 @@ impl ProgressBar {
     pub fn finish(&self) {
         self.inner.set_message(self.finished_message);
         self.inner.abandon();
+
+        let _ = TERM.show_cursor();
     }
 }

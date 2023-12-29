@@ -120,12 +120,18 @@ where
         Ok(())
     }
 
-    pub fn get_records_to_undo(&mut self, n: usize) -> &[Record<T>] {
-        self.stack.pop_refs(n)
+    pub fn get_records_to_undo(
+        &mut self,
+        n: usize,
+    ) -> impl ExactSizeIterator<Item = &Record<T>> {
+        self.stack.pop_refs(n).iter().rev()
     }
 
-    pub fn get_records_to_redo(&mut self, n: usize) -> &[Record<T>] {
-        self.stack.unpop_refs(n)
+    pub fn get_records_to_redo(
+        &mut self,
+        n: usize,
+    ) -> impl ExactSizeIterator<Item = &Record<T>> {
+        self.stack.unpop_refs(n).iter()
     }
 
     pub fn path(&self) -> &str {
