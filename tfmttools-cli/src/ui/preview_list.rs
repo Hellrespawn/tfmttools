@@ -10,6 +10,7 @@ impl<'i> ItemName<'i> {
         Self { single, plural: None }
     }
 
+    #[allow(dead_code)]
     pub fn new(single: &'i str, plural: &'i str) -> Self {
         Self { single, plural: Some(plural) }
     }

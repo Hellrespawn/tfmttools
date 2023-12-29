@@ -13,6 +13,7 @@ debug = []
 tfmttools-history = { path = "../tfmttools-history" }
 
 camino = { version = "1.1", features = ["serde", "serde1"] }
+chrono = { version = "0.4", features = ["serde"] }
 color-eyre = "0.6"
 fs-err = "2.9"
 ignore = "0.4"
@@ -21,5 +22,4 @@ minijinja = { version = "1.0", features = ["loader", "custom_syntax", "debug"] }
 once_cell = "1"
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }
-time = { version = "0.3", features = ["formatting"] }
 tracing = "0.1"

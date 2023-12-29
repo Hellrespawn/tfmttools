@@ -3,10 +3,9 @@ use tfmttools_core::action::Action;
 use tfmttools_core::util::format_record;
 use tfmttools_history::{History, HistoryMode, LoadHistoryResult, Record};
 
-use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
-
 use super::super::config::Config;
 use super::Command;
+use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
 pub struct UndoRedo {

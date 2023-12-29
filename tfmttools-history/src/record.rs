@@ -1,16 +1,16 @@
+use chrono::{DateTime, Local};
 use color_eyre::Result;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Record<T> {
     items: Vec<T>,
-    timestamp: Option<OffsetDateTime>,
+    timestamp: Option<DateTime<Local>>,
 }
 
 impl<T> Record<T> {
     pub fn new(items: Vec<T>) -> Result<Self> {
-        Ok(Self { items, timestamp: Some(OffsetDateTime::now_utc()) })
+        Ok(Self { items, timestamp: Some(Local::now()) })
     }
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> {
@@ -29,7 +29,7 @@ impl<T> Record<T> {
         &self.items
     }
 
-    pub fn timestamp(&self) -> Option<OffsetDateTime> {
+    pub fn timestamp(&self) -> Option<DateTime<Local>> {
         self.timestamp
     }
 }

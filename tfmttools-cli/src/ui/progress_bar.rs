@@ -3,9 +3,8 @@ use indicatif::{
     ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
 
-use crate::TERM;
-
 use super::super::config::DRY_RUN_PREFIX;
+use crate::TERM;
 
 pub struct ProgressBarOptions {
     style: ProgressStyle,

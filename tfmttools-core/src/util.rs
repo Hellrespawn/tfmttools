@@ -1,13 +1,8 @@
-use once_cell::sync::Lazy;
 use tfmttools_history::Record;
-use time::format_description::{self, FormatItem};
 
 use crate::action::Action;
 
-static DATE_FORMAT: Lazy<Vec<FormatItem>> = Lazy::new(|| {
-    format_description::parse("[year]-[month]-[day] [hour]:[minute]:[second]")
-        .expect("Unable to parse date format.")
-});
+const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 pub fn normalize_separators(string: &str) -> String {
     string
@@ -20,12 +15,7 @@ pub fn format_record(record: &Record<Action>) -> String {
     let summary = format_action_summary(record);
 
     if let Some(timestamp) = record.timestamp() {
-        format!(
-            "{} ({summary}) ",
-            timestamp
-                .format(&DATE_FORMAT)
-                .expect("Unable to format timestamp.")
-        )
+        format!("{} ({summary}) ", timestamp.format(DATE_FORMAT))
     } else {
         summary
     }
