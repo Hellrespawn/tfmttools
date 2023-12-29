@@ -11,6 +11,7 @@ use super::commands::undo_redo::UndoRedo;
 use super::commands::Command;
 use crate::args::Subcommand;
 use crate::commands::clear_history::ClearHistory;
+use crate::commands::show_history::ShowHistory;
 
 pub const DRY_RUN_PREFIX: &str = "[D] ";
 
@@ -95,6 +96,7 @@ impl Config {
                     HistoryMode::Redo,
                 ))
             },
+            Subcommand::ShowHistory => Box::new(ShowHistory),
         };
 
         Ok(Config { directory: config_directory, dry_run, command })

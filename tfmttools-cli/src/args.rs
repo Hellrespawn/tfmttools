@@ -28,6 +28,8 @@ impl Args {
 pub enum Subcommand {
     #[command(name = "clear")]
     ClearHistory,
+    #[command(name = "history")]
+    ShowHistory,
     // ClearHistory(ClearHistory),
     #[command(name = "list")]
     ListTemplates(ListTemplates),
