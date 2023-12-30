@@ -96,7 +96,9 @@ impl Config {
                     HistoryMode::Redo,
                 ))
             },
-            Subcommand::ShowHistory => Box::new(ShowHistory),
+            Subcommand::ShowHistory(show_history) => {
+                Box::new(ShowHistory::new(show_history.verbose))
+            },
         };
 
         Ok(Config { directory: config_directory, dry_run, command })

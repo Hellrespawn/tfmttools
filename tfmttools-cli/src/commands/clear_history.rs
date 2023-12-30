@@ -7,6 +7,8 @@ use crate::config::{Config, DRY_RUN_PREFIX};
 #[derive(Debug)]
 pub struct ClearHistory;
 
+// TODO? Prompt for confirmation?
+
 impl Command for ClearHistory {
     fn run(&self, config: &Config) -> Result<()> {
         let path = &config.history_file();

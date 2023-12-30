@@ -4,8 +4,9 @@ use color_eyre::Result;
 use tfmttools_core::action::{validate_move_actions, Action, Move};
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::fs::{self, PathIterator, RemoveDirResult};
+use tfmttools_core::history::{ActionHistory, ActionRecordMetadata};
 use tfmttools_core::templates::{Template, TemplateLoader};
-use tfmttools_history::{History, SaveHistoryResult};
+use tfmttools_history::{History, Record, SaveHistoryResult};
 use tracing::debug;
 
 use super::super::config::{Config, DRY_RUN_PREFIX};
@@ -289,9 +290,17 @@ impl<'a> InnerRename<'a> {
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
         if !self.config.dry_run() {
-            let mut history = History::load(&self.config.history_file())?;
+            let mut history: ActionHistory =
+                History::load(&self.config.history_file())?.unwrap();
 
-            history.push(actions)?;
+            let metadata = ActionRecordMetadata::new(
+                self.options.template.as_str().to_owned(),
+                self.options.arguments.clone(),
+            );
+
+            let record = Record::with_metadata(actions, metadata);
+
+            history.push(record)?;
 
             if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
                 eprintln!(

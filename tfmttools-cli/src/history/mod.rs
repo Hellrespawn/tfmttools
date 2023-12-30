@@ -1,4 +1,3 @@
-mod action_record;
-mod record_summary;
+mod record_formatter;
 
-pub use action_record::ActionRecord;
+pub use record_formatter::{RecordFormat, RecordFormatter};

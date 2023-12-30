@@ -29,7 +29,7 @@ pub enum Subcommand {
     #[command(name = "clear")]
     ClearHistory,
     #[command(name = "history")]
-    ShowHistory,
+    ShowHistory(ShowHistory),
     // ClearHistory(ClearHistory),
     #[command(name = "list")]
     ListTemplates(ListTemplates),
@@ -41,6 +41,12 @@ pub enum Subcommand {
 
 #[derive(ClapArgs, Debug)]
 pub struct ClearHistory {}
+
+#[derive(ClapArgs, Debug)]
+pub struct ShowHistory {
+    #[arg(short, long)]
+    pub verbose: bool,
+}
 
 #[derive(ClapArgs, Debug)]
 pub struct ListTemplates {

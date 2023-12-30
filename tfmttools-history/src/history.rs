@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -11,33 +9,21 @@ use super::record::Record;
 use super::serde::HistorySerde;
 use super::stack::RefStack;
 
-pub enum LoadHistoryResult<T>
+pub enum LoadHistoryResult<T, M>
 where
     T: std::fmt::Debug + Serialize + DeserializeOwned,
+    M: std::fmt::Debug + Serialize + DeserializeOwned,
 {
-    Loaded(History<T>),
-    New(History<T>),
+    Loaded(History<T, M>),
+    New(History<T, M>),
 }
 
-impl<T> Deref for LoadHistoryResult<T>
+impl<T, M> LoadHistoryResult<T, M>
 where
     T: std::fmt::Debug + Serialize + DeserializeOwned,
+    M: std::fmt::Debug + Serialize + DeserializeOwned,
 {
-    type Target = History<T>;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            LoadHistoryResult::Loaded(history)
-            | LoadHistoryResult::New(history) => history,
-        }
-    }
-}
-
-impl<T> DerefMut for LoadHistoryResult<T>
-where
-    T: std::fmt::Debug + Serialize + DeserializeOwned,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
+    pub fn unwrap(self) -> History<T, M> {
         match self {
             LoadHistoryResult::Loaded(history)
             | LoadHistoryResult::New(history) => history,
@@ -50,19 +36,21 @@ pub enum SaveHistoryResult {
     Exists(Utf8PathBuf),
 }
 
-pub struct History<T>
+pub struct History<T, M>
 where
     T: std::fmt::Debug + Serialize + DeserializeOwned,
+    M: std::fmt::Debug + Serialize + DeserializeOwned,
 {
     path: Utf8PathBuf,
-    stack: RefStack<Record<T>>,
+    stack: RefStack<Record<T, M>>,
 }
 
-impl<T> History<T>
+impl<T, M> History<T, M>
 where
     T: std::fmt::Debug + Serialize + DeserializeOwned,
+    M: std::fmt::Debug + Serialize + DeserializeOwned,
 {
-    pub fn load(path: &Utf8Path) -> Result<LoadHistoryResult<T>> {
+    pub fn load(path: &Utf8Path) -> Result<LoadHistoryResult<T, M>> {
         let result = if path.is_file() {
             let body = fs::read(path)?;
 
@@ -114,23 +102,34 @@ where
         Ok(result)
     }
 
-    pub fn push(&mut self, items: Vec<T>) -> Result<()> {
-        let record = Record::new(items)?;
+    pub fn push(&mut self, record: Record<T, M>) -> Result<()> {
         self.stack.push(record);
         Ok(())
     }
 
     pub fn get_records_to_undo(
-        &mut self,
-        n: usize,
-    ) -> impl ExactSizeIterator<Item = &Record<T>> {
-        self.stack.pop_refs(n).iter().rev()
+        &self,
+    ) -> impl ExactSizeIterator<Item = &Record<T, M>> {
+        self.stack.get_unpopped_refs().iter().rev()
     }
 
     pub fn get_records_to_redo(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &Record<T, M>> {
+        self.stack.get_popped_refs().iter()
+    }
+
+    pub fn pop_records_to_undo(
         &mut self,
         n: usize,
-    ) -> impl ExactSizeIterator<Item = &Record<T>> {
+    ) -> impl ExactSizeIterator<Item = &Record<T, M>> {
+        self.stack.pop_refs(n).iter().rev()
+    }
+
+    pub fn unpop_records_to_redo(
+        &mut self,
+        n: usize,
+    ) -> impl ExactSizeIterator<Item = &Record<T, M>> {
         self.stack.unpop_refs(n).iter()
     }
 

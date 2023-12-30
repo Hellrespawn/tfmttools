@@ -5,21 +5,21 @@ use serde::{Deserialize, Serialize};
 /// Popped references can be unpopped until a new element is pushed, at which point all elements whose references where popped are discarded. The new element is pushed on top of these.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RefStack<T> {
-    inner: Vec<T>,
+    stack: Vec<T>,
     cursor: usize,
 }
 
 impl<T> RefStack<T> {
     /// Create a new `RefStack`
     pub fn new() -> Self {
-        Self { inner: Vec::new(), cursor: 0 }
+        Self { stack: Vec::new(), cursor: 0 }
     }
 
     /// Push a new item onto the stack. This removes any unpopped items.
     pub fn push(&mut self, item: T) {
-        self.inner.truncate(self.cursor);
-        self.inner.push(item);
-        self.cursor = self.inner.len();
+        self.stack.truncate(self.cursor);
+        self.stack.push(item);
+        self.cursor = self.stack.len();
     }
 
     #[cfg(test)]
@@ -27,9 +27,36 @@ impl<T> RefStack<T> {
     where
         I: IntoIterator<Item = T>,
     {
-        self.inner.truncate(self.cursor);
-        self.inner.extend(iter);
-        self.cursor = self.inner.len();
+        self.stack.truncate(self.cursor);
+        self.stack.extend(iter);
+        self.cursor = self.stack.len();
+    }
+
+    pub fn get_unpopped_refs(&self) -> &[T] {
+        let range = 0..self.cursor;
+
+        if range.is_empty() {
+            &[]
+        } else {
+            let items = self.stack.get(range);
+
+            items.unwrap_or_default()
+        }
+    }
+
+    pub fn get_popped_refs(&self) -> &[T] {
+        let start = self.cursor;
+        let end = self.stack.len();
+
+        let range = start..end;
+
+        if range.is_empty() {
+            &[]
+        } else {
+            let items = self.stack.get(start..end);
+
+            items.unwrap_or_default()
+        }
     }
 
     /// Pop up to `n` references
@@ -44,7 +71,7 @@ impl<T> RefStack<T> {
         } else {
             let amount = end - start;
 
-            let items = self.inner.get(start..end);
+            let items = self.stack.get(start..end);
 
             self.cursor = self.cursor.saturating_sub(amount);
 
@@ -55,7 +82,7 @@ impl<T> RefStack<T> {
     /// Unpop up to `n` references
     pub fn unpop_refs(&mut self, n: usize) -> &[T] {
         let start = self.cursor;
-        let end = std::cmp::min(self.cursor + n, self.inner.len());
+        let end = std::cmp::min(self.cursor + n, self.stack.len());
 
         let range = start..end;
 
@@ -64,7 +91,7 @@ impl<T> RefStack<T> {
         } else {
             let amount = end - start;
 
-            let items = self.inner.get(start..end);
+            let items = self.stack.get(start..end);
 
             self.cursor += amount;
 
@@ -75,20 +102,22 @@ impl<T> RefStack<T> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::stack::RefStack;
 
     #[test]
     fn test_empty_ref_stack() {
         let mut stack: RefStack<usize> = RefStack::new();
 
-        assert_eq!(stack.pop_refs(1), &[][..]);
+        let empty: &[usize] = &[][..];
+
+        assert_eq!(stack.pop_refs(1), empty);
         assert_eq!(stack.cursor, 0);
-        assert_eq!(stack.pop_refs(3), &[][..]);
+        assert_eq!(stack.pop_refs(3), empty);
         assert_eq!(stack.cursor, 0);
 
-        assert_eq!(stack.unpop_refs(1), &[][..]);
+        assert_eq!(stack.unpop_refs(1), empty);
         assert_eq!(stack.cursor, 0);
-        assert_eq!(stack.unpop_refs(3), &[][..]);
+        assert_eq!(stack.unpop_refs(3), empty);
         assert_eq!(stack.cursor, 0);
     }
 
@@ -100,18 +129,18 @@ mod test {
         stack.push("b");
         stack.push("c");
 
-        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.stack, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 3);
 
         assert_eq!(stack.pop_refs(1), &["c"][..]);
         assert_eq!(stack.pop_refs(1), &["b"][..]);
 
-        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.stack, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 1);
 
         stack.push("d");
 
-        assert_eq!(stack.inner, vec!["a", "d"]);
+        assert_eq!(stack.stack, vec!["a", "d"]);
         assert_eq!(stack.cursor, 2);
     }
 
@@ -123,13 +152,13 @@ mod test {
         stack.push("b");
         stack.push("c");
 
-        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.stack, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 3);
 
         assert_eq!(stack.pop_refs(1), &["c"][..]);
         assert_eq!(stack.pop_refs(1), &["b"][..]);
 
-        assert_eq!(stack.inner, vec!["a", "b", "c"]);
+        assert_eq!(stack.stack, vec!["a", "b", "c"]);
         assert_eq!(stack.cursor, 1);
 
         assert_eq!(stack.unpop_refs(2), &["b", "c"][..]);
