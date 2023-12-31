@@ -1,5 +1,4 @@
-use color_eyre::eyre::eyre;
-use color_eyre::Result;
+use crate::{HistoryError, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::trace;
@@ -16,10 +15,13 @@ impl HistorySerde {
         M: std::fmt::Debug + Serialize + DeserializeOwned,
     {
         #[cfg(feature = "debug")]
-        let bytes = serde_json::to_vec_pretty(stack)?;
+        let result = serde_json::to_vec_pretty(stack);
 
         #[cfg(not(feature = "debug"))]
-        let bytes = serde_json::to_vec(stack)?;
+        let result = serde_json::to_vec(stack);
+
+        let bytes =
+            result.map_err(|source| HistoryError::Serialize { source })?;
 
         Ok(bytes)
     }
@@ -30,7 +32,7 @@ impl HistorySerde {
         M: std::fmt::Debug + Serialize + DeserializeOwned,
     {
         let stack = serde_json::from_slice(bytes)
-            .map_err(|err| eyre!("Unable to deserialize history: {}", err,))?;
+            .map_err(|source| HistoryError::Deserialize { source })?;
 
         trace!("Deserialized history:\n{:#?}", stack);
 

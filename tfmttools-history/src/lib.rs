@@ -1,8 +1,10 @@
+mod error;
 mod history;
 mod record;
 mod serde;
 mod stack;
 
+pub use error::{HistoryError, Result};
 pub use history::{History, LoadHistoryResult, SaveHistoryResult};
 pub use record::Record;
 

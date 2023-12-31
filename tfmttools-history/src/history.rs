@@ -1,6 +1,5 @@
+use crate::{HistoryError, Result};
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
-use color_eyre::Result;
 use fs_err as fs;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -59,10 +58,7 @@ where
                 stack: HistorySerde::deserialize(&body)?,
             })
         } else if path.exists() {
-            return Err(eyre!(
-                "History file path exists, but is not a file: {}",
-                path
-            ));
+            return Err(HistoryError::PathIsNotAFile(path.to_owned()));
         } else {
             LoadHistoryResult::New(Self {
                 path: path.to_owned(),
