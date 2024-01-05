@@ -5,6 +5,9 @@ license = "BSD-3-Clause"
 name = "tfmttools-cli"
 rust-version = "1.70"
 version = "0.16.0"
+description = "Use `minijinja` to rename audio files according to their tags."
+repository = ""
+homepage = ""
 
 [features]
 debug = []
