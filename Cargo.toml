@@ -1,8 +1,8 @@
 [workspace]
-members = [
-    "tfmttools-core",
-    "tfmttools-history",
-    "tfmttools-cli",
-]
+members = ["tfmttools-core", "tfmttools-history", "tfmttools-cli"]
 default-members = ["tfmttools-cli"]
 resolver = "2"
+
+[profile.release]
+strip = true # Automatically strip symbols from the binary.
+lto = true   # Enable Link Time Optimization (LTO)
