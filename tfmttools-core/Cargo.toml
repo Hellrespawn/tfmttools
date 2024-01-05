@@ -14,6 +14,7 @@ tfmttools-history = { path = "../tfmttools-history" }
 
 camino = { version = "1.1", features = ["serde", "serde1"] }
 color-eyre = "0.6"
+convert_case = "0.6"
 fs-err = "2.9"
 ignore = "0.4"
 lofty = "0.17"

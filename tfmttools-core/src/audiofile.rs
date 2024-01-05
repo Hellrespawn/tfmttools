@@ -9,7 +9,6 @@ use crate::util::normalize_separators;
 #[derive(Clone)]
 pub struct AudioFile {
     path: Utf8PathBuf,
-    extension: String,
     tag: Tag,
 }
 
@@ -26,15 +25,15 @@ impl AudioFile {
 
     pub fn new(path: &Utf8Path) -> Result<AudioFile> {
         let path = path.to_owned();
+
         let tagged_file = lofty::read_from_path(&path)?;
+
         let tag = tagged_file
             .primary_tag()
             .ok_or_else(|| eyre!("Unable to read primary tag for '{}'", path))?
             .clone();
 
-        let extension = path.extension().unwrap().to_string();
-
-        Ok(AudioFile { path, extension, tag })
+        Ok(AudioFile { path, tag })
     }
 
     pub fn path_predicate(path: &Utf8Path) -> bool {
@@ -54,7 +53,7 @@ impl AudioFile {
     }
 
     pub fn extension(&self) -> &str {
-        self.extension.as_ref()
+        self.path.extension().as_ref().unwrap()
     }
 
     pub fn tag(&self) -> &Tag {

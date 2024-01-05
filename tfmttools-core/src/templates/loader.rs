@@ -117,7 +117,9 @@ impl<'tl> TemplateLoader<'tl> {
         env
     }
 
-    fn year(date: &str) -> Result<String, minijinja::Error> {
+    fn year(date: Value) -> Result<String, minijinja::Error> {
+        let date = date.to_string();
+
         static RE_ISO: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
 
@@ -127,11 +129,11 @@ impl<'tl> TemplateLoader<'tl> {
         static RE_YEAR: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"(\d{4})").unwrap());
 
-        if let Some(m) = RE_ISO.find(date) {
+        if let Some(m) = RE_ISO.find(&date) {
             Ok(m.as_str().to_owned())
-        } else if let Some(m) = RE_AMBIGUOUS.find(date) {
+        } else if let Some(m) = RE_AMBIGUOUS.find(&date) {
             Ok(m.as_str().to_owned())
-        } else if let Some(m) = RE_YEAR.find(date) {
+        } else if let Some(m) = RE_YEAR.find(&date) {
             Ok(m.as_str().to_owned())
         } else {
             Err(minijinja::Error::new(
@@ -141,7 +143,7 @@ impl<'tl> TemplateLoader<'tl> {
         }
     }
 
-    fn zero_pad(value: usize, width: usize) -> String {
+    fn zero_pad(value: Value, width: usize) -> String {
         format!("{value:0>width$}")
     }
 }
