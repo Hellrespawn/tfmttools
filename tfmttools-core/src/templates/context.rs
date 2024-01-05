@@ -49,7 +49,7 @@ impl AudioFileContext {
             .map(std::borrow::ToOwned::to_owned);
 
         trace!(
-            "[{}][{:?}] Read value: '{}'",
+            "[{}][{:?}] => '{}'",
             self.audio_file.path().file_name().unwrap_or("unknown"),
             key,
             if let Some(tag) = &tag { tag } else { "unknown" }
@@ -62,7 +62,6 @@ impl AudioFileContext {
         Some(self.process_mode(self.read_value(key)?).into())
     }
 
-    // TODO Separate into get_number and get_number_with_total
     fn get_number(&self, key: &ItemKey) -> Option<Value> {
         let tag = self.read_value(key)?;
 
@@ -73,7 +72,7 @@ impl AudioFileContext {
         };
 
         trace!(
-            "[{}][{:?}] Processed number: '{}' => '{}'",
+            "[{}][{:?}] '{}' => '{}' (as number)",
             self.audio_file.path().file_name().unwrap_or("unknown"),
             key,
             tag,

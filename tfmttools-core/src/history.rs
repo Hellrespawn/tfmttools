@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
-use tfmttools_history::{History, Record};
+use tfmttools_history::{History, LoadHistoryResult, Record};
 
 use crate::action::Action;
 
+pub type LoadActionHistoryResult =
+    LoadHistoryResult<Action, ActionRecordMetadata>;
 pub type ActionHistory = History<Action, ActionRecordMetadata>;
 pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 

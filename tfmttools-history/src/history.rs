@@ -1,4 +1,3 @@
-use crate::{HistoryError, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use fs_err as fs;
 use serde::de::DeserializeOwned;
@@ -7,6 +6,7 @@ use serde::Serialize;
 use super::record::Record;
 use super::serde::HistorySerde;
 use super::stack::RefStack;
+use crate::{HistoryError, Result};
 
 pub enum LoadHistoryResult<T, M>
 where
@@ -23,6 +23,13 @@ where
     M: std::fmt::Debug + Serialize + DeserializeOwned,
 {
     pub fn unwrap(self) -> History<T, M> {
+        match self {
+            LoadHistoryResult::Loaded(history)
+            | LoadHistoryResult::New(history) => history,
+        }
+    }
+
+    pub fn unwrap_ref(&self) -> &History<T, M> {
         match self {
             LoadHistoryResult::Loaded(history)
             | LoadHistoryResult::New(history) => history,

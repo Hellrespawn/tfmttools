@@ -1,22 +1,74 @@
 use tfmttools_core::action::Action;
-use tfmttools_core::history::ActionRecord;
+use tfmttools_core::history::{ActionHistory, ActionRecord};
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 #[derive(Debug)]
-pub enum RecordFormat {
+pub enum HistoryFormat {
     Normal,
     Verbose,
 }
 
 #[derive(Debug)]
-pub struct RecordFormatter {
-    record_format: RecordFormat,
+pub struct HistoryFormatter {
+    format: HistoryFormat,
 }
 
-impl RecordFormatter {
-    pub fn new(record_format: RecordFormat) -> Self {
-        Self { record_format }
+impl HistoryFormatter {
+    pub fn new(format: HistoryFormat) -> Self {
+        Self { format }
+    }
+
+    pub fn normal() -> Self {
+        Self { format: HistoryFormat::Normal }
+    }
+
+    pub fn verbose() -> Self {
+        Self { format: HistoryFormat::Verbose }
+    }
+
+    pub fn format(&self, history: &ActionHistory) -> String {
+        let undo = history.get_records_to_undo().collect::<Vec<_>>();
+
+        let redo = history.get_records_to_redo().collect::<Vec<_>>();
+
+        if undo.is_empty() && redo.is_empty() {
+            "There is nothing to undo or redo".to_owned()
+        } else {
+            let mut buffer = String::new();
+
+            if undo.is_empty() {
+                buffer.push_str("There is nothing to undo.");
+            } else {
+                buffer.push_str("Undo history:\n");
+
+                buffer.push_str(
+                    &undo
+                        .into_iter()
+                        .map(|record| self.format_record(record))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                );
+            }
+
+            buffer.push_str("\n\n");
+
+            if redo.is_empty() {
+                buffer.push_str("There is nothing to redo.");
+            } else {
+                buffer.push_str("Redo history:\n");
+
+                buffer.push_str(
+                    &redo
+                        .into_iter()
+                        .map(|record| self.format_record(record))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                );
+            }
+
+            buffer
+        }
     }
 
     pub fn format_record(&self, record: &ActionRecord) -> String {
@@ -25,9 +77,9 @@ impl RecordFormatter {
         let normal_string =
             format!("{} ({summary})", record.timestamp().format(DATE_FORMAT));
 
-        match self.record_format {
-            RecordFormat::Normal => normal_string,
-            RecordFormat::Verbose => {
+        match self.format {
+            HistoryFormat::Normal => normal_string,
+            HistoryFormat::Verbose => {
                 if let Some(metadata) = record.metadata() {
                     let metadata_string = format!(
                         "'{}' => '{}'",

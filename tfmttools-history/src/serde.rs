@@ -1,10 +1,10 @@
-use crate::{HistoryError, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::trace;
 
 use super::record::Record;
 use super::stack::RefStack;
+use crate::{HistoryError, Result};
 
 pub struct HistorySerde;
 

@@ -5,7 +5,7 @@ use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
 use super::super::config::Config;
 use super::Command;
-use crate::history::{RecordFormat, RecordFormatter};
+use crate::history::{load_history, HistoryFormatter};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
@@ -14,17 +14,12 @@ pub struct UndoRedo {
 
     amount: usize,
     mode: HistoryMode,
-    formatter: RecordFormatter,
+    formatter: HistoryFormatter,
 }
 
 impl UndoRedo {
     pub fn new(force: bool, amount: usize, mode: HistoryMode) -> Self {
-        Self {
-            force,
-            amount,
-            mode,
-            formatter: RecordFormatter::new(RecordFormat::Normal),
-        }
+        Self { force, amount, mode, formatter: HistoryFormatter::normal() }
     }
 
     fn undo_redo(&self, config: &Config) -> Result<()> {
@@ -33,9 +28,9 @@ impl UndoRedo {
             HistoryMode::Redo => "redo",
         };
 
-        let result = ActionHistory::load(&config.history_file())?;
+        let load_history_result = load_history(config)?;
 
-        match result {
+        match load_history_result {
             LoadHistoryResult::New(_) => {
                 eprintln!("There is no history to {verb}.");
                 Ok(())

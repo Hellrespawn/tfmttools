@@ -1,23 +1,22 @@
 use color_eyre::Result;
-use tfmttools_core::history::ActionHistory;
-use tfmttools_history::LoadHistoryResult;
+use tfmttools_core::history::LoadActionHistoryResult;
 
 use super::Command;
 use crate::config::Config;
-use crate::history::{RecordFormat, RecordFormatter};
+use crate::history::{load_history, HistoryFormat, HistoryFormatter};
 
 #[derive(Debug)]
 pub struct ShowHistory {
-    formatter: RecordFormatter,
+    formatter: HistoryFormatter,
 }
 
 impl ShowHistory {
     pub fn new(verbose: bool) -> Self {
         Self {
-            formatter: RecordFormatter::new(if verbose {
-                RecordFormat::Verbose
+            formatter: HistoryFormatter::new(if verbose {
+                HistoryFormat::Verbose
             } else {
-                RecordFormat::Normal
+                HistoryFormat::Normal
             }),
         }
     }
@@ -25,48 +24,17 @@ impl ShowHistory {
 
 impl Command for ShowHistory {
     fn run(&self, config: &Config) -> Result<()> {
-        let load_history_result = ActionHistory::load(&config.history_file())?;
+        let load_history_result = load_history(config)?;
 
-        if let LoadHistoryResult::New(_) = &load_history_result {
-            print_no_history();
-        } else {
-            let history = load_history_result.unwrap();
-
-            let undo = history.get_records_to_undo().collect::<Vec<_>>();
-
-            let redo = history.get_records_to_redo().collect::<Vec<_>>();
-
-            if undo.is_empty() && redo.is_empty() {
-                print_no_history();
-            } else {
-                if undo.is_empty() {
-                    println!("There is nothing to undo.");
-                } else {
-                    println!("Undo history:");
-                }
-
-                for record in undo {
-                    println!("{}", self.formatter.format_record(record));
-                }
-
-                println!();
-
-                if redo.is_empty() {
-                    println!("There is nothing to redo.");
-                } else {
-                    println!("Redo history:");
-                }
-
-                for record in redo {
-                    println!("{}", self.formatter.format_record(record));
-                }
-            }
+        match load_history_result {
+            LoadActionHistoryResult::Loaded(history) => {
+                println!("{}", self.formatter.format(&history));
+            },
+            LoadActionHistoryResult::New(_) => {
+                println!("There is no history.");
+            },
         }
 
         Ok(())
     }
-}
-
-fn print_no_history() {
-    println!("There is no history to display.");
 }

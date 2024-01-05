@@ -4,13 +4,14 @@ use color_eyre::Result;
 use tfmttools_core::action::{validate_move_actions, Action, Move};
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::fs::{self, PathIterator, RemoveDirResult};
-use tfmttools_core::history::{ActionHistory, ActionRecordMetadata};
+use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::{Template, TemplateLoader};
-use tfmttools_history::{History, Record, SaveHistoryResult};
+use tfmttools_history::{Record, SaveHistoryResult};
 use tracing::debug;
 
 use super::super::config::{Config, DRY_RUN_PREFIX};
 use super::Command;
+use crate::history::load_history;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
 };
@@ -290,8 +291,7 @@ impl<'a> InnerRename<'a> {
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
         if !self.config.dry_run() {
-            let mut history: ActionHistory =
-                History::load(&self.config.history_file())?.unwrap();
+            let mut history = load_history(self.config)?.unwrap();
 
             let metadata = ActionRecordMetadata::new(
                 self.options.template.as_str().to_owned(),

@@ -18,11 +18,7 @@ pub enum HistoryError {
         source: std::io::Error,
     },
     #[error("Unable to serialize history: {source}")]
-    Serialize {
-        source: serde_json::Error,
-    },
+    Serialize { source: serde_json::Error },
     #[error("Unable to deserialize history: {source}")]
-    Deserialize {
-        source: serde_json::Error,
-    },
+    Deserialize { source: serde_json::Error },
 }
