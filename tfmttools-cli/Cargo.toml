@@ -4,11 +4,7 @@ edition = "2021"
 license = "BSD-3-Clause"
 name = "tfmttools-cli"
 rust-version = "1.70"
-version = "0.15.0"
-
-[[bin]]
-name = "tfmt"
-path = "src/main.rs"
+version = "0.16.0"
 
 [features]
 debug = []
