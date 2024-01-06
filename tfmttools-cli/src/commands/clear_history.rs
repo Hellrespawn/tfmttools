@@ -1,8 +1,7 @@
 use color_eyre::Result;
-use fs_err as fs;
 
 use super::Command;
-use crate::config::{Config, DRY_RUN_PREFIX};
+use crate::config::Config;
 use crate::history::{load_history, HistoryFormatter};
 use crate::ui::ConfirmationPrompt;
 
@@ -26,11 +25,7 @@ impl Command for ClearHistory {
                 ConfirmationPrompt::new("Clear history?").prompt()?;
 
             if confirmation {
-                if config.dry_run() {
-                    print!("{DRY_RUN_PREFIX}");
-                } else {
-                    fs::remove_file(path)?;
-                }
+                config.fs_handler().remove_file(path)?;
 
                 println!("Removed history file at: {path}");
             } else {

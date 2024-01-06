@@ -3,7 +3,6 @@ use indicatif::{
     ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
 
-use super::super::config::DRY_RUN_PREFIX;
 use crate::TERM;
 
 pub struct ProgressBarOptions {
@@ -15,12 +14,10 @@ pub struct ProgressBarOptions {
 
 impl ProgressBarOptions {
     pub fn bar(
-        dry_run: bool,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
         Self::new(
-            dry_run,
             ProgressStyle::default_bar(),
             "[{pos}/{len}] {msg} {wide_bar}",
             working_message,
@@ -29,14 +26,12 @@ impl ProgressBarOptions {
     }
 
     pub fn spinner(
-        dry_run: bool,
         found: &str,
         total: &str,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
         Self::new(
-            dry_run,
             ProgressStyle::default_spinner(),
             &format!(
                 "[{{pos}}/{{len}} {found}/{total} files] {{wide_msg}} {{spinner}}",
@@ -47,17 +42,12 @@ impl ProgressBarOptions {
     }
 
     pub fn new(
-        dry_run: bool,
         style: ProgressStyle,
         template: &str,
         working_message: &'static str,
         finished_message: &'static str,
     ) -> Result<Self> {
-        let prefix = if dry_run { DRY_RUN_PREFIX } else { "" };
-
-        let template = format!("{prefix}{template}");
-
-        let style = style.template(&template)?;
+        let style = style.template(template)?;
 
         #[cfg(test)]
         let draw_target = ProgressDrawTarget::stdout();

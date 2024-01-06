@@ -1,9 +1,8 @@
 use camino::Utf8PathBuf;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use fs_err as fs;
 
-use super::super::config::{Config, DRY_RUN_PREFIX};
+use super::super::config::Config;
 use super::Command;
 
 struct DefaultFile {
@@ -33,10 +32,7 @@ impl Command for Seed {
         let template_directory = &self.template_directory;
 
         if self.force {
-            tfmttools_core::fs::remove_dir_all(
-                config.dry_run(),
-                template_directory,
-            )?;
+            config.fs_handler().remove_dir_all(template_directory)?;
         } else if self.template_directory.is_dir() {
             let has_files = template_directory
                 .read_dir()
@@ -51,16 +47,12 @@ impl Command for Seed {
             }
         }
 
-        tfmttools_core::fs::create_dir(config.dry_run(), template_directory)?;
+        config.fs_handler().create_dir(template_directory)?;
 
         for file in &DEFAULT_FILES {
             let path = template_directory.join(file.name);
 
-            if config.dry_run() {
-                print!("{DRY_RUN_PREFIX}");
-            } else {
-                fs::write(path, file.content)?;
-            }
+            config.fs_handler().write(path, file.content)?;
 
             println!("Wrote default files to {template_directory}");
         }

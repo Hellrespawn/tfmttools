@@ -11,9 +11,9 @@ pub struct ShowHistory {
 }
 
 impl ShowHistory {
-    pub fn new(verbose: bool) -> Self {
+    pub fn new(verbosity: u8) -> Self {
         Self {
-            formatter: HistoryFormatter::new(if verbose {
+            formatter: HistoryFormatter::new(if verbosity > 0 {
                 HistoryFormat::Verbose
             } else {
                 HistoryFormat::Normal

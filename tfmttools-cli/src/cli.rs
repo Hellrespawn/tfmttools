@@ -24,6 +24,10 @@ pub fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    if args.dry_run {
+        println!("Doing dry run. No files are modified.");
+    }
+
     let config = Config::from_args(args)?;
 
     debug!("Configuration:\n{:#?}", config);

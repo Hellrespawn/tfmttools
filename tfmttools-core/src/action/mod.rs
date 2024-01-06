@@ -8,6 +8,8 @@ mod validation;
 
 pub use validation::validate_move_actions;
 
+use crate::fs::FsHandler;
+
 #[derive(PartialEq, Serialize, Deserialize, Debug)]
 pub struct Move {
     source: Utf8PathBuf,
@@ -101,40 +103,40 @@ impl Action {
         matches!(self, Self::RemoveDir(_))
     }
 
-    pub fn apply(&self, dry_run: bool) -> Result<()> {
+    pub fn apply(&self, fs_handler: &FsHandler) -> Result<()> {
         match self {
             Action::Move { source, target } => {
-                crate::fs::move_file(dry_run, source, target)?;
+                fs_handler.move_file(source, target)?;
             },
             Action::MakeDir(path) => {
-                crate::fs::create_dir(dry_run, path)?;
+                fs_handler.create_dir(path)?;
             },
             Action::RemoveDir(path) => {
-                crate::fs::remove_dir(dry_run, path)?;
+                fs_handler.remove_dir(path)?;
             },
         }
 
         Ok(())
     }
 
-    pub fn undo(&self, dry_run: bool) -> Result<()> {
+    pub fn undo(&self, fs_handler: &FsHandler) -> Result<()> {
         match self {
             Action::Move { source, target } => {
-                crate::fs::move_file(dry_run, target, source)?;
+                fs_handler.move_file(target, source)?;
             },
             Action::MakeDir(path) => {
-                crate::fs::remove_dir(dry_run, path)?;
+                fs_handler.remove_dir(path)?;
             },
             Action::RemoveDir(path) => {
-                crate::fs::create_dir(dry_run, path)?;
+                fs_handler.create_dir(path)?;
             },
         }
 
         Ok(())
     }
 
-    pub fn redo(&self, dry_run: bool) -> Result<()> {
-        self.apply(dry_run)
+    pub fn redo(&self, fs_handler: &FsHandler) -> Result<()> {
+        self.apply(fs_handler)
     }
 }
 

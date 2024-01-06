@@ -1,5 +1,6 @@
 use color_eyre::Result;
 use tfmttools_core::action::Action;
+use tfmttools_core::fs::FsHandler;
 use tfmttools_core::history::{ActionHistory, ActionRecord};
 use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
@@ -57,7 +58,7 @@ impl UndoRedo {
                     if confirmation {
                         self.perform_undo_redo_actions(
                             &records,
-                            config.dry_run(),
+                            config.fs_handler(),
                         )?;
 
                         history.save()?;
@@ -122,7 +123,7 @@ impl UndoRedo {
     fn perform_undo_redo_actions(
         &self,
         records: &[&ActionRecord],
-        dry_run: bool,
+        fs_handler: &FsHandler,
     ) -> Result<()> {
         for record in records {
             println!(
@@ -138,8 +139,8 @@ impl UndoRedo {
 
             for action in actions {
                 match self.mode {
-                    HistoryMode::Undo => action.undo(dry_run)?,
-                    HistoryMode::Redo => action.redo(dry_run)?,
+                    HistoryMode::Undo => action.undo(fs_handler)?,
+                    HistoryMode::Redo => action.redo(fs_handler)?,
                 }
             }
 

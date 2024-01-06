@@ -9,6 +9,10 @@ description = "Use `minijinja` to rename audio files according to their tags."
 repository = ""
 homepage = ""
 
+[[bin]]
+name = "tfmt"
+path = "src/main.rs"
+
 [features]
 debug = []
 

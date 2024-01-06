@@ -1,6 +1,7 @@
 use camino::Utf8PathBuf;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use tfmttools_core::fs::FsHandler;
 use tfmttools_history::HistoryMode;
 
 use super::args::Args;
@@ -12,8 +13,6 @@ use super::commands::Command;
 use crate::args::Subcommand;
 use crate::commands::clear_history::ClearHistory;
 use crate::commands::show_history::ShowHistory;
-
-pub const DRY_RUN_PREFIX: &str = "[D] ";
 
 pub fn default_input_dir() -> Result<Utf8PathBuf> {
     let path = std::env::current_dir()?;
@@ -34,7 +33,7 @@ pub fn default_template_and_config_dir() -> Result<Utf8PathBuf> {
 #[derive(Debug)]
 pub struct Config {
     directory: Utf8PathBuf,
-    dry_run: bool,
+    fs_handler: FsHandler,
     command: Box<dyn Command>,
 }
 
@@ -47,11 +46,11 @@ impl Config {
                 default_template_and_config_dir()
             }?;
 
-        let dry_run = args.dry_run;
+        let fs_handler = FsHandler::new(args.dry_run);
 
         let command: Box<dyn Command> = match args.command {
             Subcommand::ClearHistory => Box::new(ClearHistory),
-            Subcommand::ListTemplates(list_templates) => {
+            Subcommand::Templates(list_templates) => {
                 let template_directory = Self::get_template_directory(
                     list_templates.custom_template_directory,
                 )?;
@@ -96,12 +95,12 @@ impl Config {
                     HistoryMode::Redo,
                 ))
             },
-            Subcommand::ShowHistory(show_history) => {
+            Subcommand::History(show_history) => {
                 Box::new(ShowHistory::new(show_history.verbose))
             },
         };
 
-        Ok(Config { directory: config_directory, dry_run, command })
+        Ok(Config { directory: config_directory, fs_handler, command })
     }
 
     #[allow(clippy::unused_self)]
@@ -142,8 +141,8 @@ impl Config {
         Ok(template_directory)
     }
 
-    pub fn dry_run(&self) -> bool {
-        self.dry_run
+    pub fn fs_handler(&self) -> &FsHandler {
+        &self.fs_handler
     }
 
     pub fn command(&self) -> &dyn Command {

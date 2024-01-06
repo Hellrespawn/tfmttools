@@ -203,10 +203,10 @@ impl TestEnv {
     }
 
     fn add_default_rename_args(&self, cmd: &mut Command) {
-        cmd.arg("--config")
+        cmd.arg("--custom-config-directory")
             .arg(self.get_config_dir())
             .arg("rename")
-            .arg("--template-directory")
+            .arg("--custom-template-directory")
             .arg(self.get_template_dir())
             .arg("--force");
     }
@@ -234,7 +234,7 @@ fn undo(env: &TestEnv) {
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
     let assert = cmd
-        .arg("--config")
+        .arg("--custom-config-directory")
         .arg(config_dir)
         .arg("undo")
         .arg("--force")
@@ -252,7 +252,7 @@ fn redo(env: &TestEnv) {
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
     let assert = cmd
-        .arg("--config")
+        .arg("--custom-config-directory")
         .arg(config_dir)
         .arg("redo")
         .arg("--force")

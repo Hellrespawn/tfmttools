@@ -9,7 +9,7 @@ use tfmttools_core::templates::{Template, TemplateLoader};
 use tfmttools_history::{Record, SaveHistoryResult};
 use tracing::debug;
 
-use super::super::config::{Config, DRY_RUN_PREFIX};
+use super::super::config::Config;
 use super::Command;
 use crate::history::load_history;
 use crate::ui::{
@@ -108,7 +108,6 @@ impl<'a> InnerRename<'a> {
 
     fn gather_files(&self) -> Result<Vec<AudioFile>> {
         let options = ProgressBarOptions::spinner(
-            self.config.dry_run(),
             "audio",
             "total",
             "Gathering files...",
@@ -146,7 +145,6 @@ impl<'a> InnerRename<'a> {
         let cwd = self.config.working_directory()?;
 
         let options = ProgressBarOptions::bar(
-            self.config.dry_run(),
             "Determining output paths:",
             "Determined output paths.",
         )?;
@@ -234,18 +232,14 @@ impl<'a> InnerRename<'a> {
 
         let mut actions = self.move_files(move_actions)?;
 
-        if self.config.dry_run() {
-            print!("{DRY_RUN_PREFIX}");
-        }
-
         debug!("Common prefix of path: {:?}", common_prefix);
 
         if let Some(common_path) = common_prefix {
-            let removed = fs::remove_empty_subdirectories(
-                self.config.dry_run(),
-                &common_path,
-                self.options.recursion_depth,
-            )?;
+            let removed =
+                self.config.fs_handler().remove_empty_subdirectories(
+                    &common_path,
+                    self.options.recursion_depth,
+                )?;
 
             actions.extend(
                 removed
@@ -263,18 +257,14 @@ impl<'a> InnerRename<'a> {
     }
 
     fn move_files(&self, move_actions: Vec<Move>) -> Result<Vec<Action>> {
-        let options = ProgressBarOptions::bar(
-            self.config.dry_run(),
-            "Moving files:",
-            "Moved files.",
-        )?;
+        let options = ProgressBarOptions::bar("Moving files:", "Moved files.")?;
 
         let bar = ProgressBar::with_length(options, move_actions.len() as u64);
 
         let actions = Move::create_actions(move_actions);
 
         for action in &actions {
-            action.apply(self.config.dry_run())?;
+            action.apply(self.config.fs_handler())?;
 
             if action.is_move() {
                 bar.inc_found();
@@ -290,7 +280,7 @@ impl<'a> InnerRename<'a> {
     }
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
-        if !self.config.dry_run() {
+        if !self.config.fs_handler().dry_run() {
             let mut history = load_history(self.config)?.unwrap();
 
             let metadata = ActionRecordMetadata::new(
