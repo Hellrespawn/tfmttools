@@ -1,7 +1,6 @@
 pub mod clear_history;
 pub mod list_templates;
 pub mod rename;
-pub mod seed;
 pub mod show_history;
 pub mod undo_redo;
 

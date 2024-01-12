@@ -7,7 +7,7 @@ use crate::util::FileOrName;
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
 pub struct Args {
-    /// Sets a custom configuration directory.
+    /// Sets a custom configuration directory. Defaults to '~/.tfmttools'.
     #[arg(short = 'c', long)]
     pub custom_config_directory: Option<Utf8PathBuf>,
 
@@ -39,9 +39,6 @@ pub enum Subcommand {
 
     /// Use a template to rename audio files according to their tags.
     Rename(Rename),
-
-    /// Seed example scripts into the application directory.
-    Seed(Seed),
 
     /// Undo actions.
     Undo(UndoRedo),

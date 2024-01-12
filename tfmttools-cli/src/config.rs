@@ -7,7 +7,6 @@ use tfmttools_history::HistoryMode;
 use super::args::Args;
 use super::commands::list_templates::ListTemplates;
 use super::commands::rename::Rename;
-use super::commands::seed::Seed;
 use super::commands::undo_redo::UndoRedo;
 use super::commands::Command;
 use crate::args::Subcommand;
@@ -73,13 +72,6 @@ impl Config {
                     rename.template,
                     rename.arguments,
                 ))
-            },
-            Subcommand::Seed(seed) => {
-                let template_directory = Self::get_template_directory(
-                    seed.custom_template_directory,
-                )?;
-
-                Box::new(Seed::new(template_directory, seed.force))
             },
             Subcommand::Undo(undo_redo) => {
                 Box::new(UndoRedo::new(
