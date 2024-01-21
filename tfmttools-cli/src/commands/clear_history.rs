@@ -2,7 +2,7 @@ use color_eyre::Result;
 
 use super::Command;
 use crate::config::Config;
-use crate::history::{load_history, HistoryFormatter};
+use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::ConfirmationPrompt;
 
 #[derive(Debug)]
@@ -17,9 +17,12 @@ impl Command for ClearHistory {
 
             let history = result.unwrap();
 
-            let formatter = HistoryFormatter::normal();
+            println!("Showing history from: {path}");
 
-            println!("{}", formatter.format(&history));
+            let formatter = HistoryFormatter::new()
+                .with_prefix(HistoryPrefix::Ordered(')'));
+
+            println!("{}", formatter.format_history(&history));
 
             let confirmation =
                 ConfirmationPrompt::new("Clear history?").prompt()?;

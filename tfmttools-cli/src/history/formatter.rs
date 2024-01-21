@@ -10,24 +10,48 @@ pub enum HistoryFormat {
 }
 
 #[derive(Debug)]
+pub enum HistoryPrefix {
+    Unordered(char),
+    Ordered(char),
+}
+
+impl HistoryPrefix {
+    fn format(&self, index: usize, total: usize) -> String {
+        match self {
+            HistoryPrefix::Unordered(list_style) => format!("{list_style} "),
+            HistoryPrefix::Ordered(list_style) => {
+                let width = total.to_string().len();
+
+                format!("{:>width$}{} ", index + 1, list_style)
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct HistoryFormatter {
     format: HistoryFormat,
+    prefix: Option<HistoryPrefix>,
 }
 
 impl HistoryFormatter {
-    pub fn new(format: HistoryFormat) -> Self {
-        Self { format }
+    pub fn new() -> Self {
+        Self { format: HistoryFormat::Normal, prefix: None }
     }
 
-    pub fn normal() -> Self {
-        Self { format: HistoryFormat::Normal }
+    pub fn with_format(mut self, format: HistoryFormat) -> Self {
+        self.format = format;
+
+        self
     }
 
-    pub fn verbose() -> Self {
-        Self { format: HistoryFormat::Verbose }
+    pub fn with_prefix(mut self, prefix: HistoryPrefix) -> Self {
+        self.prefix = Some(prefix);
+
+        self
     }
 
-    pub fn format(&self, history: &ActionHistory) -> String {
+    pub fn format_history(&self, history: &ActionHistory) -> String {
         let undo = history.get_records_to_undo().collect::<Vec<_>>();
 
         let redo = history.get_records_to_redo().collect::<Vec<_>>();
@@ -37,48 +61,66 @@ impl HistoryFormatter {
         } else {
             let mut buffer = String::new();
 
+            buffer.push_str("Undo history:\n");
+
             if undo.is_empty() {
                 buffer.push_str("There is nothing to undo.");
             } else {
-                buffer.push_str("Undo history:\n");
-
-                buffer.push_str(
-                    &undo
-                        .into_iter()
-                        .map(|record| self.format_record(record))
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                );
+                buffer.push_str(&self.format_records(&undo));
             }
 
-            buffer.push_str("\n\n");
+            buffer.push_str("\n\nRedo history:\n");
 
             if redo.is_empty() {
                 buffer.push_str("There is nothing to redo.");
             } else {
-                buffer.push_str("Redo history:\n");
-
-                buffer.push_str(
-                    &redo
-                        .into_iter()
-                        .map(|record| self.format_record(record))
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                );
+                buffer.push_str(&self.format_records(&redo));
             }
 
             buffer
         }
     }
 
+    pub fn format_records(&self, records: &[&ActionRecord]) -> String {
+        records
+            .iter()
+            .enumerate()
+            .map(|(i, record)| {
+                if let Some(prefix) = &self.prefix {
+                    let formatted_prefix = prefix.format(i, records.len());
+
+                    let formatted_record = self.format_record(record);
+
+                    let mut iter = formatted_record.lines();
+
+                    let mut string =
+                        format!("{formatted_prefix}{}", iter.next().unwrap());
+
+                    for line in iter {
+                        string += &format!(
+                            "\n{}{}",
+                            " ".repeat(formatted_prefix.len()),
+                            line
+                        );
+                    }
+
+                    string
+                } else {
+                    self.format_record(record)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     pub fn format_record(&self, record: &ActionRecord) -> String {
         let summary = RecordSummary::from_record(record);
 
-        let normal_string =
+        let base_string =
             format!("{} ({summary})", record.timestamp().format(DATE_FORMAT));
 
         match self.format {
-            HistoryFormat::Normal => normal_string,
+            HistoryFormat::Normal => base_string,
             HistoryFormat::Verbose => {
                 if let Some(metadata) = record.metadata() {
                     let metadata_string = format!(
@@ -87,9 +129,9 @@ impl HistoryFormatter {
                         metadata.arguments().join(" ")
                     );
 
-                    format!("┌ {normal_string}\n└── {metadata_string}")
+                    format!("┌ {base_string}\n└── {metadata_string}")
                 } else {
-                    normal_string
+                    base_string
                 }
             },
         }

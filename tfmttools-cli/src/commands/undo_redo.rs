@@ -6,7 +6,7 @@ use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
 use super::super::config::Config;
 use super::Command;
-use crate::history::{load_history, HistoryFormatter};
+use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
@@ -20,7 +20,13 @@ pub struct UndoRedo {
 
 impl UndoRedo {
     pub fn new(force: bool, amount: usize, mode: HistoryMode) -> Self {
-        Self { force, amount, mode, formatter: HistoryFormatter::normal() }
+        Self {
+            force,
+            amount,
+            mode,
+            formatter: HistoryFormatter::new()
+                .with_prefix(HistoryPrefix::Ordered(')')),
+        }
     }
 
     fn undo_redo(&self, config: &Config) -> Result<()> {

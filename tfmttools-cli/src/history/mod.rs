@@ -4,7 +4,7 @@ use color_eyre::Result;
 use tfmttools_core::history::{ActionHistory, LoadActionHistoryResult};
 use tracing::debug;
 
-pub use self::formatter::{HistoryFormat, HistoryFormatter};
+pub use self::formatter::{HistoryFormat, HistoryFormatter, HistoryPrefix};
 use crate::config::Config;
 
 pub fn load_history(config: &Config) -> Result<LoadActionHistoryResult> {
@@ -13,7 +13,9 @@ pub fn load_history(config: &Config) -> Result<LoadActionHistoryResult> {
     if let LoadActionHistoryResult::Loaded(history) = &result {
         debug!(
             "Loaded history:\n{}",
-            HistoryFormatter::verbose().format(history)
+            HistoryFormatter::new()
+                .with_format(HistoryFormat::Verbose)
+                .format_history(history)
         );
     }
 
