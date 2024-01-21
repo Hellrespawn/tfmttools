@@ -115,7 +115,9 @@ impl FsHandler {
         if self.dry_run {
             Ok(MoveFileResult::DryRun)
         } else {
-            if let Err(err) = fs::rename(source, target) {
+            // HACK Unable to capture raw_os_error with fs_err, use
+            // std::fs::rename instead.
+            if let Err(err) = std::fs::rename(source, target) {
                 // Can't rename across filesystem boundaries. Checks for
                 // the appropriate error and copies/deletes instead.
                 // Error codes are correct on Windows 10 20H2 and Arch
@@ -137,6 +139,8 @@ impl FsHandler {
 
                     return Err(err.into());
                 }
+
+                return Err(err.into());
             }
 
             Ok(MoveFileResult::Moved)
