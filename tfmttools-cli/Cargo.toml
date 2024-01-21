@@ -6,8 +6,8 @@ name = "tfmttools-cli"
 rust-version = "1.70"
 version = "0.16.1"
 description = "Use `minijinja` to rename audio files according to their tags."
-repository = ""
-homepage = ""
+repository = "https://github.com/Hellrespawn/tfmttools"
+homepage = "https://github.com/Hellrespawn/tfmttools"
 
 [[bin]]
 name = "tfmt"
