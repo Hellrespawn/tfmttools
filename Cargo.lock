@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-core"
-version = "0.15.0"
+version = "0.17.0"
 dependencies = [
  "camino",
  "color-eyre",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-history"
-version = "0.15.0"
+version = "0.17.0"
 dependencies = [
  "camino",
  "chrono",

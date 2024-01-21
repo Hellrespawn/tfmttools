@@ -1,3 +1,14 @@
+[workspace.package]
+version = "0.17.0"
+authors = ["Stef Korporaal <stef@skorporaal.com>"]
+description = "Use `minijinja` to rename audio files according to their tags."
+edition = "2021"
+license = "BSD-3-Clause"
+rust-version = "1.70"
+repository = "https://github.com/Hellrespawn/tfmttools"
+homepage = "https://github.com/Hellrespawn/tfmttools"
+
+
 [workspace]
 members = ["tfmttools-core", "tfmttools-history", "tfmttools-cli"]
 default-members = ["tfmttools-cli"]
@@ -18,9 +29,8 @@ pr-run-mode = "plan"
 
 [profile.release]
 strip = true # Automatically strip symbols from the binary.
-lto = true   # Enable Link Time Optimization (LTO)
+lto = "thin"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
-lto = "thin"

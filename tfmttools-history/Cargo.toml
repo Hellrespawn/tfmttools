@@ -1,10 +1,14 @@
 [package]
-authors = ["Stef Korporaal <stef@skorporaal.com>"]
-edition = "2021"
-license = "BSD-3-Clause"
 name = "tfmttools-history"
-rust-version = "1.70"
-version = "0.15.0"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust.workspace-version = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+version.workspace = true
 
 [dependencies]
 camino = { version = "1.1", features = ["serde", "serde1"] }
