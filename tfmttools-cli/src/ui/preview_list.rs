@@ -88,15 +88,12 @@ where
 
         let preview_amount = std::cmp::max(
             Self::MIN_PREVIEW_AMOUNT,
-            TERM.size().0 as usize
-                - self.leading_lines
-                - self.trailing_lines
-                - padding,
+            TERM.size().0 as usize - padding,
         );
 
         let total = self.iter.len();
 
-        if total > preview_amount {
+        if total >= preview_amount {
             println!(
                 "Previewing {preview_amount} of {total} {}:",
                 self.item_name.by_amount(total)
