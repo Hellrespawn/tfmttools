@@ -167,8 +167,6 @@ fn insert_case(
     map: &mut HashMap<String, ItemKey>,
 ) {
     let pascal_case = match pascal_case {
-        "PodcastURL" => "PodcastUrl".to_owned(),
-        "PodcastGlobalUniqueID" => "PodcastGlobalUniqueId".to_owned(),
         "AppleId3v2ContentGroup" => "AppleId3V2ContentGroup".to_owned(),
         _ => pascal_case.to_owned(),
     };
@@ -205,21 +203,25 @@ const CASES: [Case; 9] = [
 ];
 
 const ITEM_KEYS: [ItemKey; 102] = [
+    // Titles
     ItemKey::AlbumTitle,
     ItemKey::SetSubtitle,
     ItemKey::ShowName,
     ItemKey::ContentGroup,
     ItemKey::TrackTitle,
     ItemKey::TrackSubtitle,
+    // Original names
     ItemKey::OriginalAlbumTitle,
     ItemKey::OriginalArtist,
     ItemKey::OriginalLyricist,
+    // Sorting
     ItemKey::AlbumTitleSortOrder,
     ItemKey::AlbumArtistSortOrder,
     ItemKey::TrackTitleSortOrder,
     ItemKey::TrackArtistSortOrder,
     ItemKey::ShowNameSortOrder,
     ItemKey::ComposerSortOrder,
+    // People & Organizations
     ItemKey::AlbumArtist,
     ItemKey::TrackArtist,
     ItemKey::Arranger,
@@ -228,7 +230,6 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::Conductor,
     ItemKey::Director,
     ItemKey::Engineer,
-    ItemKey::InvolvedPeople,
     ItemKey::Lyricist,
     ItemKey::MixDj,
     ItemKey::MixEngineer,
@@ -240,15 +241,32 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::InternetRadioStationName,
     ItemKey::InternetRadioStationOwner,
     ItemKey::Remixer,
+    // Counts & Indexes
     ItemKey::DiscNumber,
     ItemKey::DiscTotal,
     ItemKey::TrackNumber,
     ItemKey::TrackTotal,
     ItemKey::Popularimeter,
     ItemKey::ParentalAdvisory,
+    // Dates
+    // Recording date
+    //
+    // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#date-10>
     ItemKey::RecordingDate,
+    // Year
     ItemKey::Year,
+    // Release date
+    //
+    // The release date of a podcast episode or any other kind of release.
+    //
+    // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#release-date-10>
+    ItemKey::ReleaseDate,
+    // Original release date/year
+    //
+    // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#original-release-date-1>
+    // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#original-release-year-1>
     ItemKey::OriginalReleaseDate,
+    // Identifiers
     ItemKey::Isrc,
     ItemKey::Barcode,
     ItemKey::CatalogNumber,
@@ -256,21 +274,63 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::Movement,
     ItemKey::MovementNumber,
     ItemKey::MovementTotal,
+    //////////////////////////////////////////
+    // MusicBrainz Identifiers
+    // MusicBrainz Recording ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id21>
     ItemKey::MusicBrainzRecordingId,
+    // MusicBrainz Track ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id24>
     ItemKey::MusicBrainzTrackId,
+    // MusicBrainz Release ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id23>
     ItemKey::MusicBrainzReleaseId,
+    // MusicBrainz Release Group ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#musicbrainz-release-group-id>
     ItemKey::MusicBrainzReleaseGroupId,
+    // MusicBrainz Artist ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id17>
     ItemKey::MusicBrainzArtistId,
+    // MusicBrainz Release Artist ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id22>
     ItemKey::MusicBrainzReleaseArtistId,
+    // MusicBrainz Work ID
+    //
+    // Textual representation of the UUID.
+    //
+    // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#musicbrainz-work-id>
     ItemKey::MusicBrainzWorkId,
+    //////////////////////////////////////////
+
+    // Flags
     ItemKey::FlagCompilation,
     ItemKey::FlagPodcast,
+    // File Information
     ItemKey::FileType,
     ItemKey::FileOwner,
     ItemKey::TaggingTime,
     ItemKey::Length,
     ItemKey::OriginalFileName,
     ItemKey::OriginalMediaType,
+    // Encoder information
     ItemKey::EncodedBy,
     ItemKey::EncoderSoftware,
     ItemKey::EncoderSettings,
@@ -279,6 +339,7 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::ReplayGainAlbumPeak,
     ItemKey::ReplayGainTrackGain,
     ItemKey::ReplayGainTrackPeak,
+    // URLs
     ItemKey::AudioFileUrl,
     ItemKey::AudioSourceUrl,
     ItemKey::CommercialInformationUrl,
@@ -287,26 +348,42 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::RadioStationUrl,
     ItemKey::PaymentUrl,
     ItemKey::PublisherUrl,
+    // Style
     ItemKey::Genre,
     ItemKey::InitialKey,
     ItemKey::Color,
     ItemKey::Mood,
+    // Decimal BPM value with arbitrary precision
+    //
+    // Only read and written if the tag format supports a field for decimal BPM values
+    // that are not restricted to integer values.
+    //
+    // Not supported by ID3v2 that restricts BPM values to integers in `TBPM`.
     ItemKey::Bpm,
+    // Non-fractional BPM value with integer precision
+    //
+    // Only read and written if the tag format has a field for integer BPM values,
+    // e.g. ID3v2 ([`TBPM` frame](https://github.com/id3/ID3v2.4/blob/516075e38ff648a6390e48aff490abed987d3199/id3v2.4.0-frames.txt#L376))
+    // and MP4 (`tmpo` integer atom).
+    ItemKey::IntegerBpm,
+    // Legal
     ItemKey::CopyrightMessage,
     ItemKey::License,
+    // Podcast
     ItemKey::PodcastDescription,
     ItemKey::PodcastSeriesCategory,
-    ItemKey::PodcastURL,
-    ItemKey::PodcastReleaseDate,
-    ItemKey::PodcastGlobalUniqueID,
+    ItemKey::PodcastUrl,
+    ItemKey::PodcastGlobalUniqueId,
     ItemKey::PodcastKeywords,
+    // Miscellaneous
     ItemKey::Comment,
     ItemKey::Description,
     ItemKey::Language,
     ItemKey::Script,
     ItemKey::Lyrics,
+    // Vendor-specific
     ItemKey::AppleXid,
-    ItemKey::AppleId3v2ContentGroup,
+    ItemKey::AppleId3v2ContentGroup, // GRP1
 ];
 
 // fn autocomplete(key: &ItemKey) {
