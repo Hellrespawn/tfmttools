@@ -31,7 +31,6 @@ fs-err = "2.11"
 indicatif = { version = "0.17", features = ["improved_unicode"] }
 once_cell = "1.19"
 textwrap = "0.16"
-time = { version = "0.3", features = ["formatting"] }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

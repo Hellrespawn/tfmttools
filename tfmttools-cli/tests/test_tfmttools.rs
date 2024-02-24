@@ -63,7 +63,7 @@ static TYPICAL_INPUT_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
     "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
     "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-]    .into_iter()
+].into_iter()
 .map(normalize_separators)
 .collect()
 });

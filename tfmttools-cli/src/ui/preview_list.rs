@@ -1,3 +1,5 @@
+use color_eyre::Result;
+
 use crate::TERM;
 
 pub struct ItemName<'i> {
@@ -83,7 +85,7 @@ where
         self
     }
 
-    pub fn print(self) {
+    pub fn print(self) -> Result<()> {
         let padding = self.leading_lines + self.trailing_lines;
 
         let preview_amount = std::cmp::max(
@@ -93,23 +95,26 @@ where
 
         let total = self.iter.len();
 
-        if total >= preview_amount {
+        let indices = if total >= preview_amount {
             println!(
                 "Previewing {preview_amount} of {total} {}:",
                 self.item_name.by_amount(total)
             );
+
+            rounded_linear_space(0, total, preview_amount)?
         } else {
             println!("Previewing {total} {}:", self.item_name.by_amount(total));
+
+            (0..total).collect()
         };
 
-        let step = total.div_ceil(preview_amount);
+        // let step = total.div_ceil(preview_amount);
 
         let iter = self
             .iter
             .enumerate()
-            .map(|(index, item)| (index + 1, item))
-            .step_by(step)
-            .take(preview_amount);
+            .filter(|(index, _)| indices.contains(index))
+            .map(|(index, item)| (index + 1, item));
 
         let enumeration_width = total.to_string().len();
 
@@ -118,5 +123,29 @@ where
 
             println!("{}", item.to_string());
         }
+
+        Ok(())
     }
+}
+
+fn rounded_linear_space(
+    start: usize,
+    end: usize,
+    amount: usize,
+) -> Result<Vec<usize>> {
+    let start: f32 = u16::try_from(start)?.into();
+    let end: f32 = u16::try_from(end)?.into();
+
+    let size: f32 = (u16::try_from(amount)? - 1).into();
+    let dx = (end - start) / size;
+
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_sign_loss)]
+    Ok((1..=amount)
+        .scan(-dx, |a, _| {
+            *a += dx;
+            Some(*a)
+        })
+        .map(|f| f.round() as usize)
+        .collect())
 }

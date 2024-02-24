@@ -187,7 +187,7 @@ impl<'a> InnerRename<'a> {
     fn confirm_move_actions(&self, move_actions: &[Move]) -> Result<bool> {
         let cwd = self.config.working_directory()?;
 
-        Self::preview_move_actions(move_actions, &cwd);
+        Self::preview_move_actions(move_actions, &cwd)?;
 
         let confirmation_prompt = ConfirmationPrompt::new("Move files?");
 
@@ -197,7 +197,7 @@ impl<'a> InnerRename<'a> {
     fn preview_move_actions(
         move_actions: &[Move],
         working_directory: &Utf8Path,
-    ) {
+    ) -> Result<()> {
         const LEADING_LINES: usize = 3;
         const TRAILING_LINES: usize = 3;
 
@@ -219,7 +219,9 @@ impl<'a> InnerRename<'a> {
             .trailing(TRAILING_LINES)
             .item_name(ItemName::simple("file"));
 
-        preview_list.print();
+        preview_list.print()?;
+
+        Ok(())
     }
 
     fn perform_move_actions(

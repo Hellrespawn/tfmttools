@@ -93,7 +93,7 @@ impl UndoRedo {
     }
 
     fn confirm_undo_redo(&self, records: &[&ActionRecord]) -> Result<bool> {
-        self.preview_undo_redo(records);
+        self.preview_undo_redo(records)?;
 
         let item_name = ItemName::simple("record");
 
@@ -111,7 +111,7 @@ impl UndoRedo {
         confirmation_prompt.prompt()
     }
 
-    fn preview_undo_redo(&self, records: &[&ActionRecord]) {
+    fn preview_undo_redo(&self, records: &[&ActionRecord]) -> Result<()> {
         const LEADING_LINES: usize = 3;
         const TRAILING_LINES: usize = 3;
 
@@ -123,7 +123,9 @@ impl UndoRedo {
             .trailing(TRAILING_LINES)
             .item_name(ItemName::simple("record"));
 
-        preview_list.print();
+        preview_list.print()?;
+
+        Ok(())
     }
 
     fn perform_undo_redo_actions(
