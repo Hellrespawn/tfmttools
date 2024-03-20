@@ -1,0 +1,26 @@
+[
+    {
+        "retain": [
+            "genre",
+            "albumartist",
+            "artist",
+            "album",
+            "date",
+            "year",
+            "albumsort",
+            "discnumber",
+            "tracknumber",
+            "title",
+            "*replaygain*"
+        ]
+    },
+    {
+        "collapse": {
+            "main-tag": "artist",
+            "optional-tags": [
+                "albumartist"
+            ],
+            "predicate": "equal"
+        }
+    }
+]
