@@ -76,4 +76,8 @@ impl AudioFile {
         // relative_path, so this is always safe.
         Ok(relative_path.join(target_path))
     }
+
+    pub fn tag_mut(&mut self) -> &mut Tag {
+        &mut self.tag
+    }
 }
