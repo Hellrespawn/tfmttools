@@ -1,8 +1,9 @@
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use lofty::{ItemKey, TagExt};
 use serde::Deserialize;
 
-use crate::{audiofile::AudioFile, item_keys::ItemKeys};
+use crate::audiofile::AudioFile;
+use crate::item_keys::ItemKeys;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]

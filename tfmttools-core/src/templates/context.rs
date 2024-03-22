@@ -30,12 +30,14 @@ impl AudioFileContext {
     fn process_mode(&self, value: String) -> String {
         match self.mode {
             InterpolationMode::Normal => value,
-            InterpolationMode::Safe => FORBIDDEN_CHARACTERS.iter().fold(
-                value,
-                |string, (char, replacement)| {
-                    string.replace(*char, replacement.unwrap_or(""))
-                },
-            ),
+            InterpolationMode::Safe => {
+                FORBIDDEN_CHARACTERS.iter().fold(
+                    value,
+                    |string, (char, replacement)| {
+                        string.replace(*char, replacement.unwrap_or(""))
+                    },
+                )
+            },
             InterpolationMode::Strict => unimplemented!(),
         }
     }
