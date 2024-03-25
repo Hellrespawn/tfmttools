@@ -1,0 +1,17 @@
+[
+    {
+        "retain": [
+            "genre",
+            "albumartist",
+            "artist",
+            "album",
+            "date",
+            "year",
+            "albumsort",
+            "discnumber",
+            "tracknumber",
+            "title",
+            "*replaygain*"
+        ]
+    }
+]

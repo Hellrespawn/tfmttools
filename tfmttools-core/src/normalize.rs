@@ -102,11 +102,19 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn test_deserialize() -> Result<()> {
-        let string = include_str!("../../examples/normalize.json");
+    fn parse_test_program(
+        input: &str,
+        reference: &NormalizeProgram,
+    ) -> Result<NormalizeProgram> {
+        let program: NormalizeProgram = serde_json::from_str(input)?;
 
-        let program: NormalizeProgram = serde_json::from_str(string)?;
+        assert_eq!(program, *reference);
+
+        Ok(program)
+    }
+
+    fn parse_deserialize_test_program() -> Result<NormalizeProgram> {
+        let string = include_str!("../tests/normalize-deserialize.json");
 
         let reference = NormalizeProgram {
             commands: vec![
@@ -133,7 +141,14 @@ mod test {
             ],
         };
 
-        assert_eq!(program, reference);
+        let program = parse_test_program(string, &reference)?;
+
+        Ok(program)
+    }
+
+    #[test]
+    fn test_deserialize() -> Result<()> {
+        let program = parse_deserialize_test_program()?;
 
         Ok(())
     }
