@@ -8,13 +8,13 @@ use crate::item_keys::ItemKeys;
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct NormalizeProgram {
-    commands: Vec<NormalizeCommand>,
+    directives: Vec<NormalizeDirective>,
 }
 
 impl NormalizeProgram {
     pub fn process_files(&self, files: &mut [AudioFile]) -> Result<()> {
-        for command in &self.commands {
-            command.apply(files)?;
+        for directive in &self.directives {
+            directive.apply(files)?;
         }
 
         for file in files {
@@ -27,16 +27,16 @@ impl NormalizeProgram {
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum NormalizeCommand {
+pub enum NormalizeDirective {
     Retain(Retain),
     Collapse(Collapse),
 }
 
-impl NormalizeCommand {
+impl NormalizeDirective {
     fn apply(&self, files: &mut [AudioFile]) -> Result<()> {
         match self {
-            NormalizeCommand::Retain(retain) => retain.apply(files),
-            NormalizeCommand::Collapse(collapse) => collapse.apply(files),
+            NormalizeDirective::Retain(retain) => retain.apply(files),
+            NormalizeDirective::Collapse(collapse) => collapse.apply(files),
         }
     }
 }
@@ -49,16 +49,35 @@ pub struct Retain {
 }
 
 impl Retain {
-    fn apply(&self, files: &mut [AudioFile]) -> Result<()> {
+    fn get_item_keys(&self) -> Result<Vec<&ItemKey>> {
         let retained_tags = self
             .tags
             .iter()
             .map(|tag| {
-                let key = ItemKeys::from_string(tag)?;
+                let tags = match tag.as_str() {
+                    "album" => vec![&ItemKey::AlbumTitle],
+                    "date" => {
+                        vec![
+                            &ItemKey::RecordingDate,
+                            &ItemKey::Year,
+                            &ItemKey::OriginalReleaseDate,
+                        ]
+                    },
+                    other => vec![ItemKeys::from_string(other)?],
+                };
 
-                Ok(key)
+                Ok(tags)
             })
-            .collect::<Result<Vec<&ItemKey>>>()?;
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+
+        Ok(retained_tags)
+    }
+
+    fn apply(&self, files: &mut [AudioFile]) -> Result<()> {
+        let retained_tags = self.get_item_keys()?;
 
         let tags_to_remove = ItemKeys::all()
             .iter()
@@ -117,28 +136,21 @@ mod test {
         let string = include_str!("../tests/normalize-deserialize.json");
 
         let reference = NormalizeProgram {
-            commands: vec![
-                NormalizeCommand::Retain(Retain {
-                    tags: vec![
-                        "genre".to_owned(),
-                        "albumartist".to_owned(),
-                        "artist".to_owned(),
-                        "album".to_owned(),
-                        "date".to_owned(),
-                        "year".to_owned(),
-                        "albumsort".to_owned(),
-                        "discnumber".to_owned(),
-                        "tracknumber".to_owned(),
-                        "title".to_owned(),
-                        "*replaygain*".to_owned(),
-                    ],
-                }),
-                NormalizeCommand::Collapse(Collapse {
-                    main_tag: "artist".to_owned(),
-                    optional_tags: vec!["albumartist".to_owned()],
-                    predicate: Predicate::Equal,
-                }),
-            ],
+            directives: vec![NormalizeDirective::Retain(Retain {
+                tags: vec![
+                    "genre".to_owned(),
+                    "albumartist".to_owned(),
+                    "artist".to_owned(),
+                    "album".to_owned(),
+                    "date".to_owned(),
+                    "year".to_owned(),
+                    "albumsort".to_owned(),
+                    "discnumber".to_owned(),
+                    "tracknumber".to_owned(),
+                    "title".to_owned(),
+                    "*replaygain*".to_owned(),
+                ],
+            })],
         };
 
         let program = parse_test_program(string, &reference)?;
@@ -149,6 +161,16 @@ mod test {
     #[test]
     fn test_deserialize() -> Result<()> {
         let program = parse_deserialize_test_program()?;
+
+        assert_eq!(program.directives.len(), 1);
+
+        let directive = &program.directives[0];
+
+        let NormalizeDirective::Retain(retain) = directive else {
+            panic!("Expected directive 'Retain', found {directive:?}",)
+        };
+
+        let retained_tags = retain.get_item_keys()?;
 
         Ok(())
     }
