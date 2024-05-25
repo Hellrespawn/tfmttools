@@ -1,30 +1,29 @@
 use std::collections::HashSet;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 
 mod validation;
 
-pub use validation::validate_move_actions;
-
-use crate::fs::FsHandler;
+pub use validation::validate_rename_actions;
 
 #[derive(PartialEq, Serialize, Deserialize, Debug)]
-pub struct Move {
+pub struct RenameAction {
     source: Utf8PathBuf,
     target: Utf8PathBuf,
 }
 
-impl Move {
+impl RenameAction {
     pub fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
         Self { source, target }
     }
 
-    pub fn filter_unchanged_destinations(move_actions: Vec<Move>) -> Vec<Move> {
-        move_actions
+    pub fn filter_unchanged_destinations(
+        rename_actions: Vec<RenameAction>,
+    ) -> Vec<RenameAction> {
+        rename_actions
             .into_iter()
-            .filter(Move::source_differs_from_target)
+            .filter(RenameAction::source_differs_from_target)
             .collect()
     }
 
@@ -40,9 +39,9 @@ impl Move {
         self.source() != self.target()
     }
 
-    pub fn create_actions(move_actions: Vec<Move>) -> Vec<Action> {
+    pub fn create_actions(rename_actions: Vec<RenameAction>) -> Vec<Action> {
         let target_paths =
-            move_actions.iter().map(Move::target).collect::<Vec<_>>();
+            rename_actions.iter().map(RenameAction::target).collect::<Vec<_>>();
 
         let mut actions =
             Self::list_all_intermediate_paths_of_files(&target_paths)
@@ -51,11 +50,7 @@ impl Move {
                 .map(Action::MakeDir)
                 .collect::<Vec<_>>();
 
-        actions.extend(
-            move_actions
-                .into_iter()
-                .map(|m| Action::Move { source: m.source, target: m.target }),
-        );
+        actions.extend(rename_actions.into_iter().map(Action::Rename));
 
         actions
     }
@@ -85,58 +80,14 @@ impl Move {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
-    Move { source: Utf8PathBuf, target: Utf8PathBuf },
+    Rename(RenameAction),
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
 }
 
 impl Action {
-    pub fn is_move(&self) -> bool {
-        matches!(self, Self::Move { .. })
-    }
-
-    pub fn is_mk_dir(&self) -> bool {
-        matches!(self, Self::MakeDir(_))
-    }
-
-    pub fn is_rm_dir(&self) -> bool {
-        matches!(self, Self::RemoveDir(_))
-    }
-
-    pub fn apply(&self, fs_handler: &FsHandler) -> Result<()> {
-        match self {
-            Action::Move { source, target } => {
-                fs_handler.move_file(source, target)?;
-            },
-            Action::MakeDir(path) => {
-                fs_handler.create_dir(path)?;
-            },
-            Action::RemoveDir(path) => {
-                fs_handler.remove_dir(path)?;
-            },
-        }
-
-        Ok(())
-    }
-
-    pub fn undo(&self, fs_handler: &FsHandler) -> Result<()> {
-        match self {
-            Action::Move { source, target } => {
-                fs_handler.move_file(target, source)?;
-            },
-            Action::MakeDir(path) => {
-                fs_handler.remove_dir(path)?;
-            },
-            Action::RemoveDir(path) => {
-                fs_handler.create_dir(path)?;
-            },
-        }
-
-        Ok(())
-    }
-
-    pub fn redo(&self, fs_handler: &FsHandler) -> Result<()> {
-        self.apply(fs_handler)
+    pub fn is_rename(&self) -> bool {
+        matches!(self, Self::Rename { .. })
     }
 }
 
@@ -167,7 +118,7 @@ mod test {
             paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
 
         let directories =
-            Move::list_all_intermediate_paths_of_files(&paths_ref);
+            RenameAction::list_all_intermediate_paths_of_files(&paths_ref);
 
         assert_eq!(directories, reference);
     }
@@ -195,7 +146,7 @@ mod test {
             paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
 
         let directories =
-            Move::list_all_intermediate_paths_of_files(&paths_ref);
+            RenameAction::list_all_intermediate_paths_of_files(&paths_ref);
 
         assert_eq!(directories, reference);
     }

@@ -4,9 +4,11 @@ use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use tfmttools_core::templates::Template;
 
-use super::{Template, TEMPLATE_EXTENSIONS};
-use crate::fs::PathIterator;
+use crate::PathIterator;
+
+pub const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
 #[derive(Debug)]
 pub struct TemplateLoader<'tl> {

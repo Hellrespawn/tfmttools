@@ -19,6 +19,7 @@ debug = []
 
 [dependencies]
 tfmttools-core = { path = "../tfmttools-core" }
+tfmttools-fs = { path = "../tfmttools-fs" }
 tfmttools-history = { path = "../tfmttools-history" }
 camino = { workspace = true, features = ["serde", "serde1"] }
 clap = { workspace = true, features = ["derive", "wrap_help"] }

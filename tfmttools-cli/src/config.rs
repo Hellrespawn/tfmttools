@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use tfmttools_core::fs::FsHandler;
+use tfmttools_fs::FsHandler;
 use tfmttools_history::HistoryMode;
 
 use super::args::Args;

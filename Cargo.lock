@@ -1072,7 +1072,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-cli"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
@@ -1087,6 +1087,7 @@ dependencies = [
  "once_cell",
  "textwrap",
  "tfmttools-core",
+ "tfmttools-fs",
  "tfmttools-history",
  "tracing",
  "tracing-appender",
@@ -1095,17 +1096,14 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-core"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "camino",
  "color-eyre",
  "convert_case",
- "fs-err",
- "ignore",
  "lofty",
  "minijinja",
  "once_cell",
- "regex",
  "serde",
  "serde_json",
  "tfmttools-history",
@@ -1113,8 +1111,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tfmttools-fs"
+version = "0.19.0"
+dependencies = [
+ "camino",
+ "color-eyre",
+ "fs-err",
+ "ignore",
+ "minijinja",
+ "once_cell",
+ "regex",
+ "tfmttools-core",
+ "tracing",
+]
+
+[[package]]
 name = "tfmttools-history"
-version = "0.18.0"
+version = "0.19.0"
 dependencies = [
  "camino",
  "chrono",

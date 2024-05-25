@@ -1,7 +1,8 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
 use textwrap::Options;
-use tfmttools_core::templates::{Template, TemplateLoader};
+use tfmttools_core::templates::Template;
+use tfmttools_fs::TemplateLoader;
 
 use super::Command;
 use crate::config::Config;

@@ -6,8 +6,8 @@ use minijinja::Value;
 use tracing::trace;
 
 use crate::audiofile::AudioFile;
-use crate::fs::FORBIDDEN_CHARACTERS;
 use crate::item_keys::ItemKeys;
+use crate::FORBIDDEN_CHARACTERS;
 
 #[derive(Debug)]
 #[allow(dead_code)]

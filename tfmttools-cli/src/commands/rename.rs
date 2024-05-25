@@ -1,11 +1,14 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use tfmttools_core::action::{validate_move_actions, Action, Move};
+use tfmttools_core::action::{validate_rename_actions, Action, RenameAction};
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::fs::{self, PathIterator, RemoveDirResult};
 use tfmttools_core::history::ActionRecordMetadata;
-use tfmttools_core::templates::{Template, TemplateLoader};
+use tfmttools_core::templates::Template;
+use tfmttools_fs::{
+    get_longest_common_prefix, ActionHandler, PathIterator, RemoveDirResult,
+    TemplateLoader,
+};
 use tfmttools_history::{Record, SaveHistoryResult};
 use tracing::debug;
 
@@ -82,20 +85,21 @@ impl<'a> InnerRename<'a> {
 
         let files = self.gather_files()?;
 
-        let move_actions = self.create_move_actions(&template, &files)?;
-        let move_actions = Move::filter_unchanged_destinations(move_actions);
+        let rename_actions = self.create_rename_actions(&template, &files)?;
+        let rename_actions =
+            RenameAction::filter_unchanged_destinations(rename_actions);
 
-        if move_actions.is_empty() {
+        if rename_actions.is_empty() {
             println!("There are no audio files to rename.");
             Ok(())
         } else {
-            Self::validate_move_actions(&move_actions)?;
+            Self::validate_rename_actions(&rename_actions)?;
 
             let confirmation = self.options.force
-                || self.confirm_move_actions(&move_actions)?;
+                || self.confirm_rename_actions(&rename_actions)?;
 
             if confirmation {
-                let actions = self.perform_move_actions(move_actions)?;
+                let actions = self.perform_rename_actions(rename_actions)?;
 
                 self.store_history(actions)?;
             } else {
@@ -137,11 +141,11 @@ impl<'a> InnerRename<'a> {
         file_paths
     }
 
-    fn create_move_actions(
+    fn create_rename_actions(
         &self,
         template: &Template,
         files: &[AudioFile],
-    ) -> Result<Vec<Move>> {
+    ) -> Result<Vec<RenameAction>> {
         let cwd = self.config.working_directory()?;
 
         let options = ProgressBarOptions::bar(
@@ -151,10 +155,10 @@ impl<'a> InnerRename<'a> {
 
         let bar = ProgressBar::with_length(options, files.len() as u64);
 
-        let move_actions: Result<Vec<Move>> = files
+        let rename_actions: Result<Vec<RenameAction>> = files
             .iter()
             .map(|audiofile| {
-                Ok(Move::new(
+                Ok(RenameAction::new(
                     audiofile.path().to_owned(),
                     audiofile.construct_target_path(template, &cwd)?,
                 ))
@@ -171,11 +175,11 @@ impl<'a> InnerRename<'a> {
 
         println!();
 
-        move_actions
+        rename_actions
     }
 
-    fn validate_move_actions(move_actions: &[Move]) -> Result<()> {
-        let validation_errors = validate_move_actions(move_actions);
+    fn validate_rename_actions(rename_actions: &[RenameAction]) -> Result<()> {
+        let validation_errors = validate_rename_actions(rename_actions);
 
         if validation_errors.is_empty() {
             Ok(())
@@ -184,28 +188,31 @@ impl<'a> InnerRename<'a> {
         }
     }
 
-    fn confirm_move_actions(&self, move_actions: &[Move]) -> Result<bool> {
+    fn confirm_rename_actions(
+        &self,
+        rename_actions: &[RenameAction],
+    ) -> Result<bool> {
         let cwd = self.config.working_directory()?;
 
-        Self::preview_move_actions(move_actions, &cwd)?;
+        Self::preview_rename_actions(rename_actions, &cwd)?;
 
         let confirmation_prompt = ConfirmationPrompt::new("Move files?");
 
         confirmation_prompt.prompt()
     }
 
-    fn preview_move_actions(
-        move_actions: &[Move],
+    fn preview_rename_actions(
+        rename_actions: &[RenameAction],
         working_directory: &Utf8Path,
     ) -> Result<()> {
         const LEADING_LINES: usize = 3;
         const TRAILING_LINES: usize = 3;
 
-        let iter = move_actions.iter().map(|move_action| {
-            let path = move_action
+        let iter = rename_actions.iter().map(|rename_action| {
+            let path = rename_action
                 .target()
                 .strip_prefix(working_directory)
-                .unwrap_or(move_action.target());
+                .unwrap_or(rename_action.target());
 
             if path.is_relative() {
                 format!(".{}{path}", std::path::MAIN_SEPARATOR)
@@ -224,15 +231,18 @@ impl<'a> InnerRename<'a> {
         Ok(())
     }
 
-    fn perform_move_actions(
+    fn perform_rename_actions(
         &self,
-        move_actions: Vec<Move>,
+        rename_actions: Vec<RenameAction>,
     ) -> Result<Vec<Action>> {
-        let common_prefix = fs::get_longest_common_prefix(
-            &move_actions.iter().map(Move::source).collect::<Vec<_>>(),
+        let common_prefix = get_longest_common_prefix(
+            &rename_actions
+                .iter()
+                .map(RenameAction::source)
+                .collect::<Vec<_>>(),
         );
 
-        let mut actions = self.move_files(move_actions)?;
+        let mut actions = self.move_files(rename_actions)?;
 
         debug!("Common prefix of path: {:?}", common_prefix);
 
@@ -258,17 +268,23 @@ impl<'a> InnerRename<'a> {
         Ok(actions)
     }
 
-    fn move_files(&self, move_actions: Vec<Move>) -> Result<Vec<Action>> {
+    fn move_files(
+        &self,
+        rename_actions: Vec<RenameAction>,
+    ) -> Result<Vec<Action>> {
         let options = ProgressBarOptions::bar("Moving files:", "Moved files.")?;
 
-        let bar = ProgressBar::with_length(options, move_actions.len() as u64);
+        let bar =
+            ProgressBar::with_length(options, rename_actions.len() as u64);
 
-        let actions = Move::create_actions(move_actions);
+        let actions = RenameAction::create_actions(rename_actions);
+
+        let handler = ActionHandler::new(self.config.fs_handler());
 
         for action in &actions {
-            action.apply(self.config.fs_handler())?;
+            handler.apply(action)?;
 
-            if action.is_move() {
+            if action.is_rename() {
                 bar.inc_found();
 
                 #[cfg(feature = "debug")]
