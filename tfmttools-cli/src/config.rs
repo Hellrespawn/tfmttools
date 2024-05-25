@@ -5,13 +5,13 @@ use tfmttools_core::fs::FsHandler;
 use tfmttools_history::HistoryMode;
 
 use super::args::Args;
-use super::commands::list_templates::ListTemplates;
-use super::commands::rename::Rename;
-use super::commands::undo_redo::UndoRedo;
+use super::commands::list_templates::ListTemplatesCommand;
+use super::commands::rename::RenameCommand;
+use super::commands::undo_redo::UndoRedoCommand;
 use super::commands::Command;
 use crate::args::Subcommand;
-use crate::commands::clear_history::ClearHistory;
-use crate::commands::show_history::ShowHistory;
+use crate::commands::clear_history::ClearHistoryCommand;
+use crate::commands::show_history::ShowHistoryCommand;
 
 pub fn default_input_dir() -> Result<Utf8PathBuf> {
     let path = std::env::current_dir()?;
@@ -48,13 +48,13 @@ impl Config {
         let fs_handler = FsHandler::new(args.dry_run);
 
         let command: Box<dyn Command> = match args.command {
-            Subcommand::ClearHistory => Box::new(ClearHistory),
+            Subcommand::ClearHistory => Box::new(ClearHistoryCommand),
             Subcommand::Templates(list_templates) => {
                 let template_directory = Self::get_template_directory(
                     list_templates.custom_template_directory,
                 )?;
 
-                Box::new(ListTemplates::new(template_directory))
+                Box::new(ListTemplatesCommand::new(template_directory))
             },
             Subcommand::Rename(rename) => {
                 let input_dir =
@@ -64,7 +64,7 @@ impl Config {
                     rename.custom_template_directory,
                 )?;
 
-                Box::new(Rename::new(
+                Box::new(RenameCommand::new(
                     input_dir,
                     template_directory,
                     rename.force,
@@ -74,21 +74,21 @@ impl Config {
                 ))
             },
             Subcommand::Undo(undo_redo) => {
-                Box::new(UndoRedo::new(
+                Box::new(UndoRedoCommand::new(
                     undo_redo.force,
                     undo_redo.amount.unwrap_or(1),
                     HistoryMode::Undo,
                 ))
             },
             Subcommand::Redo(undo_redo) => {
-                Box::new(UndoRedo::new(
+                Box::new(UndoRedoCommand::new(
                     undo_redo.force,
                     undo_redo.amount.unwrap_or(1),
                     HistoryMode::Redo,
                 ))
             },
             Subcommand::History(show_history) => {
-                Box::new(ShowHistory::new(show_history.verbose))
+                Box::new(ShowHistoryCommand::new(show_history.verbose))
             },
         };
 

@@ -6,9 +6,9 @@ use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::ConfirmationPrompt;
 
 #[derive(Debug)]
-pub struct ClearHistory;
+pub struct ClearHistoryCommand;
 
-impl Command for ClearHistory {
+impl Command for ClearHistoryCommand {
     fn run(&self, config: &Config) -> Result<()> {
         let path = &config.history_file();
 

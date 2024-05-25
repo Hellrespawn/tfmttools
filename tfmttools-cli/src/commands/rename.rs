@@ -20,7 +20,7 @@ use crate::util::FileOrName;
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 
 #[derive(Debug)]
-pub struct Rename {
+pub struct RenameCommand {
     input_directory: Utf8PathBuf,
     template_directory: Utf8PathBuf,
 
@@ -32,7 +32,7 @@ pub struct Rename {
     arguments: Vec<String>,
 }
 
-impl Rename {
+impl RenameCommand {
     pub fn new(
         input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
@@ -52,14 +52,14 @@ impl Rename {
     }
 }
 
-impl Command for Rename {
+impl Command for RenameCommand {
     fn run(&self, config: &Config) -> Result<()> {
         InnerRename { options: self, config }.rename()
     }
 }
 
 struct InnerRename<'ir> {
-    options: &'ir Rename,
+    options: &'ir RenameCommand,
     config: &'ir Config,
 }
 

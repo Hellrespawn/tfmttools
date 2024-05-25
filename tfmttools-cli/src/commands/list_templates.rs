@@ -8,11 +8,11 @@ use crate::config::Config;
 use crate::TERM;
 
 #[derive(Debug)]
-pub struct ListTemplates {
+pub struct ListTemplatesCommand {
     template_directory: Utf8PathBuf,
 }
 
-impl ListTemplates {
+impl ListTemplatesCommand {
     pub fn new(template_directory: Utf8PathBuf) -> Self {
         Self { template_directory }
     }
@@ -34,7 +34,7 @@ impl ListTemplates {
     }
 }
 
-impl Command for ListTemplates {
+impl Command for ListTemplatesCommand {
     fn run(&self, _config: &Config) -> Result<()> {
         let loader = TemplateLoader::read_directory(&self.template_directory)?;
 

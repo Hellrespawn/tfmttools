@@ -10,7 +10,7 @@ use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
-pub struct UndoRedo {
+pub struct UndoRedoCommand {
     force: bool,
 
     amount: usize,
@@ -18,7 +18,7 @@ pub struct UndoRedo {
     formatter: HistoryFormatter,
 }
 
-impl UndoRedo {
+impl UndoRedoCommand {
     pub fn new(force: bool, amount: usize, mode: HistoryMode) -> Self {
         Self {
             force,
@@ -159,7 +159,7 @@ impl UndoRedo {
     }
 }
 
-impl Command for UndoRedo {
+impl Command for UndoRedoCommand {
     fn run(&self, config: &Config) -> Result<()> {
         self.undo_redo(config)
     }

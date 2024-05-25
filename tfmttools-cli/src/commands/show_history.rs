@@ -8,11 +8,11 @@ use crate::history::{
 };
 
 #[derive(Debug)]
-pub struct ShowHistory {
+pub struct ShowHistoryCommand {
     formatter: HistoryFormatter,
 }
 
-impl ShowHistory {
+impl ShowHistoryCommand {
     pub fn new(verbosity: u8) -> Self {
         let formatter =
             HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
@@ -27,7 +27,7 @@ impl ShowHistory {
     }
 }
 
-impl Command for ShowHistory {
+impl Command for ShowHistoryCommand {
     fn run(&self, config: &Config) -> Result<()> {
         let load_history_result = load_history(config)?;
 
