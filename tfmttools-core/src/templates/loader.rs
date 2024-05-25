@@ -77,16 +77,15 @@ impl<'tl> TemplateLoader<'tl> {
         let source = template.source();
 
         let syntax = self.environment.syntax();
+        let (comment_start, comment_end) = syntax.comment_delimiters();
 
-        if source.trim().starts_with(syntax.comment_start.as_ref()) {
-            let option = source.split_once(syntax.comment_end.as_ref()).map(
-                |(left, _)| {
-                    left.replace(syntax.comment_start.as_ref(), "")
-                        .replace(syntax.comment_end.as_ref(), "")
-                        .trim()
-                        .to_owned()
-                },
-            );
+        if source.trim().starts_with(comment_start) {
+            let option = source.split_once(comment_end).map(|(left, _)| {
+                left.replace(comment_start, "")
+                    .replace(comment_end, "")
+                    .trim()
+                    .to_owned()
+            });
 
             option
         } else {

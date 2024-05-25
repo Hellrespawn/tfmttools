@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.17.4"
+version = "0.18.0"
 authors = ["Stef Korporaal <stef@skorporaal.com>"]
 description = "Use `minijinja` to rename audio files according to their tags."
 edition = "2021"
@@ -14,49 +14,32 @@ members = ["tfmttools-core", "tfmttools-history", "tfmttools-cli"]
 default-members = ["tfmttools-cli"]
 resolver = "2"
 
-# Config for 'cargo dist'
-[workspace.metadata.dist]
-# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.8.0"
-# CI backends to support
-ci = ["github"]
-# The installers to generate for each app
-installers = ["shell", "powershell"]
-# Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Publish jobs to run in CI
-pr-run-mode = "plan"
-
 [workspace.dependencies]
-assert_cmd = "2.0"
-assert_fs = "1.1"
-camino = "1.1"
-chrono = "0.4"
-clap = "4.5"
-color-eyre = "0.6"
-console = "0.15"
-convert_case = "0.6"
-ctrlc = "3.4"
-dirs = "5.0"
-fs-err = "2.11"
-ignore = "0.4"
-indicatif = "0.17"
-lofty = "0.18"
-minijinja = "1.0"
-once_cell = "1.19"
-regex = "1.10"
-serde = "1.0"
-serde_json = "1.0"
-textwrap = "0.16"
-thiserror = "1.0"
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-subscriber = "0.3"
+assert_cmd = "2.0.14"
+assert_fs = "1.1.1"
+camino = "1.1.7"
+chrono = "0.4.38"
+clap = "4.5.4"
+color-eyre = "0.6.3"
+console = "0.15.8"
+convert_case = "0.6.0"
+ctrlc = "3.4.4"
+dirs = "5.0.1"
+fs-err = "2.11.0"
+ignore = "0.4.22"
+indicatif = "0.17.8"
+lofty = "0.19.2"
+minijinja = "2.0.1"
+once_cell = "1.19.0"
+regex = "1.10.4"
+serde = "1.0.202"
+serde_json = "1.0.117"
+textwrap = "0.16.1"
+thiserror = "1.0.61"
+tracing = "0.1.40"
+tracing-appender = "0.2.3"
+tracing-subscriber = "0.3.18"
 
 [profile.release]
 strip = true # Automatically strip symbols from the binary.
 lto = "thin"
-
-# The profile that 'cargo dist' will build with
-[profile.dist]
-inherits = "release"

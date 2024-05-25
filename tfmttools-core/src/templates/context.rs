@@ -1,5 +1,7 @@
-use lofty::ItemKey;
-use minijinja::value::StructObject;
+use std::sync::Arc;
+
+use lofty::tag::ItemKey;
+use minijinja::value::Object;
 use minijinja::Value;
 use tracing::trace;
 
@@ -59,7 +61,7 @@ impl AudioFileContext {
         tag
     }
 
-    fn get_value(&self, key: &ItemKey) -> Option<Value> {
+    fn get_value_for_item_key(&self, key: &ItemKey) -> Option<Value> {
         let string = self.process_mode(self.read_value(key)?);
 
         if let Ok(number) = string.parse::<usize>() {
@@ -101,14 +103,18 @@ impl AudioFileContext {
     }
 
     fn get_date(&self) -> Option<Value> {
-        self.get_value(&ItemKey::RecordingDate)
-            .or_else(|| self.get_value(&ItemKey::Year))
-            .or_else(|| self.get_value(&ItemKey::OriginalReleaseDate))
+        self.get_value_for_item_key(&ItemKey::RecordingDate)
+            .or_else(|| self.get_value_for_item_key(&ItemKey::Year))
+            .or_else(|| {
+                self.get_value_for_item_key(&ItemKey::OriginalReleaseDate)
+            })
     }
 }
 
-impl StructObject for AudioFileContext {
-    fn get_field(&self, field: &str) -> Option<Value> {
+impl Object for AudioFileContext {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let field = key.as_str()?;
+
         match field {
             "args" | "Args" | "ARGS" | "arguments" | "Arguments"
             | "ARGUMENTS" => Some(self.arguments.clone().into()),
@@ -123,7 +129,7 @@ impl StructObject for AudioFileContext {
                     ItemKey::TrackTotal => self.get_total(key),
                     ItemKey::MovementNumber => self.get_current(key),
                     ItemKey::MovementTotal => self.get_total(key),
-                    _ => self.get_value(key),
+                    _ => self.get_value_for_item_key(key),
                 }
             },
         }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use convert_case::{Case, Casing};
-use lofty::ItemKey;
+use lofty::tag::ItemKey;
 use once_cell::sync::Lazy;
 use tracing::trace;
 

@@ -1,7 +1,8 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use lofty::{Tag, TaggedFileExt};
+use lofty::file::TaggedFileExt;
+use lofty::tag::Tag;
 
 use crate::templates::Template;
 use crate::util::normalize_separators;

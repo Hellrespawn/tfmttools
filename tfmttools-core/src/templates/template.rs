@@ -31,14 +31,14 @@ impl<'templates, 'source> Template<'templates, 'source> {
     }
 
     pub fn render(&self, audio_file: &AudioFile) -> Result<String> {
-        let struct_object = AudioFileContext::safe(
+        let context = AudioFileContext::safe(
             audio_file.to_owned(),
             self.arguments.clone(),
         );
 
-        let context = Value::from_struct_object(struct_object);
+        let context_value = Value::from_object(context);
 
-        let output = self.inner.render(&context)?;
+        let output = self.inner.render(&context_value)?;
 
         Ok(output)
     }
