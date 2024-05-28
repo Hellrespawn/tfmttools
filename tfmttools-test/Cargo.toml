@@ -1,0 +1,24 @@
+[package]
+name = "tfmttools-test"
+
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+version.workspace = true
+
+[features]
+debug = []
+
+[dependencies]
+assert_cmd = { workspace = true }
+assert_fs = { workspace = true }
+color-eyre = { workspace = true }
+fs-err = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+termtree = { workspace = true }
+textwrap = { workspace = true }

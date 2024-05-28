@@ -67,7 +67,7 @@ impl Config {
                 Box::new(RenameCommand::new(
                     input_dir,
                     template_directory,
-                    rename.force,
+                    rename.yes,
                     rename.recursion_depth,
                     rename.template,
                     rename.arguments,
@@ -75,14 +75,14 @@ impl Config {
             },
             Subcommand::Undo(undo_redo) => {
                 Box::new(UndoRedoCommand::new(
-                    undo_redo.force,
+                    undo_redo.yes,
                     undo_redo.amount.unwrap_or(1),
                     HistoryMode::Undo,
                 ))
             },
             Subcommand::Redo(undo_redo) => {
                 Box::new(UndoRedoCommand::new(
-                    undo_redo.force,
+                    undo_redo.yes,
                     undo_redo.amount.unwrap_or(1),
                     HistoryMode::Redo,
                 ))

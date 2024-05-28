@@ -27,7 +27,7 @@ pub struct RenameCommand {
     input_directory: Utf8PathBuf,
     template_directory: Utf8PathBuf,
 
-    force: bool,
+    yes: bool,
 
     recursion_depth: usize,
 
@@ -39,7 +39,7 @@ impl RenameCommand {
     pub fn new(
         input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
-        force: bool,
+        yes: bool,
         recursion_depth: Option<usize>,
         template: FileOrName,
         arguments: Vec<String>,
@@ -47,7 +47,7 @@ impl RenameCommand {
         Self {
             input_directory,
             template_directory,
-            force,
+            yes,
             recursion_depth: recursion_depth.unwrap_or(DEFAULT_RECURSION_DEPTH),
             template,
             arguments,
@@ -95,7 +95,7 @@ impl<'a> InnerRename<'a> {
         } else {
             Self::validate_rename_actions(&rename_actions)?;
 
-            let confirmation = self.options.force
+            let confirmation = self.options.yes
                 || self.confirm_rename_actions(&rename_actions)?;
 
             if confirmation {

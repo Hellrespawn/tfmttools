@@ -36,5 +36,5 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [dev-dependencies]
-assert_cmd = { workspace = true }
+tfmttools-test = { path = "../tfmttools-test" }
 assert_fs = { workspace = true }

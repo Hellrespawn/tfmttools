@@ -11,7 +11,7 @@ use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
 pub struct UndoRedoCommand {
-    force: bool,
+    yes: bool,
 
     amount: usize,
     mode: HistoryMode,
@@ -19,9 +19,9 @@ pub struct UndoRedoCommand {
 }
 
 impl UndoRedoCommand {
-    pub fn new(force: bool, amount: usize, mode: HistoryMode) -> Self {
+    pub fn new(yes: bool, amount: usize, mode: HistoryMode) -> Self {
         Self {
-            force,
+            yes,
             amount,
             mode,
             formatter: HistoryFormatter::new()
@@ -59,7 +59,7 @@ impl UndoRedoCommand {
                     println!("There are no runs to {verb}.");
                 } else {
                     let confirmation =
-                        self.force || self.confirm_undo_redo(&records)?;
+                        self.yes || self.confirm_undo_redo(&records)?;
 
                     if confirmation {
                         self.perform_undo_redo_actions(

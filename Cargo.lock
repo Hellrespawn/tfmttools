@@ -1074,7 +1074,6 @@ dependencies = [
 name = "tfmttools-cli"
 version = "0.19.0"
 dependencies = [
- "assert_cmd",
  "assert_fs",
  "camino",
  "clap",
@@ -1089,6 +1088,7 @@ dependencies = [
  "tfmttools-core",
  "tfmttools-fs",
  "tfmttools-history",
+ "tfmttools-test",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -1136,6 +1136,20 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "tfmttools-test"
+version = "0.19.0"
+dependencies = [
+ "assert_cmd",
+ "assert_fs",
+ "color-eyre",
+ "fs-err",
+ "serde",
+ "serde_json",
+ "termtree",
+ "textwrap",
 ]
 
 [[package]]

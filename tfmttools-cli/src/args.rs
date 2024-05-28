@@ -77,7 +77,7 @@ pub struct Rename {
 
     #[arg(short, long)]
     /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub force: bool,
+    pub yes: bool,
 
     /// Path to or name of template.
     pub template: FileOrName,
@@ -94,14 +94,14 @@ pub struct Seed {
 
     #[arg(short, long)]
     /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub force: bool,
+    pub yes: bool,
 }
 
 #[derive(ClapArgs, Debug)]
 pub struct UndoRedo {
     #[arg(short, long)]
     /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub force: bool,
+    pub yes: bool,
 
     /// Amount of actions.
     pub amount: Option<usize>,
