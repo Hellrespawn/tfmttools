@@ -7,7 +7,7 @@ use color_eyre::Result;
 use fs_err as fs;
 use once_cell::sync::Lazy;
 
-const TEST_DATA_DIRECTORY: &str = "tests/testdata/";
+const TEST_DATA_DIRECTORY: &str = "../testdata/";
 
 static INITIAL_CONFIG_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
     vec!["config/simple_input.tfmt", "config/typical_input.tfmt"]
@@ -22,6 +22,7 @@ static INITIAL_FILE_REFERENCE: Lazy<Vec<String>> = Lazy::new(|| {
         "files/Damjan Mravunac - Welcome To Heaven.ogg",
         "files/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
         "files/MASTER BOOT RECORD - Dune.mp3",
+        "files/MASTER BOOT RECORD - MYTH.NFO.mp3",
         "files/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
         "files/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
         "files/Nightwish - Elvenpath (Live).mp3",
