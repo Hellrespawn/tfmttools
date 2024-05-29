@@ -3,10 +3,11 @@ use std::path::Path;
 
 use color_eyre::Result;
 use serde::Deserialize;
+use tfmttools_fs::FileOrName;
 
 #[derive(Deserialize)]
 pub struct TemplateReference {
-    pub template: String,
+    pub template: FileOrName,
     pub reference: HashMap<String, String>,
     pub arguments: Option<Vec<String>>,
 }

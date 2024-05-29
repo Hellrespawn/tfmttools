@@ -4,6 +4,7 @@ mod test_case;
 pub use test_case::TestCase;
 
 pub static TEST_DATA_DIRECTORY: &str = "../testdata";
+
 pub static TEST_CASE_DIR_NAME: &str = "cases";
 pub static TEST_AUDIO_FILE_DIR_NAME: &str = "files";
 pub static TEST_TEMPLATE_DIR_NAME: &str = "template";

@@ -1,4 +1,5 @@
 use camino::Utf8PathBuf;
+use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileOrName {
@@ -23,5 +24,16 @@ impl FileOrName {
         match self {
             FileOrName::Name(s) | FileOrName::File(_, s) => s,
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for FileOrName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let string: &str = Deserialize::deserialize(deserializer)?;
+
+        Ok(FileOrName::from(string.to_owned()))
     }
 }

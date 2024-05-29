@@ -1121,6 +1121,7 @@ dependencies = [
  "minijinja",
  "once_cell",
  "regex",
+ "serde",
  "tfmttools-core",
  "tracing",
 ]
@@ -1150,6 +1151,7 @@ dependencies = [
  "serde_json",
  "termtree",
  "textwrap",
+ "tfmttools-fs",
 ]
 
 [[package]]

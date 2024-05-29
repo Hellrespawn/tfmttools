@@ -1,5 +1,5 @@
 {
-  "template": "typical_input.tfmt",
+  "template": "typical_input",
   "reference": {
     "Amon Amarth - Under Siege.mp3": "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
     "Damjan Mravunac - Welcome To Heaven.ogg": "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",

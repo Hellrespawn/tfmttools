@@ -15,15 +15,14 @@ version.workspace = true
 tfmttools-core = { path = "../tfmttools-core" }
 camino = { workspace = true, features = ["serde", "serde1"] }
 color-eyre = { workspace = true }
-# convert_case = { workspace = true }
 fs-err = { workspace = true }
 ignore = { workspace = true }
-# lofty = { workspace = true }
-minijinja = { workspace = true, features = ["loader", "custom_syntax", "debug"] }
+minijinja = { workspace = true, features = [
+    "loader",
+    "custom_syntax",
+    "debug",
+] }
 once_cell = { workspace = true }
 regex = { workspace = true }
-# serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true }
 tracing = { workspace = true }
-
-# [dev-dependencies]
-# serde_json = { workspace = true }

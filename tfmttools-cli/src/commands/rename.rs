@@ -6,8 +6,8 @@ use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
-    get_longest_common_prefix, ActionHandler, PathIterator, RemoveDirResult,
-    TemplateLoader,
+    get_longest_common_prefix, ActionHandler, FileOrName, PathIterator,
+    RemoveDirResult, TemplateLoader,
 };
 use tfmttools_history::{Record, SaveHistoryResult};
 use tracing::debug;
@@ -18,7 +18,6 @@ use crate::history::load_history;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
 };
-use crate::util::FileOrName;
 
 const DEFAULT_RECURSION_DEPTH: usize = 4;
 

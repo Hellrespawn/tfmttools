@@ -1,7 +1,6 @@
 use camino::Utf8PathBuf;
 use clap::{Args as ClapArgs, Parser, Subcommand as ClapSubcommand};
-
-use crate::util::FileOrName;
+use tfmttools_fs::FileOrName;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

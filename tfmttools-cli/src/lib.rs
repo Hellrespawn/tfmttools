@@ -9,7 +9,6 @@ mod commands;
 mod config;
 mod history;
 mod ui;
-mod util;
 
 pub mod cli;
 
