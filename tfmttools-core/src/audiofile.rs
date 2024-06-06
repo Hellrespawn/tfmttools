@@ -27,7 +27,8 @@ impl AudioFile {
     pub fn new(path: &Utf8Path) -> Result<AudioFile> {
         let path = path.to_owned();
 
-        let tagged_file = lofty::read_from_path(&path)?;
+        let tagged_file = lofty::read_from_path(&path)
+            .map_err(|e| eyre!("parsing {}:\n{}", path, e))?;
 
         let tag = tagged_file
             .primary_tag()

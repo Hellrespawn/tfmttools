@@ -183,7 +183,7 @@ impl<'a> InnerRename<'a> {
         if validation_errors.is_empty() {
             Ok(())
         } else {
-            Err(eyre!("Had validation errors:"))
+            Err(eyre!("Had validation errors:\n{validation_errors:#?}"))
         }
     }
 

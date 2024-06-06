@@ -32,16 +32,23 @@ impl AudioFileContext {
     fn process_mode(&self, value: String) -> String {
         match self.mode {
             InterpolationMode::Normal => value,
-            InterpolationMode::Safe => {
-                FORBIDDEN_CHARACTERS.iter().fold(
-                    value,
-                    |string, (char, replacement)| {
-                        string.replace(*char, replacement.unwrap_or(""))
-                    },
-                )
-            },
+            InterpolationMode::Safe => Self::remove_forbidden_characters(value),
+
             InterpolationMode::Strict => unimplemented!(),
         }
+    }
+
+    fn remove_forbidden_characters(value: String) -> String {
+        let value = FORBIDDEN_CHARACTERS.iter().fold(
+            value,
+            |string, (char, replacement)| {
+                string.replace(*char, replacement.unwrap_or(""))
+            },
+        );
+
+        let value = value.trim_end_matches('.');
+
+        value.to_owned()
     }
 
     fn read_value(&self, key: &ItemKey) -> Option<String> {

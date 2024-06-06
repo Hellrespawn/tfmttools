@@ -4,6 +4,7 @@ use camino::Utf8Path;
 
 use crate::action::RenameAction;
 
+#[derive(Debug)]
 pub enum ValidationError<'e> {
     DoubleSeparators(&'e RenameAction),
     Collision(Vec<&'e RenameAction>),
