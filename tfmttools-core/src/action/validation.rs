@@ -11,6 +11,36 @@ pub enum ValidationError<'e> {
     TargetExists(&'e RenameAction),
 }
 
+impl<'e> std::fmt::Display for ValidationError<'e> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValidationError::DoubleSeparators(action) => {
+                writeln!(
+                    f,
+                    "The target file contains double path separators."
+                )?;
+                writeln!(f, "\tsource: {}", action.source())?;
+                writeln!(f, "\target: {}", action.target())?;
+            },
+            ValidationError::Collision(actions) => {
+                writeln!(f, "These files all evaluate to the same target.")?;
+                for action in actions {
+                    writeln!(f, "\tsource: {}", action.source())?;
+                }
+
+                writeln!(f, "\target: {}", actions.first().unwrap().target())?;
+            },
+            ValidationError::TargetExists(action) => {
+                writeln!(f, "The target file already exists.")?;
+                writeln!(f, "\tsource: {}", action.source())?;
+                writeln!(f, "\target: {}", action.target())?;
+            },
+        }
+
+        Ok(())
+    }
+}
+
 pub fn validate_rename_actions(
     rename_actions: &[RenameAction],
 ) -> Vec<ValidationError> {

@@ -20,7 +20,6 @@ See also the "examples"-folder.
 
 ## TODO
 
-- Properly present validation errors
 - Handle extra long names
 - Do proper check for trailing period in folder / file name
 - Add year to singles?
@@ -29,4 +28,3 @@ See also the "examples"-folder.
 Check:
 
 - .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3
--

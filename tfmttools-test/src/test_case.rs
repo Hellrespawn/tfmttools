@@ -56,7 +56,7 @@ impl TestCase {
             .arg("--custom-template-directory")
             .arg(self.get_template_dest_dir())
             .arg("--yes")
-            .arg(&self.template.as_str());
+            .arg(self.template.as_str());
 
         for argument in &self.arguments {
             cmd.arg(argument);
