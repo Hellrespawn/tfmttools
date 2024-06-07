@@ -1,4 +1,3 @@
-use color_eyre::Result;
 use indicatif::{
     ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
@@ -16,7 +15,7 @@ impl ProgressBarOptions {
     pub fn bar(
         working_message: &'static str,
         finished_message: &'static str,
-    ) -> Result<Self> {
+    ) -> Self {
         Self::new(
             ProgressStyle::default_bar(),
             "[{pos}/{len}] {msg} {wide_bar}",
@@ -30,7 +29,7 @@ impl ProgressBarOptions {
         total: &str,
         working_message: &'static str,
         finished_message: &'static str,
-    ) -> Result<Self> {
+    ) -> Self {
         Self::new(
             ProgressStyle::default_spinner(),
             &format!(
@@ -46,8 +45,15 @@ impl ProgressBarOptions {
         template: &str,
         working_message: &'static str,
         finished_message: &'static str,
-    ) -> Result<Self> {
-        let style = style.template(template)?;
+    ) -> Self {
+        let style = match style.template(template) {
+            Ok(style) => style,
+            Err(err) => {
+                panic!(
+                    "Unable to parse indicatif template: '{template}'\n{err}",
+                )
+            },
+        };
 
         #[cfg(test)]
         let draw_target = ProgressDrawTarget::stdout();
@@ -57,7 +63,7 @@ impl ProgressBarOptions {
 
         let _ = TERM.hide_cursor();
 
-        Ok(Self { style, draw_target, working_message, finished_message })
+        Self { style, draw_target, working_message, finished_message }
     }
 }
 

@@ -14,7 +14,6 @@ version.workspace = true
 [dependencies]
 tfmttools-core = { path = "../tfmttools-core" }
 camino = { workspace = true, features = ["serde", "serde1"] }
-color-eyre = { workspace = true }
 fs-err = { workspace = true }
 ignore = { workspace = true }
 minijinja = { workspace = true, features = [
@@ -25,4 +24,5 @@ minijinja = { workspace = true, features = [
 once_cell = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }

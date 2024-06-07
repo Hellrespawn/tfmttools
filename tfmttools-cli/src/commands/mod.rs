@@ -1,4 +1,6 @@
 pub mod clear_history;
+pub mod copy_tags;
+pub mod fix;
 pub mod list_templates;
 pub mod rename;
 pub mod show_history;

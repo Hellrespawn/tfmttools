@@ -1,9 +1,7 @@
 use std::path::Path;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
-use color_eyre::Result;
-use fs_err as fs;
+use tfmttools_core::error::{TFMTError, TFMTResult};
 use tracing::trace;
 
 use crate::PathIterator;
@@ -57,7 +55,7 @@ impl FsHandler {
         C: AsRef<[u8]>,
     {
         if !self.dry_run {
-            fs::write(path, contents)
+            fs_err::write(path, contents)
         } else {
             Ok(())
         }
@@ -67,7 +65,7 @@ impl FsHandler {
         &self,
         source: &Utf8Path,
         target: &Utf8Path,
-    ) -> Result<MoveFileResult> {
+    ) -> TFMTResult<MoveFileResult> {
         if self.dry_run {
             Ok(MoveFileResult::DryRun)
         } else {
@@ -88,8 +86,8 @@ impl FsHandler {
                     let expected_error_code = 18;
 
                     if expected_error_code == error_code {
-                        fs::copy(source, target)?;
-                        fs::remove_file(source)?;
+                        fs_err::copy(source, target)?;
+                        fs_err::remove_file(source)?;
                         return Ok(MoveFileResult::CopiedAndRemoved);
                     }
 
@@ -103,33 +101,33 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_file(&self, path: &Utf8Path) -> Result<()> {
+    pub fn remove_file(&self, path: &Utf8Path) -> TFMTResult<()> {
         if !self.dry_run {
-            fs::remove_file(path)?;
+            fs_err::remove_file(path)?;
         }
 
         Ok(())
     }
 
-    pub fn create_dir(&self, path: &Utf8Path) -> Result<CreateDirResult> {
+    pub fn create_dir(&self, path: &Utf8Path) -> TFMTResult<CreateDirResult> {
         if self.dry_run {
             Ok(CreateDirResult::DryRun)
         } else if path.is_dir() {
             Ok(CreateDirResult::Exists)
         } else if path.exists() {
-            Err(eyre!("Path exists but is not a directory: {}", path))
+            Err(TFMTError::NotADirectory(path.to_owned()))
         } else {
-            fs::create_dir(path)?;
+            fs_err::create_dir(path)?;
 
             Ok(CreateDirResult::Created)
         }
     }
 
-    pub fn remove_dir(&self, path: &Utf8Path) -> Result<RemoveDirResult> {
+    pub fn remove_dir(&self, path: &Utf8Path) -> TFMTResult<RemoveDirResult> {
         if self.dry_run {
             Ok(RemoveDirResult::DryRun)
         } else {
-            let result = fs::remove_dir(path);
+            let result = fs_err::remove_dir(path);
 
             if let Err(io_error) = result {
                 if let Some(error_code) = io_error.raw_os_error() {
@@ -155,11 +153,14 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_dir_all(&self, path: &Utf8Path) -> Result<RemoveDirResult> {
+    pub fn remove_dir_all(
+        &self,
+        path: &Utf8Path,
+    ) -> TFMTResult<RemoveDirResult> {
         if self.dry_run {
             Ok(RemoveDirResult::DryRun)
         } else {
-            fs::remove_dir_all(path)?;
+            fs_err::remove_dir_all(path)?;
             Ok(RemoveDirResult::Removed)
         }
     }
@@ -168,7 +169,7 @@ impl FsHandler {
         &self,
         path: &Utf8Path,
         recursion_depth: usize,
-    ) -> Result<Vec<(Utf8PathBuf, RemoveDirResult)>> {
+    ) -> TFMTResult<Vec<(Utf8PathBuf, RemoveDirResult)>> {
         let dirs = gather_subdirectories(path, recursion_depth)
             .into_iter()
             .rev()
@@ -179,7 +180,7 @@ impl FsHandler {
 
                 Ok((p, removed))
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<TFMTResult<Vec<_>>>()?;
 
         Ok(dirs)
     }

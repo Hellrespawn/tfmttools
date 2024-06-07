@@ -1,11 +1,12 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
-use color_eyre::Result;
 use lofty::file::TaggedFileExt;
 use lofty::tag::Tag;
 
+use crate::error::{TFMTError, TFMTResult};
 use crate::templates::Template;
 use crate::util::normalize_separators;
+
+pub mod encoding;
 
 #[derive(Clone)]
 pub struct AudioFile {
@@ -24,30 +25,16 @@ impl std::fmt::Debug for AudioFile {
 impl AudioFile {
     pub const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
 
-    pub fn new(path: &Utf8Path) -> Result<AudioFile> {
-        let path = path.to_owned();
+    pub fn new(path: Utf8PathBuf) -> TFMTResult<AudioFile> {
+        let tagged_file = match lofty::read_from_path(&path) {
+            Ok(tagged_file) => tagged_file,
+            Err(err) => return Err(TFMTError::Lofty(path, err)),
+        };
 
-        let tagged_file = lofty::read_from_path(&path)
-            .map_err(|e| eyre!("parsing {}:\n{}", path, e))?;
-
-        let tag = tagged_file
-            .primary_tag()
-            .ok_or_else(|| eyre!("Unable to read primary tag for '{}'", path))?
-            .clone();
-
-        Ok(AudioFile { path, tag })
-    }
-
-    pub fn path_predicate(path: &Utf8Path) -> bool {
-        path.extension().map_or(false, |extension| {
-            for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
-                if extension == supported_extension {
-                    return true;
-                }
-            }
-
-            false
-        })
+        match tagged_file.primary_tag() {
+            Some(tag) => Ok(AudioFile { path, tag: tag.clone() }),
+            None => Err(TFMTError::NoPrimaryTag(path)),
+        }
     }
 
     pub fn path(&self) -> &Utf8Path {
@@ -66,7 +53,7 @@ impl AudioFile {
         &self,
         template: &Template,
         relative_path: &Utf8Path,
-    ) -> Result<Utf8PathBuf> {
+    ) -> TFMTResult<Utf8PathBuf> {
         let string = template.render(self)?;
 
         let string = normalize_separators(&string);
@@ -81,5 +68,17 @@ impl AudioFile {
 
     pub fn tag_mut(&mut self) -> &mut Tag {
         &mut self.tag
+    }
+
+    pub fn path_predicate(path: &Utf8Path) -> bool {
+        path.extension().map_or(false, |extension| {
+            for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
+                if extension == supported_extension {
+                    return true;
+                }
+            }
+
+            false
+        })
     }
 }

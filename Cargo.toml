@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.19.0"
+version = "0.20.0"
 authors = ["Stef Korporaal <stef@skorporaal.com>"]
 description = "Use `minijinja` to rename audio files according to their tags."
 edition = "2021"
@@ -15,7 +15,7 @@ members = [
     "tfmttools-cli",
     "tfmttools-fs",
     "tfmttools-history",
-    "tfmttools-test"
+    "tfmttools-test",
 ]
 default-members = ["tfmttools-cli"]
 resolver = "2"
@@ -32,6 +32,7 @@ convert_case = "0.6.0"
 ctrlc = "3.4.4"
 dirs = "5.0.1"
 fs-err = "2.11.0"
+id3 = "1.13.1"
 ignore = "0.4.22"
 indicatif = "0.17.8"
 lofty = "0.20.0"

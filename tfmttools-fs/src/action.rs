@@ -1,5 +1,5 @@
-use color_eyre::Result;
 use tfmttools_core::action::Action;
+use tfmttools_core::error::TFMTResult;
 
 use crate::fs::FsHandler;
 
@@ -12,7 +12,7 @@ impl<'a> ActionHandler<'a> {
         Self { fs_handler }
     }
 
-    pub fn apply(&self, action: &Action) -> Result<()> {
+    pub fn apply(&self, action: &Action) -> TFMTResult<()> {
         match action {
             Action::Rename(rename_action) => {
                 self.fs_handler.move_file(
@@ -31,7 +31,7 @@ impl<'a> ActionHandler<'a> {
         Ok(())
     }
 
-    pub fn undo(&self, action: &Action) -> Result<()> {
+    pub fn undo(&self, action: &Action) -> TFMTResult<()> {
         match action {
             Action::Rename(rename_action) => {
                 self.fs_handler.move_file(
@@ -50,7 +50,7 @@ impl<'a> ActionHandler<'a> {
         Ok(())
     }
 
-    pub fn redo(&self, action: &Action) -> Result<()> {
+    pub fn redo(&self, action: &Action) -> TFMTResult<()> {
         self.apply(action)
     }
 }

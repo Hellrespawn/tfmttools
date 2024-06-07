@@ -1,8 +1,8 @@
-use color_eyre::Result;
 use minijinja::Value;
 
 use super::context::AudioFileContext;
 use crate::audiofile::AudioFile;
+use crate::error::TFMTResult;
 
 #[derive(Debug)]
 pub struct Template<'templates, 'source> {
@@ -30,7 +30,7 @@ impl<'templates, 'source> Template<'templates, 'source> {
         self.description.as_ref()
     }
 
-    pub fn render(&self, audio_file: &AudioFile) -> Result<String> {
+    pub fn render(&self, audio_file: &AudioFile) -> TFMTResult<String> {
         let context = AudioFileContext::safe(
             audio_file.to_owned(),
             self.arguments.clone(),

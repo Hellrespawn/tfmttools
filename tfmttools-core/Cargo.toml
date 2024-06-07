@@ -16,12 +16,18 @@ debug = []
 [dependencies]
 tfmttools-history = { path = "../tfmttools-history" }
 camino = { workspace = true, features = ["serde", "serde1"] }
-color-eyre = { workspace = true }
 convert_case = { workspace = true }
+id3 = { workspace = true }
+ignore = { workspace = true }
 lofty = { workspace = true }
-minijinja = { workspace = true, features = ["loader", "custom_syntax", "debug"] }
+minijinja = { workspace = true, features = [
+    "loader",
+    "custom_syntax",
+    "debug",
+] }
 once_cell = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

@@ -3,6 +3,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use tfmttools_core::action::{validate_rename_actions, Action, RenameAction};
 use tfmttools_core::audiofile::AudioFile;
+use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
@@ -18,8 +19,6 @@ use crate::history::load_history;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
 };
-
-const DEFAULT_RECURSION_DEPTH: usize = 4;
 
 #[derive(Debug)]
 pub struct RenameCommand {
@@ -39,7 +38,7 @@ impl RenameCommand {
         input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
         yes: bool,
-        recursion_depth: Option<usize>,
+        recursion_depth: usize,
         template: FileOrName,
         arguments: Vec<String>,
     ) -> Self {
@@ -47,7 +46,7 @@ impl RenameCommand {
             input_directory,
             template_directory,
             yes,
-            recursion_depth: recursion_depth.unwrap_or(DEFAULT_RECURSION_DEPTH),
+            recursion_depth,
             template,
             arguments,
         }
@@ -82,9 +81,12 @@ impl<'a> InnerRename<'a> {
             .get_template(template_name, self.options.arguments.clone())
             .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
-        let files = self.gather_files()?;
+        let paths = self.gather_file_paths();
 
-        let rename_actions = self.create_rename_actions(&template, &files)?;
+        let audio_files = Self::read_files(paths)?;
+
+        let rename_actions =
+            self.create_rename_actions(&template, &audio_files)?;
         let rename_actions =
             RenameAction::filter_unchanged_destinations(rename_actions);
 
@@ -109,13 +111,13 @@ impl<'a> InnerRename<'a> {
         }
     }
 
-    fn gather_files(&self) -> Result<Vec<AudioFile>> {
+    fn gather_file_paths(&self) -> Vec<Utf8PathBuf> {
         let options = ProgressBarOptions::spinner(
             "audio",
             "total",
             "Gathering files...",
             "Gathered files.",
-        )?;
+        );
 
         let spinner = ProgressBar::new(options);
 
@@ -132,12 +134,33 @@ impl<'a> InnerRename<'a> {
             #[cfg(feature = "debug")]
             crate::debug::delay();
         })
-        .map(|path| AudioFile::new(&path))
-        .collect::<Result<Vec<_>>>();
+        .collect::<Vec<_>>();
 
         spinner.finish();
 
         file_paths
+    }
+
+    fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
+        let options =
+            ProgressBarOptions::bar("Reading files...", "Read files.");
+
+        let bar = ProgressBar::with_length(options, file_paths.len() as u64);
+
+        let audio_files = file_paths
+            .into_iter()
+            .inspect(|_| {
+                bar.inc_found();
+
+                #[cfg(feature = "debug")]
+                crate::debug::delay();
+            })
+            .map(AudioFile::new)
+            .collect::<TFMTResult<Vec<_>>>();
+
+        bar.finish();
+
+        Ok(audio_files?)
     }
 
     fn create_rename_actions(
@@ -150,7 +173,7 @@ impl<'a> InnerRename<'a> {
         let options = ProgressBarOptions::bar(
             "Determining output paths:",
             "Determined output paths.",
-        )?;
+        );
 
         let bar = ProgressBar::with_length(options, files.len() as u64);
 
@@ -271,7 +294,7 @@ impl<'a> InnerRename<'a> {
         &self,
         rename_actions: Vec<RenameAction>,
     ) -> Result<Vec<Action>> {
-        let options = ProgressBarOptions::bar("Moving files:", "Moved files.")?;
+        let options = ProgressBarOptions::bar("Moving files:", "Moved files.");
 
         let bar =
             ProgressBar::with_length(options, rename_actions.len() as u64);
@@ -297,7 +320,7 @@ impl<'a> InnerRename<'a> {
     }
 
     fn store_history(&self, actions: Vec<Action>) -> Result<()> {
-        if !self.config.fs_handler().dry_run() {
+        if !self.config.dry_run() {
             let mut history = load_history(self.config)?.unwrap();
 
             let metadata = ActionRecordMetadata::new(

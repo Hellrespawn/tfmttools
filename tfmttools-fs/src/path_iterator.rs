@@ -1,11 +1,11 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::Result;
 use ignore::{Walk, WalkBuilder};
+use tfmttools_core::error::TFMTResult;
 
 pub struct PathIterator(Walk);
 
 impl Iterator for PathIterator {
-    type Item = Result<Utf8PathBuf>;
+    type Item = TFMTResult<Utf8PathBuf>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self

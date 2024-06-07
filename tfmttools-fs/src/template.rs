@@ -1,9 +1,9 @@
 use camino::Utf8Path;
-use color_eyre::Result;
 use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
 
 use crate::PathIterator;
@@ -17,7 +17,7 @@ pub struct TemplateLoader<'tl> {
 }
 
 impl<'tl> TemplateLoader<'tl> {
-    pub fn read_directory(template_directory: &Utf8Path) -> Result<Self> {
+    pub fn read_directory(template_directory: &Utf8Path) -> TFMTResult<Self> {
         let mut template_names = Vec::new();
         let mut environment = Self::create_environment();
 
@@ -39,7 +39,7 @@ impl<'tl> TemplateLoader<'tl> {
         Ok(Self { template_names, environment })
     }
 
-    pub fn read_filename(path: &Utf8Path, name: &str) -> Result<Self> {
+    pub fn read_filename(path: &Utf8Path, name: &str) -> TFMTResult<Self> {
         let mut environment = Self::create_environment();
 
         let template = fs::read_to_string(path)?;

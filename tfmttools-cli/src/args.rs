@@ -2,6 +2,10 @@ use camino::Utf8PathBuf;
 use clap::{Args as ClapArgs, Parser, Subcommand as ClapSubcommand};
 use tfmttools_fs::FileOrName;
 
+fn default_recursion_depth() -> usize {
+    4
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
@@ -44,6 +48,12 @@ pub enum Subcommand {
 
     /// Redo actions.
     Redo(UndoRedo),
+
+    /// Fix tags.
+    Fix(Fix),
+
+    #[command(hide = true)]
+    CopyTags(CopyTags),
 }
 
 #[derive(ClapArgs, Debug)]
@@ -70,9 +80,9 @@ pub struct Rename {
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 
-    #[arg(short, long)]
+    #[arg(short, long, default_value_t = default_recursion_depth())]
     /// Set custom recursion depth for scan.
-    pub recursion_depth: Option<usize>,
+    pub recursion_depth: usize,
 
     #[arg(short, long)]
     /// Skips confirmation prompt. Suitable for non-interactive use.
@@ -104,4 +114,25 @@ pub struct UndoRedo {
 
     /// Amount of actions.
     pub amount: Option<usize>,
+}
+
+#[derive(ClapArgs, Debug)]
+pub struct Fix {
+    #[arg(short = 'i', long)]
+    /// Directory to scan for input files. Defaults to the current directory.
+    pub custom_input_directory: Option<Utf8PathBuf>,
+
+    #[arg(short, long, default_value_t = default_recursion_depth())]
+    /// Set custom recursion depth for scan.
+    pub recursion_depth: usize,
+
+    #[arg(short, long)]
+    /// Skips confirmation prompt. Suitable for non-interactive use.
+    pub yes: bool,
+}
+
+#[derive(ClapArgs, Debug)]
+pub struct CopyTags {
+    pub source: Utf8PathBuf,
+    pub target: Utf8PathBuf,
 }

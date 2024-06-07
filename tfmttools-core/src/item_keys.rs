@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use color_eyre::eyre::eyre;
-use color_eyre::Result;
 use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
 use once_cell::sync::Lazy;
 use tracing::trace;
+
+use crate::error::{TFMTError, TFMTResult};
 
 pub struct ItemKeys;
 
@@ -14,10 +14,10 @@ impl ItemKeys {
         &ITEM_KEYS
     }
 
-    pub fn from_string(string: &str) -> Result<&'static ItemKey> {
+    pub fn from_string(string: &str) -> TFMTResult<&'static ItemKey> {
         STRING_TO_ITEM_KEY_MAP
             .get(string)
-            .ok_or(eyre!("Unknown tag: {}", string))
+            .ok_or(TFMTError::UnknownTag(string.to_owned()))
     }
 }
 

@@ -11,6 +11,8 @@ use super::commands::undo_redo::UndoRedoCommand;
 use super::commands::Command;
 use crate::args::Subcommand;
 use crate::commands::clear_history::ClearHistoryCommand;
+use crate::commands::copy_tags::CopyTagsCommand;
+use crate::commands::fix::FixCommand;
 use crate::commands::show_history::ShowHistoryCommand;
 
 pub fn default_input_dir() -> Result<Utf8PathBuf> {
@@ -90,6 +92,23 @@ impl Config {
             Subcommand::History(show_history) => {
                 Box::new(ShowHistoryCommand::new(show_history.verbose))
             },
+            Subcommand::Fix(fix) => {
+                let input_dir =
+                    Self::get_input_directory(fix.custom_input_directory)?;
+
+                Box::new(FixCommand::new(
+                    input_dir,
+                    fix.yes,
+                    fix.recursion_depth,
+                ))
+            },
+
+            Subcommand::CopyTags(copy_tags) => {
+                Box::new(CopyTagsCommand::new(
+                    copy_tags.source,
+                    copy_tags.target,
+                ))
+            },
         };
 
         Ok(Config { directory: config_directory, fs_handler, command })
@@ -131,6 +150,10 @@ impl Config {
             }?;
 
         Ok(template_directory)
+    }
+
+    pub fn dry_run(&self) -> bool {
+        self.fs_handler().dry_run()
     }
 
     pub fn fs_handler(&self) -> &FsHandler {
