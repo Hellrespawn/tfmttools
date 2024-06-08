@@ -92,7 +92,7 @@ fn validate_existing_files(
 ) -> Vec<ValidationError> {
     rename_actions
         .iter()
-        .filter(|m| m.target().exists())
+        .filter(|m| m.target().exists() && m.target() != m.source())
         .map(ValidationError::TargetExists)
         .collect()
 }

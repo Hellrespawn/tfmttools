@@ -131,9 +131,15 @@ impl<'tl> TemplateLoader<'tl> {
             Lazy::new(|| Regex::new(r"(\d{4})").unwrap());
 
         if let Some(m) = RE_ISO.find(&date) {
-            Ok(m.as_str().to_owned())
+            let year = &m.as_str()[0..4];
+
+            Ok(year.to_owned())
         } else if let Some(m) = RE_AMBIGUOUS.find(&date) {
-            Ok(m.as_str().to_owned())
+            let string = m.as_str();
+
+            let year = &string[string.len() - 4..string.len()];
+
+            Ok(year.to_owned())
         } else if let Some(m) = RE_YEAR.find(&date) {
             Ok(m.as_str().to_owned())
         } else {
