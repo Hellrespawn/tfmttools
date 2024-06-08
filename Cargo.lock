@@ -1093,6 +1093,7 @@ dependencies = [
  "ctrlc",
  "dirs",
  "fs-err",
+ "id3",
  "indicatif",
  "once_cell",
  "textwrap",

@@ -107,6 +107,7 @@ impl Config {
                 Box::new(CopyTagsCommand::new(
                     copy_tags.source,
                     copy_tags.target,
+                    copy_tags.yes,
                 ))
             },
         };

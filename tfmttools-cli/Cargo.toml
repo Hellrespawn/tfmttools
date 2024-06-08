@@ -28,6 +28,7 @@ console = { workspace = true }
 ctrlc = { workspace = true, features = ["termination"] }
 dirs = { workspace = true }
 fs-err = { workspace = true }
+id3 = { workspace = true }
 indicatif = { workspace = true, features = ["improved_unicode"] }
 once_cell = { workspace = true }
 textwrap = { workspace = true }

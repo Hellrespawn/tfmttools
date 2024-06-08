@@ -135,4 +135,7 @@ pub struct Fix {
 pub struct CopyTags {
     pub source: Utf8PathBuf,
     pub target: Utf8PathBuf,
+
+    #[arg(short, long)]
+    pub yes: bool,
 }
