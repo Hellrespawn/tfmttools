@@ -11,14 +11,13 @@ pub enum HistoryFormat {
 
 #[derive(Debug)]
 pub enum HistoryPrefix {
-    Unordered(char),
     Ordered(char),
 }
 
 impl HistoryPrefix {
     fn format(&self, index: usize, total: usize) -> String {
         match self {
-            HistoryPrefix::Unordered(list_style) => format!("{list_style} "),
+            // HistoryPrefix::Unordered(list_style) => format!("{list_style} "),
             HistoryPrefix::Ordered(list_style) => {
                 let width = total.to_string().len();
 

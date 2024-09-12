@@ -14,11 +14,7 @@ impl HistorySerde {
         T: std::fmt::Debug + Serialize + DeserializeOwned,
         M: std::fmt::Debug + Serialize + DeserializeOwned,
     {
-        #[cfg(feature = "debug")]
         let result = serde_json::to_vec_pretty(stack);
-
-        #[cfg(not(feature = "debug"))]
-        let result = serde_json::to_vec(stack);
 
         let bytes =
             result.map_err(|source| HistoryError::Serialize { source })?;
