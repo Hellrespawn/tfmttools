@@ -37,7 +37,7 @@ impl<'i> ItemName<'i> {
     }
 }
 
-impl<'i> Default for ItemName<'i> {
+impl Default for ItemName<'_> {
     fn default() -> Self {
         Self { single: "item", plural: None }
     }

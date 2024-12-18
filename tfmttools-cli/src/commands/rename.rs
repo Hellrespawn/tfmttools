@@ -64,7 +64,7 @@ struct InnerRename<'ir> {
     config: &'ir Config,
 }
 
-impl<'a> InnerRename<'a> {
+impl InnerRename<'_> {
     pub fn rename(&self) -> Result<()> {
         let loader = match &self.options.template {
             FileOrName::File(path, string) => {

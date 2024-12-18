@@ -11,7 +11,7 @@ pub enum ValidationError<'e> {
     TargetExists(&'e RenameAction),
 }
 
-impl<'e> std::fmt::Display for ValidationError<'e> {
+impl std::fmt::Display for ValidationError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ValidationError::DoubleSeparators(action) => {

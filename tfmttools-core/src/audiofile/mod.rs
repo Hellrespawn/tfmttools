@@ -71,7 +71,7 @@ impl AudioFile {
     }
 
     pub fn path_predicate(path: &Utf8Path) -> bool {
-        path.extension().map_or(false, |extension| {
+        path.extension().is_some_and(|extension| {
             for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {
                 if extension == supported_extension {
                     return true;

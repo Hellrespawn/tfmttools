@@ -96,7 +96,7 @@ impl<'tl> TemplateLoader<'tl> {
     }
 
     fn path_is_template(path: &Utf8Path) -> bool {
-        path.extension().map_or(false, |string| {
+        path.extension().is_some_and(|string| {
             TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
         })
     }
