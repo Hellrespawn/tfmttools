@@ -4,7 +4,7 @@ Use `minijinja` to rename audio files according to their tags.
 
 ## Requirements
 
-- Rust (MSRV: 1.70)
+- Rust (MSRV: 1.83)
 
 ## Installation
 
@@ -24,6 +24,7 @@ See also the "examples"-folder.
 - Do proper check for trailing period in folder / file name
 - Add year to singles?
 - Handle UTF-16 odd length error manually?
+- Remember last used template, use it in the future when no template specified.
 
 Check:
 

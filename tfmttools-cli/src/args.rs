@@ -50,6 +50,7 @@ pub enum Subcommand {
     Redo(UndoRedo),
 
     /// Fix tags.
+    #[command(hide = true)]
     Fix(Fix),
 
     #[command(hide = true)]
