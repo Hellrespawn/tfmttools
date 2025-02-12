@@ -15,6 +15,7 @@ pub static FORBIDDEN_CHARACTERS: Lazy<HashMap<char, Option<&str>>> =
         let mut map = HashMap::new();
 
         map.insert('<', None);
+        map.insert('"', None);
         map.insert('>', None);
         map.insert(':', None);
         map.insert('|', None);
