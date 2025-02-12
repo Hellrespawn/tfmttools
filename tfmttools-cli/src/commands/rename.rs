@@ -206,7 +206,12 @@ impl InnerRename<'_> {
         if validation_errors.is_empty() {
             Ok(())
         } else {
-            Err(eyre!("Had validation errors:\n{validation_errors:#?}"))
+            let error_string = validation_errors
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("\n");
+            Err(eyre!("Had validation errors:\n{error_string}"))
         }
     }
 
