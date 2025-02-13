@@ -98,6 +98,13 @@ impl<T> RefStack<T> {
             items.unwrap_or_default()
         }
     }
+
+    pub fn find<P>(&self, predicate: P) -> Option<&T>
+    where
+        P: Fn(&T) -> bool,
+    {
+        self.stack.iter().rev().find(|i| predicate(*i))
+    }
 }
 
 #[cfg(test)]
@@ -184,5 +191,28 @@ mod test {
 
         assert_eq!(stack.unpop_refs(5), &["a", "b", "c"][..]);
         assert_eq!(stack.cursor, 3);
+    }
+
+    #[test]
+    fn test_find() {
+        let mut stack = RefStack::new();
+
+        stack.extend(["a1", "a2", "b1", "b2"]);
+
+        let option = stack.find(|_| true);
+
+        assert_eq!(
+            option,
+            Some(&"b2"),
+            "Did not retrieve last pushed element."
+        );
+
+        let option = stack.find(|i| i.starts_with("a"));
+
+        assert_eq!(
+            option,
+            Some(&"a2"),
+            "Did not retrieve last pushed element matching predicate."
+        );
     }
 }

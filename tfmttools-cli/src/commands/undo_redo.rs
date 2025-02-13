@@ -4,8 +4,8 @@ use tfmttools_core::history::{ActionHistory, ActionRecord};
 use tfmttools_fs::{ActionHandler, FsHandler};
 use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
-use super::super::config::Config;
 use super::Command;
+use crate::config::paths::AppPaths;
 use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
@@ -29,13 +29,17 @@ impl UndoRedoCommand {
         }
     }
 
-    fn undo_redo(&self, config: &Config) -> Result<()> {
+    fn undo_redo(
+        &self,
+        app_paths: &AppPaths,
+        fs_handler: &FsHandler,
+    ) -> Result<()> {
         let verb = match self.mode {
             HistoryMode::Undo => "undo",
             HistoryMode::Redo => "redo",
         };
 
-        let load_history_result = load_history(config)?;
+        let load_history_result = load_history(&app_paths.history_file())?;
 
         match load_history_result {
             LoadHistoryResult::New(_) => {
@@ -62,10 +66,7 @@ impl UndoRedoCommand {
                         self.yes || self.confirm_undo_redo(&records)?;
 
                     if confirmation {
-                        self.perform_undo_redo_actions(
-                            &records,
-                            config.fs_handler(),
-                        )?;
+                        self.perform_undo_redo_actions(&records, fs_handler)?;
 
                         history.save()?;
                     } else {
@@ -162,7 +163,7 @@ impl UndoRedoCommand {
 }
 
 impl Command for UndoRedoCommand {
-    fn run(&self, config: &Config) -> Result<()> {
-        self.undo_redo(config)
+    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()> {
+        self.undo_redo(app_paths, fs_handler)
     }
 }

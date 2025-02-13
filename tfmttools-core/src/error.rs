@@ -14,6 +14,9 @@ pub enum TFMTError {
     #[error("Path exists but is not a directory: {0}")]
     NotADirectory(Utf8PathBuf),
 
+    #[error("Path exists but is not a file: {0}")]
+    NotAFile(Utf8PathBuf),
+
     // Passthrough errors
     #[error(transparent)]
     Camino(#[from] camino::FromPathBufError),

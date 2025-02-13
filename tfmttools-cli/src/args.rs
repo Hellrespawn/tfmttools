@@ -90,7 +90,7 @@ pub struct Rename {
     pub yes: bool,
 
     /// Path to or name of template.
-    pub template: FileOrName,
+    pub template: Option<FileOrName>,
 
     /// Template arguments.
     pub arguments: Vec<String>,

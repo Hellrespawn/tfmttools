@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum FileOrName {
     File(Utf8PathBuf, String),
     Name(String),
@@ -19,6 +19,12 @@ impl From<String> for FileOrName {
     }
 }
 
+impl From<&str> for FileOrName {
+    fn from(string: &str) -> Self {
+        FileOrName::from(string.to_owned())
+    }
+}
+
 impl FileOrName {
     pub fn as_str(&self) -> &str {
         match self {
@@ -27,13 +33,8 @@ impl FileOrName {
     }
 }
 
-impl<'de> Deserialize<'de> for FileOrName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let string: &str = Deserialize::deserialize(deserializer)?;
-
-        Ok(FileOrName::from(string.to_owned()))
+impl std::fmt::Display for FileOrName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }

@@ -2,10 +2,10 @@ use camino::Utf8PathBuf;
 use color_eyre::Result;
 use textwrap::Options;
 use tfmttools_core::templates::Template;
-use tfmttools_fs::TemplateLoader;
+use tfmttools_fs::{FsHandler, TemplateLoader};
 
 use super::Command;
-use crate::config::Config;
+use crate::config::paths::AppPaths;
 use crate::TERM;
 
 #[derive(Debug)]
@@ -36,7 +36,11 @@ impl ListTemplatesCommand {
 }
 
 impl Command for ListTemplatesCommand {
-    fn run(&self, _config: &Config) -> Result<()> {
+    fn run(
+        &self,
+        _app_paths: &AppPaths,
+        _fs_handler: &FsHandler,
+    ) -> Result<()> {
         let loader = TemplateLoader::read_directory(&self.template_directory)?;
 
         let all_templates = loader.get_all_templates();

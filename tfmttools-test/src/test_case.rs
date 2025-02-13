@@ -6,7 +6,6 @@ use assert_cmd::Command;
 use assert_fs::TempDir;
 use color_eyre::Result;
 use termtree::Tree;
-use tfmttools_fs::FileOrName;
 
 use crate::template_reference::TemplateReference;
 use crate::{
@@ -16,7 +15,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct TestCase {
-    template: FileOrName,
+    template: String,
     reference: HashMap<String, String>,
     arguments: Vec<String>,
     temp_dir: TempDir,
@@ -61,6 +60,24 @@ impl TestCase {
         for argument in &self.arguments {
             cmd.arg(argument);
         }
+
+        self.run_command(cmd, "apply", report);
+
+        self.assert_files_exist(self.reference.values(), |p| {
+            self.print_temp_dir_contents(&format!(
+                "File was not renamed: {}",
+                p.display()
+            ));
+        });
+    }
+
+    pub fn assert_apply_without_template_and_args(&self, report: bool) {
+        let mut cmd = self.create_command();
+
+        cmd.arg("rename")
+            .arg("--custom-template-directory")
+            .arg(self.get_template_dest_dir())
+            .arg("--yes");
 
         self.run_command(cmd, "apply", report);
 
@@ -174,12 +191,10 @@ impl TestCase {
         self.print_temp_dir_contents(&format!("After {name}"));
     }
 
-    fn validate_template(file_or_name: &FileOrName) {
-        if let FileOrName::Name(name) = file_or_name {
-            let path = get_template_data_dir().join(format!("{name}.tfmt"));
+    fn validate_template(name: &str) {
+        let path = get_template_data_dir().join(format!("{name}.tfmt"));
 
-            assert!(path.is_file(), "Template {} does not exist.", name);
-        }
+        assert!(path.is_file(), "Template {} does not exist.", name);
     }
 
     fn populate_templates(&self) -> Result<()> {

@@ -145,7 +145,7 @@ impl<'tl> TemplateLoader<'tl> {
         } else {
             Err(minijinja::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
-                "Unable to parse date: {date}",
+                format!("Unable to parse date: {date}"),
             ))
         }
     }

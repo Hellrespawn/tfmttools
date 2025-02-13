@@ -7,14 +7,14 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
-    get_longest_common_prefix, ActionHandler, FileOrName, PathIterator,
-    RemoveDirResult, TemplateLoader,
+    get_longest_common_prefix, ActionHandler, FileOrName, FsHandler,
+    PathIterator, RemoveDirResult, TemplateLoader,
 };
-use tfmttools_history::{Record, SaveHistoryResult};
+use tfmttools_history::{LoadHistoryResult, Record, SaveHistoryResult};
 use tracing::debug;
 
-use super::super::config::Config;
 use super::Command;
+use crate::config::paths::AppPaths;
 use crate::history::load_history;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
@@ -26,10 +26,11 @@ pub struct RenameCommand {
     template_directory: Utf8PathBuf,
 
     yes: bool,
+    dry_run: bool,
 
     recursion_depth: usize,
 
-    template: FileOrName,
+    template: Option<FileOrName>,
     arguments: Vec<String>,
 }
 
@@ -38,14 +39,16 @@ impl RenameCommand {
         input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
         yes: bool,
+        dry_run: bool,
         recursion_depth: usize,
-        template: FileOrName,
+        template: Option<FileOrName>,
         arguments: Vec<String>,
     ) -> Self {
         Self {
             input_directory,
             template_directory,
             yes,
+            dry_run,
             recursion_depth,
             template,
             arguments,
@@ -54,19 +57,23 @@ impl RenameCommand {
 }
 
 impl Command for RenameCommand {
-    fn run(&self, config: &Config) -> Result<()> {
-        InnerRename { options: self, config }.rename()
+    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()> {
+        InnerRename { options: self, app_paths, fs_handler }.rename()
     }
 }
 
 struct InnerRename<'ir> {
     options: &'ir RenameCommand,
-    config: &'ir Config,
+    app_paths: &'ir AppPaths,
+    fs_handler: &'ir FsHandler,
 }
 
 impl InnerRename<'_> {
     pub fn rename(&self) -> Result<()> {
-        let loader = match &self.options.template {
+        let (file_or_name, arguments) =
+            self.get_template_name_and_arguments()?;
+
+        let loader = match &file_or_name {
             FileOrName::File(path, string) => {
                 TemplateLoader::read_filename(path, string)
             },
@@ -75,10 +82,10 @@ impl InnerRename<'_> {
             },
         }?;
 
-        let template_name = self.options.template.as_str();
+        let template_name = file_or_name.as_str();
 
         let template = loader
-            .get_template(template_name, self.options.arguments.clone())
+            .get_template(template_name, arguments.clone())
             .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
         let paths = self.gather_file_paths();
@@ -92,7 +99,6 @@ impl InnerRename<'_> {
 
         if rename_actions.is_empty() {
             println!("There are no audio files to rename.");
-            Ok(())
         } else {
             Self::validate_rename_actions(&rename_actions)?;
 
@@ -102,12 +108,47 @@ impl InnerRename<'_> {
             if confirmation {
                 let actions = self.perform_rename_actions(rename_actions)?;
 
-                self.store_history(actions)?;
+                self.store_history(actions, template_name, &arguments)?;
             } else {
                 println!("Aborting!");
             }
+        }
 
-            Ok(())
+        Ok(())
+    }
+
+    fn get_template_name_and_arguments(
+        &self,
+    ) -> Result<(FileOrName, Vec<String>)> {
+        if let Some(file_or_name) = &self.options.template {
+            debug!("Using template and arguments from command line.");
+
+            Ok((file_or_name.clone(), self.options.arguments.clone()))
+        } else {
+            let history = load_history(&self.app_paths.history_file())?;
+
+            if let LoadHistoryResult::Loaded(history) = history {
+                let metadata_option =
+                    history.find_record(|r| r.metadata().is_some()).map(|r| {
+                        r.metadata().expect(
+                            "Presence of metadata checked in query condition.",
+                        )
+                    });
+
+                if let Some(metadata) = metadata_option {
+                    let template_name = FileOrName::from(metadata.template());
+
+                    let arguments = metadata.arguments().to_owned();
+
+                    println!("Re-using template '{template_name}' and arguments from previous rename.");
+
+                    debug!("Using previous rename data:\ntemplate: '{}'\narguments: '{}'", template_name, arguments.join("', '"));
+
+                    return Ok((template_name, arguments));
+                }
+            }
+
+            Err(eyre!("No template specified and no data from previous run available."))
         }
     }
 
@@ -168,7 +209,7 @@ impl InnerRename<'_> {
         template: &Template,
         files: &[AudioFile],
     ) -> Result<Vec<RenameAction>> {
-        let cwd = self.config.working_directory()?;
+        let cwd = self.app_paths.working_directory()?;
 
         let options = ProgressBarOptions::bar(
             "Determining output paths:",
@@ -219,7 +260,7 @@ impl InnerRename<'_> {
         &self,
         rename_actions: &[RenameAction],
     ) -> Result<bool> {
-        let cwd = self.config.working_directory()?;
+        let cwd = self.app_paths.working_directory()?;
 
         Self::preview_rename_actions(rename_actions, &cwd)?;
 
@@ -274,11 +315,10 @@ impl InnerRename<'_> {
         debug!("Common prefix of path: {:?}", common_prefix);
 
         if let Some(common_path) = common_prefix {
-            let removed =
-                self.config.fs_handler().remove_empty_subdirectories(
-                    &common_path,
-                    self.options.recursion_depth,
-                )?;
+            let removed = self.fs_handler.remove_empty_subdirectories(
+                &common_path,
+                self.options.recursion_depth,
+            )?;
 
             actions.extend(
                 removed
@@ -306,7 +346,7 @@ impl InnerRename<'_> {
 
         let actions = RenameAction::create_actions(rename_actions);
 
-        let handler = ActionHandler::new(self.config.fs_handler());
+        let handler = ActionHandler::new(self.fs_handler);
 
         for action in &actions {
             handler.apply(action)?;
@@ -324,13 +364,19 @@ impl InnerRename<'_> {
         Ok(actions)
     }
 
-    fn store_history(&self, actions: Vec<Action>) -> Result<()> {
-        if !self.config.dry_run() {
-            let mut history = load_history(self.config)?.unwrap();
+    fn store_history(
+        &self,
+        actions: Vec<Action>,
+        template_name: &str,
+        arguments: &[String],
+    ) -> Result<()> {
+        if !self.options.dry_run {
+            let mut history =
+                load_history(&self.app_paths.history_file())?.unwrap();
 
             let metadata = ActionRecordMetadata::new(
-                self.options.template.as_str().to_owned(),
-                self.options.arguments.clone(),
+                template_name.to_owned(),
+                arguments.to_owned(),
             );
 
             let record = Record::with_metadata(actions, metadata);

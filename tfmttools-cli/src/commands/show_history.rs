@@ -1,8 +1,9 @@
 use color_eyre::Result;
 use tfmttools_core::history::LoadActionHistoryResult;
+use tfmttools_fs::FsHandler;
 
 use super::Command;
-use crate::config::Config;
+use crate::config::paths::AppPaths;
 use crate::history::{
     load_history, HistoryFormat, HistoryFormatter, HistoryPrefix,
 };
@@ -28,8 +29,8 @@ impl ShowHistoryCommand {
 }
 
 impl Command for ShowHistoryCommand {
-    fn run(&self, config: &Config) -> Result<()> {
-        let load_history_result = load_history(config)?;
+    fn run(&self, app_paths: &AppPaths, _fs_handler: &FsHandler) -> Result<()> {
+        let load_history_result = load_history(&app_paths.history_file())?;
 
         match load_history_result {
             LoadActionHistoryResult::Loaded(history) => {

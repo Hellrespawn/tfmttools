@@ -139,4 +139,11 @@ where
     pub fn path(&self) -> &str {
         self.path.as_ref()
     }
+
+    pub fn find_record<P>(&self, predicate: P) -> Option<&Record<T, M>>
+    where
+        P: Fn(&Record<T, M>) -> bool,
+    {
+        self.stack.find(predicate)
+    }
 }

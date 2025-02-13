@@ -1,7 +1,8 @@
 use color_eyre::Result;
+use tfmttools_fs::FsHandler;
 
 use super::Command;
-use crate::config::Config;
+use crate::config::paths::AppPaths;
 use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::ConfirmationPrompt;
 
@@ -9,11 +10,11 @@ use crate::ui::ConfirmationPrompt;
 pub struct ClearHistoryCommand;
 
 impl Command for ClearHistoryCommand {
-    fn run(&self, config: &Config) -> Result<()> {
-        let path = &config.history_file();
+    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()> {
+        let path = &app_paths.history_file();
 
         if path.is_file() {
-            let result = load_history(config)?;
+            let result = load_history(path)?;
 
             let history = result.unwrap();
 
@@ -28,7 +29,7 @@ impl Command for ClearHistoryCommand {
                 ConfirmationPrompt::new("Clear history?").prompt()?;
 
             if confirmation {
-                config.fs_handler().remove_file(path)?;
+                fs_handler.remove_file(path)?;
 
                 println!("Removed history file at: {path}");
             } else {

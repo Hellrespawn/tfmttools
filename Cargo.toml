@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.20.0"
+version = "0.21.0"
 authors = ["Stef Korporaal <stef@skorporaal.com>"]
 description = "Use `minijinja` to rename audio files according to their tags."
 edition = "2021"

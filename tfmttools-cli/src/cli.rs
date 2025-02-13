@@ -1,12 +1,23 @@
+use camino::Utf8PathBuf;
 use color_eyre::Result;
+use tfmttools_fs::FsHandler;
+use tfmttools_history::HistoryMode;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, registry, EnvFilter};
 
-use super::config::Config;
-use crate::args::Args;
+use crate::args::{Args, Subcommand};
+use crate::commands::clear_history::ClearHistoryCommand;
+use crate::commands::copy_tags::CopyTagsCommand;
+use crate::commands::fix::FixCommand;
+use crate::commands::list_templates::ListTemplatesCommand;
+use crate::commands::rename::RenameCommand;
+use crate::commands::show_history::ShowHistoryCommand;
+use crate::commands::undo_redo::UndoRedoCommand;
+use crate::commands::Command;
+use crate::config::paths::AppPaths;
 use crate::TERM;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
@@ -25,16 +36,78 @@ pub fn main() -> Result<()> {
     let args = Args::parse();
 
     if args.dry_run {
-        println!("Doing dry run. No files are modified.");
+        println!("Doing dry run. No files will be modified.");
     }
-
-    let config = Config::from_args(args)?;
-
-    debug!("Configuration:\n{:#?}", config);
+    let app_paths = AppPaths::from_args(&args)?;
+    let fs_handler = FsHandler::new(args.dry_run);
 
     install_restore_cursor_hooks();
 
-    config.command().run(&config)
+    let command: Box<dyn Command> = match args.command {
+        Subcommand::ClearHistory => Box::new(ClearHistoryCommand),
+        Subcommand::Templates(list_templates) => {
+            let template_directory = list_templates
+                .custom_template_directory
+                .unwrap_or(app_paths.config_directory().to_owned());
+
+            Box::new(ListTemplatesCommand::new(template_directory))
+        },
+        Subcommand::Rename(rename) => {
+            let input_dir = get_input_directory(rename.custom_input_directory)?;
+
+            let template_directory = rename
+                .custom_template_directory
+                .unwrap_or(app_paths.config_directory().to_owned());
+
+            Box::new(RenameCommand::new(
+                input_dir,
+                template_directory,
+                rename.yes,
+                args.dry_run,
+                rename.recursion_depth,
+                rename.template,
+                rename.arguments,
+            ))
+        },
+        Subcommand::Undo(undo_redo) => {
+            Box::new(UndoRedoCommand::new(
+                undo_redo.yes,
+                undo_redo.amount.unwrap_or(1),
+                HistoryMode::Undo,
+            ))
+        },
+        Subcommand::Redo(undo_redo) => {
+            Box::new(UndoRedoCommand::new(
+                undo_redo.yes,
+                undo_redo.amount.unwrap_or(1),
+                HistoryMode::Redo,
+            ))
+        },
+        Subcommand::History(show_history) => {
+            Box::new(ShowHistoryCommand::new(show_history.verbose))
+        },
+        Subcommand::Fix(fix) => {
+            let input_dir = get_input_directory(fix.custom_input_directory)?;
+
+            Box::new(FixCommand::new(
+                input_dir,
+                fix.yes,
+                args.dry_run,
+                fix.recursion_depth,
+            ))
+        },
+
+        Subcommand::CopyTags(copy_tags) => {
+            Box::new(CopyTagsCommand::new(
+                copy_tags.source,
+                copy_tags.target,
+                copy_tags.yes,
+                args.dry_run,
+            ))
+        },
+    };
+
+    command.run(&app_paths, &fs_handler)
 }
 
 // Initialize logger. if `TFMT_LOG` is set, write the log to the current
@@ -80,4 +153,23 @@ fn install_restore_cursor_hooks() {
 /// Make the cursor visible again, ignoring the result.
 fn show_cursor() {
     let _ = TERM.show_cursor();
+}
+
+pub fn default_input_dir() -> Result<Utf8PathBuf> {
+    let path = std::env::current_dir()?;
+
+    Ok(path.clone().try_into()?)
+}
+
+fn get_input_directory(
+    custom_input_directory: Option<Utf8PathBuf>,
+) -> Result<Utf8PathBuf> {
+    let input_directory = if let Some(input_directory) = custom_input_directory
+    {
+        Ok(input_directory)
+    } else {
+        default_input_dir()
+    }?;
+
+    Ok(input_directory)
 }

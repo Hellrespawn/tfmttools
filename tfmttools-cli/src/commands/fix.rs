@@ -3,10 +3,10 @@ use color_eyre::Result;
 use tfmttools_core::audiofile::encoding::convert_encoding_to_utf8;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTError;
-use tfmttools_fs::PathIterator;
+use tfmttools_fs::{FsHandler, PathIterator};
 
 use super::Command;
-use crate::config::Config;
+use crate::config::paths::AppPaths;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
 };
@@ -19,6 +19,7 @@ pub struct FixCommand {
     input_directory: Utf8PathBuf,
 
     yes: bool,
+    dry_run: bool,
 
     recursion_depth: usize,
 }
@@ -27,14 +28,15 @@ impl FixCommand {
     pub fn new(
         input_directory: Utf8PathBuf,
         yes: bool,
+        dry_run: bool,
         recursion_depth: usize,
     ) -> Self {
-        Self { input_directory, yes, recursion_depth }
+        Self { input_directory, yes, dry_run, recursion_depth }
     }
 }
 
 impl Command for FixCommand {
-    fn run(&self, config: &Config) -> Result<()> {
+    fn run(&self, app_paths: &AppPaths, _fs_handler: &FsHandler) -> Result<()> {
         let paths = self.gather_file_paths();
 
         let utf16_error_paths = Self::get_utf16_error_files(paths);
@@ -42,7 +44,7 @@ impl Command for FixCommand {
         if utf16_error_paths.is_empty() {
             println!("There are no files to fix.");
         } else {
-            let cwd = config.working_directory()?;
+            let cwd = app_paths.working_directory()?;
 
             Self::preview_files_to_fix(&utf16_error_paths, &cwd)?;
 
@@ -51,7 +53,7 @@ impl Command for FixCommand {
             );
 
             if self.yes || confirmation_prompt.prompt()? {
-                Self::fix_files(&utf16_error_paths, config.dry_run())?;
+                Self::fix_files(&utf16_error_paths, self.dry_run)?;
             }
         }
 
