@@ -84,7 +84,7 @@ const CASES: [Case; 9] = [
     Case::Flat,
     Case::Kebab,
     Case::Pascal,
-    Case::ScreamingSnake,
+    Case::UpperSnake,
     Case::Snake,
     Case::Train,
     Case::UpperFlat,
