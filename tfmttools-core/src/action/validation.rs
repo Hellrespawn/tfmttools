@@ -1,19 +1,94 @@
 use std::collections::HashMap;
 
 use camino::{Utf8Component, Utf8Path};
+use once_cell::sync::Lazy;
 
 use crate::action::RenameAction;
+use crate::MAX_PATH_LENGTH;
+
+pub struct ForbiddenCharacter<'f> {
+    char: &'f str,
+    replacement: Option<&'f str>,
+}
+
+impl ForbiddenCharacter<'_> {
+    pub fn char(&self) -> &str {
+        self.char
+    }
+
+    pub fn replacement(&self) -> Option<&str> {
+        self.replacement
+    }
+}
+
+pub static FORBIDDEN_CHARACTERS: Lazy<Vec<ForbiddenCharacter>> =
+    Lazy::new(|| {
+        vec![
+            ForbiddenCharacter { char: "<", replacement: None },
+            ForbiddenCharacter { char: "\"", replacement: None },
+            ForbiddenCharacter { char: ">", replacement: None },
+            ForbiddenCharacter { char: ":", replacement: None },
+            ForbiddenCharacter { char: "|", replacement: None },
+            ForbiddenCharacter { char: "?", replacement: None },
+            ForbiddenCharacter { char: "*", replacement: None },
+            ForbiddenCharacter { char: "~", replacement: Some("-") },
+            ForbiddenCharacter { char: "/", replacement: Some("-") },
+            ForbiddenCharacter { char: "\\", replacement: Some("-") },
+        ]
+    });
+
+pub struct ForbiddenLeadingOrTrailingChar<'f> {
+    char: &'f str,
+    leading: bool,
+    trailing: bool,
+}
+
+impl ForbiddenLeadingOrTrailingChar<'_> {
+    pub fn char(&self) -> &str {
+        self.char
+    }
+
+    pub fn leading(&self) -> bool {
+        self.leading
+    }
+
+    pub fn trailing(&self) -> bool {
+        self.trailing
+    }
+}
+
+pub static FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS: Lazy<
+    Vec<ForbiddenLeadingOrTrailingChar>,
+> = Lazy::new(|| {
+    vec![
+        ForbiddenLeadingOrTrailingChar {
+            char: " ",
+            leading: true,
+            trailing: true,
+        },
+        ForbiddenLeadingOrTrailingChar {
+            char: ".",
+            leading: false,
+            trailing: true,
+        },
+    ]
+});
 
 #[derive(Debug)]
 pub enum ValidationError<'e> {
     DoubleSeparators(&'e RenameAction),
     Collision(Vec<&'e RenameAction>),
     TargetExists(&'e RenameAction),
-    WhitespaceInDirectoryName {
+    ForbiddenCharacterLeadingOrTrailingPathComponent {
         action: &'e RenameAction,
         component: &'e str,
-        leading: bool,
-        trailing: bool,
+        forbidden_leading_characters: Option<Vec<&'e str>>,
+        forbidden_trailing_characters: Option<Vec<&'e str>>,
+    },
+    PathTooLong {
+        action: &'e RenameAction,
+        max_length: usize,
+        actual_length: usize,
     },
 }
 
@@ -25,8 +100,7 @@ impl std::fmt::Display for ValidationError<'_> {
                     f,
                     "The target file contains double path separators."
                 )?;
-                writeln!(f, "\tsource: {}", action.source())?;
-                writeln!(f, "\ttarget: {}", action.target())?;
+                write_source_and_target(f, action)?;
             },
             ValidationError::Collision(actions) => {
                 writeln!(f, "These files all evaluate to the same target.")?;
@@ -38,33 +112,50 @@ impl std::fmt::Display for ValidationError<'_> {
             },
             ValidationError::TargetExists(action) => {
                 writeln!(f, "The target file already exists.")?;
-                writeln!(f, "\tsource: {}", action.source())?;
-                writeln!(f, "\ttarget: {}", action.target())?;
+                write_source_and_target(f, action)?;
             },
-            ValidationError::WhitespaceInDirectoryName {
+            ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent {
                 action,
                 component,
-                leading,
-                trailing,
+                forbidden_leading_characters,
+                forbidden_trailing_characters,
             } => {
                 write!(
                     f,
-                    "The '{component}' directory in the target path has "
+                    "The '{component}'-component in the target path has  "
                 )?;
-                match (leading, trailing) {
-                    (true, true) => write!(f, "leading and trailing"),
-                    (true, false) => write!(f, "leading"),
-                    (false, true) => write!(f, "trailing"),
-                    (false, false) => unreachable!(),
+
+                match (forbidden_leading_characters, forbidden_trailing_characters) {
+                    (None, None) => unreachable!("Action without forbidden leading or trailing characters should not fail validation."),
+                    (Some(forbidden_leading_characters), None) => write!(f, "forbidden leading characters: '{}'", forbidden_leading_characters.join("', '")),
+                    (None, Some(forbidden_trailing_characters)) => write!(f, "forbidden trailing characters: '{}'", forbidden_trailing_characters.join("', '")),
+                    (Some(forbidden_leading_characters), Some(forbidden_trailing_characters)) => write!(f, "forbidden leading ('{}') and trailing ('{}') characters.", forbidden_leading_characters.join("', '"), forbidden_trailing_characters.join("', '")),
                 }?;
-                writeln!(f, " whitespace in it's name.")?;
-                writeln!(f, "\tsource: {}", action.source())?;
-                writeln!(f, "\ttarget: {}", action.target())?;
+
+                write_source_and_target(f, action)?;
             },
+            ValidationError::PathTooLong {
+                action,
+                max_length,
+                actual_length
+            } => {
+                writeln!(f, "The target path is too long (max: {max_length}, actual: {actual_length}) ")?;
+                write_source_and_target(f, action)?;
+            }
         }
 
         Ok(())
     }
+}
+
+fn write_source_and_target(
+    f: &mut std::fmt::Formatter<'_>,
+    action: &RenameAction,
+) -> std::fmt::Result {
+    writeln!(f, "\tsource: {}", action.source())?;
+    writeln!(f, "\ttarget: {}", action.target())?;
+
+    Ok(())
 }
 
 pub fn validate_rename_actions(
@@ -75,7 +166,13 @@ pub fn validate_rename_actions(
     errors.extend(validate_double_separators(rename_actions));
     errors.extend(validate_collisions(rename_actions));
     errors.extend(validate_existing_files(rename_actions));
-    errors.extend(validate_whitespace_in_directory_name(rename_actions));
+    errors.extend(
+        validate_forbidden_leading_or_trailing_characters_in_path_component(
+            rename_actions,
+            &FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS,
+        ),
+    );
+    errors.extend(validate_target_path_too_long(rename_actions));
 
     errors
 }
@@ -114,6 +211,7 @@ fn validate_collisions(
     collisions.into_values().map(ValidationError::Collision).collect()
 }
 
+// Impossible to unit test, therefore not included below.
 fn validate_existing_files(
     rename_actions: &[RenameAction],
 ) -> Vec<ValidationError> {
@@ -124,23 +222,37 @@ fn validate_existing_files(
         .collect()
 }
 
-fn validate_whitespace_in_directory_name(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
+    rename_actions: &'a [RenameAction],
+    forbidden_characters: &'static [ForbiddenLeadingOrTrailingChar],
+) -> Vec<ValidationError<'a>> {
+    let forbidden_leading_characters: Vec<&str> = forbidden_characters
+        .iter()
+        .filter(|f| f.leading())
+        .map(|f| f.char())
+        .collect();
+
+    let forbidden_trailing_characters: Vec<&str> = forbidden_characters
+        .iter()
+        .filter(|f| f.trailing())
+        .map(|f| f.char())
+        .collect();
+
     rename_actions
         .iter()
         .flat_map(|action| {
             action.target().components().filter_map(|component| {
                 if let Utf8Component::Normal(component_name) = component {
-                    let leading = component_name != component_name.trim_start();
-                    let trailing = component_name != component_name.trim_end();
+
+                    let leading = forbidden_leading_characters.iter().any(|c| component_name.starts_with(c));
+                    let trailing = forbidden_trailing_characters.iter().any(|c| component_name.ends_with(c));
 
                     if leading || trailing {
-                        Some(ValidationError::WhitespaceInDirectoryName {
+                        Some(ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent  {
                             action,
+                            forbidden_leading_characters: if leading { Some(forbidden_leading_characters.clone()) } else { None},
+                            forbidden_trailing_characters: if trailing { Some(forbidden_trailing_characters.clone()) } else { None},
                             component: component_name,
-                            leading,
-                            trailing,
                         })
                     } else {
                         None
@@ -152,3 +264,21 @@ fn validate_whitespace_in_directory_name(
         })
         .collect()
 }
+
+fn validate_target_path_too_long(
+    rename_actions: &[RenameAction],
+) -> Vec<ValidationError> {
+    rename_actions
+        .iter()
+        .map(|a| (a, a.target().to_string().len()))
+        .filter(|(_, len)| *len >= MAX_PATH_LENGTH)
+        .map(|(a, len)| {
+            ValidationError::PathTooLong {
+                action: a,
+                max_length: MAX_PATH_LENGTH,
+                actual_length: len,
+            }
+        })
+        .collect()
+}
+

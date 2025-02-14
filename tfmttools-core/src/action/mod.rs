@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 mod validation;
 
-pub use validation::validate_rename_actions;
+pub use validation::{validate_rename_actions, FORBIDDEN_CHARACTERS};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug)]
 pub struct RenameAction {

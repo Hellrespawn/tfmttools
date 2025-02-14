@@ -5,9 +5,9 @@ use minijinja::value::Object;
 use minijinja::Value;
 use tracing::trace;
 
+use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
-use crate::FORBIDDEN_CHARACTERS;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -41,8 +41,11 @@ impl AudioFileContext {
     fn remove_forbidden_characters(value: String) -> String {
         let value = FORBIDDEN_CHARACTERS.iter().fold(
             value,
-            |string, (char, replacement)| {
-                string.replace(*char, replacement.unwrap_or(""))
+            |string, forbidden_character| {
+                string.replace(
+                    forbidden_character.char(),
+                    forbidden_character.replacement().unwrap_or(""),
+                )
             },
         );
 
