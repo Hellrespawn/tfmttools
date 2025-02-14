@@ -69,35 +69,36 @@ impl FsHandler {
         if self.dry_run {
             Ok(MoveFileResult::DryRun)
         } else {
-            // HACK Unable to capture raw_os_error with fs_err, use
-            // std::fs::rename instead.
+            // std::fs::rename does not work across filesystem boundaries.
+            // Check for the appropriate error and copies + deletes instead.
+            // Error codes are correct on Windows 10 20H2 and Arch
+            // Linux.
+            // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
+
+            #[cfg(windows)]
+            const EXPECTED_ERROR_CODE: usize = 17;
+
+            #[cfg(unix)]
+            const EXPECTED_ERROR_CODE: usize = 18;
+
             if let Err(err) = std::fs::rename(source, target) {
-                // Can't rename across filesystem boundaries. Checks for
-                // the appropriate error and copies/deletes instead.
-                // Error codes are correct on Windows 10 20H2 and Arch
-                // Linux.
-                // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
+                // HACK Unable to capture raw_os_error with fs_err, use
+                // std::fs::rename instead.
+                let is_expected_error =
+                    err.raw_os_error().is_some_and(|code| {
+                        code > 0 && code as usize == EXPECTED_ERROR_CODE
+                    });
 
-                if let Some(error_code) = err.raw_os_error() {
-                    #[cfg(windows)]
-                    let expected_error_code = 17;
-
-                    #[cfg(unix)]
-                    let expected_error_code = 18;
-
-                    if expected_error_code == error_code {
-                        fs_err::copy(source, target)?;
-                        fs_err::remove_file(source)?;
-                        return Ok(MoveFileResult::CopiedAndRemoved);
-                    }
-
-                    return Err(err.into());
+                if is_expected_error {
+                    fs_err::copy(source, target)?;
+                    fs_err::remove_file(source)?;
+                    Ok(MoveFileResult::CopiedAndRemoved)
+                } else {
+                    Err(err.into())
                 }
-
-                return Err(err.into());
+            } else {
+                Ok(MoveFileResult::Moved)
             }
-
-            Ok(MoveFileResult::Moved)
         }
     }
 
