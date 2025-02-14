@@ -9,14 +9,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{fmt, registry, EnvFilter};
 
 use crate::args::{Args, Subcommand};
-use crate::commands::clear_history::ClearHistoryCommand;
-use crate::commands::copy_tags::CopyTagsCommand;
-use crate::commands::fix::FixCommand;
-use crate::commands::list_templates::ListTemplatesCommand;
-use crate::commands::rename::RenameCommand;
-use crate::commands::show_history::ShowHistoryCommand;
-use crate::commands::undo_redo::UndoRedoCommand;
-use crate::commands::Command;
+use crate::commands::{
+    clear_history, copy_tags, list_templates, show_history, FixCommand,
+    RenameCommand, UndoRedoCommand,
+};
 use crate::config::paths::AppPaths;
 use crate::TERM;
 
@@ -43,14 +39,14 @@ pub fn main() -> Result<()> {
 
     install_restore_cursor_hooks();
 
-    let command: Box<dyn Command> = match args.command {
-        Subcommand::ClearHistory => Box::new(ClearHistoryCommand),
-        Subcommand::Templates(list_templates) => {
-            let template_directory = list_templates
+    match args.command {
+        Subcommand::ClearHistory => clear_history(&app_paths, &fs_handler)?,
+        Subcommand::Templates(list_templates_args) => {
+            let template_directory = list_templates_args
                 .custom_template_directory
                 .unwrap_or(app_paths.config_directory().to_owned());
 
-            Box::new(ListTemplatesCommand::new(template_directory))
+            list_templates(&template_directory)?;
         },
         Subcommand::Rename(rename) => {
             let input_dir = get_input_directory(rename.custom_input_directory)?;
@@ -59,7 +55,7 @@ pub fn main() -> Result<()> {
                 .custom_template_directory
                 .unwrap_or(app_paths.config_directory().to_owned());
 
-            Box::new(RenameCommand::new(
+            RenameCommand::new(
                 input_dir,
                 template_directory,
                 rename.yes,
@@ -67,47 +63,51 @@ pub fn main() -> Result<()> {
                 rename.recursion_depth,
                 rename.template,
                 rename.arguments,
-            ))
+            )
+            .run(&app_paths, &fs_handler)?;
         },
         Subcommand::Undo(undo_redo) => {
-            Box::new(UndoRedoCommand::new(
+            UndoRedoCommand::new(
                 undo_redo.yes,
                 undo_redo.amount.unwrap_or(1),
                 HistoryMode::Undo,
-            ))
+            )
+            .run(&app_paths, &fs_handler)?;
         },
         Subcommand::Redo(undo_redo) => {
-            Box::new(UndoRedoCommand::new(
+            UndoRedoCommand::new(
                 undo_redo.yes,
                 undo_redo.amount.unwrap_or(1),
                 HistoryMode::Redo,
-            ))
+            )
+            .run(&app_paths, &fs_handler)?;
         },
-        Subcommand::History(show_history) => {
-            Box::new(ShowHistoryCommand::new(show_history.verbose))
+        Subcommand::History(show_history_args) => {
+            show_history(&app_paths, show_history_args.verbose)?;
         },
         Subcommand::Fix(fix) => {
             let input_dir = get_input_directory(fix.custom_input_directory)?;
 
-            Box::new(FixCommand::new(
+            FixCommand::new(
                 input_dir,
                 fix.yes,
                 args.dry_run,
                 fix.recursion_depth,
-            ))
+            )
+            .run(&app_paths)?;
         },
 
-        Subcommand::CopyTags(copy_tags) => {
-            Box::new(CopyTagsCommand::new(
-                copy_tags.source,
-                copy_tags.target,
-                copy_tags.yes,
+        Subcommand::CopyTags(copy_tags_args) => {
+            copy_tags(
+                &copy_tags_args.source,
+                &copy_tags_args.target,
+                copy_tags_args.yes,
                 args.dry_run,
-            ))
+            )?;
         },
     };
 
-    command.run(&app_paths, &fs_handler)
+    Ok(())
 }
 
 // Initialize logger. if `TFMT_LOG` is set, write the log to the current

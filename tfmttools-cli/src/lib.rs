@@ -20,9 +20,3 @@ pub const PKG_NAME: &str = "tfmttools";
 
 #[cfg(feature = "debug")]
 mod debug;
-
-// TODO Handle exit codes properly
-// TODO Check if leftovers are images and offer to delete.
-
-// TODO? Update tag with leading/trailing whitespace?
-// TODO? Separate Move ActionType into CopyFile and RemoveFile?

@@ -1,16 +1,15 @@
-pub mod clear_history;
-pub mod copy_tags;
-pub mod fix;
-pub mod list_templates;
-pub mod rename;
-pub mod show_history;
-pub mod undo_redo;
+mod clear_history;
+mod copy_tags;
+mod fix;
+mod list_templates;
+mod rename;
+mod show_history;
+mod undo_redo;
 
-use color_eyre::Result;
-use tfmttools_fs::FsHandler;
-
-use crate::config::paths::AppPaths;
-
-pub trait Command: std::fmt::Debug {
-    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()>;
-}
+pub use clear_history::clear_history;
+pub use copy_tags::copy_tags;
+pub use fix::FixCommand;
+pub use list_templates::list_templates;
+pub use rename::RenameCommand;
+pub use show_history::show_history;
+pub use undo_redo::UndoRedoCommand;

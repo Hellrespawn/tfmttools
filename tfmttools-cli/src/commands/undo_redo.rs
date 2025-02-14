@@ -4,7 +4,6 @@ use tfmttools_core::history::{ActionHistory, ActionRecord};
 use tfmttools_fs::{ActionHandler, FsHandler};
 use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
-use super::Command;
 use crate::config::paths::AppPaths;
 use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
@@ -29,7 +28,7 @@ impl UndoRedoCommand {
         }
     }
 
-    fn undo_redo(
+    pub fn run(
         &self,
         app_paths: &AppPaths,
         fs_handler: &FsHandler,
@@ -159,11 +158,5 @@ impl UndoRedoCommand {
         }
 
         Ok(())
-    }
-}
-
-impl Command for UndoRedoCommand {
-    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()> {
-        self.undo_redo(app_paths, fs_handler)
     }
 }

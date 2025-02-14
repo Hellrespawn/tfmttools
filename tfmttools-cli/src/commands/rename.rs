@@ -13,7 +13,6 @@ use tfmttools_fs::{
 use tfmttools_history::{LoadHistoryResult, Record, SaveHistoryResult};
 use tracing::debug;
 
-use super::Command;
 use crate::config::paths::AppPaths;
 use crate::history::load_history;
 use crate::ui::{
@@ -54,10 +53,12 @@ impl RenameCommand {
             arguments,
         }
     }
-}
 
-impl Command for RenameCommand {
-    fn run(&self, app_paths: &AppPaths, fs_handler: &FsHandler) -> Result<()> {
+    pub fn run(
+        &self,
+        app_paths: &AppPaths,
+        fs_handler: &FsHandler,
+    ) -> Result<()> {
         InnerRename { options: self, app_paths, fs_handler }.rename()
     }
 }

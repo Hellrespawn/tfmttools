@@ -3,9 +3,8 @@ use color_eyre::Result;
 use tfmttools_core::audiofile::encoding::convert_encoding_to_utf8;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTError;
-use tfmttools_fs::{FsHandler, PathIterator};
+use tfmttools_fs::PathIterator;
 
-use super::Command;
 use crate::config::paths::AppPaths;
 use crate::ui::{
     ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
@@ -35,8 +34,8 @@ impl FixCommand {
     }
 }
 
-impl Command for FixCommand {
-    fn run(&self, app_paths: &AppPaths, _fs_handler: &FsHandler) -> Result<()> {
+impl FixCommand {
+    pub fn run(&self, app_paths: &AppPaths) -> Result<()> {
         let paths = self.gather_file_paths();
 
         let utf16_error_paths = Self::get_utf16_error_files(paths);
@@ -59,9 +58,7 @@ impl Command for FixCommand {
 
         Ok(())
     }
-}
 
-impl FixCommand {
     fn gather_file_paths(&self) -> Vec<Utf8PathBuf> {
         let options = ProgressBarOptions::spinner(
             "audio",
