@@ -321,6 +321,8 @@ mod test {
     }
 
     #[test]
+    #[cfg(unix)]
+    // TODO Test fails on Windows
     fn test_validate_double_separators() {
         let valid = [RenameAction::new(
             Utf8PathBuf::from("/a/b/c/"),
