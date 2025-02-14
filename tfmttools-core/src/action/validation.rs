@@ -282,3 +282,168 @@ fn validate_target_path_too_long(
         .collect()
 }
 
+#[cfg(test)]
+mod test {
+
+    use camino::Utf8PathBuf;
+
+    use super::*;
+
+    fn assert_valid(rename_actions: &[RenameAction]) {
+        assert!(validate_rename_actions(rename_actions).is_empty());
+    }
+
+    fn assert_single_error(rename_actions: &[RenameAction]) -> ValidationError {
+        let mut errors = validate_rename_actions(rename_actions);
+
+        assert!(errors.len() == 1);
+
+        errors.pop().unwrap()
+    }
+
+    fn assert_n_errors(
+        rename_actions: &[RenameAction],
+        n: usize,
+    ) -> Vec<ValidationError> {
+        let errors = validate_rename_actions(rename_actions);
+
+        let len = errors.len();
+
+        assert_eq!(len, n, "expected {n} errors, got {len}.");
+
+        errors
+    }
+
+    fn assert_double_separator_error(rename_actions: &[RenameAction]) {
+        let error = assert_single_error(rename_actions);
+
+        assert!(matches!(error, ValidationError::DoubleSeparators(..)));
+    }
+
+    #[test]
+    fn test_validate_double_separators() {
+        let valid = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from("/d/e/f/"),
+        )];
+
+        assert_valid(&valid);
+
+        let leading = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from("//d/e/f/"),
+        )];
+
+        assert_double_separator_error(&leading);
+
+        let middle = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from("/d//e/f/"),
+        )];
+
+        assert_double_separator_error(&middle);
+
+        let trailing = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from("/d/e/f//"),
+        )];
+
+        assert_double_separator_error(&trailing);
+    }
+
+    #[test]
+    fn test_validate_collision() {
+        let valid = [
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/e/f/"),
+            ),
+            RenameAction::new(
+                Utf8PathBuf::from("/g/h/i/"),
+                Utf8PathBuf::from("/j/k/l/"),
+            ),
+        ];
+
+        assert_valid(&valid);
+
+        let colliding = [
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/e/f/"),
+            ),
+            RenameAction::new(
+                Utf8PathBuf::from("/g/h/i/"),
+                Utf8PathBuf::from("/d/e/f/"),
+            ),
+        ];
+
+        let error = assert_single_error(&colliding);
+        assert!(matches!(error, ValidationError::Collision(..)));
+    }
+
+    #[test]
+    fn test_validate_forbidden() {
+        let valid = [
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/e/f/"),
+            ),
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/.e/f/"),
+            ),
+        ];
+
+        assert_valid(&valid);
+
+        let forbidden_leading = [
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/ e/f/"),
+            ),
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/e /f/"),
+            ),
+            RenameAction::new(
+                Utf8PathBuf::from("/a/b/c/"),
+                Utf8PathBuf::from("/d/e./f/"),
+            ),
+        ];
+
+        let errors = assert_n_errors(&forbidden_leading, 3);
+
+        assert!(errors.into_iter().all(|e| matches!(e, ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent { .. })))
+    }
+
+    #[test]
+    fn validate_path_too_long() {
+        let valid = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from("/d/e/f/"),
+        )];
+
+        assert_valid(&valid);
+
+        let too_long = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from(format!("/d{}/f/", "/e".repeat(128))),
+        )];
+
+        let error = assert_single_error(&too_long);
+
+        assert!(matches!(error, ValidationError::PathTooLong { .. }));
+
+        let exact = [RenameAction::new(
+            Utf8PathBuf::from("/a/b/c/"),
+            Utf8PathBuf::from(format!("/d{}/f", "/e".repeat(126))),
+        )];
+
+        let error = assert_single_error(&exact);
+
+        assert!(matches!(error, ValidationError::PathTooLong {
+            actual_length: 256,
+            ..
+        }));
+    }
+}
