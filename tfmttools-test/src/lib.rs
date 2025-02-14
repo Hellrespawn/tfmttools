@@ -1,4 +1,3 @@
-mod template_reference;
 mod test_case;
 
 pub use test_case::TestCase;

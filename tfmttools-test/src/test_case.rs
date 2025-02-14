@@ -5,13 +5,30 @@ use std::process::Output;
 use assert_cmd::Command;
 use assert_fs::TempDir;
 use color_eyre::Result;
+use serde::Deserialize;
 use termtree::Tree;
 
-use crate::template_reference::TemplateReference;
 use crate::{
     TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME, TEST_CONFIG_DIR_NAME,
     TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
 };
+
+#[derive(Deserialize)]
+struct TestCaseData {
+    pub template: String,
+    pub reference: HashMap<String, String>,
+    pub arguments: Option<Vec<String>>,
+}
+
+impl TestCaseData {
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let body = fs_err::read_to_string(path)?;
+
+        let test_case_data: TestCaseData = serde_json::from_str(&body)?;
+
+        Ok(test_case_data)
+    }
+}
 
 #[derive(Debug)]
 pub struct TestCase {
@@ -27,8 +44,8 @@ impl TestCase {
             .join(TEST_CASE_DIR_NAME)
             .join(format!("{case}.json"));
 
-        let TemplateReference { template, reference, arguments } =
-            TemplateReference::from_file(&path)?;
+        let TestCaseData { template, reference, arguments } =
+            TestCaseData::from_file(&path)?;
 
         Self::validate_template(&template);
         let reference = Self::validate_reference(reference);
