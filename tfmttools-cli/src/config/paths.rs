@@ -4,6 +4,7 @@ use color_eyre::Result;
 
 use crate::args::Args;
 
+#[derive(Debug)]
 pub struct AppPaths {
     config_directory: Utf8PathBuf,
 }

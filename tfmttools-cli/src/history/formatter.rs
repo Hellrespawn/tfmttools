@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionHistory, ActionRecord};
 
@@ -96,11 +98,12 @@ impl HistoryFormatter {
                         format!("{formatted_prefix}{}", iter.next().unwrap());
 
                     for line in iter {
-                        string += &format!(
+                        write!(
+                            string,
                             "\n{}{}",
                             " ".repeat(formatted_prefix.len()),
                             line
-                        );
+                        ).expect("Using write! to append to String should never fail.");
                     }
 
                     string

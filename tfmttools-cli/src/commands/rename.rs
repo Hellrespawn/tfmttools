@@ -8,7 +8,7 @@ use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
     get_longest_common_prefix, ActionHandler, FileOrName, FsHandler,
-    PathIterator, RemoveDirResult, TemplateLoader,
+    PathIterator, PathIteratorOptions, RemoveDirResult, TemplateLoader,
 };
 use tfmttools_history::{LoadHistoryResult, Record, SaveHistoryResult};
 use tracing::debug;
@@ -20,153 +20,159 @@ use crate::ui::{
 };
 
 #[derive(Debug)]
-pub struct RenameCommand {
-    input_directory: Utf8PathBuf,
+pub struct RenameTemplateOptions {
     template_directory: Utf8PathBuf,
-
-    yes: bool,
-    dry_run: bool,
-
-    recursion_depth: usize,
 
     template: Option<FileOrName>,
     arguments: Vec<String>,
 }
 
-impl RenameCommand {
+impl RenameTemplateOptions {
     pub fn new(
-        input_directory: Utf8PathBuf,
         template_directory: Utf8PathBuf,
-        yes: bool,
-        dry_run: bool,
-        recursion_depth: usize,
         template: Option<FileOrName>,
         arguments: Vec<String>,
     ) -> Self {
+        Self { template_directory, template, arguments }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RenameMiscOptions {
+    no_confirm: bool,
+    dry_run: bool,
+}
+
+impl RenameMiscOptions {
+    pub fn new(no_confirm: bool, dry_run: bool) -> Self {
+        Self { no_confirm, dry_run }
+    }
+}
+
+#[derive(Debug)]
+pub struct RenameContext<'rc> {
+    app_paths: &'rc AppPaths,
+    fs_handler: &'rc FsHandler,
+    path_iterator_options: &'rc PathIteratorOptions<'rc>,
+    template_options: &'rc RenameTemplateOptions,
+    misc_options: RenameMiscOptions,
+}
+
+impl<'rc> RenameContext<'rc> {
+    pub fn new(
+        app_paths: &'rc AppPaths,
+        fs_handler: &'rc FsHandler,
+        path_iterator_options: &'rc PathIteratorOptions,
+        template_options: &'rc RenameTemplateOptions,
+        misc_options: RenameMiscOptions,
+    ) -> Self {
         Self {
-            input_directory,
-            template_directory,
-            yes,
-            dry_run,
-            recursion_depth,
-            template,
-            arguments,
+            app_paths,
+            fs_handler,
+            path_iterator_options,
+            template_options,
+            misc_options,
         }
-    }
-
-    pub fn run(
-        &self,
-        app_paths: &AppPaths,
-        fs_handler: &FsHandler,
-    ) -> Result<()> {
-        InnerRename { options: self, app_paths, fs_handler }.rename()
     }
 }
 
-struct InnerRename<'ir> {
-    options: &'ir RenameCommand,
-    app_paths: &'ir AppPaths,
-    fs_handler: &'ir FsHandler,
+pub fn rename(context: &RenameContext) -> Result<()> {
+    let (file_or_name, arguments) = get_template_name_and_arguments(context)?;
+
+    let loader = match &file_or_name {
+        FileOrName::File(path, string) => {
+            TemplateLoader::read_filename(path, string)
+        },
+        FileOrName::Name(_) => {
+            TemplateLoader::read_directory(
+                &context.template_options.template_directory,
+            )
+        },
+    }?;
+
+    let template_name = file_or_name.as_str();
+
+    let template = loader
+        .get_template(template_name, arguments.clone())
+        .ok_or(eyre!("Unable to find template: {}", template_name))?;
+
+    let paths = gather_file_paths(context);
+
+    let audio_files = read_files(paths)?;
+
+    let rename_actions =
+        create_rename_actions(context, &template, &audio_files)?;
+    let rename_actions =
+        RenameAction::filter_unchanged_destinations(rename_actions);
+
+    if rename_actions.is_empty() {
+        println!("There are no audio files to rename.");
+    } else {
+        validate_rename_action_errors(&rename_actions)?;
+
+        let confirmation = context.misc_options.no_confirm
+            || confirm_rename_actions(context, &rename_actions)?;
+
+        if confirmation {
+            let actions = perform_rename_actions(context, rename_actions)?;
+
+            store_history(context, actions, template_name, &arguments)?;
+        } else {
+            println!("Aborting!");
+        }
+    }
+
+    Ok(())
 }
 
-impl InnerRename<'_> {
-    pub fn rename(&self) -> Result<()> {
-        let (file_or_name, arguments) =
-            self.get_template_name_and_arguments()?;
+fn get_template_name_and_arguments(
+    context: &RenameContext,
+) -> Result<(FileOrName, Vec<String>)> {
+    if let Some(file_or_name) = &context.template_options.template {
+        debug!("Using template and arguments from command line.");
 
-        let loader = match &file_or_name {
-            FileOrName::File(path, string) => {
-                TemplateLoader::read_filename(path, string)
-            },
-            FileOrName::Name(_) => {
-                TemplateLoader::read_directory(&self.options.template_directory)
-            },
-        }?;
+        Ok((file_or_name.clone(), context.template_options.arguments.clone()))
+    } else {
+        let history = load_history(&context.app_paths.history_file())?;
 
-        let template_name = file_or_name.as_str();
+        if let LoadHistoryResult::Loaded(history) = history {
+            let metadata_option =
+                history.find_record(|r| r.metadata().is_some()).map(|r| {
+                    r.metadata().expect(
+                        "Presence of metadata checked in query condition.",
+                    )
+                });
 
-        let template = loader
-            .get_template(template_name, arguments.clone())
-            .ok_or(eyre!("Unable to find template: {}", template_name))?;
+            if let Some(metadata) = metadata_option {
+                let template_name = FileOrName::from(metadata.template());
 
-        let paths = self.gather_file_paths();
+                let arguments = metadata.arguments().to_owned();
 
-        let audio_files = Self::read_files(paths)?;
+                println!("Re-using template '{template_name}' and arguments from previous rename.");
 
-        let rename_actions =
-            self.create_rename_actions(&template, &audio_files)?;
-        let rename_actions =
-            RenameAction::filter_unchanged_destinations(rename_actions);
+                debug!("Using previous rename data:\ntemplate: '{}'\narguments: '{}'", template_name, arguments.join("', '"));
 
-        if rename_actions.is_empty() {
-            println!("There are no audio files to rename.");
-        } else {
-            Self::validate_rename_actions(&rename_actions)?;
-
-            let confirmation = self.options.yes
-                || self.confirm_rename_actions(&rename_actions)?;
-
-            if confirmation {
-                let actions = self.perform_rename_actions(rename_actions)?;
-
-                self.store_history(actions, template_name, &arguments)?;
-            } else {
-                println!("Aborting!");
+                return Ok((template_name, arguments));
             }
         }
 
-        Ok(())
+        Err(eyre!(
+            "No template specified and no data from previous run available."
+        ))
     }
+}
 
-    fn get_template_name_and_arguments(
-        &self,
-    ) -> Result<(FileOrName, Vec<String>)> {
-        if let Some(file_or_name) = &self.options.template {
-            debug!("Using template and arguments from command line.");
+fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
+    let progress_bar_options = ProgressBarOptions::spinner(
+        "audio",
+        "total",
+        "Gathering files...",
+        "Gathered files.",
+    );
 
-            Ok((file_or_name.clone(), self.options.arguments.clone()))
-        } else {
-            let history = load_history(&self.app_paths.history_file())?;
+    let spinner = ProgressBar::new(progress_bar_options);
 
-            if let LoadHistoryResult::Loaded(history) = history {
-                let metadata_option =
-                    history.find_record(|r| r.metadata().is_some()).map(|r| {
-                        r.metadata().expect(
-                            "Presence of metadata checked in query condition.",
-                        )
-                    });
-
-                if let Some(metadata) = metadata_option {
-                    let template_name = FileOrName::from(metadata.template());
-
-                    let arguments = metadata.arguments().to_owned();
-
-                    println!("Re-using template '{template_name}' and arguments from previous rename.");
-
-                    debug!("Using previous rename data:\ntemplate: '{}'\narguments: '{}'", template_name, arguments.join("', '"));
-
-                    return Ok((template_name, arguments));
-                }
-            }
-
-            Err(eyre!("No template specified and no data from previous run available."))
-        }
-    }
-
-    fn gather_file_paths(&self) -> Vec<Utf8PathBuf> {
-        let options = ProgressBarOptions::spinner(
-            "audio",
-            "total",
-            "Gathering files...",
-            "Gathered files.",
-        );
-
-        let spinner = ProgressBar::new(options);
-
-        let file_paths = PathIterator::new(
-            &self.options.input_directory,
-            Some(self.options.recursion_depth),
-        )
+    let file_paths = PathIterator::new(context.path_iterator_options)
         .flatten()
         .inspect(|_| spinner.inc_total())
         .filter(|path| AudioFile::path_predicate(path))
@@ -178,223 +184,219 @@ impl InnerRename<'_> {
         })
         .collect::<Vec<_>>();
 
-        spinner.finish();
+    spinner.finish();
 
-        file_paths
-    }
+    file_paths
+}
 
-    fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
-        let options =
-            ProgressBarOptions::bar("Reading files...", "Read files.");
+fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
+    let options = ProgressBarOptions::bar("Reading files...", "Read files.");
 
-        let bar = ProgressBar::with_length(options, file_paths.len() as u64);
+    let bar = ProgressBar::with_length(options, file_paths.len() as u64);
 
-        let audio_files = file_paths
-            .into_iter()
-            .inspect(|_| {
-                bar.inc_found();
+    let audio_files = file_paths
+        .into_iter()
+        .inspect(|_| {
+            bar.inc_found();
 
-                #[cfg(feature = "debug")]
-                crate::debug::delay();
-            })
-            .map(AudioFile::new)
-            .collect::<TFMTResult<Vec<_>>>();
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .map(AudioFile::new)
+        .collect::<TFMTResult<Vec<_>>>();
 
-        bar.finish();
+    bar.finish();
 
-        Ok(audio_files?)
-    }
+    Ok(audio_files?)
+}
 
-    fn create_rename_actions(
-        &self,
-        template: &Template,
-        files: &[AudioFile],
-    ) -> Result<Vec<RenameAction>> {
-        let cwd = self.app_paths.working_directory()?;
+fn create_rename_actions(
+    context: &RenameContext,
+    template: &Template,
+    files: &[AudioFile],
+) -> Result<Vec<RenameAction>> {
+    let cwd = context.app_paths.working_directory()?;
 
-        let options = ProgressBarOptions::bar(
-            "Determining output paths:",
-            "Determined output paths.",
-        );
+    let options = ProgressBarOptions::bar(
+        "Determining output paths:",
+        "Determined output paths.",
+    );
 
-        let bar = ProgressBar::with_length(options, files.len() as u64);
+    let bar = ProgressBar::with_length(options, files.len() as u64);
 
-        let rename_actions: Result<Vec<RenameAction>> = files
+    let rename_actions: Result<Vec<RenameAction>> = files
+        .iter()
+        .map(|audiofile| {
+            Ok(RenameAction::new(
+                audiofile.path().to_owned(),
+                audiofile.construct_target_path(template, &cwd)?,
+            ))
+        })
+        .inspect(|_| {
+            bar.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .collect();
+
+    bar.finish();
+
+    println!();
+
+    rename_actions
+}
+
+fn validate_rename_action_errors(
+    rename_actions: &[RenameAction],
+) -> Result<()> {
+    let validation_errors = validate_rename_actions(rename_actions);
+
+    if validation_errors.is_empty() {
+        Ok(())
+    } else {
+        let error_string = validation_errors
             .iter()
-            .map(|audiofile| {
-                Ok(RenameAction::new(
-                    audiofile.path().to_owned(),
-                    audiofile.construct_target_path(template, &cwd)?,
-                ))
-            })
-            .inspect(|_| {
-                bar.inc_found();
-
-                #[cfg(feature = "debug")]
-                crate::debug::delay();
-            })
-            .collect();
-
-        bar.finish();
-
-        println!();
-
-        rename_actions
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        Err(eyre!("Had validation errors:\n{error_string}"))
     }
+}
 
-    fn validate_rename_actions(rename_actions: &[RenameAction]) -> Result<()> {
-        let validation_errors = validate_rename_actions(rename_actions);
+fn confirm_rename_actions(
+    context: &RenameContext,
+    rename_actions: &[RenameAction],
+) -> Result<bool> {
+    let cwd = context.app_paths.working_directory()?;
 
-        if validation_errors.is_empty() {
-            Ok(())
+    preview_rename_actions(rename_actions, &cwd)?;
+
+    let confirmation_prompt = ConfirmationPrompt::new("Move files?");
+
+    confirmation_prompt.prompt()
+}
+
+fn preview_rename_actions(
+    rename_actions: &[RenameAction],
+    working_directory: &Utf8Path,
+) -> Result<()> {
+    const LEADING_LINES: usize = 3;
+    const TRAILING_LINES: usize = 3;
+
+    let iter = rename_actions.iter().map(|rename_action| {
+        let path = rename_action
+            .target()
+            .strip_prefix(working_directory)
+            .unwrap_or(rename_action.target());
+
+        if path.is_relative() {
+            format!(".{}{path}", std::path::MAIN_SEPARATOR)
         } else {
-            let error_string = validation_errors
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("\n");
-            Err(eyre!("Had validation errors:\n{error_string}"))
+            format!("{path}")
         }
-    }
+    });
 
-    fn confirm_rename_actions(
-        &self,
-        rename_actions: &[RenameAction],
-    ) -> Result<bool> {
-        let cwd = self.app_paths.working_directory()?;
+    let preview_list = PreviewList::new(iter)
+        .leading(LEADING_LINES)
+        .trailing(TRAILING_LINES)
+        .item_name(ItemName::simple("file"));
 
-        Self::preview_rename_actions(rename_actions, &cwd)?;
+    preview_list.print()?;
 
-        let confirmation_prompt = ConfirmationPrompt::new("Move files?");
+    Ok(())
+}
 
-        confirmation_prompt.prompt()
-    }
+fn perform_rename_actions(
+    context: &RenameContext,
+    rename_actions: Vec<RenameAction>,
+) -> Result<Vec<Action>> {
+    let common_prefix = get_longest_common_prefix(
+        &rename_actions.iter().map(RenameAction::source).collect::<Vec<_>>(),
+    );
 
-    fn preview_rename_actions(
-        rename_actions: &[RenameAction],
-        working_directory: &Utf8Path,
-    ) -> Result<()> {
-        const LEADING_LINES: usize = 3;
-        const TRAILING_LINES: usize = 3;
+    let mut actions = move_files(context.fs_handler, rename_actions)?;
 
-        let iter = rename_actions.iter().map(|rename_action| {
-            let path = rename_action
-                .target()
-                .strip_prefix(working_directory)
-                .unwrap_or(rename_action.target());
+    debug!("Common prefix of path: {:?}", common_prefix);
 
-            if path.is_relative() {
-                format!(".{}{path}", std::path::MAIN_SEPARATOR)
-            } else {
-                format!("{path}")
-            }
-        });
+    if let Some(common_path) = common_prefix {
+        let removed = context.fs_handler.remove_empty_subdirectories(
+            &common_path,
+            context.path_iterator_options.recursion_depth(),
+        )?;
 
-        let preview_list = PreviewList::new(iter)
-            .leading(LEADING_LINES)
-            .trailing(TRAILING_LINES)
-            .item_name(ItemName::simple("file"));
-
-        preview_list.print()?;
-
-        Ok(())
-    }
-
-    fn perform_rename_actions(
-        &self,
-        rename_actions: Vec<RenameAction>,
-    ) -> Result<Vec<Action>> {
-        let common_prefix = get_longest_common_prefix(
-            &rename_actions
+        actions.extend(
+            removed
                 .iter()
-                .map(RenameAction::source)
-                .collect::<Vec<_>>(),
+                .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
+                .map(|(p, _)| Action::RemoveDir(p.clone())),
         );
 
-        let mut actions = self.move_files(rename_actions)?;
+        println!("Removed leftover folders.");
+    } else {
+        println!("Unable to remove leftover folders.");
+    }
 
-        debug!("Common prefix of path: {:?}", common_prefix);
+    Ok(actions)
+}
 
-        if let Some(common_path) = common_prefix {
-            let removed = self.fs_handler.remove_empty_subdirectories(
-                &common_path,
-                self.options.recursion_depth,
-            )?;
+fn move_files(
+    fs_handler: &FsHandler,
+    rename_actions: Vec<RenameAction>,
+) -> Result<Vec<Action>> {
+    let options = ProgressBarOptions::bar("Moving files:", "Moved files.");
 
-            actions.extend(
-                removed
-                    .iter()
-                    .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
-                    .map(|(p, _)| Action::RemoveDir(p.clone())),
+    let bar = ProgressBar::with_length(options, rename_actions.len() as u64);
+
+    let actions = RenameAction::create_actions(rename_actions);
+
+    let handler = ActionHandler::new(fs_handler);
+
+    for action in &actions {
+        handler.apply(action)?;
+
+        if action.is_rename() {
+            bar.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        }
+    }
+
+    bar.finish();
+
+    Ok(actions)
+}
+
+fn store_history(
+    context: &RenameContext,
+    actions: Vec<Action>,
+    template_name: &str,
+    arguments: &[String],
+) -> Result<()> {
+    if !context.misc_options.dry_run {
+        let mut history =
+            load_history(&context.app_paths.history_file())?.unwrap();
+
+        let metadata = ActionRecordMetadata::new(
+            template_name.to_owned(),
+            arguments.to_owned(),
+        );
+
+        let record = Record::with_metadata(actions, metadata);
+
+        history.push(record)?;
+
+        if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
+            eprintln!(
+                "History file path exists, but is not a file: {}",
+                history.path()
             );
-
-            println!("Removed leftover folders.");
-        } else {
-            println!("Unable to remove leftover folders.");
+            eprintln!("Backed up history to: {tmp_file}");
         }
-
-        Ok(actions)
     }
 
-    fn move_files(
-        &self,
-        rename_actions: Vec<RenameAction>,
-    ) -> Result<Vec<Action>> {
-        let options = ProgressBarOptions::bar("Moving files:", "Moved files.");
-
-        let bar =
-            ProgressBar::with_length(options, rename_actions.len() as u64);
-
-        let actions = RenameAction::create_actions(rename_actions);
-
-        let handler = ActionHandler::new(self.fs_handler);
-
-        for action in &actions {
-            handler.apply(action)?;
-
-            if action.is_rename() {
-                bar.inc_found();
-
-                #[cfg(feature = "debug")]
-                crate::debug::delay();
-            }
-        }
-
-        bar.finish();
-
-        Ok(actions)
-    }
-
-    fn store_history(
-        &self,
-        actions: Vec<Action>,
-        template_name: &str,
-        arguments: &[String],
-    ) -> Result<()> {
-        if !self.options.dry_run {
-            let mut history =
-                load_history(&self.app_paths.history_file())?.unwrap();
-
-            let metadata = ActionRecordMetadata::new(
-                template_name.to_owned(),
-                arguments.to_owned(),
-            );
-
-            let record = Record::with_metadata(actions, metadata);
-
-            history.push(record)?;
-
-            if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
-                eprintln!(
-                    "History file path exists, but is not a file: {}",
-                    history.path()
-                );
-                eprintln!("Backed up history to: {tmp_file}");
-            }
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 #[cfg(test)]

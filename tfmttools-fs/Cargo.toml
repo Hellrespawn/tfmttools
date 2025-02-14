@@ -21,7 +21,6 @@ minijinja = { workspace = true, features = [
     "custom_syntax",
     "debug",
 ] }
-once_cell = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

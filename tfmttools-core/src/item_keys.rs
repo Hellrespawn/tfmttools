@@ -1,8 +1,8 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
-use once_cell::sync::Lazy;
 use tracing::trace;
 
 use crate::error::{TFMTError, TFMTResult};
@@ -28,8 +28,8 @@ fn all_cases(pascal_case: &str) -> Vec<String> {
         .collect()
 }
 
-static STRING_TO_ITEM_KEY_MAP: Lazy<HashMap<String, ItemKey>> =
-    Lazy::new(|| {
+static STRING_TO_ITEM_KEY_MAP: LazyLock<HashMap<String, ItemKey>> =
+    LazyLock::new(|| {
         let mut map = HashMap::new();
 
         for key in ITEM_KEYS {

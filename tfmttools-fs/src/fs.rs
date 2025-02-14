@@ -4,6 +4,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_core::error::{TFMTError, TFMTResult};
 use tracing::trace;
 
+use crate::path_iterator::PathIteratorOptions;
 use crate::PathIterator;
 
 pub enum MoveFileResult {
@@ -29,10 +30,9 @@ pub fn gather_subdirectories(
     path: &Utf8Path,
     depth: usize,
 ) -> Vec<Utf8PathBuf> {
-    PathIterator::new(path, Some(depth))
-        .flatten()
-        .filter(|p| p.is_dir())
-        .collect()
+    let options = PathIteratorOptions::with_depth(path, depth);
+
+    PathIterator::new(&options).flatten().filter(|p| p.is_dir()).collect()
 }
 
 #[derive(Debug)]

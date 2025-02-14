@@ -12,10 +12,11 @@ mod ui;
 
 pub mod cli;
 
-use console::Term;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-pub static TERM: Lazy<Term> = Lazy::new(Term::stdout);
+use console::Term;
+
+pub static TERM: LazyLock<Term> = LazyLock::new(Term::stdout);
 pub const PKG_NAME: &str = "tfmttools";
 
 #[cfg(feature = "debug")]

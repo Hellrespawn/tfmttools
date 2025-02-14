@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use camino::{Utf8Component, Utf8Path};
-use once_cell::sync::Lazy;
 
 use crate::action::RenameAction;
 use crate::MAX_PATH_LENGTH;
@@ -21,8 +21,8 @@ impl ForbiddenCharacter<'_> {
     }
 }
 
-pub static FORBIDDEN_CHARACTERS: Lazy<Vec<ForbiddenCharacter>> =
-    Lazy::new(|| {
+pub static FORBIDDEN_CHARACTERS: LazyLock<Vec<ForbiddenCharacter>> =
+    LazyLock::new(|| {
         vec![
             ForbiddenCharacter { char: "<", replacement: None },
             ForbiddenCharacter { char: "\"", replacement: None },
@@ -57,9 +57,9 @@ impl ForbiddenLeadingOrTrailingChar<'_> {
     }
 }
 
-pub static FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS: Lazy<
+pub static FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS: LazyLock<
     Vec<ForbiddenLeadingOrTrailingChar>,
-> = Lazy::new(|| {
+> = LazyLock::new(|| {
     vec![
         ForbiddenLeadingOrTrailingChar {
             char: " ",

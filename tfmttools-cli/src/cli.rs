@@ -1,6 +1,6 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
-use tfmttools_fs::FsHandler;
+use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history::HistoryMode;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -10,8 +10,8 @@ use tracing_subscriber::{fmt, registry, EnvFilter};
 
 use crate::args::{Args, Subcommand};
 use crate::commands::{
-    clear_history, copy_tags, list_templates, show_history, FixCommand,
-    RenameCommand, UndoRedoCommand,
+    clear_history, copy_tags, list_templates, rename, show_history, FixCommand,
+    RenameContext, RenameMiscOptions, RenameTemplateOptions, UndoRedoCommand,
 };
 use crate::config::paths::AppPaths;
 use crate::TERM;
@@ -48,23 +48,37 @@ pub fn main() -> Result<()> {
 
             list_templates(&template_directory)?;
         },
-        Subcommand::Rename(rename) => {
-            let input_dir = get_input_directory(rename.custom_input_directory)?;
+        Subcommand::Rename(rename_args) => {
+            let input_directory =
+                get_input_directory(rename_args.custom_input_directory)?;
 
-            let template_directory = rename
+            let template_directory = rename_args
                 .custom_template_directory
                 .unwrap_or(app_paths.config_directory().to_owned());
 
-            RenameCommand::new(
-                input_dir,
+            let path_iterator_options = PathIteratorOptions::with_depth(
+                &input_directory,
+                rename_args.recursion_depth,
+            );
+
+            let template_options = RenameTemplateOptions::new(
                 template_directory,
-                rename.yes,
-                args.dry_run,
-                rename.recursion_depth,
-                rename.template,
-                rename.arguments,
-            )
-            .run(&app_paths, &fs_handler)?;
+                rename_args.template,
+                rename_args.arguments,
+            );
+
+            let misc_options =
+                RenameMiscOptions::new(rename_args.yes, args.dry_run);
+
+            let rename_context = RenameContext::new(
+                &app_paths,
+                &fs_handler,
+                &path_iterator_options,
+                &template_options,
+                misc_options,
+            );
+
+            rename(&rename_context)?;
         },
         Subcommand::Undo(undo_redo) => {
             UndoRedoCommand::new(
@@ -105,7 +119,7 @@ pub fn main() -> Result<()> {
                 args.dry_run,
             )?;
         },
-    };
+    }
 
     Ok(())
 }

@@ -1,7 +1,8 @@
+use std::sync::LazyLock;
+
 use camino::Utf8Path;
 use fs_err as fs;
 use minijinja::{escape_formatter, Environment, Value};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
@@ -21,7 +22,7 @@ impl<'tl> TemplateLoader<'tl> {
         let mut template_names = Vec::new();
         let mut environment = Self::create_environment();
 
-        let iter = PathIterator::new(template_directory, None)
+        let iter = PathIterator::single_directory(template_directory)
             .flatten()
             .filter(|path| Self::path_is_template(path));
 
@@ -121,14 +122,14 @@ impl<'tl> TemplateLoader<'tl> {
     fn year(date: Value) -> Result<String, minijinja::Error> {
         let date = date.to_string();
 
-        static RE_ISO: Lazy<Regex> =
-            Lazy::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
+        static RE_ISO: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
 
-        static RE_AMBIGUOUS: Lazy<Regex> =
-            Lazy::new(|| Regex::new(r"\d{2}-\d{2}-(\d{4})").unwrap());
+        static RE_AMBIGUOUS: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\d{2}-\d{2}-(\d{4})").unwrap());
 
-        static RE_YEAR: Lazy<Regex> =
-            Lazy::new(|| Regex::new(r"(\d{4})").unwrap());
+        static RE_YEAR: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(\d{4})").unwrap());
 
         if let Some(m) = RE_ISO.find(&date) {
             let year = &m.as_str()[0..4];

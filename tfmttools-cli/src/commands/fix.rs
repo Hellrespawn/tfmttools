@@ -3,7 +3,7 @@ use color_eyre::Result;
 use tfmttools_core::audiofile::encoding::convert_encoding_to_utf8;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTError;
-use tfmttools_fs::PathIterator;
+use tfmttools_fs::{PathIterator, PathIteratorOptions};
 
 use crate::config::paths::AppPaths;
 use crate::ui::{
@@ -69,20 +69,22 @@ impl FixCommand {
 
         let spinner = ProgressBar::new(options);
 
-        let file_paths = PathIterator::new(
+        let path_iterator_options = PathIteratorOptions::with_depth(
             &self.input_directory,
-            Some(self.recursion_depth),
-        )
-        .flatten()
-        .inspect(|_| spinner.inc_total())
-        .filter(|path| AudioFile::path_predicate(path))
-        .inspect(|_| {
-            spinner.inc_found();
+            self.recursion_depth,
+        );
 
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
-        })
-        .collect::<Vec<_>>();
+        let file_paths = PathIterator::new(&path_iterator_options)
+            .flatten()
+            .inspect(|_| spinner.inc_total())
+            .filter(|path| AudioFile::path_predicate(path))
+            .inspect(|_| {
+                spinner.inc_found();
+
+                #[cfg(feature = "debug")]
+                crate::debug::delay();
+            })
+            .collect::<Vec<_>>();
 
         spinner.finish();
 
