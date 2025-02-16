@@ -348,14 +348,22 @@ fn move_files(
 
     let bar = ProgressBar::with_length(options, rename_actions.len() as u64);
 
-    let actions = RenameAction::create_actions(rename_actions);
+    let initial_actions = RenameAction::create_actions(rename_actions);
+
+    let mut applied_actions = Vec::new();
 
     let handler = ActionHandler::new(fs_handler);
 
-    for action in &actions {
-        handler.apply(action)?;
+    for action in initial_actions {
+        let actions = handler.apply(action)?;
 
-        if action.is_move_file() {
+        let is_rename_action = actions
+            .iter()
+            .any(tfmttools_core::action::Action::is_rename_action);
+
+        applied_actions.extend(actions);
+
+        if is_rename_action {
             bar.inc_found();
 
             #[cfg(feature = "debug")]
@@ -365,7 +373,7 @@ fn move_files(
 
     bar.finish();
 
-    Ok(actions)
+    Ok(applied_actions)
 }
 
 fn store_history(

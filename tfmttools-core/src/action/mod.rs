@@ -88,7 +88,7 @@ pub enum Action {
 }
 
 impl Action {
-    pub fn is_move_file(&self) -> bool {
+    pub fn is_rename_action(&self) -> bool {
         matches!(self, Self::MoveFile { .. })
     }
 }

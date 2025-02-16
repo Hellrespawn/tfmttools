@@ -12,8 +12,8 @@ impl<'a> ActionHandler<'a> {
         Self { fs_handler }
     }
 
-    pub fn apply(&self, action: &Action) -> TFMTResult<()> {
-        match action {
+    pub fn apply(&self, action: Action) -> TFMTResult<Vec<Action>> {
+        match &action {
             Action::MoveFile(move_file_action) => {
                 self.fs_handler.move_file(
                     move_file_action.source(),
@@ -28,7 +28,7 @@ impl<'a> ActionHandler<'a> {
             },
         }
 
-        Ok(())
+        Ok(vec![action])
     }
 
     pub fn undo(&self, action: &Action) -> TFMTResult<()> {
@@ -51,6 +51,21 @@ impl<'a> ActionHandler<'a> {
     }
 
     pub fn redo(&self, action: &Action) -> TFMTResult<()> {
-        self.apply(action)
+        match action {
+            Action::MoveFile(move_file_action) => {
+                self.fs_handler.move_file(
+                    move_file_action.source(),
+                    move_file_action.target(),
+                )?;
+            },
+            Action::MakeDir(path) => {
+                self.fs_handler.create_dir(path)?;
+            },
+            Action::RemoveDir(path) => {
+                self.fs_handler.remove_dir(path)?;
+            },
+        }
+
+        Ok(())
     }
 }
