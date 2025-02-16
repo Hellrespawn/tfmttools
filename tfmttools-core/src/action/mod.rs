@@ -50,7 +50,7 @@ impl RenameAction {
                 .map(Action::MakeDir)
                 .collect::<Vec<_>>();
 
-        actions.extend(rename_actions.into_iter().map(Action::Rename));
+        actions.extend(rename_actions.into_iter().map(Action::MoveFile));
 
         actions
     }
@@ -80,14 +80,16 @@ impl RenameAction {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
-    Rename(RenameAction),
+    MoveFile(RenameAction),
+    // CopyFile(RenameAction),
+    // RemoveFile(Utf8PathBuf),
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
 }
 
 impl Action {
-    pub fn is_rename(&self) -> bool {
-        matches!(self, Self::Rename { .. })
+    pub fn is_move_file(&self) -> bool {
+        matches!(self, Self::MoveFile { .. })
     }
 }
 

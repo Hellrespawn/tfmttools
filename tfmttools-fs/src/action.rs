@@ -14,10 +14,10 @@ impl<'a> ActionHandler<'a> {
 
     pub fn apply(&self, action: &Action) -> TFMTResult<()> {
         match action {
-            Action::Rename(rename_action) => {
+            Action::MoveFile(move_file_action) => {
                 self.fs_handler.move_file(
-                    rename_action.source(),
-                    rename_action.target(),
+                    move_file_action.source(),
+                    move_file_action.target(),
                 )?;
             },
             Action::MakeDir(path) => {
@@ -33,10 +33,10 @@ impl<'a> ActionHandler<'a> {
 
     pub fn undo(&self, action: &Action) -> TFMTResult<()> {
         match action {
-            Action::Rename(rename_action) => {
+            Action::MoveFile(move_file_action) => {
                 self.fs_handler.move_file(
-                    rename_action.target(),
-                    rename_action.source(),
+                    move_file_action.target(),
+                    move_file_action.source(),
                 )?;
             },
             Action::MakeDir(path) => {

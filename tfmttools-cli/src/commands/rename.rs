@@ -355,7 +355,7 @@ fn move_files(
     for action in &actions {
         handler.apply(action)?;
 
-        if action.is_rename() {
+        if action.is_move_file() {
             bar.inc_found();
 
             #[cfg(feature = "debug")]

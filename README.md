@@ -20,15 +20,16 @@ See also the "examples"-folder.
 
 ## TODO
 
-- Add year to singles?
-- Handle UTF-16 odd length error manually?
-
 - TODO Handle exit codes properly
 - TODO Check if leftovers are images and offer to delete.
 
+- TODO? Add year to singles?
 - TODO? Update tag with leading/trailing whitespace?
-- TODO? Separate Move ActionType into CopyFile and RemoveFile?
 
+- TODO? Separate Move ActionType into CopyFile and RemoveFile?
+- TODO? Add explicit version to history format?
+
+- Handle UTF-16 odd length error manually?
 Check:
 
 - .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3
