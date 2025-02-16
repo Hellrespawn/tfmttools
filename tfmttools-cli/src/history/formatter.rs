@@ -143,6 +143,8 @@ impl HistoryFormatter {
 #[derive(Default)]
 pub struct RecordSummary {
     mv: usize,
+    cp: usize,
+    rm_file: usize,
     mk_dir: usize,
     rm_dir: usize,
 }
@@ -154,6 +156,8 @@ impl RecordSummary {
         for action in record.iter() {
             match action {
                 Action::MoveFile { .. } => summary.mv += 1,
+                Action::CopyFile(_) => summary.cp += 1,
+                Action::RemoveFile(_) => summary.rm_file += 1,
                 Action::MakeDir(_) => summary.mk_dir += 1,
                 Action::RemoveDir(_) => summary.rm_dir += 1,
             }
@@ -184,6 +188,26 @@ impl std::fmt::Display for RecordSummary {
             },
             std::cmp::Ordering::Greater => {
                 strings.push(format!("{} files moved", self.mv));
+            },
+        }
+
+        match self.cp.cmp(&1) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => {
+                strings.push("1 file copied".to_string());
+            },
+            std::cmp::Ordering::Greater => {
+                strings.push(format!("{} files copied", self.mv));
+            },
+        }
+
+        match self.rm_file.cmp(&1) {
+            std::cmp::Ordering::Less => (),
+            std::cmp::Ordering::Equal => {
+                strings.push("1 file removed".to_string());
+            },
+            std::cmp::Ordering::Greater => {
+                strings.push(format!("{} files removed", self.mv));
             },
         }
 

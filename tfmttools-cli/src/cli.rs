@@ -67,8 +67,11 @@ pub fn main() -> Result<()> {
                 rename_args.arguments,
             );
 
-            let misc_options =
-                RenameMiscOptions::new(rename_args.yes, args.dry_run);
+            let misc_options = RenameMiscOptions::new(
+                rename_args.always_copy,
+                rename_args.yes,
+                args.dry_run,
+            );
 
             let rename_context = RenameContext::new(
                 &app_paths,

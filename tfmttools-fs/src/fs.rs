@@ -13,6 +13,16 @@ pub enum MoveFileResult {
     DryRun,
 }
 
+pub enum CopyFileResult {
+    Copied,
+    DryRun,
+}
+
+pub enum RemoveFileResult {
+    Removed,
+    DryRun,
+}
+
 pub enum CreateDirResult {
     Created,
     Exists,
@@ -102,12 +112,28 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_file(&self, path: &Utf8Path) -> TFMTResult<()> {
-        if !self.dry_run {
-            fs_err::remove_file(path)?;
-        }
+    pub fn copy_file(
+        &self,
+        source: &Utf8Path,
+        target: &Utf8Path,
+    ) -> TFMTResult<CopyFileResult> {
+        if self.dry_run {
+            Ok(CopyFileResult::DryRun)
+        } else {
+            fs_err::copy(source, target)?;
 
-        Ok(())
+            Ok(CopyFileResult::Copied)
+        }
+    }
+
+    pub fn remove_file(&self, path: &Utf8Path) -> TFMTResult<RemoveFileResult> {
+        if self.dry_run {
+            Ok(RemoveFileResult::DryRun)
+        } else {
+            fs_err::remove_file(path)?;
+
+            Ok(RemoveFileResult::Removed)
+        }
     }
 
     pub fn create_dir(&self, path: &Utf8Path) -> TFMTResult<CreateDirResult> {

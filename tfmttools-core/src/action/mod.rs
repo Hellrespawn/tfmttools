@@ -81,15 +81,15 @@ impl RenameAction {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
     MoveFile(RenameAction),
-    // CopyFile(RenameAction),
-    // RemoveFile(Utf8PathBuf),
+    CopyFile(RenameAction),
+    RemoveFile(Utf8PathBuf),
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
 }
 
 impl Action {
     pub fn is_rename_action(&self) -> bool {
-        matches!(self, Self::MoveFile { .. })
+        matches!(self, Self::MoveFile { .. } | Self::CopyFile(..))
     }
 }
 

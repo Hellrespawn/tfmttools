@@ -94,6 +94,9 @@ pub struct Rename {
 
     /// Template arguments.
     pub arguments: Vec<String>,
+
+    #[arg(long, hide = true)]
+    pub always_copy: bool,
 }
 
 #[derive(ClapArgs, Debug)]

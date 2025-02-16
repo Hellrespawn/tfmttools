@@ -39,13 +39,14 @@ impl RenameTemplateOptions {
 
 #[derive(Debug, Clone, Copy)]
 pub struct RenameMiscOptions {
+    always_copy: bool,
     no_confirm: bool,
     dry_run: bool,
 }
 
 impl RenameMiscOptions {
-    pub fn new(no_confirm: bool, dry_run: bool) -> Self {
-        Self { no_confirm, dry_run }
+    pub fn new(always_copy: bool, no_confirm: bool, dry_run: bool) -> Self {
+        Self { always_copy, no_confirm, dry_run }
     }
 }
 
@@ -315,7 +316,7 @@ fn perform_rename_actions(
         &rename_actions.iter().map(RenameAction::source).collect::<Vec<_>>(),
     );
 
-    let mut actions = move_files(context.fs_handler, rename_actions)?;
+    let mut actions = move_files(context, rename_actions)?;
 
     debug!("Common prefix of path: {:?}", common_prefix);
 
@@ -341,7 +342,7 @@ fn perform_rename_actions(
 }
 
 fn move_files(
-    fs_handler: &FsHandler,
+    context: &RenameContext,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
     let options = ProgressBarOptions::bar("Moving files:", "Moved files.");
@@ -352,7 +353,10 @@ fn move_files(
 
     let mut applied_actions = Vec::new();
 
-    let handler = ActionHandler::new(fs_handler);
+    let handler = ActionHandler::new(
+        context.fs_handler,
+        context.misc_options.always_copy,
+    );
 
     for action in initial_actions {
         let actions = handler.apply(action)?;
