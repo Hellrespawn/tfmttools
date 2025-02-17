@@ -197,7 +197,7 @@ impl std::fmt::Display for RecordSummary {
                 strings.push("1 file copied".to_string());
             },
             std::cmp::Ordering::Greater => {
-                strings.push(format!("{} files copied", self.mv));
+                strings.push(format!("{} files copied", self.cp));
             },
         }
 
@@ -207,7 +207,7 @@ impl std::fmt::Display for RecordSummary {
                 strings.push("1 file removed".to_string());
             },
             std::cmp::Ordering::Greater => {
-                strings.push(format!("{} files removed", self.mv));
+                strings.push(format!("{} files removed", self.rm_file));
             },
         }
 
