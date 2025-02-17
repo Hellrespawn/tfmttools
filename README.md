@@ -28,7 +28,7 @@ See also the "examples"-folder.
 
 - TODO? Add explicit version to history format?
 
-- TODO? Testcase inheritance?
+- TODO? Custom test runner (disable libtest?)
 
 - Handle UTF-16 odd length error manually?
 

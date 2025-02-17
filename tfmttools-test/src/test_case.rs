@@ -4,6 +4,7 @@ use std::fmt::Write;
 use assert_cmd::Command;
 use assert_fs::TempDir;
 use camino::{Utf8Path, Utf8PathBuf};
+use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use serde::Deserialize;
 use tfmttools_fs::PathIterator;
@@ -13,6 +14,7 @@ use crate::predicates::{
     check_reference_files_dont_exist_and_get_remaining,
     check_reference_files_exist_and_get_missing,
 };
+use crate::test_case_data::TestCaseData;
 use crate::test_result::CommandOutput;
 use crate::{
     TestResult, TestResultType, TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME,
@@ -21,7 +23,7 @@ use crate::{
 
 #[derive(Debug, Deserialize, Copy, Clone)]
 #[serde(rename_all = "kebab-case")]
-enum TestType {
+pub enum TestType {
     Apply,
     Undo,
     Redo,
@@ -36,26 +38,6 @@ impl std::fmt::Display for TestType {
             TestType::Redo => write!(f, "redo"),
             TestType::PreviousData => write!(f, "previous-data"),
         }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct TestCaseData {
-    template: String,
-    template_arguments: Option<Vec<String>>,
-    global_arguments: Option<Vec<String>>,
-    rename_arguments: Option<Vec<String>>,
-    reference: HashMap<String, String>,
-    types: Vec<TestType>,
-}
-
-impl TestCaseData {
-    pub fn from_file(path: &Utf8Path) -> Result<Self> {
-        let body = fs_err::read_to_string(path)?;
-
-        let test_case_data: TestCaseData = serde_json::from_str(&body)?;
-
-        Ok(test_case_data)
     }
 }
 
@@ -102,12 +84,22 @@ impl TestCase {
             template_arguments,
             global_arguments,
             rename_arguments,
-            types,
             reference,
-        } = TestCaseData::from_file(path)?;
+            types,
+            ..
+        } = Self::load_data(path)?;
 
-        Self::validate_template(&template);
-        let reference = Self::validate_reference(reference);
+        let template_name = Self::validate_template(path, template)?;
+
+        let reference = Self::validate_reference(path, reference)?;
+
+        if types.is_none() {
+            return Err(eyre!(
+                "Test case data does not define test types: {path}",
+            ));
+        }
+
+        let types = types.unwrap();
 
         let cases = types
             .into_iter()
@@ -124,7 +116,7 @@ impl TestCase {
 
                 let case = TestCase {
                     name,
-                    template: template.clone(),
+                    template: template_name.clone(),
                     reference: reference.clone(),
                     template_arguments: template_arguments
                         .clone()
@@ -147,6 +139,22 @@ impl TestCase {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(cases)
+    }
+
+    fn load_data(path: &Utf8Path) -> Result<TestCaseData> {
+        let mut test_case_data = TestCaseData::from_file(path)?;
+
+        while let Some(extends) = &test_case_data.extends {
+            let ancestor_path = get_test_data_dir()
+                .join(TEST_CASE_DIR_NAME)
+                .join(format!("{}.case.json", extends));
+
+            let ancestor_data = TestCaseData::from_file(&ancestor_path)?;
+
+            test_case_data = ancestor_data.merge(test_case_data);
+        }
+
+        Ok(test_case_data)
     }
 
     pub fn run_test(&self) -> TestResult {
@@ -444,10 +452,29 @@ impl TestCase {
         }
     }
 
-    fn validate_template(name: &str) {
-        let path = get_template_data_dir().join(format!("{name}.tfmt"));
+    fn validate_template(
+        path: &Utf8Path,
+        template_name: Option<String>,
+    ) -> Result<String> {
+        if let Some(template_name) = template_name {
+            let path =
+                get_template_data_dir().join(format!("{template_name}.tfmt"));
 
-        assert!(path.is_file(), "Template {} does not exist.", name);
+            if path.is_file() {
+                Ok(template_name)
+            } else {
+                Err(eyre!("Template {} does not exist.", template_name))
+            }
+        } else {
+            Err(Self::template_validation_error(path, "name"))
+        }
+    }
+
+    fn template_validation_error(
+        path: &Utf8Path,
+        property: &str,
+    ) -> color_eyre::Report {
+        eyre!("Test case data does not define {property}: {path}",)
     }
 
     fn populate_templates(&self) -> Result<()> {
@@ -467,8 +494,6 @@ impl TestCase {
         for template_path in &paths {
             // Templates are selected by is_file, should always have a filename
             // so path.file_name().unwrap() should be safe.
-
-            assert!(template_path.file_name().is_some());
             let file_name = template_path.file_name().unwrap();
 
             fs_err::copy(template_path, template_dir.join(file_name))?;
@@ -495,8 +520,6 @@ impl TestCase {
             // Audio files are selected by is_file, should always have a
             // filename so path.file_name().unwrap() should be safe.
 
-            assert!(audiofile_path.file_name().is_some());
-
             fs_err::copy(
                 audiofile_path,
                 audio_dir.join(audiofile_path.file_name().unwrap()),
@@ -507,19 +530,29 @@ impl TestCase {
     }
 
     fn validate_reference(
-        reference: HashMap<String, String>,
-    ) -> HashMap<String, String> {
-        let mut valid_reference = HashMap::new();
+        path: &Utf8Path,
+        reference: Option<HashMap<String, String>>,
+    ) -> Result<HashMap<String, String>> {
+        if let Some(reference) = reference {
+            let mut valid_reference = HashMap::new();
 
-        for (key, value) in reference {
-            let path = get_audio_data_dir().join(&key);
+            for (key, value) in reference {
+                let file_path = get_audio_data_dir().join(&key);
 
-            assert!(path.is_file(), "Unable to validate audio file {}", path);
+                if !file_path.is_file() {
+                    return Err(eyre!(
+                        "Unable to validate audio file {}",
+                        file_path
+                    ));
+                }
 
-            valid_reference.insert(format!("files/{key}"), value);
+                valid_reference.insert(format!("files/{key}"), value);
+            }
+
+            Ok(valid_reference)
+        } else {
+            Err(Self::template_validation_error(path, "reference"))
         }
-
-        valid_reference
     }
 
     fn create_temp_dir_file_tree(&self) -> FileTreeNode {

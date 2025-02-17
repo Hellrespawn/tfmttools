@@ -1,6 +1,7 @@
 mod file_tree;
 mod predicates;
 mod test_case;
+mod test_case_data;
 mod test_result;
 
 pub use test_case::TestCase;
