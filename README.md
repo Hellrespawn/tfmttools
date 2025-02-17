@@ -4,7 +4,7 @@ Use `minijinja` to rename audio files according to their tags.
 
 ## Requirements
 
-- Rust (MSRV: 1.83)
+- Rust (MSRV: 1.84.1)
 
 ## Installation
 
@@ -26,10 +26,12 @@ See also the "examples"-folder.
 - TODO? Add year to singles?
 - TODO? Update tag with leading/trailing whitespace?
 
-- TODO? Separate Move ActionType into CopyFile and RemoveFile?
 - TODO? Add explicit version to history format?
 
+- TODO? Testcase inheritance?
+
 - Handle UTF-16 odd length error manually?
+
 Check:
 
 - .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3

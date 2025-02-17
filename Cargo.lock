@@ -859,7 +859,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41b740d195ed3166cd147c8047ec98db0e22ec019eb8eeb76d343b795304fb13"
 dependencies = [
  "predicates-core",
- "termtree 0.4.1",
+ "termtree",
 ]
 
 [[package]]
@@ -1081,12 +1081,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
-name = "termtree"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
-
-[[package]]
 name = "textwrap"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1111,8 +1105,6 @@ dependencies = [
  "fs-err",
  "id3",
  "indicatif",
- "serde",
- "serde_json",
  "textwrap",
  "tfmttools-core",
  "tfmttools-fs",
@@ -1151,7 +1143,6 @@ dependencies = [
  "regex",
  "serde",
  "tfmttools-core",
- "thiserror 2.0.11",
  "tracing",
 ]
 
@@ -1174,12 +1165,11 @@ version = "0.21.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
+ "camino",
  "color-eyre",
  "fs-err",
  "serde",
  "serde_json",
- "termtree 0.5.1",
- "textwrap",
  "tfmttools-fs",
 ]
 

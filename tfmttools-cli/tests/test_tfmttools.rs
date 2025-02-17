@@ -2,83 +2,30 @@ use color_eyre::Result;
 use tfmttools_test::TestCase;
 
 #[test]
-fn test_rename_apply_simple_input() -> Result<()> {
-    let case = TestCase::load("simple_input")?;
+fn test_all_cases() -> Result<()> {
+    let cases = TestCase::load_all()?;
 
-    case.assert_apply(true);
+    let results = cases.iter().map(|c| c.run_test()).collect::<Vec<_>>();
 
-    Ok(())
-}
+    let mut failed_test_names = Vec::new();
 
-#[test]
-fn test_rename_undo_simple_input() -> Result<()> {
-    let case = TestCase::load("simple_input")?;
+    for result in results {
+        println!("{result}");
 
-    case.assert_apply(false);
-    case.assert_undo(true);
+        if result.is_failure() {
+            failed_test_names.push(result.test_case_name);
+            println!();
+        }
+    }
 
-    Ok(())
-}
+    if !failed_test_names.is_empty() {
+        println!(
+            "The following tests have failed:\n  {}",
+            failed_test_names.join("\n  ")
+        );
 
-#[test]
-fn test_rename_apply_simple_input_with_previous_run_data() -> Result<()> {
-    let case = TestCase::load("simple_input")?;
-
-    case.assert_apply(false);
-    case.assert_undo(false);
-    case.assert_apply_without_template_and_args(true);
-
-    Ok(())
-}
-
-#[test]
-fn test_rename_redo_simple_input() -> Result<()> {
-    let case = TestCase::load("simple_input")?;
-
-    case.assert_apply(false);
-    case.assert_undo(false);
-    case.assert_redo(true);
-
-    Ok(())
-}
-
-#[test]
-fn test_rename_apply_typical_input() -> Result<()> {
-    let case = TestCase::load("typical_input")?;
-
-    case.assert_apply(true);
-
-    Ok(())
-}
-
-#[test]
-fn test_rename_undo_typical_input() -> Result<()> {
-    let case = TestCase::load("typical_input")?;
-
-    case.assert_apply(false);
-    case.assert_undo(true);
-
-    Ok(())
-}
-
-#[test]
-fn test_rename_apply_typical_input_with_previous_run_data() -> Result<()> {
-    let case = TestCase::load("typical_input")?;
-
-    case.assert_apply(false);
-    case.assert_undo(false);
-    case.assert_apply_without_template_and_args(true);
-
-    Ok(())
-}
-
-#[test]
-fn test_rename_redo_typical_input() -> Result<()> {
-    let case = TestCase::load("typical_input")?;
-
-    case.assert_apply(false);
-    case.assert_undo(false);
-    case.assert_redo(true);
+        panic!()
+    }
 
     Ok(())
 }

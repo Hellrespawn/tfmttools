@@ -1,27 +1,56 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Output;
+use std::fmt::Write;
 
 use assert_cmd::Command;
 use assert_fs::TempDir;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use serde::Deserialize;
-use termtree::Tree;
+use tfmttools_fs::PathIterator;
 
+use crate::file_tree::FileTreeNode;
+use crate::predicates::{
+    check_reference_files_dont_exist_and_get_remaining,
+    check_reference_files_exist_and_get_missing,
+};
+use crate::test_result::CommandOutput;
 use crate::{
-    TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME, TEST_CONFIG_DIR_NAME,
-    TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
+    TestResult, TestResultType, TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME,
+    TEST_CONFIG_DIR_NAME, TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
 };
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Copy, Clone)]
+#[serde(rename_all = "kebab-case")]
+enum TestType {
+    Apply,
+    Undo,
+    Redo,
+    PreviousData,
+}
+
+impl std::fmt::Display for TestType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TestType::Apply => write!(f, "apply"),
+            TestType::Undo => write!(f, "undo"),
+            TestType::Redo => write!(f, "redo"),
+            TestType::PreviousData => write!(f, "previous-data"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 struct TestCaseData {
-    pub template: String,
-    pub reference: HashMap<String, String>,
-    pub arguments: Option<Vec<String>>,
+    template: String,
+    template_arguments: Option<Vec<String>>,
+    global_arguments: Option<Vec<String>>,
+    rename_arguments: Option<Vec<String>>,
+    reference: HashMap<String, String>,
+    types: Vec<TestType>,
 }
 
 impl TestCaseData {
-    pub fn from_file(path: &Path) -> Result<Self> {
+    pub fn from_file(path: &Utf8Path) -> Result<Self> {
         let body = fs_err::read_to_string(path)?;
 
         let test_case_data: TestCaseData = serde_json::from_str(&body)?;
@@ -32,140 +61,330 @@ impl TestCaseData {
 
 #[derive(Debug)]
 pub struct TestCase {
+    name: String,
     template: String,
+    template_arguments: Vec<String>,
+    global_arguments: Vec<String>,
+    rename_arguments: Vec<String>,
     reference: HashMap<String, String>,
-    arguments: Vec<String>,
+    test_type: TestType,
     temp_dir: TempDir,
 }
 
 impl TestCase {
-    pub fn load(case: &str) -> Result<Self> {
-        let path = get_test_data_dir()
-            .join(TEST_CASE_DIR_NAME)
-            .join(format!("{case}.json"));
+    fn temp_dir_path(&self) -> Utf8PathBuf {
+        Utf8PathBuf::from_path_buf(self.temp_dir.path().to_path_buf())
+            .expect("temp_dir should be valid UTF-8")
+    }
 
-        let TestCaseData { template, reference, arguments } =
-            TestCaseData::from_file(&path)?;
+    pub fn load_all() -> Result<Vec<Self>> {
+        let test_cases_dir = get_test_data_dir().join(TEST_CASE_DIR_NAME);
+
+        let test_case_iterator =
+            PathIterator::single_directory(&test_cases_dir);
+
+        let cases = test_case_iterator.flatten().filter(|p| {
+            let component = p.components().last().expect("iterator of path components should always have one element");
+
+            component.as_str().ends_with(".case.json")
+        }).map(|p|Self::load(&p))
+        .try_fold(Vec::new(), |mut cases, case| {
+            cases.extend(case?);
+            Ok::<_, color_eyre::Report>(cases)
+        })?;
+
+        Ok(cases)
+    }
+
+    pub fn load(path: &Utf8Path) -> Result<Vec<Self>> {
+        let TestCaseData {
+            template,
+            template_arguments,
+            global_arguments,
+            rename_arguments,
+            types,
+            reference,
+        } = TestCaseData::from_file(path)?;
 
         Self::validate_template(&template);
         let reference = Self::validate_reference(reference);
 
-        let temp_dir = TempDir::new()?;
+        let cases = types
+            .into_iter()
+            .map(|test_type| {
+                let temp_dir = TempDir::new()?;
 
-        let case = TestCase {
-            template,
-            reference,
-            arguments: arguments.unwrap_or_default(),
-            temp_dir,
-        };
+                let case_data_name = path
+                    .file_name()
+                    .expect("Path to file should always have a file name")
+                    .replace(".case.json", "")
+                    .to_owned();
 
-        case.populate_templates()?;
-        case.populate_files()?;
+                let name = format!("{}::{}", case_data_name, test_type);
 
-        Ok(case)
+                let case = TestCase {
+                    name,
+                    template: template.clone(),
+                    reference: reference.clone(),
+                    template_arguments: template_arguments
+                        .clone()
+                        .unwrap_or_default(),
+                    global_arguments: global_arguments
+                        .clone()
+                        .unwrap_or_default(),
+                    rename_arguments: rename_arguments
+                        .clone()
+                        .unwrap_or_default(),
+                    test_type,
+                    temp_dir,
+                };
+
+                case.populate_templates()?;
+                case.populate_files()?;
+
+                Ok(case)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(cases)
     }
 
-    pub fn assert_apply(&self, report: bool) {
+    pub fn run_test(&self) -> TestResult {
+        match self.test_type {
+            TestType::Apply => self.apply(),
+            TestType::Undo => {
+                let result = self.apply();
+
+                if result.is_failure() {
+                    return result;
+                }
+
+                self.undo()
+            },
+            TestType::Redo => {
+                let result = self.apply();
+
+                if result.is_failure() {
+                    return result;
+                }
+
+                let result = self.undo();
+
+                if result.is_failure() {
+                    return result;
+                }
+
+                self.redo()
+            },
+            TestType::PreviousData => {
+                let result = self.apply();
+
+                if result.is_failure() {
+                    return result;
+                }
+
+                let result = self.undo();
+
+                if result.is_failure() {
+                    return result;
+                }
+
+                self.previous_data()
+            },
+        }
+    }
+
+    fn create_rename_command(&self, previous_data: bool) -> Command {
         let mut cmd = self.create_command();
 
-        cmd.arg("rename")
-            .arg("--custom-template-directory")
-            .arg(self.get_template_dest_dir())
-            .arg("--yes")
-            .arg(self.template.as_str());
-
-        for argument in &self.arguments {
-            cmd.arg(argument);
+        for arg in &self.global_arguments {
+            cmd.arg(arg);
         }
 
-        self.run_command(cmd, "apply", report);
-
-        self.assert_files_exist(self.reference.values(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "File was not renamed: {}",
-                p.display()
-            ));
-        });
-    }
-
-    pub fn assert_apply_without_template_and_args(&self, report: bool) {
-        let mut cmd = self.create_command();
-
         cmd.arg("rename")
             .arg("--custom-template-directory")
             .arg(self.get_template_dest_dir())
             .arg("--yes");
 
-        self.run_command(cmd, "apply", report);
+        for arg in &self.rename_arguments {
+            cmd.arg(arg);
+        }
 
-        self.assert_files_exist(self.reference.values(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "File was not renamed: {}",
-                p.display()
-            ));
-        });
+        if !previous_data {
+            cmd.arg(self.template.as_str());
+            cmd.arg("--");
+
+            for argument in &self.template_arguments {
+                cmd.arg(argument);
+            }
+        }
+
+        cmd
     }
 
-    pub fn assert_undo(&self, report: bool) {
-        let mut cmd = Command::cargo_bin("tfmt").unwrap();
+    pub fn apply(&self) -> TestResult {
+        let cmd = self.create_rename_command(false);
 
-        cmd.arg("--custom-config-directory")
-            .arg(self.get_config_dest_dir())
-            .arg("undo")
-            .arg("--yes");
+        let command_output = self.run_command(cmd, TestType::Apply);
 
-        self.run_command(cmd, "undo", report);
+        let missing_files = check_reference_files_exist_and_get_missing(
+            &self.temp_dir_path(),
+            self.reference.values(),
+        )
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>();
 
-        self.assert_files_exist(self.reference.keys(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "{} was not returned to original location.",
-                p.display()
-            ));
-        });
+        let exit_code = command_output.exit_code;
 
-        self.assert_files_dont_exist(self.reference.values(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "{} is still in renamed location.",
-                p.display()
-            ));
-        });
+        let message = if exit_code != 0 {
+            Some(format!("Command exited with code: {}", exit_code))
+        } else if !missing_files.is_empty() {
+            Some(format!(
+                "Files missing after rename:\n  {}",
+                missing_files.join("\n  ")
+            ))
+        } else {
+            None
+        };
+
+        TestResult {
+            test_case_name: self.name.clone(),
+            command_output,
+            test_result_type: if let Some(message) = message {
+                TestResultType::Failure(message)
+            } else {
+                TestResultType::Success
+            },
+        }
     }
 
-    pub fn assert_redo(&self, report: bool) {
-        let mut cmd = Command::cargo_bin("tfmt").unwrap();
+    pub fn previous_data(&self) -> TestResult {
+        let cmd = self.create_rename_command(true);
 
-        cmd.arg("--custom-config-directory")
-            .arg(self.get_config_dest_dir())
-            .arg("redo")
-            .arg("--yes");
+        let command_output = self.run_command(cmd, TestType::PreviousData);
 
-        self.run_command(cmd, "redo", report);
+        let missing_files = check_reference_files_exist_and_get_missing(
+            &self.temp_dir_path(),
+            self.reference.values(),
+        )
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>();
 
-        self.assert_files_exist(self.reference.values(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "{} was not returned to renamed location.",
-                p.display()
-            ));
-        });
+        let exit_code = command_output.exit_code;
 
-        self.assert_files_dont_exist(self.reference.keys(), |p| {
-            self.print_temp_dir_contents(&format!(
-                "{} is still in undone location.",
-                p.display()
-            ));
-        });
+        let message = if exit_code != 0 {
+            Some(format!("Command exited with code: {}", exit_code))
+        } else if !missing_files.is_empty() {
+            Some(format!(
+                "Files missing after rename:\n  {}",
+                missing_files.join("\n  ")
+            ))
+        } else {
+            None
+        };
+
+        TestResult {
+            test_case_name: self.name.clone(),
+            command_output,
+            test_result_type: if let Some(message) = message {
+                TestResultType::Failure(message)
+            } else {
+                TestResultType::Success
+            },
+        }
     }
 
-    fn get_audio_dest_dir(&self) -> PathBuf {
-        self.temp_dir.join(TEST_AUDIO_FILE_DIR_NAME)
+    pub fn undo(&self) -> TestResult {
+        let mut cmd = self.create_command();
+
+        cmd.arg("undo").arg("--yes");
+
+        let command_output = self.run_command(cmd, TestType::Undo);
+
+        let remaining_files =
+            check_reference_files_dont_exist_and_get_remaining(
+                &self.temp_dir_path(),
+                self.reference.values(),
+            )
+            .into_iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>();
+
+        let exit_code = command_output.exit_code;
+
+        let message = if exit_code != 0 {
+            Some(format!("Command exited with code: {}", exit_code))
+        } else if !remaining_files.is_empty() {
+            Some(format!(
+                "Files remaining after undo:\n  {}",
+                remaining_files.join("\n  ")
+            ))
+        } else {
+            None
+        };
+
+        TestResult {
+            test_case_name: self.name.clone(),
+            command_output,
+            test_result_type: if let Some(message) = message {
+                TestResultType::Failure(message)
+            } else {
+                TestResultType::Success
+            },
+        }
     }
 
-    fn get_config_dest_dir(&self) -> PathBuf {
-        self.temp_dir.join(TEST_CONFIG_DIR_NAME)
+    pub fn redo(&self) -> TestResult {
+        let mut cmd = self.create_command();
+
+        cmd.arg("redo").arg("--yes");
+
+        let command_output = self.run_command(cmd, TestType::Redo);
+
+        let missing_files = check_reference_files_exist_and_get_missing(
+            &self.temp_dir_path(),
+            self.reference.values(),
+        )
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect::<Vec<_>>();
+
+        let exit_code = command_output.exit_code;
+
+        let message = if exit_code != 0 {
+            Some(format!("Command exited with code: {}", exit_code))
+        } else if !missing_files.is_empty() {
+            Some(format!(
+                "Files missing after redo:\n  {}",
+                missing_files.join("\n  ")
+            ))
+        } else {
+            None
+        };
+
+        TestResult {
+            test_case_name: self.name.clone(),
+            command_output,
+            test_result_type: if let Some(message) = message {
+                TestResultType::Failure(message)
+            } else {
+                TestResultType::Success
+            },
+        }
     }
 
-    fn get_template_dest_dir(&self) -> PathBuf {
-        self.temp_dir.join(TEST_TEMPLATE_DIR_NAME)
+    fn get_audio_dest_dir(&self) -> Utf8PathBuf {
+        self.temp_dir_path().join(TEST_AUDIO_FILE_DIR_NAME)
+    }
+
+    fn get_config_dest_dir(&self) -> Utf8PathBuf {
+        self.temp_dir_path().join(TEST_CONFIG_DIR_NAME)
+    }
+
+    fn get_template_dest_dir(&self) -> Utf8PathBuf {
+        self.temp_dir_path().join(TEST_TEMPLATE_DIR_NAME)
     }
 
     fn create_command(&self) -> Command {
@@ -176,36 +395,53 @@ impl TestCase {
         cmd
     }
 
-    fn run_command(&self, mut cmd: Command, name: &str, report: bool) {
-        if report {
-            println!();
-            self.print_temp_dir_contents(&format!("Before {name}"));
+    fn get_invocation(cmd: &Command) -> String {
+        let mut string = String::new();
+
+        write!(string, "{}", cmd.get_program().to_string_lossy()).unwrap();
+
+        for arg in cmd.get_args() {
+            write!(string, " {}", arg.to_string_lossy()).unwrap();
         }
 
-        let assert = cmd.current_dir(self.temp_dir.path()).assert();
-
-        if report {
-            let output = assert.get_output();
-            self.report_command_output(name, output);
-        }
-
-        assert.success();
+        string
     }
 
-    fn report_command_output(&self, name: &str, output: &Output) {
-        println!("Exit status: {}", output.status.code().unwrap_or(-1));
-        println!();
+    fn run_command(
+        &self,
+        mut cmd: Command,
+        test_type: TestType,
+    ) -> CommandOutput {
+        let file_tree_before = self.create_temp_dir_file_tree();
 
-        println!("```stdout");
-        println!("{}```", indent(String::from_utf8_lossy(&output.stdout)));
+        let result = cmd.current_dir(self.temp_dir.path()).output();
 
-        println!();
+        let file_tree_after = self.create_temp_dir_file_tree();
 
-        println!("```stderr");
-        println!("{}```", indent(String::from_utf8_lossy(&output.stderr)));
-        println!();
-
-        self.print_temp_dir_contents(&format!("After {name}"));
+        match result {
+            Ok(output) => {
+                CommandOutput {
+                    action_name: test_type.to_string(),
+                    invocation: Self::get_invocation(&cmd),
+                    exit_code: output.status.code().unwrap_or(-255),
+                    file_tree_before,
+                    file_tree_after,
+                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+                }
+            },
+            Err(error) => {
+                CommandOutput {
+                    action_name: test_type.to_string(),
+                    invocation: Self::get_invocation(&cmd),
+                    exit_code: i32::MIN,
+                    file_tree_before,
+                    file_tree_after,
+                    stdout: String::new(),
+                    stderr: error.to_string(),
+                }
+            },
+        }
     }
 
     fn validate_template(name: &str) {
@@ -215,9 +451,14 @@ impl TestCase {
     }
 
     fn populate_templates(&self) -> Result<()> {
-        let paths: Vec<PathBuf> = fs_err::read_dir(get_template_data_dir())?
-            .flat_map(|result| result.map(|entry| entry.path()))
-            .collect();
+        let paths = fs_err::read_dir(get_template_data_dir())?
+            .flat_map(|result| {
+                result.map(|entry| {
+                    Utf8PathBuf::from_path_buf(entry.path().to_path_buf())
+                })
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
         let template_dir = self.get_template_dest_dir();
 
@@ -237,9 +478,14 @@ impl TestCase {
     }
 
     fn populate_files(&self) -> Result<()> {
-        let paths: Vec<PathBuf> = fs_err::read_dir(get_audio_data_dir())?
-            .flat_map(|result| result.map(|entry| entry.path()))
-            .collect();
+        let paths = fs_err::read_dir(get_audio_data_dir())?
+            .flat_map(|result| {
+                result.map(|entry| {
+                    Utf8PathBuf::from_path_buf(entry.path().to_path_buf())
+                })
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
         let audio_dir = self.get_audio_dest_dir();
 
@@ -268,11 +514,7 @@ impl TestCase {
         for (key, value) in reference {
             let path = get_audio_data_dir().join(&key);
 
-            assert!(
-                path.is_file(),
-                "Unable to validate audio file {}",
-                path.display()
-            );
+            assert!(path.is_file(), "Unable to validate audio file {}", path);
 
             valid_reference.insert(format!("files/{key}"), value);
         }
@@ -280,93 +522,30 @@ impl TestCase {
         valid_reference
     }
 
-    fn assert_files_exist<'a, I, F>(&self, reference: I, failure_callback: F)
-    where
-        I: Iterator<Item = &'a String>,
-        F: Fn(&Path),
-    {
-        for file in reference {
-            let path = self.temp_dir.join(file);
+    fn create_temp_dir_file_tree(&self) -> FileTreeNode {
+        let temp_dir_path =
+            Utf8PathBuf::from_path_buf(self.temp_dir.path().to_path_buf())
+                .unwrap();
 
-            if !path.is_file() {
-                failure_callback(&path);
-                panic!("File does not exist: {}", path.display());
-            }
-        }
-    }
-
-    fn assert_files_dont_exist<'a, I, F>(
-        &self,
-        reference: I,
-        failure_callback: F,
-    ) where
-        I: Iterator<Item = &'a String>,
-        F: Fn(&Path),
-    {
-        for file in reference {
-            let path = self.temp_dir.join(file);
-
-            if path.is_file() {
-                failure_callback(&path);
-                panic!("File exists: {}", path.display());
-            }
-        }
-    }
-
-    fn print_temp_dir_contents(&self, message: &str) {
-        fn label(p: &Path) -> String {
-            p.file_name().unwrap().to_str().unwrap().to_owned()
-        }
-
-        fn tree(p: &Path) -> Tree<String> {
-            fs_err::read_dir(p)
-                .expect("Unable to read temp_dir")
-                .filter_map(|e| e.ok())
-                .fold(Tree::new(label(p)), |mut root, entry| {
-                    let dir = entry.metadata().unwrap();
-                    if dir.is_dir() {
-                        root.push(tree(&entry.path()));
-                    } else {
-                        root.push(Tree::new(label(&entry.path())));
-                    }
-                    root
-                })
-        }
-
-        println!(
-            "{}:\n{}",
-            message,
-            indent(tree(self.temp_dir.path()).to_string())
-        )
+        FileTreeNode::from_path(&temp_dir_path).unwrap()
     }
 }
 
-fn get_test_data_dir() -> PathBuf {
-    PathBuf::from(TEST_DATA_DIRECTORY)
+fn get_test_data_dir() -> Utf8PathBuf {
+    Utf8PathBuf::from(TEST_DATA_DIRECTORY)
 }
 
-fn get_template_data_dir() -> PathBuf {
+fn get_template_data_dir() -> Utf8PathBuf {
     get_test_data_dir().join("template")
 }
 
-fn get_audio_data_dir() -> PathBuf {
+fn get_audio_data_dir() -> Utf8PathBuf {
     get_test_data_dir().join("music")
 }
 
-fn indent<S: AsRef<str>>(string: S) -> String {
-    textwrap::indent(string.as_ref(), "····")
-}
+// fn indent<S: AsRef<str>>(string: S) -> String {
+//     const PREFIX: &str = "    ";
+//     // const PREFIX: &str = "····";
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_testcase() -> Result<()> {
-        let case = TestCase::load("simple_input")?;
-
-        dbg!(case);
-
-        Ok(())
-    }
-}
+//     textwrap::indent(string.as_ref(), PREFIX)
+// }

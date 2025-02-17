@@ -18,9 +18,8 @@ tfmttools-fs = { path = "../tfmttools-fs" }
 
 assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
+camino = { workspace = true }
 color-eyre = { workspace = true }
 fs-err = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-termtree = { workspace = true }
-textwrap = { workspace = true }

@@ -23,5 +23,4 @@ minijinja = { workspace = true, features = [
 ] }
 regex = { workspace = true }
 serde = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }

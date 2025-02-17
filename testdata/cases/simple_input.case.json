@@ -1,4 +1,5 @@
 {
+  "types": ["apply", "undo", "redo", "previous-data"],
   "template": "simple_input",
   "reference": {
     "Amon Amarth - Under Siege.mp3": "Amon Amarth/Under Siege.mp3",

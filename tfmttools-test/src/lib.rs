@@ -1,6 +1,10 @@
+mod file_tree;
+mod predicates;
 mod test_case;
+mod test_result;
 
 pub use test_case::TestCase;
+pub use test_result::{TestResult, TestResultType};
 
 pub static TEST_DATA_DIRECTORY: &str = "../testdata";
 
