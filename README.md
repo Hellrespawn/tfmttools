@@ -4,7 +4,7 @@ Use `minijinja` to rename audio files according to their tags.
 
 ## Requirements
 
-- Rust (MSRV: 1.84.1)
+- Rust (MSRV: 1.80.1)
 
 ## Installation
 
