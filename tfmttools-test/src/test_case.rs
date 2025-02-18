@@ -15,10 +15,10 @@ use crate::predicates::{
     check_reference_files_exist_and_get_missing,
 };
 use crate::test_case_data::TestCaseData;
-use crate::test_result::CommandOutput;
+use crate::test_failure::{CommandOutput, TestFailure};
 use crate::{
-    TestResult, TestResultType, TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME,
-    TEST_CONFIG_DIR_NAME, TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
+    TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME, TEST_CONFIG_DIR_NAME,
+    TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
 };
 
 #[derive(Debug, Deserialize, Copy, Clone)]
@@ -43,7 +43,7 @@ impl std::fmt::Display for TestType {
 
 #[derive(Debug)]
 pub struct TestCase {
-    name: String,
+    pub name: String,
     template: String,
     template_arguments: Vec<String>,
     global_arguments: Vec<String>,
@@ -151,52 +151,27 @@ impl TestCase {
 
             let ancestor_data = TestCaseData::from_file(&ancestor_path)?;
 
-            test_case_data = ancestor_data.merge(test_case_data);
+            test_case_data = test_case_data.inherit_from(ancestor_data);
         }
 
         Ok(test_case_data)
     }
 
-    pub fn run_test(&self) -> TestResult {
+    pub fn run_test(&self) -> Result<(), Box<TestFailure>> {
         match self.test_type {
             TestType::Apply => self.apply(),
             TestType::Undo => {
-                let result = self.apply();
-
-                if result.is_failure() {
-                    return result;
-                }
-
+                self.apply()?;
                 self.undo()
             },
             TestType::Redo => {
-                let result = self.apply();
-
-                if result.is_failure() {
-                    return result;
-                }
-
-                let result = self.undo();
-
-                if result.is_failure() {
-                    return result;
-                }
-
+                self.apply()?;
+                self.undo()?;
                 self.redo()
             },
             TestType::PreviousData => {
-                let result = self.apply();
-
-                if result.is_failure() {
-                    return result;
-                }
-
-                let result = self.undo();
-
-                if result.is_failure() {
-                    return result;
-                }
-
+                self.apply()?;
+                self.undo()?;
                 self.previous_data()
             },
         }
@@ -230,7 +205,7 @@ impl TestCase {
         cmd
     }
 
-    pub fn apply(&self) -> TestResult {
+    pub fn apply(&self) -> Result<(), Box<TestFailure>> {
         let cmd = self.create_rename_command(false);
 
         let command_output = self.run_command(cmd, TestType::Apply);
@@ -256,18 +231,18 @@ impl TestCase {
             None
         };
 
-        TestResult {
-            test_case_name: self.name.clone(),
-            command_output,
-            test_result_type: if let Some(message) = message {
-                TestResultType::Failure(message)
-            } else {
-                TestResultType::Success
-            },
+        if let Some(message) = message {
+            Err(Box::new(TestFailure {
+                test_case_name: self.name.clone(),
+                command_output,
+                message,
+            }))
+        } else {
+            Ok(())
         }
     }
 
-    pub fn previous_data(&self) -> TestResult {
+    pub fn previous_data(&self) -> Result<(), Box<TestFailure>> {
         let cmd = self.create_rename_command(true);
 
         let command_output = self.run_command(cmd, TestType::PreviousData);
@@ -293,18 +268,18 @@ impl TestCase {
             None
         };
 
-        TestResult {
-            test_case_name: self.name.clone(),
-            command_output,
-            test_result_type: if let Some(message) = message {
-                TestResultType::Failure(message)
-            } else {
-                TestResultType::Success
-            },
+        if let Some(message) = message {
+            Err(Box::new(TestFailure {
+                test_case_name: self.name.clone(),
+                command_output,
+                message,
+            }))
+        } else {
+            Ok(())
         }
     }
 
-    pub fn undo(&self) -> TestResult {
+    pub fn undo(&self) -> Result<(), Box<TestFailure>> {
         let mut cmd = self.create_command();
 
         cmd.arg("undo").arg("--yes");
@@ -333,18 +308,18 @@ impl TestCase {
             None
         };
 
-        TestResult {
-            test_case_name: self.name.clone(),
-            command_output,
-            test_result_type: if let Some(message) = message {
-                TestResultType::Failure(message)
-            } else {
-                TestResultType::Success
-            },
+        if let Some(message) = message {
+            Err(Box::new(TestFailure {
+                test_case_name: self.name.clone(),
+                command_output,
+                message,
+            }))
+        } else {
+            Ok(())
         }
     }
 
-    pub fn redo(&self) -> TestResult {
+    pub fn redo(&self) -> Result<(), Box<TestFailure>> {
         let mut cmd = self.create_command();
 
         cmd.arg("redo").arg("--yes");
@@ -372,14 +347,14 @@ impl TestCase {
             None
         };
 
-        TestResult {
-            test_case_name: self.name.clone(),
-            command_output,
-            test_result_type: if let Some(message) = message {
-                TestResultType::Failure(message)
-            } else {
-                TestResultType::Success
-            },
+        if let Some(message) = message {
+            Err(Box::new(TestFailure {
+                test_case_name: self.name.clone(),
+                command_output,
+                message,
+            }))
+        } else {
+            Ok(())
         }
     }
 

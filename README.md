@@ -27,8 +27,7 @@ See also the "examples"-folder.
 - TODO? Update tag with leading/trailing whitespace?
 
 - TODO? Add explicit version to history format?
-
-- TODO? Custom test runner (disable libtest?)
+- TODO? Replace custom history format with SQLite?
 
 - Handle UTF-16 odd length error manually?
 

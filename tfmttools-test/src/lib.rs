@@ -1,11 +1,11 @@
 mod file_tree;
 mod predicates;
+mod runner;
 mod test_case;
 mod test_case_data;
-mod test_result;
+mod test_failure;
 
-pub use test_case::TestCase;
-pub use test_result::{TestResult, TestResultType};
+pub use runner::test_runner;
 
 pub static TEST_DATA_DIRECTORY: &str = "../testdata";
 

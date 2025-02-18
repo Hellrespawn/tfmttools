@@ -27,18 +27,23 @@ impl TestCaseData {
         Ok(test_case_data)
     }
 
-    pub fn merge(self, other: TestCaseData) -> TestCaseData {
+    pub fn inherit_from(self, ancestor: TestCaseData) -> TestCaseData {
         TestCaseData {
-            template: other.template.or(self.template),
-            template_arguments: other
+            template: self.template.or(ancestor.template),
+            template_arguments: self
                 .template_arguments
-                .or(self.template_arguments),
-            global_arguments: other.global_arguments.or(self.global_arguments),
-            rename_arguments: other.rename_arguments.or(self.rename_arguments),
-            reference: other.reference.or(self.reference),
-            types: other.types.or(self.types),
+                .or(ancestor.template_arguments),
+            global_arguments: self
+                .global_arguments
+                .or(ancestor.global_arguments),
+            rename_arguments: self
+                .rename_arguments
+                .or(ancestor.rename_arguments),
+            reference: self.reference.or(ancestor.reference),
+            types: self.types.or(ancestor.types),
+
             // Treated differently
-            extends: self.extends.or(None),
+            extends: ancestor.extends.or(None),
         }
     }
 }
