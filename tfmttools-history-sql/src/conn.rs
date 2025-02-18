@@ -2,7 +2,7 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use rusqlite::Connection as SqliteConnection;
 
-pub struct Connection(SqliteConnection);
+pub struct Connection(pub SqliteConnection);
 
 impl Connection {
     pub fn open(path: &Utf8Path) -> Result<Connection> {

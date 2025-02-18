@@ -1051,6 +1051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7753b721174eb8ff87a9a0e799e2d7bc3749323e773db92e0984debb00019d6e"
 dependencies = [
  "bitflags",
+ "chrono",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "hashlink",
@@ -1306,10 +1307,12 @@ name = "tfmttools-history-sql"
 version = "0.21.0"
 dependencies = [
  "camino",
+ "chrono",
  "color-eyre",
  "include_dir",
  "rusqlite",
  "rusqlite_migration",
+ "tfmttools-core",
 ]
 
 [[package]]
