@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 
-use color_eyre::Result;
 use include_dir::include_dir;
-use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
+
+use crate::Connection;
 
 // Define migrations. These are applied atomically.
 static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
@@ -19,8 +19,10 @@ static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
     )
 });
 
-pub fn migrate_database(connection: &mut Connection) -> Result<()> {
+pub fn migrate_database(
+    connection: &mut Connection,
+) -> rusqlite_migration::Result<()> {
     // Update the database schema, atomically
-    MIGRATIONS.to_latest(connection)?;
+    MIGRATIONS.to_latest(&mut connection.0)?;
     Ok(())
 }

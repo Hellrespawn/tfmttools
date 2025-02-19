@@ -52,16 +52,50 @@ impl ToSql for RecordState {
 }
 
 pub struct RecordEntity {
-    id: i64,
-    state: RecordState,
-    datetime: NaiveDateTime,
-    template: String,
-    arguments: String,
-    superseded_by_id: Option<i64>,
+    pub id: i64,
+    pub state: RecordState,
+    pub datetime: NaiveDateTime,
+    pub template: String,
+    pub arguments: String,
+    pub superseded_by_id: Option<i64>,
 }
 
 impl RecordEntity {
-    fn get_actions(
+    pub fn get_by_id(conn: &mut Connection, id: i64) -> rusqlite::Result<Self> {
+        todo!()
+    }
+
+    pub fn get_records_to_undo(
+        conn: &mut Connection,
+        amount: usize,
+    ) -> rusqlite::Result<Vec<Self>> {
+        todo!()
+    }
+
+    pub fn get_records_to_redo(
+        conn: &mut Connection,
+        amount: usize,
+    ) -> rusqlite::Result<Vec<Self>> {
+        todo!()
+    }
+
+    pub fn insert(
+        conn: &mut Connection,
+        template: &str,
+        arguments: &str,
+    ) -> rusqlite::Result<Self> {
+        todo!()
+    }
+
+    /// Marks records with the undone state as superseded
+    pub fn supersede_undone_records(
+        conn: &mut Connection,
+        record: &RecordEntity,
+    ) -> rusqlite::Result<Vec<Self>> {
+        todo!()
+    }
+
+    pub fn get_actions(
         &self,
         conn: &mut Connection,
     ) -> rusqlite::Result<Vec<ActionEntity>> {
@@ -75,7 +109,11 @@ impl RecordEntity {
         Ok(actions)
     }
 
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+    pub fn set_state(&mut self) -> rusqlite::Result<()> {
+        todo!()
+    }
+
+    pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Self {
             id: row.get(0)?,
             state: row.get(1)?,

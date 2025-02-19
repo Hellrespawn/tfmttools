@@ -5,6 +5,8 @@ use rusqlite::types::{
 use rusqlite::{Row, ToSql};
 use tfmttools_core::action::Action;
 
+use crate::conn::Connection;
+
 #[repr(i64)]
 #[derive(Clone, Copy)]
 pub enum ActionType {
@@ -13,6 +15,18 @@ pub enum ActionType {
     RemoveFile = 2,
     MakeDir = 3,
     RemoveDir = 4,
+}
+
+impl From<&Action> for ActionType {
+    fn from(value: &Action) -> Self {
+        match value {
+            Action::MoveFile(..) => Self::MoveFile,
+            Action::CopyFile(..) => Self::CopyFile,
+            Action::RemoveFile(..) => Self::RemoveFile,
+            Action::MakeDir(..) => Self::MakeDir,
+            Action::RemoveDir(..) => Self::RemoveDir,
+        }
+    }
 }
 
 impl TryFrom<i64> for ActionType {
@@ -59,6 +73,28 @@ pub struct ActionEntity {
 }
 
 impl ActionEntity {
+    pub fn insert(
+        conn: &mut Connection,
+        action_type: ActionType,
+        target: String,
+        source: Option<String>,
+        record_id: i64,
+    ) -> rusqlite::Result<Self> {
+        todo!()
+    }
+
+    pub fn insert_from_action(
+        conn: &mut Connection,
+        action: &Action,
+        record_id: i64,
+    ) -> rusqlite::Result<Self> {
+        let action_type = action.into();
+        let target = action.target().to_string();
+        let source = action.source().map(|s| s.to_string());
+
+        Self::insert(conn, action_type, target, source, record_id)
+    }
+
     pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Self {
             id: row.get(0)?,

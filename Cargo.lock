@@ -1313,6 +1313,7 @@ dependencies = [
  "rusqlite",
  "rusqlite_migration",
  "tfmttools-core",
+ "thiserror 2.0.11",
 ]
 
 [[package]]

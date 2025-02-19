@@ -19,4 +19,5 @@ chrono = { workspace = true, features = ["serde"] }
 color-eyre = { workspace = true }
 include_dir = { workspace = true }
 rusqlite = { workspace = true, features = ["bundled", "chrono"] }
-rusqlite_migration = { workspace = true, features = ["from-directory"] }
+rusqlite_migration = { workspace = true }
+thiserror = { workspace = true }

@@ -91,6 +91,26 @@ impl Action {
     pub fn is_rename_action(&self) -> bool {
         matches!(self, Self::MoveFile { .. } | Self::CopyFile(..))
     }
+
+    pub fn source(&self) -> Option<&Utf8Path> {
+        match self {
+            Action::MoveFile(rename_action) => Some(rename_action.source()),
+            Action::CopyFile(rename_action) => Some(rename_action.source()),
+            Action::RemoveFile(_) => None,
+            Action::MakeDir(_) => None,
+            Action::RemoveDir(_) => None,
+        }
+    }
+
+    pub fn target(&self) -> &Utf8Path {
+        match self {
+            Action::MoveFile(rename_action) => rename_action.target(),
+            Action::CopyFile(rename_action) => rename_action.target(),
+            Action::RemoveFile(path) => path,
+            Action::MakeDir(path) => path,
+            Action::RemoveDir(path) => path,
+        }
+    }
 }
 
 #[cfg(test)]
