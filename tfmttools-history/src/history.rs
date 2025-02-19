@@ -6,7 +6,12 @@ use serde::Serialize;
 use super::record::Record;
 use super::serde::HistorySerde;
 use super::stack::RefStack;
-use crate::{HistoryError, Result};
+use crate::{record::RecordState, HistoryError, Result};
+
+pub enum LoadHistoryResultNew {
+    Loaded,
+    New,
+}
 
 pub enum LoadHistoryResult<T, M>
 where
@@ -40,6 +45,60 @@ where
 pub enum SaveHistoryResult {
     Saved,
     Exists(Utf8PathBuf),
+}
+
+pub trait HistoryExt<A, M>
+where
+    A: std::fmt::Debug + Serialize + DeserializeOwned,
+    M: std::fmt::Debug + Serialize + DeserializeOwned,
+{
+    fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()>;
+
+    fn get_records_to_undo(
+        &self,
+        amount: Option<usize>,
+    ) -> Result<Vec<Record<A, M>>>;
+
+    fn get_records_to_redo(
+        &self,
+        amount: Option<usize>,
+    ) -> Result<Vec<Record<A, M>>>;
+
+    fn set_record_state(
+        &mut self,
+        record: &mut Record<A, M>,
+        state: RecordState,
+    ) -> Result<()>;
+
+    fn get_n_records_to_undo(
+        &self,
+        amount: usize,
+    ) -> Result<Vec<Record<A, M>>> {
+        self.get_records_to_undo(Some(amount))
+    }
+
+    fn get_n_records_to_redo(
+        &self,
+        amount: usize,
+    ) -> Result<Vec<Record<A, M>>> {
+        self.get_records_to_redo(Some(amount))
+    }
+
+    fn get_all_records_to_undo(&self) -> Result<Vec<Record<A, M>>> {
+        self.get_records_to_undo(None)
+    }
+
+    fn get_all_records_to_redo(&self) -> Result<Vec<Record<A, M>>> {
+        self.get_records_to_redo(None)
+    }
+
+    fn mark_record_undone(&mut self, record: &mut Record<A, M>) -> Result<()> {
+        self.set_record_state(record, RecordState::Undone)
+    }
+
+    fn mark_record_redone(&mut self, record: &mut Record<A, M>) -> Result<()> {
+        self.set_record_state(record, RecordState::Redone)
+    }
 }
 
 pub struct History<T, M>

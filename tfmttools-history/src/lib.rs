@@ -3,9 +3,10 @@ mod history;
 mod record;
 mod serde;
 mod stack;
+mod serde_history;
 
 pub use error::{HistoryError, Result};
-pub use history::{History, LoadHistoryResult, SaveHistoryResult};
+pub use history::{History, LoadHistoryResult, SaveHistoryResult, HistoryExt};
 pub use record::Record;
 
 #[derive(Copy, Clone, Debug)]

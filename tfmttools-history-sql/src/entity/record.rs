@@ -14,6 +14,7 @@ pub enum RecordState {
     Undone = 1,
     Redone = 2,
     Superseded = 3,
+    TransactionError = 4,
 }
 
 impl TryFrom<i64> for RecordState {
@@ -21,7 +22,7 @@ impl TryFrom<i64> for RecordState {
 
     fn try_from(value: i64) -> std::result::Result<Self, Self::Error> {
         match value {
-            0..=3 => {
+            0..=4 => {
                 Ok(unsafe { std::mem::transmute::<i64, RecordState>(value) })
             },
             n => {

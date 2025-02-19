@@ -124,17 +124,13 @@ impl HistoryFormatter {
         match self.format {
             HistoryFormat::Normal => base_string,
             HistoryFormat::Verbose => {
-                if let Some(metadata) = record.metadata() {
-                    let metadata_string = format!(
-                        "'{}' => '{}'",
-                        metadata.template(),
-                        metadata.arguments().join(" ")
-                    );
+                let metadata_string = format!(
+                    "'{}' => '{}'",
+                    record.metadata().template(),
+                    record.metadata().arguments().join(" ")
+                );
 
-                    format!("┌ {base_string}\n└── {metadata_string}")
-                } else {
-                    base_string
-                }
+                format!("┌ {base_string}\n└── {metadata_string}")
             },
         }
     }

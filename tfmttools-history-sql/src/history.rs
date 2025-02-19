@@ -82,11 +82,19 @@ impl History {
         Ok((record_entity, action_entities))
     }
 
-    pub fn undo_records<F>(&mut self, amount: usize, function: F)
+    pub fn undo_records<F>(&mut self, amount: usize, function: F) -> Result<()>
     where
         F: Fn(Action) -> color_eyre::Result<()>,
     {
+        let records =
+            RecordEntity::get_records_to_undo(&mut self.conn, amount)?;
+
+        for record in records {
+            let actions = record.get_actions(&mut self.conn)?;
+        }
+
         todo!()
+
         // Start transaction
         // undo actions
         // mark undone

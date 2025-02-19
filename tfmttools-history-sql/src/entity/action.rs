@@ -1,9 +1,10 @@
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use rusqlite::types::{
     FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef,
 };
 use rusqlite::{Row, ToSql};
-use tfmttools_core::action::Action;
+use tfmttools_core::action::{Action, RenameAction};
 
 use crate::conn::Connection;
 
@@ -37,11 +38,9 @@ impl TryFrom<i64> for ActionType {
             0..=4 => {
                 Ok(unsafe { std::mem::transmute::<i64, ActionType>(value) })
             },
-            n => {
-                Err(FromSqlError::Other(
-                    (format!("Invalid RecordState '{}'", n)).into(),
-                ))
-            },
+            n => Err(FromSqlError::Other(
+                (format!("Invalid RecordState '{}'", n)).into(),
+            )),
         }
     }
 }
@@ -70,6 +69,22 @@ pub struct ActionEntity {
     target: String,
     source: Option<String>,
     record_id: isize,
+}
+
+impl From<ActionEntity> for Action {
+    fn from(value: ActionEntity) -> Self {
+        match value.action_type {
+            ActionType::MoveFile => Action::MoveFile(RenameAction::new(
+                Utf8PathBuf::from(value.source.expect("ActionEntity with action_type MoveFile should have source.")), Utf8PathBuf::from(value.target)
+            )),
+            ActionType::CopyFile => Action::CopyFile(RenameAction::new(
+                Utf8PathBuf::from(value.source.expect("ActionEntity with action_type MoveFile should have source.")), Utf8PathBuf::from(value.target)
+            )),
+            ActionType::RemoveFile => Action::RemoveFile(Utf8PathBuf::from(value.target)),
+            ActionType::MakeDir => Action::MakeDir(Utf8PathBuf::from(value.target)),
+            ActionType::RemoveDir => Action::RemoveDir(Utf8PathBuf::from(value.target)),
+        }
+    }
 }
 
 impl ActionEntity {

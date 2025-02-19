@@ -84,11 +84,9 @@ pub fn rename(context: &RenameContext) -> Result<()> {
         FileOrName::File(path, string) => {
             TemplateLoader::read_filename(path, string)
         },
-        FileOrName::Name(_) => {
-            TemplateLoader::read_directory(
-                &context.template_options.template_directory,
-            )
-        },
+        FileOrName::Name(_) => TemplateLoader::read_directory(
+            &context.template_options.template_directory,
+        ),
     }?;
 
     let template_name = file_or_name.as_str();
@@ -137,12 +135,9 @@ fn get_template_name_and_arguments(
         let history = load_history(&context.app_paths.history_file())?;
 
         if let LoadHistoryResult::Loaded(history) = history {
-            let metadata_option =
-                history.find_record(|r| r.metadata().is_some()).map(|r| {
-                    r.metadata().expect(
-                        "Presence of metadata checked in query condition.",
-                    )
-                });
+            let metadata_option = history
+                .find_record(|_| true)
+                .map(|r: &Record<Action, ActionRecordMetadata>| r.metadata());
 
             if let Some(metadata) = metadata_option {
                 let template_name = FileOrName::from(metadata.template());
@@ -395,7 +390,7 @@ fn store_history(
             arguments.to_owned(),
         );
 
-        let record = Record::with_metadata(actions, metadata);
+        let record = Record::new(actions, metadata);
 
         history.push(record)?;
 

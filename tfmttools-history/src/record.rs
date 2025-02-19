@@ -1,44 +1,56 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Record<T, M> {
-    items: Vec<T>,
-    timestamp: DateTime<Local>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    metadata: Option<M>,
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub enum RecordState {
+    Applied,
+    Undone,
+    Redone,
 }
 
-impl<T, M> Record<T, M> {
-    pub fn new(items: Vec<T>) -> Self {
-        Self { items, timestamp: Local::now(), metadata: None }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Record<A, M> {
+    actions: Vec<A>,
+    state: RecordState,
+    timestamp: DateTime<Local>,
+    metadata: M,
+}
+
+impl<A, M> Record<A, M> {
+    pub fn new(items: Vec<A>, metadata: M) -> Self {
+        Self {
+            actions: items,
+            state: RecordState::Applied,
+            timestamp: Local::now(),
+            metadata,
+        }
     }
 
-    pub fn with_metadata(items: Vec<T>, metadata: M) -> Self {
-        Self { items, timestamp: Local::now(), metadata: Some(metadata) }
-    }
-
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &T> {
-        self.items.iter()
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &A> {
+        self.actions.iter()
     }
 
     pub fn len(&self) -> usize {
-        self.items.len()
+        self.actions.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
+        self.actions.is_empty()
     }
 
-    pub fn items(&self) -> &[T] {
-        &self.items
+    pub fn actions(&self) -> &[A] {
+        &self.actions
     }
 
     pub fn timestamp(&self) -> DateTime<Local> {
         self.timestamp
     }
 
-    pub fn metadata(&self) -> Option<&M> {
-        self.metadata.as_ref()
+    pub fn metadata(&self) -> &M {
+        &self.metadata
+    }
+
+    pub fn state(&self) -> RecordState {
+        self.state
     }
 }
