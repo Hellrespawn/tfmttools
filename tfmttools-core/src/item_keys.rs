@@ -68,7 +68,10 @@ fn insert_case(
     for (i, new_case) in all_cases.into_iter().enumerate() {
         if map.contains_key(new_case.as_str()) {
             if i == 0 {
-                panic!("Key collision!\nAttempt: '{new_case}' => '{key:?}'\nExists: '{new_case}' => '{:?}'", map.get(new_case.as_str()).unwrap() );
+                panic!(
+                    "Key collision!\nAttempt: '{new_case}' => '{key:?}'\nExists: '{new_case}' => '{:?}'",
+                    map.get(new_case.as_str()).unwrap()
+                );
             } else {
                 continue;
             }

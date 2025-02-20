@@ -11,7 +11,7 @@ pub use copy_tags::copy_tags;
 pub use fix::FixCommand;
 pub use list_templates::list_templates;
 pub use rename::{
-    rename, RenameContext, RenameMiscOptions, RenameTemplateOptions,
+    RenameContext, RenameMiscOptions, RenameTemplateOptions, rename,
 };
 pub use show_history::show_history;
 pub use undo_redo::UndoRedoCommand;

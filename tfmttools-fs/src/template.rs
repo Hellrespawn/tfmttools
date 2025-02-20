@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use camino::Utf8Path;
 use fs_err as fs;
-use minijinja::{escape_formatter, Environment, Value};
+use minijinja::{Environment, Value, escape_formatter};
 use regex::Regex;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;

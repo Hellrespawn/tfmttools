@@ -3,8 +3,8 @@ use std::sync::LazyLock;
 
 use camino::{Utf8Component, Utf8Path};
 
-use crate::action::RenameAction;
 use crate::MAX_PATH_LENGTH;
+use crate::action::RenameAction;
 
 pub struct ForbiddenCharacter<'f> {
     char: &'f str,

@@ -38,9 +38,11 @@ impl TryFrom<i64> for ActionType {
             0..=4 => {
                 Ok(unsafe { std::mem::transmute::<i64, ActionType>(value) })
             },
-            n => Err(FromSqlError::Other(
-                (format!("Invalid RecordState '{}'", n)).into(),
-            )),
+            n => {
+                Err(FromSqlError::Other(
+                    (format!("Invalid RecordState '{}'", n)).into(),
+                ))
+            },
         }
     }
 }

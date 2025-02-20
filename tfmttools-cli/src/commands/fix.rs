@@ -1,7 +1,7 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use tfmttools_core::audiofile::encoding::convert_encoding_to_utf8;
 use tfmttools_core::audiofile::AudioFile;
+use tfmttools_core::audiofile::encoding::convert_encoding_to_utf8;
 use tfmttools_core::error::TFMTError;
 use tfmttools_fs::{PathIterator, PathIteratorOptions};
 

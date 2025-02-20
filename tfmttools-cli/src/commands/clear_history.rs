@@ -2,7 +2,7 @@ use color_eyre::Result;
 use tfmttools_fs::FsHandler;
 
 use crate::config::paths::AppPaths;
-use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
+use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
 use crate::ui::ConfirmationPrompt;
 
 pub fn clear_history(

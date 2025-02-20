@@ -29,11 +29,7 @@ impl<'i> ItemName<'i> {
     }
 
     pub fn by_amount(&self, amount: usize) -> String {
-        if amount == 1 {
-            self.single()
-        } else {
-            self.plural()
-        }
+        if amount == 1 { self.single() } else { self.plural() }
     }
 }
 

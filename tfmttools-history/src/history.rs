@@ -1,12 +1,13 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use fs_err as fs;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use super::record::Record;
 use super::serde::HistorySerde;
 use super::stack::RefStack;
-use crate::{record::RecordState, HistoryError, Result};
+use crate::record::RecordState;
+use crate::{HistoryError, Result};
 
 pub enum LoadHistoryResultNew {
     Loaded,

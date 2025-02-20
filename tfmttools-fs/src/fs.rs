@@ -4,8 +4,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_core::error::{TFMTError, TFMTResult};
 use tracing::trace;
 
-use crate::path_iterator::PathIteratorOptions;
 use crate::PathIterator;
+use crate::path_iterator::PathIteratorOptions;
 
 pub enum MoveFileResult {
     Moved,
@@ -64,11 +64,7 @@ impl FsHandler {
         P: AsRef<Path>,
         C: AsRef<[u8]>,
     {
-        if !self.dry_run {
-            fs_err::write(path, contents)
-        } else {
-            Ok(())
-        }
+        if !self.dry_run { fs_err::write(path, contents) } else { Ok(()) }
     }
 
     pub fn move_file(

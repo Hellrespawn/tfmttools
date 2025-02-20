@@ -6,15 +6,16 @@ use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::{fmt, registry, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, registry};
 
+use crate::TERM;
 use crate::args::{Args, Subcommand};
 use crate::commands::{
-    clear_history, copy_tags, list_templates, rename, show_history, FixCommand,
-    RenameContext, RenameMiscOptions, RenameTemplateOptions, UndoRedoCommand,
+    FixCommand, RenameContext, RenameMiscOptions, RenameTemplateOptions,
+    UndoRedoCommand, clear_history, copy_tags, list_templates, rename,
+    show_history,
 };
 use crate::config::paths::AppPaths;
-use crate::TERM;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use lofty::tag::ItemKey;
-use minijinja::value::Object;
 use minijinja::Value;
+use minijinja::value::Object;
 use tracing::trace;
 
 use crate::action::FORBIDDEN_CHARACTERS;

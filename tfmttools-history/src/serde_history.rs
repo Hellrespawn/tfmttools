@@ -1,13 +1,15 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use serde::{de::DeserializeOwned, Serialize};
+use fs_err as fs;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tracing::trace;
 
-use crate::{
-    error::Result, history::LoadHistoryResultNew, record::RecordState,
-    serde::HistorySerde, stack::RefStack, HistoryError, HistoryExt,
-    LoadHistoryResult, Record,
-};
-use fs_err as fs;
+use crate::error::Result;
+use crate::history::LoadHistoryResultNew;
+use crate::record::RecordState;
+use crate::serde::HistorySerde;
+use crate::stack::RefStack;
+use crate::{HistoryError, HistoryExt, LoadHistoryResult, Record};
 
 pub enum SaveHistoryResult {
     Saved,

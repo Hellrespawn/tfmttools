@@ -3,7 +3,7 @@ use tfmttools_core::history::LoadActionHistoryResult;
 
 use crate::config::paths::AppPaths;
 use crate::history::{
-    load_history, HistoryFormat, HistoryFormatter, HistoryPrefix,
+    HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,
 };
 
 pub fn show_history(app_paths: &AppPaths, verbosity: u8) -> Result<()> {

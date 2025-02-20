@@ -3,9 +3,9 @@ use std::fs;
 use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_core::action::Action;
 
+use crate::Connection;
 use crate::entity::{ActionEntity, RecordEntity};
 use crate::error::{HistoryError, Result};
-use crate::Connection;
 
 pub enum LoadHistoryResult {
     Loaded(History),

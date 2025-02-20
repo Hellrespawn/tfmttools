@@ -4,8 +4,8 @@ use std::fmt::Write;
 use assert_cmd::Command;
 use assert_fs::TempDir;
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 use serde::Deserialize;
 use tfmttools_fs::PathIterator;
 

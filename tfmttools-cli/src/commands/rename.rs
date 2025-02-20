@@ -1,14 +1,14 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use tfmttools_core::action::{validate_rename_actions, Action, RenameAction};
+use color_eyre::eyre::eyre;
+use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
-    get_longest_common_prefix, ActionHandler, FileOrName, FsHandler,
-    PathIterator, PathIteratorOptions, RemoveDirResult, TemplateLoader,
+    ActionHandler, FileOrName, FsHandler, PathIterator, PathIteratorOptions,
+    RemoveDirResult, TemplateLoader, get_longest_common_prefix,
 };
 use tfmttools_history::{LoadHistoryResult, Record, SaveHistoryResult};
 use tracing::debug;
@@ -84,9 +84,11 @@ pub fn rename(context: &RenameContext) -> Result<()> {
         FileOrName::File(path, string) => {
             TemplateLoader::read_filename(path, string)
         },
-        FileOrName::Name(_) => TemplateLoader::read_directory(
-            &context.template_options.template_directory,
-        ),
+        FileOrName::Name(_) => {
+            TemplateLoader::read_directory(
+                &context.template_options.template_directory,
+            )
+        },
     }?;
 
     let template_name = file_or_name.as_str();
@@ -144,9 +146,15 @@ fn get_template_name_and_arguments(
 
                 let arguments = metadata.arguments().to_owned();
 
-                println!("Re-using template '{template_name}' and arguments from previous rename.");
+                println!(
+                    "Re-using template '{template_name}' and arguments from previous rename."
+                );
 
-                debug!("Using previous rename data:\ntemplate: '{}'\narguments: '{}'", template_name, arguments.join("', '"));
+                debug!(
+                    "Using previous rename data:\ntemplate: '{}'\narguments: '{}'",
+                    template_name,
+                    arguments.join("', '")
+                );
 
                 return Ok((template_name, arguments));
             }

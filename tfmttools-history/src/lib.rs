@@ -2,11 +2,11 @@ mod error;
 mod history;
 mod record;
 mod serde;
-mod stack;
 mod serde_history;
+mod stack;
 
 pub use error::{HistoryError, Result};
-pub use history::{History, LoadHistoryResult, SaveHistoryResult, HistoryExt};
+pub use history::{History, HistoryExt, LoadHistoryResult, SaveHistoryResult};
 pub use record::Record;
 
 #[derive(Copy, Clone, Debug)]

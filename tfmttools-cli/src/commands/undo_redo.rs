@@ -5,7 +5,7 @@ use tfmttools_fs::{ActionHandler, FsHandler};
 use tfmttools_history::{HistoryMode, LoadHistoryResult};
 
 use crate::config::paths::AppPaths;
-use crate::history::{load_history, HistoryFormatter, HistoryPrefix};
+use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
 
 #[derive(Debug)]
@@ -53,9 +53,9 @@ impl UndoRedoCommand {
 
                 if actual < amount {
                     println!(
-                    "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
-                    verb = self.mode.verb()
-                );
+                        "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
+                        verb = self.mode.verb()
+                    );
                 }
 
                 if records.is_empty() {

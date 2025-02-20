@@ -33,7 +33,7 @@ impl<'cp> ConfirmationPrompt<'cp> {
                 "y" | "yes" => return Ok(true),
                 "n" | "no" => return Ok(false),
                 "" if self.default.is_some() => {
-                    return Ok(self.default.unwrap())
+                    return Ok(self.default.unwrap());
                 },
                 _ => {
                     print!("{} {} ", self.error_prompt, options);

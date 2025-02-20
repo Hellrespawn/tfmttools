@@ -2,9 +2,9 @@
 version = "0.21.0"
 authors = ["Stef Korporaal <stef@skorporaal.com>"]
 description = "Use `minijinja` to rename audio files according to their tags."
-edition = "2021"
+edition = "2024"
 license = "BSD-3-Clause"
-rust-version = "1.80.1"
+rust-version = "1.85.0"
 repository = "https://github.com/Hellrespawn/tfmttools"
 homepage = "https://github.com/Hellrespawn/tfmttools"
 

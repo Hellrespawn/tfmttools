@@ -1,6 +1,6 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 
 use crate::args::Args;
 

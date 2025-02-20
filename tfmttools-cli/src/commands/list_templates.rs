@@ -12,9 +12,11 @@ pub fn list_templates(template_directory: &Utf8Path) -> Result<()> {
     let all_templates = loader.get_all_templates();
 
     match all_templates.len() {
-        0 => println!(
-            "Couldn't find any templates at {template_directory} or in the current directory."
-        ),
+        0 => {
+            println!(
+                "Couldn't find any templates at {template_directory} or in the current directory."
+            )
+        },
         1 => println!("Found 1 template:"),
         other => println!("Found {other} templates:"),
     }

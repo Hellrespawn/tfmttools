@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use include_dir::include_dir;
-use rusqlite_migration::{Migrations, M};
+use rusqlite_migration::{M, Migrations};
 
 use crate::Connection;
 

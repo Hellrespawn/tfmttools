@@ -6,6 +6,6 @@ mod template;
 
 pub use action::ActionHandler;
 pub use file_or_name::FileOrName;
-pub use fs::{get_longest_common_prefix, FsHandler, RemoveDirResult};
+pub use fs::{FsHandler, RemoveDirResult, get_longest_common_prefix};
 pub use path_iterator::{PathIterator, PathIteratorOptions};
 pub use template::TemplateLoader;
