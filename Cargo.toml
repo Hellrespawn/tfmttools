@@ -17,7 +17,7 @@ members = [
     "tfmttools-history-core",
     "tfmttools-history-serde",
     "tfmttools-test",
-    # "tfmttools-history-sql",
+    "tfmttools-history-sql",
 ]
 default-members = ["tfmttools-cli"]
 resolver = "2"

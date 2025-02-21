@@ -16,4 +16,7 @@ pub enum HistoryError {
 
     #[error("Unable to save history: {0}. Saved backup to {1}.")]
     SaveErrorWithBackup(String, Utf8PathBuf),
+
+    #[error("{0}")]
+    MiscError(String),
 }

@@ -1,81 +1,118 @@
 use std::fs;
 
 use camino::{Utf8Path, Utf8PathBuf};
+use rusqlite::Params;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
-use tfmttools_history::History;
+use tfmttools_history_core::{History, HistoryError, Record, Result};
 
 use crate::Connection;
 use crate::entity::{ActionEntity, RecordEntity};
-use crate::error::{HistoryError, Result};
 
 pub struct SqlHistory {
     path: Utf8PathBuf,
     conn: Connection,
 }
 
-impl History {
-    pub fn load(path: &Utf8Path) -> color_eyre::Result<Self>
+impl SqlHistory {
+    pub fn load(path: &Utf8Path) -> Result<Self> {
+        let conn = Connection::open(path)
+            .map_err(|err| HistoryError::LoadError(err.to_string()))?;
+        let path = path.to_owned();
+
+        let mut history = SqlHistory { path, conn };
+
+        history.begin_transaction()?;
+
+        Ok(history)
+    }
+
+    fn execute<P>(&mut self, sql: &str, params: P) -> Result<usize>
+    where
+        P: Params,
+    {
+        self.conn
+            .0
+            .execute(sql, params)
+            .map_err(|err| HistoryError::MiscError(err.to_string()))
+    }
+
+    fn begin_transaction(&mut self) -> Result<()> {
+        self.execute("BEGIN TRANSACTION;", ())?;
+
+        Ok(())
+    }
+
+    fn commit_transaction(&mut self) -> Result<()> {
+        self.execute("COMMIT;", ())?;
+
+        Ok(())
+    }
+
+    fn rollback_transaction(&mut self) -> Result<()> {
+        self.execute("ROLLBACK;", ())?;
+
+        Ok(())
+    }
 }
 
-impl History<ActionRecord, ActionRecordMetadata> for SqlHistory {
-    fn save(&mut self) -> tfmttools_history::Result<()> {
-        todo!()
+impl Drop for SqlHistory {
+    fn drop(&mut self) {
+        let _ = self.rollback_transaction();
+    }
+}
+
+impl History<Action, ActionRecordMetadata> for SqlHistory {
+    fn save(&mut self) -> Result<()> {
+        self.commit_transaction()?;
+        self.begin_transaction()?;
+
+        Ok(())
     }
 
     fn push(
         &mut self,
-        actions: Vec<ActionRecord>,
+        actions: Vec<Action>,
         metadata: ActionRecordMetadata,
-    ) -> tfmttools_history::Result<()> {
+    ) -> Result<()> {
         todo!()
     }
 
     fn get_previous_record(
         &self,
-    ) -> tfmttools_history::Result<
-        Option<&tfmttools_history::Record<ActionRecord, ActionRecordMetadata>>,
-    > {
+    ) -> Result<Option<&Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
     fn get_records_to_undo(
         &self,
         amount: Option<usize>,
-    ) -> tfmttools_history::Result<
-        Vec<&tfmttools_history::Record<ActionRecord, ActionRecordMetadata>>,
-    > {
+    ) -> Result<Vec<&Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
     fn get_records_to_redo(
         &self,
         amount: Option<usize>,
-    ) -> tfmttools_history::Result<
-        Vec<&tfmttools_history::Record<ActionRecord, ActionRecordMetadata>>,
-    > {
+    ) -> Result<Vec<&Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
     fn get_records_to_undo_mut(
         &mut self,
         amount: Option<usize>,
-    ) -> tfmttools_history::Result<
-        Vec<&mut tfmttools_history::Record<ActionRecord, ActionRecordMetadata>>,
-    > {
+    ) -> Result<Vec<&mut Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
     fn get_records_to_redo_mut(
         &mut self,
         amount: Option<usize>,
-    ) -> tfmttools_history::Result<
-        Vec<&mut tfmttools_history::Record<ActionRecord, ActionRecordMetadata>>,
-    > {
+    ) -> Result<Vec<&mut Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
-    fn remove(&mut self) -> tfmttools_history::Result<()> {
+    fn remove(&mut self) -> Result<()> {
         todo!()
     }
 }
