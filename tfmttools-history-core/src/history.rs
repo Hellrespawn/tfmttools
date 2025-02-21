@@ -1,6 +1,7 @@
 use super::record::Record;
 use crate::Result;
 
+#[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
     Loaded,
     New,

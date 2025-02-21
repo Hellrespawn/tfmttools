@@ -80,7 +80,14 @@ impl<'rc> RenameContext<'rc> {
 }
 
 pub fn rename(context: &RenameContext) -> Result<()> {
-    let (file_or_name, arguments) = get_template_name_and_arguments(context)?;
+    let (mut history, load_history_result) =
+        load_history(&context.app_paths.history_file())?;
+
+    let (file_or_name, arguments) = get_template_name_and_arguments(
+        context,
+        &mut history,
+        load_history_result,
+    )?;
 
     let loader = match &file_or_name {
         FileOrName::File(path, string) => {
@@ -119,7 +126,13 @@ pub fn rename(context: &RenameContext) -> Result<()> {
         if confirmation {
             let actions = perform_rename_actions(context, rename_actions)?;
 
-            store_history(context, actions, template_name, &arguments)?;
+            store_history(
+                context,
+                &mut history,
+                actions,
+                template_name,
+                &arguments,
+            )?;
         } else {
             println!("Aborting!");
         }
@@ -130,15 +143,14 @@ pub fn rename(context: &RenameContext) -> Result<()> {
 
 fn get_template_name_and_arguments(
     context: &RenameContext,
+    history: &mut impl History<Action, ActionRecordMetadata>,
+    load_history_result: LoadHistoryResult,
 ) -> Result<(FileOrName, Vec<String>)> {
     if let Some(file_or_name) = &context.template_options.template {
         debug!("Using template and arguments from command line.");
 
         Ok((file_or_name.clone(), context.template_options.arguments.clone()))
     } else {
-        let (mut history, load_history_result) =
-            load_history(&context.app_paths.history_file())?;
-
         if let LoadHistoryResult::Loaded = load_history_result {
             let metadata_option =
                 history.get_previous_record()?.map(Record::metadata);
@@ -387,6 +399,7 @@ fn move_files(
 
 fn store_history(
     context: &RenameContext,
+    history: &mut impl History<Action, ActionRecordMetadata>,
     actions: Vec<Action>,
     template_name: &str,
     arguments: &[String],
@@ -394,8 +407,6 @@ fn store_history(
     if context.misc_options.dry_run {
         Ok(())
     } else {
-        let (mut history, _) = load_history(&context.app_paths.history_file())?;
-
         let metadata = ActionRecordMetadata::new(
             template_name.to_owned(),
             arguments.to_owned(),
