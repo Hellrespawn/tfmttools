@@ -1,4 +1,5 @@
 use camino::Utf8PathBuf;
+use clap::error::ErrorKind;
 use color_eyre::Result;
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history_core::HistoryMode;
@@ -32,6 +33,19 @@ pub fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    let result = run(args);
+
+    if let Err(err) = result {
+        eprintln!(
+            "{}",
+            Args::command().error(ErrorKind::DisplayHelp, err.to_string())
+        );
+    }
+
+    Ok(())
+}
+
+fn run(args: Args) -> Result<()> {
     if args.dry_run {
         println!("Doing dry run. No files will be modified.");
     }

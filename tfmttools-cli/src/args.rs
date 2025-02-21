@@ -1,5 +1,8 @@
 use camino::Utf8PathBuf;
-use clap::{Args as ClapArgs, Parser, Subcommand as ClapSubcommand};
+use clap::{
+    Args as ClapArgs, Command, CommandFactory, Parser,
+    Subcommand as ClapSubcommand,
+};
 use tfmttools_fs::FileOrName;
 
 fn default_recursion_depth() -> usize {
@@ -24,6 +27,10 @@ pub struct Args {
 impl Args {
     pub fn parse() -> Self {
         <Self as Parser>::parse()
+    }
+
+    pub fn command() -> Command {
+        <Self as CommandFactory>::command()
     }
 }
 
