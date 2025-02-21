@@ -1,33 +1,30 @@
 use color_eyre::Result;
-use tfmttools_fs::FsHandler;
+use tfmttools_history::History;
 
 use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
 use crate::ui::ConfirmationPrompt;
 
-pub fn clear_history(
-    app_paths: &AppPaths,
-    fs_handler: &FsHandler,
-) -> Result<()> {
+pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {
     let path = &app_paths.history_file();
 
     if path.is_file() {
-        let result = load_history(path)?;
-
-        let history = result.unwrap();
+        let (mut history, _) = load_history(path)?;
 
         println!("Showing history from: {path}");
 
         let formatter =
             HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
 
-        println!("{}", formatter.format_history(&history));
+        println!("{}", formatter.format_history(&history)?);
 
         let confirmation =
             ConfirmationPrompt::new("Clear history?").prompt()?;
 
         if confirmation {
-            fs_handler.remove_file(path)?;
+            if !dry_run {
+                history.remove()?;
+            }
 
             println!("Removed history file at: {path}");
         } else {

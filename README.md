@@ -2,13 +2,10 @@
 
 Use `minijinja` to rename audio files according to their tags.
 
-## Requirements
-
-- Rust (MSRV: 1.80.1)
-
 ## Installation
 
 1. Ensure `cargo` and Cargo's `bin` folder are on your `PATH`.
+1. Ensure you have a version of Rust matching the MSRV described in Cargo.toml.
 1. Clone the repository.
 1. Run `cargo install --path tfmttools`.
 

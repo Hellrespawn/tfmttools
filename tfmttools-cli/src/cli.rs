@@ -41,7 +41,7 @@ pub fn main() -> Result<()> {
     install_restore_cursor_hooks();
 
     match args.command {
-        Subcommand::ClearHistory => clear_history(&app_paths, &fs_handler)?,
+        Subcommand::ClearHistory => clear_history(&app_paths, args.dry_run)?,
         Subcommand::Templates(list_templates_args) => {
             let template_directory = list_templates_args
                 .custom_template_directory

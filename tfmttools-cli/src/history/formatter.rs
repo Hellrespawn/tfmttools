@@ -1,7 +1,9 @@
 use std::fmt::Write;
 
+use color_eyre::Result;
 use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionHistory, ActionRecord};
+use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
+use tfmttools_history::History;
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -52,38 +54,48 @@ impl HistoryFormatter {
         self
     }
 
-    pub fn format_history(&self, history: &ActionHistory) -> String {
-        let undo = history.get_records_to_undo().collect::<Vec<_>>();
+    pub fn format_history(
+        &self,
+        history: &impl History<Action, ActionRecordMetadata>,
+    ) -> Result<String> {
+        let undo = history.get_all_records_to_undo()?;
 
-        let redo = history.get_records_to_redo().collect::<Vec<_>>();
+        let undo_string = self.format_records(&undo);
 
-        if undo.is_empty() && redo.is_empty() {
-            "There is nothing to undo or redo".to_owned()
+        let redo = history.get_all_records_to_redo()?;
+
+        let redo_string = self.format_records(&redo);
+
+        if undo_string.is_none() && redo_string.is_none() {
+            Ok("There is nothing to undo or redo".to_owned())
         } else {
             let mut buffer = String::new();
 
             buffer.push_str("Undo history:\n");
 
-            if undo.is_empty() {
+            if let Some(string) = undo_string {
+                buffer.push_str(&string);
+            } else {
                 buffer.push_str("There is nothing to undo.");
-            } else {
-                buffer.push_str(&self.format_records(&undo));
             }
 
-            buffer.push_str("\n\nRedo history:\n");
+            buffer.push_str("Redo history:\n");
 
-            if redo.is_empty() {
+            if let Some(string) = redo_string {
+                buffer.push_str(&string);
+            } else {
                 buffer.push_str("There is nothing to redo.");
-            } else {
-                buffer.push_str(&self.format_records(&redo));
             }
 
-            buffer
+            Ok(buffer)
         }
     }
 
-    pub fn format_records(&self, records: &[&ActionRecord]) -> String {
-        records
+    pub fn format_records(&self, records: &[&ActionRecord]) -> Option<String> {
+        if records.is_empty() {
+            None
+        } else {
+            let string = records
             .iter()
             .enumerate()
             .map(|(i, record)| {
@@ -112,7 +124,9 @@ impl HistoryFormatter {
                 }
             })
             .collect::<Vec<_>>()
-            .join("\n")
+            .join("\n");
+            Some(string)
+        }
     }
 
     pub fn format_record(&self, record: &ActionRecord) -> String {

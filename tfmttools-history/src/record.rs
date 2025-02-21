@@ -53,4 +53,8 @@ impl<A, M> Record<A, M> {
     pub fn state(&self) -> RecordState {
         self.state
     }
+
+    pub fn set_state(&mut self, state: RecordState) {
+        self.state = state;
+    }
 }

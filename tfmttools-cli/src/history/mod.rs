@@ -2,22 +2,29 @@ mod formatter;
 
 use camino::Utf8Path;
 use color_eyre::Result;
-use tfmttools_core::history::{ActionHistory, LoadActionHistoryResult};
+pub use formatter::{HistoryFormat, HistoryFormatter, HistoryPrefix};
+use tfmttools_core::action::Action;
+use tfmttools_core::history::{ActionRecordMetadata, LoadActionHistoryResult};
+use tfmttools_history::{History, SerdeHistory};
 use tracing::debug;
 
-pub use self::formatter::{HistoryFormat, HistoryFormatter, HistoryPrefix};
+pub fn load_history(
+    path: &Utf8Path,
+) -> Result<(
+    // TODO Learn what this means
+    impl History<Action, ActionRecordMetadata> + use<>,
+    LoadActionHistoryResult,
+)> {
+    let (history, result) = SerdeHistory::load(path)?;
 
-pub fn load_history(path: &Utf8Path) -> Result<LoadActionHistoryResult> {
-    let result = ActionHistory::load(path)?;
-
-    if let LoadActionHistoryResult::Loaded(history) = &result {
+    if let LoadActionHistoryResult::Loaded = &result {
         debug!(
             "Loaded history:\n{}",
             HistoryFormatter::new()
                 .with_format(HistoryFormat::Verbose)
-                .format_history(history)
+                .format_history(&history)?
         );
     }
 
-    Ok(result)
+    Ok((history, result))
 }

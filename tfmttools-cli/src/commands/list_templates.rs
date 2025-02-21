@@ -15,7 +15,7 @@ pub fn list_templates(template_directory: &Utf8Path) -> Result<()> {
         0 => {
             println!(
                 "Couldn't find any templates at {template_directory} or in the current directory."
-            )
+            );
         },
         1 => println!("Found 1 template:"),
         other => println!("Found {other} templates:"),

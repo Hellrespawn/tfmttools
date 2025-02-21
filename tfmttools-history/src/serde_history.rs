@@ -5,17 +5,11 @@ use serde::de::DeserializeOwned;
 use tracing::trace;
 
 use crate::error::Result;
-use crate::history::LoadHistoryResultNew;
+use crate::history::LoadHistoryResult;
 use crate::record::RecordState;
-use crate::serde::HistorySerde;
-use crate::stack::RefStack;
-use crate::{HistoryError, HistoryExt, LoadHistoryResult, Record};
+use crate::{History, HistoryError, Record};
 
-pub enum SaveHistoryResult {
-    Saved,
-    Exists(Utf8PathBuf),
-}
-
+#[derive(Debug)]
 pub struct SerdeHistory<A, M>
 where
     A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
@@ -25,11 +19,44 @@ where
     stack: Vec<Record<A, M>>,
 }
 
-impl<A, M> HistoryExt<A, M> for SerdeHistory<A, M>
+impl<A, M> History<A, M> for SerdeHistory<A, M>
 where
     A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
     M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
 {
+    fn save(&mut self) -> Result<()> {
+        let result = if !self.path.is_file() && self.path.exists() {
+            let tmp_dir: Utf8PathBuf = std::env::temp_dir().try_into()?;
+
+            let tmp_file = tmp_dir.join(
+                self.path.file_name().expect("history_path should be a file."),
+            );
+
+            Err(HistoryError::SaveErrorWithBackup {
+                expected: self.path.to_owned(),
+                actual: tmp_file,
+            })
+        } else {
+            Ok(())
+        };
+
+        let path = match &result {
+            Ok(()) => &self.path,
+            Err(HistoryError::PathIsNotAFile(path)) => path,
+            Err(_) => return result,
+        };
+
+        fs::create_dir_all(
+            path.parent().expect("Path to file should always have a parent."),
+        )?;
+
+        let bytes = Self::serialize(&self.stack)?;
+
+        fs::write(path, bytes)?;
+
+        result
+    }
+
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()> {
         let record = Record::new(actions, metadata);
 
@@ -38,18 +65,17 @@ where
         Ok(())
     }
 
+    fn get_previous_record(&self) -> Result<Option<&Record<A, M>>> {
+        Ok(self.stack.last())
+    }
+
     fn get_records_to_undo(
         &self,
         amount: Option<usize>,
-    ) -> Result<Vec<Record<A, M>>> {
-        let iter = self
-            .stack
-            .iter()
-            .rev()
-            .filter(|r| {
-                matches!(r.state(), RecordState::Applied | RecordState::Redone)
-            })
-            .cloned();
+    ) -> Result<Vec<&Record<A, M>>> {
+        let iter = self.stack.iter().rev().filter(|r| {
+            matches!(r.state(), RecordState::Applied | RecordState::Redone)
+        });
 
         let actions = if let Some(amount) = amount {
             iter.take(amount).collect()
@@ -63,12 +89,11 @@ where
     fn get_records_to_redo(
         &self,
         amount: Option<usize>,
-    ) -> Result<Vec<Record<A, M>>> {
+    ) -> Result<Vec<&Record<A, M>>> {
         let iter = self
             .stack
             .iter()
-            .filter(|r| matches!(r.state(), RecordState::Undone))
-            .cloned();
+            .filter(|r| matches!(r.state(), RecordState::Undone));
 
         let actions = if let Some(amount) = amount {
             iter.take(amount).collect()
@@ -79,12 +104,45 @@ where
         Ok(actions)
     }
 
-    fn set_record_state(
+    fn get_records_to_undo_mut(
         &mut self,
-        record: &mut Record<A, M>,
-        state: crate::record::RecordState,
-    ) -> Result<()> {
-        todo!()
+        amount: Option<usize>,
+    ) -> Result<Vec<&mut Record<A, M>>> {
+        let iter = self.stack.iter_mut().rev().filter(|r| {
+            matches!(r.state(), RecordState::Applied | RecordState::Redone)
+        });
+
+        let actions = if let Some(amount) = amount {
+            iter.take(amount).collect()
+        } else {
+            iter.collect()
+        };
+
+        Ok(actions)
+    }
+
+    fn get_records_to_redo_mut(
+        &mut self,
+        amount: Option<usize>,
+    ) -> Result<Vec<&mut Record<A, M>>> {
+        let iter = self
+            .stack
+            .iter_mut()
+            .filter(|r| matches!(r.state(), RecordState::Undone));
+
+        let actions = if let Some(amount) = amount {
+            iter.take(amount).collect()
+        } else {
+            iter.collect()
+        };
+
+        Ok(actions)
+    }
+
+    fn remove(&mut self) -> Result<()> {
+        self.stack.clear();
+        fs_err::remove_file(&self.path)?;
+        Ok(())
     }
 }
 
@@ -93,48 +151,23 @@ where
     A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
     M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
 {
-    fn load(&mut self, path: &Utf8Path) -> Result<LoadHistoryResultNew> {
+    pub fn load(path: &Utf8Path) -> Result<(Self, LoadHistoryResult)> {
+        let path = path.to_owned();
+
         if path.is_file() {
-            let body = fs::read(path)?;
+            let body = fs::read(&path)?;
 
-            self.stack = Self::deserialize(&body)?;
-            self.path = path.to_owned();
+            let stack = Self::deserialize(&body)?;
 
-            Ok(LoadHistoryResultNew::Loaded)
+            Ok((SerdeHistory { path, stack }, LoadHistoryResult::Loaded))
         } else if path.exists() {
             Err(HistoryError::PathIsNotAFile(path.to_owned()))
         } else {
-            Ok(LoadHistoryResultNew::New)
+            Ok((
+                SerdeHistory { path, stack: Vec::new() },
+                LoadHistoryResult::New,
+            ))
         }
-    }
-
-    pub fn save(&self) -> Result<SaveHistoryResult> {
-        let result = if !self.path.is_file() && self.path.exists() {
-            let tmp_dir: Utf8PathBuf = std::env::temp_dir().try_into()?;
-
-            let tmp_file = tmp_dir.join(
-                self.path.file_name().expect("history_path should be a file."),
-            );
-
-            SaveHistoryResult::Exists(tmp_file)
-        } else {
-            SaveHistoryResult::Saved
-        };
-
-        let path = match &result {
-            SaveHistoryResult::Saved => &self.path,
-            SaveHistoryResult::Exists(path) => path,
-        };
-
-        fs::create_dir_all(
-            path.parent().expect("Path to file should always have a parent."),
-        )?;
-
-        let bytes = Self::serialize(&self.stack)?;
-
-        fs::write(path, bytes)?;
-
-        Ok(result)
     }
 
     fn serialize(stack: &Vec<Record<A, M>>) -> Result<Vec<u8>> {

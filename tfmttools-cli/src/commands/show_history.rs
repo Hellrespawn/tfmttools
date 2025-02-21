@@ -9,13 +9,14 @@ use crate::history::{
 pub fn show_history(app_paths: &AppPaths, verbosity: u8) -> Result<()> {
     let formatter = get_history_formatter(verbosity);
 
-    let load_history_result = load_history(&app_paths.history_file())?;
+    let (history, load_history_result) =
+        load_history(&app_paths.history_file())?;
 
     match load_history_result {
-        LoadActionHistoryResult::Loaded(history) => {
-            println!("{}", formatter.format_history(&history));
+        LoadActionHistoryResult::Loaded => {
+            println!("{}", formatter.format_history(&history)?);
         },
-        LoadActionHistoryResult::New(_) => {
+        LoadActionHistoryResult::New => {
             println!("There is no history.");
         },
     }

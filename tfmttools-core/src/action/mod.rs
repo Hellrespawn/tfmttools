@@ -7,7 +7,7 @@ mod validation;
 
 pub use validation::{FORBIDDEN_CHARACTERS, validate_rename_actions};
 
-#[derive(PartialEq, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct RenameAction {
     source: Utf8PathBuf,
     target: Utf8PathBuf,
@@ -78,7 +78,7 @@ impl RenameAction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Action {
     MoveFile(RenameAction),
     CopyFile(RenameAction),

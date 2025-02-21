@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
-use tfmttools_history::{History, LoadHistoryResult, Record};
+use tfmttools_history::{LoadHistoryResult, Record};
 
 use crate::action::Action;
 
-pub type LoadActionHistoryResult =
-    LoadHistoryResult<Action, ActionRecordMetadata>;
-pub type ActionHistory = History<Action, ActionRecordMetadata>;
+pub type LoadActionHistoryResult = LoadHistoryResult;
+// pub type ActionHistoryExt = dyn HistoryExt<Action, ActionRecordMetadata>;
 pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActionRecordMetadata {
     template: String,
     arguments: Vec<String>,

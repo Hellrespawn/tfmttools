@@ -10,7 +10,7 @@ use tfmttools_fs::{
     ActionHandler, FileOrName, FsHandler, PathIterator, PathIteratorOptions,
     RemoveDirResult, TemplateLoader, get_longest_common_prefix,
 };
-use tfmttools_history::{LoadHistoryResult, Record, SaveHistoryResult};
+use tfmttools_history::{History, HistoryError, LoadHistoryResult};
 use tracing::debug;
 
 use crate::config::paths::AppPaths;
@@ -134,12 +134,13 @@ fn get_template_name_and_arguments(
 
         Ok((file_or_name.clone(), context.template_options.arguments.clone()))
     } else {
-        let history = load_history(&context.app_paths.history_file())?;
+        let (history, load_history_result) =
+            load_history(&context.app_paths.history_file())?;
 
-        if let LoadHistoryResult::Loaded(history) = history {
+        if let LoadHistoryResult::Loaded = load_history_result {
             let metadata_option = history
-                .find_record(|_| true)
-                .map(|r: &Record<Action, ActionRecordMetadata>| r.metadata());
+                .get_previous_record()?
+                .map(tfmttools_history::Record::metadata);
 
             if let Some(metadata) = metadata_option {
                 let template_name = FileOrName::from(metadata.template());
@@ -389,29 +390,28 @@ fn store_history(
     template_name: &str,
     arguments: &[String],
 ) -> Result<()> {
-    if !context.misc_options.dry_run {
-        let mut history =
-            load_history(&context.app_paths.history_file())?.unwrap();
+    if context.misc_options.dry_run {
+        Ok(())
+    } else {
+        let (mut history, _) = load_history(&context.app_paths.history_file())?;
 
         let metadata = ActionRecordMetadata::new(
             template_name.to_owned(),
             arguments.to_owned(),
         );
 
-        let record = Record::new(actions, metadata);
+        history.push(actions, metadata)?;
 
-        history.push(record)?;
+        let result = history.save();
 
-        if let SaveHistoryResult::Exists(tmp_file) = history.save()? {
-            eprintln!(
-                "History file path exists, but is not a file: {}",
-                history.path()
-            );
-            eprintln!("Backed up history to: {tmp_file}");
+        if matches!(result, Err(HistoryError::SaveErrorWithBackup { .. })) {
+            eprintln!("{}", result.unwrap_err());
+            Ok(())
+        } else {
+            result?;
+            Ok(())
         }
     }
-
-    Ok(())
 }
 
 #[cfg(test)]

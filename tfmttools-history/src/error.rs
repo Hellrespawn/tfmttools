@@ -7,6 +7,8 @@ pub type Result<T = (), E = HistoryError> = std::result::Result<T, E>;
 pub enum HistoryError {
     #[error("History file path exists, but is not a file: {0}")]
     PathIsNotAFile(Utf8PathBuf),
+    #[error("Unable to save history to {expected}. Saved backup to {actual}")]
+    SaveErrorWithBackup { expected: Utf8PathBuf, actual: Utf8PathBuf },
     #[error("Unable to read temporary directory: {source}")]
     FromPathBufError {
         #[from]
