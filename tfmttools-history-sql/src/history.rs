@@ -38,19 +38,19 @@ impl SqlHistory {
     }
 
     fn begin_transaction(&mut self) -> Result<()> {
-        self.execute("BEGIN TRANSACTION;", ())?;
+        self.execute("BEGIN TRANSACTION", ())?;
 
         Ok(())
     }
 
     fn commit_transaction(&mut self) -> Result<()> {
-        self.execute("COMMIT;", ())?;
+        self.execute("COMMIT", ())?;
 
         Ok(())
     }
 
     fn rollback_transaction(&mut self) -> Result<()> {
-        self.execute("ROLLBACK;", ())?;
+        self.execute("ROLLBACK", ())?;
 
         Ok(())
     }
@@ -75,12 +75,36 @@ impl History<Action, ActionRecordMetadata> for SqlHistory {
         actions: Vec<Action>,
         metadata: ActionRecordMetadata,
     ) -> Result<()> {
-        todo!()
+        let record = RecordEntity::insert(
+            &mut self.conn,
+            metadata.template(),
+            &metadata.arguments().join(";"),
+        )
+        .map_err(|err| HistoryError::SaveError(err.to_string()))?;
+
+        let _actions = actions
+            .iter()
+            .map(|action| {
+                ActionEntity::insert_from_action(
+                    &mut self.conn,
+                    action,
+                    record.id,
+                )
+            })
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|err| HistoryError::SaveError(err.to_string()))?;
+
+        Ok(())
     }
 
     fn get_previous_record(
         &self,
     ) -> Result<Option<&Record<Action, ActionRecordMetadata>>> {
+        // let option = RecordEntity::get_previous(&mut self.conn)
+        //     .map_err(|err| HistoryError::LoadError(err.to_string()))?;
+
+        // Ok(option.map(|entity| Record::from(entity)).as_ref())
+
         todo!()
     }
 

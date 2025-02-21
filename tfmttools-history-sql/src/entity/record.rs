@@ -1,8 +1,11 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Local, NaiveDateTime};
 use rusqlite::types::{
     FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef,
 };
-use rusqlite::{Row, ToSql};
+use rusqlite::{OptionalExtension, Row, ToSql};
+use tfmttools_core::action::Action;
+use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_history_core::Record;
 
 use super::action::ActionEntity;
 use crate::Connection;
@@ -25,11 +28,9 @@ impl TryFrom<i64> for RecordState {
             0..=4 => {
                 Ok(unsafe { std::mem::transmute::<i64, RecordState>(value) })
             },
-            n => {
-                Err(FromSqlError::Other(
-                    (format!("Invalid RecordState '{}'", n)).into(),
-                ))
-            },
+            n => Err(FromSqlError::Other(
+                (format!("Invalid RecordState '{}'", n)).into(),
+            )),
         }
     }
 }
@@ -55,45 +56,39 @@ impl ToSql for RecordState {
 pub struct RecordEntity {
     pub id: i64,
     pub state: RecordState,
-    pub datetime: NaiveDateTime,
+    pub datetime: DateTime<Local>,
     pub template: String,
     pub arguments: String,
-    pub superseded_by_id: Option<i64>,
 }
 
 impl RecordEntity {
-    pub fn get_by_id(conn: &mut Connection, id: i64) -> rusqlite::Result<Self> {
-        todo!()
-    }
-
-    pub fn get_records_to_undo(
-        conn: &mut Connection,
-        amount: usize,
-    ) -> rusqlite::Result<Vec<Self>> {
-        todo!()
-    }
-
-    pub fn get_records_to_redo(
-        conn: &mut Connection,
-        amount: usize,
-    ) -> rusqlite::Result<Vec<Self>> {
-        todo!()
-    }
-
     pub fn insert(
         conn: &mut Connection,
         template: &str,
         arguments: &str,
     ) -> rusqlite::Result<Self> {
-        todo!()
+        let mut stmt = conn.0.prepare("INSERT INTO records (state, datetime, template, arguments) VALUES (?1  ?2  ?3 ?4) RETURNING id")?;
+
+        let params = (RecordState::Applied, Local::now(), template, arguments);
+
+        let id: i64 = stmt.query_row(params, |row| row.get(0))?;
+
+        Ok(Self {
+            id,
+            state: RecordState::Applied,
+            datetime: Local::now(),
+            template: template.to_owned(),
+            arguments: arguments.to_owned(),
+        })
     }
 
-    /// Marks records with the undone state as superseded
-    pub fn supersede_undone_records(
+    pub fn get_previous(
         conn: &mut Connection,
-        record: &RecordEntity,
-    ) -> rusqlite::Result<Vec<Self>> {
-        todo!()
+    ) -> rusqlite::Result<Option<RecordEntity>> {
+        conn.0
+            .prepare("SELECT * FROM records ORDER BY datetime DESC LIMIT 1")?
+            .query_row([], RecordEntity::from_row)
+            .optional()
     }
 
     pub fn get_actions(
@@ -110,10 +105,6 @@ impl RecordEntity {
         Ok(actions)
     }
 
-    pub fn set_state(&mut self) -> rusqlite::Result<()> {
-        todo!()
-    }
-
     pub fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Self {
             id: row.get(0)?,
@@ -121,7 +112,12 @@ impl RecordEntity {
             datetime: row.get(2)?,
             template: row.get(3)?,
             arguments: row.get(4)?,
-            superseded_by_id: row.get(5)?,
         })
+    }
+}
+
+impl From<RecordEntity> for Record<Action, ActionRecordMetadata> {
+    fn from(entity: RecordEntity) -> Self {
+        todo!()
     }
 }
