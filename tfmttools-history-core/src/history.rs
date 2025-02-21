@@ -1,6 +1,3 @@
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-
 use super::record::Record;
 use crate::Result;
 
@@ -9,11 +6,7 @@ pub enum LoadHistoryResult {
     New,
 }
 
-pub trait History<A, M>
-where
-    A: std::fmt::Debug + Serialize + DeserializeOwned,
-    M: std::fmt::Debug + Serialize + DeserializeOwned,
-{
+pub trait History<A, M> {
     fn save(&mut self) -> Result<()>;
 
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()>;
