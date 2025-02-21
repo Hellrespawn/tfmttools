@@ -4,7 +4,6 @@ use tfmttools_history_core::{LoadHistoryResult, Record};
 use crate::action::Action;
 
 pub type LoadActionHistoryResult = LoadHistoryResult;
-// pub type ActionHistoryExt = dyn HistoryExt<Action, ActionRecordMetadata>;
 pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
