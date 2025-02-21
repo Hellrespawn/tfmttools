@@ -56,7 +56,7 @@ impl HistoryFormatter {
 
     pub fn format_history(
         &self,
-        history: &impl History<Action, ActionRecordMetadata>,
+        history: &mut impl History<Action, ActionRecordMetadata>,
     ) -> Result<String> {
         let undo = history.get_all_records_to_undo()?;
 

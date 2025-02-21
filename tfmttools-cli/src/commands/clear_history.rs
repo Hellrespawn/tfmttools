@@ -16,7 +16,7 @@ pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {
         let formatter =
             HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
 
-        println!("{}", formatter.format_history(&history)?);
+        println!("{}", formatter.format_history(&mut history)?);
 
         let confirmation =
             ConfirmationPrompt::new("Clear history?").prompt()?;

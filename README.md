@@ -25,6 +25,7 @@ See also the "examples"-folder.
 
 - TODO? Add explicit version to history format?
 - TODO? Replace custom history format with SQLite?
+    This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).
 
 - Handle UTF-16 odd length error manually?
 

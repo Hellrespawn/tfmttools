@@ -76,12 +76,12 @@ where
         Ok(())
     }
 
-    fn get_previous_record(&self) -> Result<Option<&Record<A, M>>> {
+    fn get_previous_record(&mut self) -> Result<Option<&Record<A, M>>> {
         Ok(self.stack.last())
     }
 
     fn get_records_to_undo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<A, M>>> {
         let iter = self.stack.iter().rev().filter(|r| {
@@ -98,7 +98,7 @@ where
     }
 
     fn get_records_to_redo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<A, M>>> {
         let iter = self

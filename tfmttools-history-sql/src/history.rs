@@ -3,7 +3,7 @@ use std::fs;
 use camino::{Utf8Path, Utf8PathBuf};
 use rusqlite::Params;
 use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
+use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_history_core::{History, HistoryError, Record, Result};
 
 use crate::Connection;
@@ -98,25 +98,23 @@ impl History<Action, ActionRecordMetadata> for SqlHistory {
     }
 
     fn get_previous_record(
-        &self,
+        &mut self,
     ) -> Result<Option<&Record<Action, ActionRecordMetadata>>> {
-        // let option = RecordEntity::get_previous(&mut self.conn)
-        //     .map_err(|err| HistoryError::LoadError(err.to_string()))?;
+        let option = RecordEntity::get_previous(&mut self.conn)
+            .map_err(|err| HistoryError::LoadError(err.to_string()))?;
 
-        // Ok(option.map(|entity| Record::from(entity)).as_ref())
-
-        todo!()
+        Ok(option.map(|entity| Record::from(entity)).as_ref())
     }
 
     fn get_records_to_undo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<Action, ActionRecordMetadata>>> {
         todo!()
     }
 
     fn get_records_to_redo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<Action, ActionRecordMetadata>>> {
         todo!()

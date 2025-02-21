@@ -18,15 +18,15 @@ where
 
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()>;
 
-    fn get_previous_record(&self) -> Result<Option<&Record<A, M>>>;
+    fn get_previous_record(&mut self) -> Result<Option<&Record<A, M>>>;
 
     fn get_records_to_undo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<A, M>>>;
 
     fn get_records_to_redo(
-        &self,
+        &mut self,
         amount: Option<usize>,
     ) -> Result<Vec<&Record<A, M>>>;
 
@@ -41,7 +41,7 @@ where
     ) -> Result<Vec<&mut Record<A, M>>>;
 
     fn get_n_records_to_undo(
-        &self,
+        &mut self,
         amount: usize,
     ) -> Result<Vec<&Record<A, M>>> {
         self.get_records_to_undo(Some(amount))
@@ -55,7 +55,7 @@ where
     }
 
     fn get_n_records_to_redo(
-        &self,
+        &mut self,
         amount: usize,
     ) -> Result<Vec<&Record<A, M>>> {
         self.get_records_to_redo(Some(amount))
@@ -68,7 +68,7 @@ where
         self.get_records_to_redo_mut(Some(amount))
     }
 
-    fn get_all_records_to_undo(&self) -> Result<Vec<&Record<A, M>>> {
+    fn get_all_records_to_undo(&mut self) -> Result<Vec<&Record<A, M>>> {
         self.get_records_to_undo(None)
     }
 
@@ -78,7 +78,7 @@ where
         self.get_records_to_undo_mut(None)
     }
 
-    fn get_all_records_to_redo(&self) -> Result<Vec<&Record<A, M>>> {
+    fn get_all_records_to_redo(&mut self) -> Result<Vec<&Record<A, M>>> {
         self.get_records_to_redo(None)
     }
 

@@ -16,14 +16,14 @@ pub fn load_history(
     impl History<Action, ActionRecordMetadata> + use<>,
     LoadActionHistoryResult,
 )> {
-    let (history, result) = SerdeHistory::load(path)?;
+    let (mut history, result) = SerdeHistory::load(path)?;
 
     if let LoadActionHistoryResult::Loaded = &result {
         debug!(
             "Loaded history:\n{}",
             HistoryFormatter::new()
                 .with_format(HistoryFormat::Verbose)
-                .format_history(&history)?
+                .format_history(&mut history)?
         );
     }
 

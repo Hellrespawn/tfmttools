@@ -136,7 +136,7 @@ fn get_template_name_and_arguments(
 
         Ok((file_or_name.clone(), context.template_options.arguments.clone()))
     } else {
-        let (history, load_history_result) =
+        let (mut history, load_history_result) =
             load_history(&context.app_paths.history_file())?;
 
         if let LoadHistoryResult::Loaded = load_history_result {
