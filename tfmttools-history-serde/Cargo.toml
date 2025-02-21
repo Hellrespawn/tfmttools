@@ -17,5 +17,4 @@ camino = { workspace = true, features = ["serde", "serde1"] }
 fs-err = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }

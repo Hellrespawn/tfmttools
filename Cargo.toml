@@ -16,7 +16,6 @@ members = [
     "tfmttools-fs",
     "tfmttools-history-core",
     "tfmttools-history-serde",
-    "tfmttools-history-sql",
     "tfmttools-test",
 ]
 default-members = ["tfmttools-cli"]
