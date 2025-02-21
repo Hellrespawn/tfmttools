@@ -1,13 +1,10 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use fs_err as fs;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use tfmttools_history_core::{
+    History, HistoryError, LoadHistoryResult, Record, RecordState, Result,
+};
 use tracing::trace;
-
-use crate::error::Result;
-use crate::history::LoadHistoryResult;
-use crate::record::RecordState;
-use crate::{History, HistoryError, Record};
 
 #[derive(Debug)]
 pub struct SerdeHistory<A, M>
@@ -26,33 +23,47 @@ where
 {
     fn save(&mut self) -> Result<()> {
         let result = if !self.path.is_file() && self.path.exists() {
-            let tmp_dir: Utf8PathBuf = std::env::temp_dir().try_into()?;
+            let tmp_dir: Utf8PathBuf =
+                std::env::temp_dir().try_into().map_err(|_| {
+                    HistoryError::SaveError(
+                        "Temporary directory is not valid UTF-8.".to_owned(),
+                    )
+                })?;
 
             let tmp_file = tmp_dir.join(
-                self.path.file_name().expect("history_path should be a file."),
+                self.path
+                    .file_name()
+                    .expect("history_path should be a file with a file name."),
             );
 
-            Err(HistoryError::SaveErrorWithBackup {
-                expected: self.path.to_owned(),
-                actual: tmp_file,
-            })
+            Err(HistoryError::SaveErrorWithBackup(
+                format!("{} exists but is not a file.", self.path),
+                tmp_file,
+            ))
         } else {
             Ok(())
         };
 
         let path = match &result {
             Ok(()) => &self.path,
-            Err(HistoryError::PathIsNotAFile(path)) => path,
+            Err(HistoryError::SaveErrorWithBackup(_, path)) => path,
             Err(_) => return result,
         };
 
-        fs::create_dir_all(
-            path.parent().expect("Path to file should always have a parent."),
-        )?;
+        let parent =
+            path.parent().expect("Path to file should always have a parent.");
+
+        fs_err::create_dir_all(parent).map_err(|err| {
+            HistoryError::SaveError(format!(
+                "Unable to create directory {parent}: {err}"
+            ))
+        })?;
 
         let bytes = Self::serialize(&self.stack)?;
 
-        fs::write(path, bytes)?;
+        fs_err::write(path, bytes).map_err(|err| {
+            HistoryError::SaveError(format!("Unable to write to {path}: {err}"))
+        })?;
 
         result
     }
@@ -141,7 +152,8 @@ where
 
     fn remove(&mut self) -> Result<()> {
         self.stack.clear();
-        fs_err::remove_file(&self.path)?;
+        fs_err::remove_file(&self.path)
+            .map_err(|err| HistoryError::RemoveError(err.to_string()))?;
         Ok(())
     }
 }
@@ -155,13 +167,17 @@ where
         let path = path.to_owned();
 
         if path.is_file() {
-            let body = fs::read(&path)?;
+            let body = fs_err::read(&path)
+                .map_err(|err| HistoryError::LoadError(err.to_string()))?;
 
             let stack = Self::deserialize(&body)?;
 
             Ok((SerdeHistory { path, stack }, LoadHistoryResult::Loaded))
         } else if path.exists() {
-            Err(HistoryError::PathIsNotAFile(path.to_owned()))
+            Err(HistoryError::LoadError(format!(
+                "{} exists but is not a file.",
+                path.to_owned()
+            )))
         } else {
             Ok((
                 SerdeHistory { path, stack: Vec::new() },
@@ -173,18 +189,24 @@ where
     fn serialize(stack: &Vec<Record<A, M>>) -> Result<Vec<u8>> {
         let result = serde_json::to_vec_pretty(stack);
 
-        let bytes =
-            result.map_err(|source| HistoryError::Serialize { source })?;
-
-        Ok(bytes)
+        result.map_err(|source| {
+            HistoryError::SaveError(format!(
+                "Unable to serialize history: {}",
+                source
+            ))
+        })
     }
 
     fn deserialize(bytes: &[u8]) -> Result<Vec<Record<A, M>>> {
-        let stack = serde_json::from_slice(bytes)
-            .map_err(|source| HistoryError::Deserialize { source })?;
+        let records = serde_json::from_slice(bytes).map_err(|source| {
+            HistoryError::LoadError(format!(
+                "Unable to deserialize history: {}",
+                source
+            ))
+        })?;
 
-        trace!("Deserialized history:\n{:#?}", stack);
+        trace!("Deserialized history:\n{:#?}", records);
 
-        Ok(stack)
+        Ok(records)
     }
 }

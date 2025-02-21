@@ -10,7 +10,9 @@ use tfmttools_fs::{
     ActionHandler, FileOrName, FsHandler, PathIterator, PathIteratorOptions,
     RemoveDirResult, TemplateLoader, get_longest_common_prefix,
 };
-use tfmttools_history::{History, HistoryError, LoadHistoryResult};
+use tfmttools_history_core::{
+    History, HistoryError, LoadHistoryResult, Record,
+};
 use tracing::debug;
 
 use crate::config::paths::AppPaths;
@@ -138,9 +140,8 @@ fn get_template_name_and_arguments(
             load_history(&context.app_paths.history_file())?;
 
         if let LoadHistoryResult::Loaded = load_history_result {
-            let metadata_option = history
-                .get_previous_record()?
-                .map(tfmttools_history::Record::metadata);
+            let metadata_option =
+                history.get_previous_record()?.map(Record::metadata);
 
             if let Some(metadata) = metadata_option {
                 let template_name = FileOrName::from(metadata.template());

@@ -2,7 +2,9 @@ use color_eyre::Result;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
 use tfmttools_fs::{ActionHandler, FsHandler};
-use tfmttools_history::{History, HistoryMode, LoadHistoryResult, RecordState};
+use tfmttools_history_core::{
+    History, HistoryMode, LoadHistoryResult, RecordState,
+};
 
 use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};

@@ -6,4 +6,3 @@ mod migration;
 mod query;
 
 use conn::Connection;
-pub use history::History;

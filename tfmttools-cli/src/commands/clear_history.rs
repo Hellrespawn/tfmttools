@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use tfmttools_history::History;
+use tfmttools_history_core::History;
 
 use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};

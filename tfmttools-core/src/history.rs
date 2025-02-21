@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tfmttools_history::{LoadHistoryResult, Record};
+use tfmttools_history_core::{LoadHistoryResult, Record};
 
 use crate::action::Action;
 

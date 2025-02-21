@@ -5,7 +5,8 @@ use color_eyre::Result;
 pub use formatter::{HistoryFormat, HistoryFormatter, HistoryPrefix};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecordMetadata, LoadActionHistoryResult};
-use tfmttools_history::{History, SerdeHistory};
+use tfmttools_history_core::History;
+use tfmttools_history_serde::SerdeHistory;
 use tracing::debug;
 
 pub fn load_history(

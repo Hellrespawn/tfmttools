@@ -3,7 +3,7 @@ use std::fmt::Write;
 use color_eyre::Result;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
-use tfmttools_history::History;
+use tfmttools_history_core::History;
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 

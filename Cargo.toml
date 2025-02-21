@@ -14,7 +14,8 @@ members = [
     "tfmttools-core",
     "tfmttools-cli",
     "tfmttools-fs",
-    "tfmttools-history",
+    "tfmttools-history-core",
+    "tfmttools-history-serde",
     "tfmttools-test",
     # "tfmttools-history-sql",
 ]

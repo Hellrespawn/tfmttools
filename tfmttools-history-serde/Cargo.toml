@@ -1,5 +1,5 @@
 [package]
-name = "tfmttools-core"
+name = "tfmttools-history-serde"
 
 authors.workspace = true
 edition.workspace = true
@@ -10,24 +10,12 @@ repository.workspace = true
 homepage.workspace = true
 version.workspace = true
 
-[features]
-debug = []
-
 [dependencies]
 tfmttools-history-core = { path = "../tfmttools-history-core" }
+
 camino = { workspace = true, features = ["serde", "serde1"] }
-convert_case = { workspace = true }
-id3 = { workspace = true }
-ignore = { workspace = true }
-lofty = { workspace = true }
-minijinja = { workspace = true, features = [
-    "loader",
-    "custom_syntax",
-    "debug",
-] }
+fs-err = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
-serde_json = { workspace = true }

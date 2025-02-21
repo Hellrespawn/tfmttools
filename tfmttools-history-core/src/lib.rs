@@ -1,12 +1,10 @@
 mod error;
 mod history;
 mod record;
-mod serde_history;
 
 pub use error::{HistoryError, Result};
 pub use history::{History, LoadHistoryResult};
 pub use record::{Record, RecordState};
-pub use serde_history::SerdeHistory;
 
 #[derive(Copy, Clone, Debug)]
 pub enum HistoryMode {
