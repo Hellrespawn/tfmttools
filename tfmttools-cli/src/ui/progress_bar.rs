@@ -3,6 +3,7 @@ use indicatif::{
 };
 
 use crate::TERM;
+use crate::cli::show_cursor;
 
 pub struct ProgressBarOptions {
     style: ProgressStyle,
@@ -105,6 +106,6 @@ impl ProgressBar {
         self.inner.set_message(self.finished_message);
         self.inner.abandon();
 
-        let _ = TERM.show_cursor();
+        show_cursor();
     }
 }

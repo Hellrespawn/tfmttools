@@ -8,7 +8,7 @@ use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{
     ActionHandler, FileOrName, FsHandler, PathIterator, PathIteratorOptions,
-    RemoveDirResult, TemplateLoader, get_longest_common_prefix,
+    TemplateLoader, get_longest_common_prefix,
 };
 use tfmttools_history_core::{
     History, HistoryError, LoadHistoryResult, Record,
@@ -124,7 +124,31 @@ pub fn rename(context: &RenameContext) -> Result<()> {
             || confirm_rename_actions(context, &rename_actions)?;
 
         if confirmation {
-            let actions = perform_rename_actions(context, rename_actions)?;
+            let mut actions = apply_actions(context, rename_actions)?;
+
+            let remaining_paths =
+                get_remaining_files_and_directories(&actions)?;
+
+            if let Some(remaining_paths) = remaining_paths {
+                let safe = remaining_paths
+                    .iter()
+                    .all(|path| file_is_safe_to_delete(path));
+
+                if safe {
+                    actions.extend(delete_remaining_files(
+                        context,
+                        remaining_paths,
+                    )?);
+
+                    println!("Cleaned up cover images and empty folders.");
+                } else {
+                    println!(
+                        "There are non-empty directories with non-image files left."
+                    );
+                }
+            } else {
+                println!("Unable to retrieve remaining files and folders.");
+            }
 
             store_history(
                 context,
@@ -139,6 +163,44 @@ pub fn rename(context: &RenameContext) -> Result<()> {
     }
 
     Ok(())
+}
+
+const IMAGE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
+
+fn file_is_safe_to_delete(path: &Utf8Path) -> bool {
+    (path.is_file()
+        && path.extension().is_some_and(|ext| IMAGE_EXTENSIONS.contains(&ext)))
+        || path.is_dir()
+}
+
+fn delete_remaining_files(
+    context: &RenameContext,
+    paths: Vec<Utf8PathBuf>,
+) -> Result<Vec<Action>> {
+    let initial_actions = paths.into_iter().rev().map(|path| if path.is_file() { Action::RemoveFile(path) } else if path.is_dir() { Action::RemoveDir(path)} else {
+        unreachable!("Paths should be filtered on files and directories before this point.");
+    }).collect::<Vec<_>>();
+
+    let mut applied_actions = Vec::new();
+
+    let handler = ActionHandler::new(
+        context.fs_handler,
+        context.misc_options.always_copy,
+        true,
+    );
+
+    for action in initial_actions {
+        let actions = handler.apply(action)?;
+
+        applied_actions.extend(actions);
+
+        #[cfg(feature = "debug")]
+        if is_rename_action {
+            crate::debug::delay();
+        }
+    }
+
+    Ok(applied_actions)
 }
 
 fn get_template_name_and_arguments(
@@ -325,40 +387,39 @@ fn preview_rename_actions(
     Ok(())
 }
 
-fn perform_rename_actions(
-    context: &RenameContext,
-    rename_actions: Vec<RenameAction>,
-) -> Result<Vec<Action>> {
+fn get_remaining_files_and_directories(
+    actions: &[Action],
+) -> Result<Option<Vec<Utf8PathBuf>>> {
     let common_prefix = get_longest_common_prefix(
-        &rename_actions.iter().map(RenameAction::source).collect::<Vec<_>>(),
+        &actions
+            .iter()
+            .filter_map(|action| {
+                if let Action::MoveFile(rename_action) = action {
+                    Some(rename_action.source())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>(),
     );
 
-    let mut actions = move_files(context, rename_actions)?;
-
     debug!("Common prefix of path: {:?}", common_prefix);
-
     if let Some(common_path) = common_prefix {
-        let removed = context.fs_handler.remove_empty_subdirectories(
-            &common_path,
-            context.path_iterator_options.recursion_depth(),
-        )?;
+        let options = PathIteratorOptions::new(&common_path);
 
-        actions.extend(
-            removed
-                .iter()
-                .filter(|(_, r)| matches!(r, RemoveDirResult::Removed))
-                .map(|(p, _)| Action::RemoveDir(p.clone())),
-        );
+        let remaining = PathIterator::new(&options)
+            // .rev()
+            .collect::<TFMTResult<Vec<_>>>()?;
 
-        println!("Removed leftover folders.");
+        Ok(Some(remaining))
     } else {
-        println!("Unable to remove leftover folders.");
+        Ok(None)
     }
-
-    Ok(actions)
 }
 
-fn move_files(
+// fn
+
+fn apply_actions(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
@@ -373,6 +434,7 @@ fn move_files(
     let handler = ActionHandler::new(
         context.fs_handler,
         context.misc_options.always_copy,
+        false,
     );
 
     for action in initial_actions {
@@ -430,7 +492,6 @@ fn store_history(
 mod tests {
     use assert_fs::TempDir;
     use color_eyre::Result;
-    use fs_err as fs;
 
     #[test]
     fn test_remove_dir_error_codes() -> Result<()> {
@@ -445,10 +506,10 @@ mod tests {
         #[cfg(unix)]
         let expected_code = 39;
 
-        fs::create_dir(&test_folder)?;
-        fs::write(test_file, "")?;
+        fs_err::create_dir(&test_folder)?;
+        fs_err::write(test_file, "")?;
 
-        if let Err(err) = fs::remove_dir(test_folder) {
+        if let Err(err) = fs_err::remove_dir(test_folder) {
             if let Some(error_code) =
                 std::io::Error::last_os_error().raw_os_error()
             {

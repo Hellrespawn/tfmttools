@@ -48,7 +48,7 @@ pub struct TestCase {
     template_arguments: Vec<String>,
     global_arguments: Vec<String>,
     rename_arguments: Vec<String>,
-    reference: HashMap<String, String>,
+    reference: HashMap<String, Option<String>>,
     test_type: TestType,
     temp_dir: TempDir,
 }
@@ -506,8 +506,8 @@ impl TestCase {
 
     fn validate_reference(
         path: &Utf8Path,
-        reference: Option<HashMap<String, String>>,
-    ) -> Result<HashMap<String, String>> {
+        reference: Option<HashMap<String, Option<String>>>,
+    ) -> Result<HashMap<String, Option<String>>> {
         if let Some(reference) = reference {
             let mut valid_reference = HashMap::new();
 

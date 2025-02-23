@@ -183,7 +183,7 @@ fn install_restore_cursor_hooks() {
 }
 
 /// Make the cursor visible again, ignoring the result.
-fn show_cursor() {
+pub fn show_cursor() {
     let _ = TERM.show_cursor();
 }
 

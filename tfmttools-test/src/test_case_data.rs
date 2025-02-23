@@ -13,7 +13,7 @@ pub struct TestCaseData {
     pub template_arguments: Option<Vec<String>>,
     pub global_arguments: Option<Vec<String>>,
     pub rename_arguments: Option<Vec<String>>,
-    pub reference: Option<HashMap<String, String>>,
+    pub reference: Option<HashMap<String, Option<String>>>,
     pub types: Option<Vec<TestType>>,
     pub extends: Option<String>,
 }
