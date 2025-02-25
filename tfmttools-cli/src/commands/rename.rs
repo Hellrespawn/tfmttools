@@ -394,7 +394,9 @@ fn get_remaining_files_and_directories(
         &actions
             .iter()
             .filter_map(|action| {
-                if let Action::MoveFile(rename_action) = action {
+                if let Action::MoveFile(rename_action)
+                | Action::CopyFile(rename_action) = action
+                {
                     Some(rename_action.source())
                 } else {
                     None
