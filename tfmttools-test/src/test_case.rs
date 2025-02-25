@@ -10,10 +10,7 @@ use serde::Deserialize;
 use tfmttools_fs::PathIterator;
 
 use crate::file_tree::FileTreeNode;
-use crate::predicates::{
-    check_reference_files_dont_exist_and_get_remaining,
-    check_reference_files_exist_and_get_missing,
-};
+use crate::predicates::{PredicateInput, check_reference};
 use crate::test_case_data::TestCaseData;
 use crate::test_failure::{CommandOutput, TestFailure};
 use crate::{
@@ -157,79 +154,34 @@ impl TestCase {
         Ok(test_case_data)
     }
 
-    pub fn run_test(&self) -> Result<(), Box<TestFailure>> {
+    pub fn run_test_case(&self) -> Result<(), Box<TestFailure>> {
         match self.test_type {
-            TestType::Apply => self.apply(),
+            TestType::Apply => self.run_test(TestType::Apply),
             TestType::Undo => {
-                self.apply()?;
-                self.undo()
+                self.run_test(TestType::Apply)?;
+                self.run_test(TestType::Undo)
             },
             TestType::Redo => {
-                self.apply()?;
-                self.undo()?;
-                self.redo()
+                self.run_test(TestType::Apply)?;
+                self.run_test(TestType::Undo)?;
+                self.run_test(TestType::Redo)
             },
             TestType::PreviousData => {
-                self.apply()?;
-                self.undo()?;
-                self.previous_data()
+                self.run_test(TestType::Apply)?;
+                self.run_test(TestType::Undo)?;
+                self.run_test(TestType::PreviousData)
             },
         }
     }
 
-    fn create_rename_command(&self, previous_data: bool) -> Command {
-        let mut cmd = self.create_command();
+    pub fn run_test(
+        &self,
+        test_type: TestType,
+    ) -> Result<(), Box<TestFailure>> {
+        let cmd = self.create_command(test_type);
+        let command_output = self.run_command(cmd, test_type);
 
-        for arg in &self.global_arguments {
-            cmd.arg(arg);
-        }
-
-        cmd.arg("rename")
-            .arg("--custom-template-directory")
-            .arg(self.get_template_dest_dir())
-            .arg("--yes");
-
-        for arg in &self.rename_arguments {
-            cmd.arg(arg);
-        }
-
-        if !previous_data {
-            cmd.arg(self.template.as_str());
-            cmd.arg("--");
-
-            for argument in &self.template_arguments {
-                cmd.arg(argument);
-            }
-        }
-
-        cmd
-    }
-
-    pub fn apply(&self) -> Result<(), Box<TestFailure>> {
-        let cmd = self.create_rename_command(false);
-
-        let command_output = self.run_command(cmd, TestType::Apply);
-
-        let missing_files = check_reference_files_exist_and_get_missing(
-            &self.temp_dir_path(),
-            self.reference.values(),
-        )
-        .into_iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>();
-
-        let exit_code = command_output.exit_code;
-
-        let message = if exit_code != 0 {
-            Some(format!("Command exited with code: {}", exit_code))
-        } else if !missing_files.is_empty() {
-            Some(format!(
-                "Files missing after rename:\n  {}",
-                missing_files.join("\n  ")
-            ))
-        } else {
-            None
-        };
+        let message = self.verify_command(&command_output, test_type);
 
         if let Some(message) = message {
             Err(Box::new(TestFailure {
@@ -242,119 +194,28 @@ impl TestCase {
         }
     }
 
-    pub fn previous_data(&self) -> Result<(), Box<TestFailure>> {
-        let cmd = self.create_rename_command(true);
+    fn verify_command(
+        &self,
+        command_output: &CommandOutput,
+        test_type: TestType,
+    ) -> Option<String> {
+        let predicate_input = PredicateInput::new(
+            self.temp_dir_path(),
+            self.temp_dir_path(),
+            self.reference.iter(),
+            test_type,
+        );
 
-        let command_output = self.run_command(cmd, TestType::PreviousData);
-
-        let missing_files = check_reference_files_exist_and_get_missing(
-            &self.temp_dir_path(),
-            self.reference.values(),
-        )
-        .into_iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>();
-
-        let exit_code = command_output.exit_code;
-
-        let message = if exit_code != 0 {
-            Some(format!("Command exited with code: {}", exit_code))
-        } else if !missing_files.is_empty() {
-            Some(format!(
-                "Files missing after rename:\n  {}",
-                missing_files.join("\n  ")
-            ))
-        } else {
-            None
-        };
-
-        if let Some(message) = message {
-            Err(Box::new(TestFailure {
-                test_case_name: self.name.clone(),
-                command_output,
-                message,
-            }))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn undo(&self) -> Result<(), Box<TestFailure>> {
-        let mut cmd = self.create_command();
-
-        cmd.arg("undo").arg("--yes");
-
-        let command_output = self.run_command(cmd, TestType::Undo);
-
-        let remaining_files =
-            check_reference_files_dont_exist_and_get_remaining(
-                &self.temp_dir_path(),
-                self.reference.values(),
-            )
-            .into_iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>();
+        let predicate_results = check_reference(predicate_input);
 
         let exit_code = command_output.exit_code;
 
-        let message = if exit_code != 0 {
+        if exit_code != 0 {
             Some(format!("Command exited with code: {}", exit_code))
-        } else if !remaining_files.is_empty() {
-            Some(format!(
-                "Files remaining after undo:\n  {}",
-                remaining_files.join("\n  ")
-            ))
+        } else if predicate_results.is_error() {
+            Some(predicate_results.to_string())
         } else {
             None
-        };
-
-        if let Some(message) = message {
-            Err(Box::new(TestFailure {
-                test_case_name: self.name.clone(),
-                command_output,
-                message,
-            }))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn redo(&self) -> Result<(), Box<TestFailure>> {
-        let mut cmd = self.create_command();
-
-        cmd.arg("redo").arg("--yes");
-
-        let command_output = self.run_command(cmd, TestType::Redo);
-
-        let missing_files = check_reference_files_exist_and_get_missing(
-            &self.temp_dir_path(),
-            self.reference.values(),
-        )
-        .into_iter()
-        .map(|p| p.to_string())
-        .collect::<Vec<_>>();
-
-        let exit_code = command_output.exit_code;
-
-        let message = if exit_code != 0 {
-            Some(format!("Command exited with code: {}", exit_code))
-        } else if !missing_files.is_empty() {
-            Some(format!(
-                "Files missing after redo:\n  {}",
-                missing_files.join("\n  ")
-            ))
-        } else {
-            None
-        };
-
-        if let Some(message) = message {
-            Err(Box::new(TestFailure {
-                test_case_name: self.name.clone(),
-                command_output,
-                message,
-            }))
-        } else {
-            Ok(())
         }
     }
 
@@ -370,10 +231,54 @@ impl TestCase {
         self.temp_dir_path().join(TEST_TEMPLATE_DIR_NAME)
     }
 
-    fn create_command(&self) -> Command {
+    fn create_command(&self, test_type: TestType) -> Command {
         let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
         cmd.arg("--custom-config-directory").arg(self.get_config_dest_dir());
+
+        match test_type {
+            TestType::Apply => {
+                for arg in &self.global_arguments {
+                    cmd.arg(arg);
+                }
+
+                cmd.arg("rename")
+                    .arg("--custom-template-directory")
+                    .arg(self.get_template_dest_dir())
+                    .arg("--yes");
+
+                for arg in &self.rename_arguments {
+                    cmd.arg(arg);
+                }
+
+                cmd.arg(self.template.as_str());
+                cmd.arg("--");
+
+                for argument in &self.template_arguments {
+                    cmd.arg(argument);
+                }
+            },
+            TestType::Undo => {
+                cmd.arg("undo").arg("--yes");
+            },
+            TestType::Redo => {
+                cmd.arg("redo").arg("--yes");
+            },
+            TestType::PreviousData => {
+                for arg in &self.global_arguments {
+                    cmd.arg(arg);
+                }
+
+                cmd.arg("rename")
+                    .arg("--custom-template-directory")
+                    .arg(self.get_template_dest_dir())
+                    .arg("--yes");
+
+                for arg in &self.rename_arguments {
+                    cmd.arg(arg);
+                }
+            },
+        }
 
         cmd
     }

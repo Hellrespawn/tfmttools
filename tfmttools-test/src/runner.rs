@@ -18,7 +18,7 @@ fn collect_tests() -> Result<Vec<Trial>, Box<dyn Error>> {
         .into_iter()
         .map(|case| {
             Trial::test(case.name.clone(), move || {
-                case.run_test().map_err(|tr| tr.into())
+                case.run_test_case().map_err(|tr| tr.into())
             })
         })
         .collect::<Vec<_>>();
