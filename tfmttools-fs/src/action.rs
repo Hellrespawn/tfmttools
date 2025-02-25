@@ -28,6 +28,8 @@ impl<'a> ActionHandler<'a> {
                         rename_action.target(),
                     )?;
 
+                    self.fs_handler.remove_file(rename_action.source())?;
+
                     let source = rename_action.source().to_owned();
 
                     vec![
