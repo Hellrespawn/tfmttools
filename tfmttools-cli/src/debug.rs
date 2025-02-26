@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-static DELAY: LazyLock<Duration> = Lazy::new(|| {
+static DELAY: LazyLock<Duration> = LazyLock::new(|| {
     Duration::from_millis(
         std::env::var("DEBUG_DELAY_MS")
             .unwrap_or_default()
