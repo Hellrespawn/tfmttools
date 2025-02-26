@@ -17,9 +17,7 @@ use tracing::debug;
 
 use crate::config::paths::AppPaths;
 use crate::history::load_history;
-use crate::ui::{
-    ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
-};
+use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
 
 #[derive(Debug)]
 pub struct RenameTemplateOptions {
@@ -190,6 +188,9 @@ fn delete_remaining_files(
     );
 
     for action in initial_actions {
+        #[cfg(feature = "debug")]
+        let is_rename_action = action.is_rename_action();
+
         let actions = handler.apply(action)?;
 
         applied_actions.extend(actions);
@@ -243,14 +244,12 @@ fn get_template_name_and_arguments(
 }
 
 fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
-    let progress_bar_options = ProgressBarOptions::spinner(
+    let spinner = ProgressBar::spinner(
         "audio",
-        "total",
+        "total files",
         "Gathering files...",
         "Gathered files.",
     );
-
-    let spinner = ProgressBar::new(progress_bar_options);
 
     let file_paths = PathIterator::new(context.path_iterator_options)
         .flatten()
@@ -270,9 +269,11 @@ fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
 }
 
 fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
-    let options = ProgressBarOptions::bar("Reading files...", "Read files.");
-
-    let bar = ProgressBar::with_length(options, file_paths.len() as u64);
+    let bar = ProgressBar::bar(
+        "Reading files...",
+        "Read files.",
+        file_paths.len() as u64,
+    );
 
     let audio_files = file_paths
         .into_iter()
@@ -297,12 +298,11 @@ fn create_rename_actions(
 ) -> Result<Vec<RenameAction>> {
     let cwd = context.app_paths.working_directory()?;
 
-    let options = ProgressBarOptions::bar(
+    let bar = ProgressBar::bar(
         "Determining output paths:",
         "Determined output paths.",
+        files.len() as u64,
     );
-
-    let bar = ProgressBar::with_length(options, files.len() as u64);
 
     let rename_actions: Result<Vec<RenameAction>> = files
         .iter()
@@ -425,9 +425,11 @@ fn apply_actions(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
-    let options = ProgressBarOptions::bar("Moving files:", "Moved files.");
-
-    let bar = ProgressBar::with_length(options, rename_actions.len() as u64);
+    let bar = ProgressBar::bar(
+        "Moving files:",
+        "Moved files.",
+        rename_actions.len() as u64,
+    );
 
     let initial_actions = RenameAction::create_actions(rename_actions);
 

@@ -6,9 +6,7 @@ use tfmttools_core::error::TFMTError;
 use tfmttools_fs::{PathIterator, PathIteratorOptions};
 
 use crate::config::paths::AppPaths;
-use crate::ui::{
-    ConfirmationPrompt, ItemName, PreviewList, ProgressBar, ProgressBarOptions,
-};
+use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
 
 const UTF_16_ERROR_TEXT: &str =
     "Text decoding: UTF-16 string has an odd length";
@@ -60,14 +58,12 @@ impl FixCommand {
     }
 
     fn gather_file_paths(&self) -> Vec<Utf8PathBuf> {
-        let options = ProgressBarOptions::spinner(
+        let spinner = ProgressBar::spinner(
             "audio",
-            "total",
+            "total files",
             "Gathering files...",
             "Gathered files.",
         );
-
-        let spinner = ProgressBar::new(options);
 
         let path_iterator_options = PathIteratorOptions::with_depth(
             &self.input_directory,
@@ -92,12 +88,11 @@ impl FixCommand {
     }
 
     fn get_utf16_error_files(file_paths: Vec<Utf8PathBuf>) -> Vec<Utf8PathBuf> {
-        let options = ProgressBarOptions::bar(
+        let bar = ProgressBar::bar(
             "Reading error files...",
             "Read error files.",
+            file_paths.len() as u64,
         );
-
-        let bar = ProgressBar::with_length(options, file_paths.len() as u64);
 
         let error_paths = file_paths
             .into_iter()
@@ -147,10 +142,11 @@ impl FixCommand {
     }
 
     fn fix_files(files_to_fix: &[Utf8PathBuf], dry_run: bool) -> Result<()> {
-        let options =
-            ProgressBarOptions::bar("Fixing files...", "Fixed files.");
-
-        let bar = ProgressBar::with_length(options, files_to_fix.len() as u64);
+        let bar = ProgressBar::bar(
+            "Fixing files...",
+            "Fixed files.",
+            files_to_fix.len() as u64,
+        );
 
         for path in files_to_fix {
             if dry_run {

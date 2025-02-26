@@ -5,23 +5,23 @@ use indicatif::{
 use crate::TERM;
 use crate::cli::show_cursor;
 
-pub struct ProgressBarOptions {
-    style: ProgressStyle,
-    draw_target: ProgressDrawTarget,
-    working_message: &'static str,
+pub struct ProgressBar {
+    inner: IndicatifProgressBar,
     finished_message: &'static str,
 }
 
-impl ProgressBarOptions {
+impl ProgressBar {
     pub fn bar(
         working_message: &'static str,
         finished_message: &'static str,
+        length: u64,
     ) -> Self {
         Self::new(
             ProgressStyle::default_bar(),
             "[{pos}/{len}] {msg} {wide_bar}",
             working_message,
             finished_message,
+            Some(length),
         )
     }
 
@@ -34,18 +34,24 @@ impl ProgressBarOptions {
         Self::new(
             ProgressStyle::default_spinner(),
             &format!(
-                "[{{pos}}/{{len}} {found}/{total} files] {{wide_msg}} {{spinner}}",
+                "[{{pos}}/{{len}} {found}/{total}] {{wide_msg}} {{spinner}}",
             ),
             working_message,
             finished_message,
+            None,
         )
     }
 
-    pub fn new(
+    // pub fn exact_size(&self) -> bool {
+    //     self.length.is_some()
+    // }
+
+    fn new(
         style: ProgressStyle,
         template: &str,
         working_message: &'static str,
         finished_message: &'static str,
+        length: Option<u64>,
     ) -> Self {
         let style = match style.template(template) {
             Ok(style) => style,
@@ -64,32 +70,14 @@ impl ProgressBarOptions {
 
         let _ = TERM.hide_cursor();
 
-        Self { style, draw_target, working_message, finished_message }
-    }
-}
-
-pub struct ProgressBar {
-    inner: IndicatifProgressBar,
-    finished_message: &'static str,
-}
-
-impl ProgressBar {
-    pub fn new(options: ProgressBarOptions) -> Self {
-        Self::with_length(options, 0)
-    }
-
-    pub fn with_length(options: ProgressBarOptions, length: u64) -> Self {
-        let ProgressBarOptions {
-            style,
-            working_message,
-            finished_message,
+        // Need to pass Some(..) to indicatif, otherwise it will substitute pos
+        // for len.
+        let inner = IndicatifProgressBar::with_draw_target(
+            Some(length.unwrap_or(0)),
             draw_target,
-        } = options;
-
-        let inner =
-            IndicatifProgressBar::with_draw_target(Some(length), draw_target)
-                .with_style(style)
-                .with_message(working_message);
+        )
+        .with_style(style)
+        .with_message(working_message);
 
         Self { inner, finished_message }
     }
