@@ -64,6 +64,22 @@ pub enum Subcommand {
     CopyTags(CopyTags),
 }
 
+impl Subcommand {
+    pub fn name(&self) -> String {
+        match self {
+            Subcommand::ClearHistory => "clear-history",
+            Subcommand::History(..) => "history",
+            Subcommand::Templates(..) => "templates",
+            Subcommand::Rename(..) => "rename",
+            Subcommand::Undo(..) => "undo",
+            Subcommand::Redo(..) => "redo",
+            Subcommand::Fix(..) => "fix",
+            Subcommand::CopyTags(..) => "copy-tags",
+        }
+        .to_owned()
+    }
+}
+
 #[derive(ClapArgs, Debug)]
 pub struct History {
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -73,18 +89,18 @@ pub struct History {
 
 #[derive(ClapArgs, Debug)]
 pub struct Templates {
-    #[arg(short = 't', long)]
+    #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 }
 
 #[derive(ClapArgs, Debug)]
 pub struct Rename {
-    #[arg(short = 'i', long)]
+    #[arg(short = 'i', long = "input-directory")]
     /// Directory to scan for input files. Defaults to the current directory.
     pub custom_input_directory: Option<Utf8PathBuf>,
 
-    #[arg(short = 't', long)]
+    #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 
@@ -108,7 +124,7 @@ pub struct Rename {
 
 #[derive(ClapArgs, Debug)]
 pub struct Seed {
-    #[arg(short = 't', long)]
+    #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 
@@ -129,7 +145,7 @@ pub struct UndoRedo {
 
 #[derive(ClapArgs, Debug)]
 pub struct Fix {
-    #[arg(short = 'i', long)]
+    #[arg(short = 'i', long = "template-directory")]
     /// Directory to scan for input files. Defaults to the current directory.
     pub custom_input_directory: Option<Utf8PathBuf>,
 

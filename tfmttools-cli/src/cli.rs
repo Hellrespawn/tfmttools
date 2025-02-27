@@ -33,13 +33,26 @@ pub fn main() -> Result<()> {
 
     let args = Args::parse();
 
+    let name = args.command.name();
+
     let result = run(args);
 
     if let Err(err) = result {
-        eprintln!(
-            "{}",
-            Args::command().error(ErrorKind::DisplayHelp, err.to_string())
-        );
+        let mut command = Args::command();
+
+        let subcommand = command.find_subcommand_mut(name);
+
+        if let Some(command) = subcommand {
+            eprintln!(
+                "{}",
+                command.error(ErrorKind::DisplayHelp, err.to_string())
+            );
+        } else {
+            eprintln!(
+                "{}",
+                command.error(ErrorKind::DisplayHelp, err.to_string())
+            );
+        }
     }
 
     Ok(())
