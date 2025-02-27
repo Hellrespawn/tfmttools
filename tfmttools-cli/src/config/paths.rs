@@ -15,19 +15,20 @@ impl AppPaths {
             if let Some(config_directory) = &args.custom_config_directory {
                 Ok(config_directory.to_owned())
             } else {
-                Self::default_template_and_config_dir()
+                Self::default_application_dir()
             }?;
 
         Ok(Self { config_directory })
     }
 
-    pub fn default_template_and_config_dir() -> Result<Utf8PathBuf> {
-        let home = dirs::home_dir()
-            .ok_or(eyre!("Unable to determine home directory."))?;
+    pub fn default_application_dir() -> Result<Utf8PathBuf> {
+        let project_dirs =
+            directories::ProjectDirs::from("nl", "korpors", crate::PKG_NAME)
+                .ok_or(eyre!("Unable to determine home directory."))?;
 
-        let path = home.join(format!(".{}", crate::PKG_NAME));
+        let path = project_dirs.config_dir();
 
-        Ok(path.clone().try_into()?)
+        Ok(Utf8PathBuf::try_from(path.to_owned())?)
     }
 
     pub fn config_directory(&self) -> &Utf8Path {
