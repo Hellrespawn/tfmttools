@@ -104,6 +104,10 @@ pub struct Rename {
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 
+    #[arg(long = "bin-directory")]
+    /// Directory to move deleted covers and such to. Defaults to a subfolder of the configuration directory
+    pub custom_bin_directory: Option<Utf8PathBuf>,
+
     #[arg(short, long, default_value_t = default_recursion_depth())]
     /// Set custom recursion depth for scan.
     pub recursion_depth: usize,
