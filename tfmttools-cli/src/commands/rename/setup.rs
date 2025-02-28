@@ -1,0 +1,175 @@
+use camino::Utf8PathBuf;
+use color_eyre::Result;
+use color_eyre::eyre::eyre;
+use tfmttools_core::action::{Action, RenameAction};
+use tfmttools_core::audiofile::AudioFile;
+use tfmttools_core::error::TFMTResult;
+use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_core::templates::Template;
+use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
+use tfmttools_history_core::{History, LoadHistoryResult, Record};
+use tracing::debug;
+
+use super::RenameContext;
+use crate::ui::ProgressBar;
+
+pub fn create_actions(
+    context: &RenameContext,
+    history: &mut impl History<Action, ActionRecordMetadata>,
+    load_history_result: LoadHistoryResult,
+) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
+    let (file_or_name, arguments) =
+        get_template_name_and_arguments(context, history, load_history_result)?;
+
+    let loader = match &file_or_name {
+        FileOrName::File(path, string) => {
+            TemplateLoader::read_filename(path, string)
+        },
+        FileOrName::Name(_) => {
+            TemplateLoader::read_directory(
+                &context.template_options.template_directory,
+            )
+        },
+    }?;
+
+    let template_name = file_or_name.as_str();
+
+    let template = loader
+        .get_template(template_name, arguments.clone())
+        .ok_or(eyre!("Unable to find template: {}", template_name))?;
+
+    let metadata =
+        ActionRecordMetadata::new(template_name.to_owned(), arguments.clone());
+
+    let paths = gather_file_paths(context);
+
+    let audio_files = read_files(paths)?;
+
+    let rename_actions =
+        create_rename_actions(context, &template, &audio_files)?;
+
+    Ok((rename_actions, metadata))
+}
+
+fn get_template_name_and_arguments(
+    context: &RenameContext,
+    history: &mut impl History<Action, ActionRecordMetadata>,
+    load_history_result: LoadHistoryResult,
+) -> Result<(FileOrName, Vec<String>)> {
+    if let Some(file_or_name) = &context.template_options.template {
+        debug!("Using template and arguments from command line.");
+
+        Ok((file_or_name.clone(), context.template_options.arguments.clone()))
+    } else {
+        if let LoadHistoryResult::Loaded = load_history_result {
+            let metadata_option =
+                history.get_previous_record()?.map(Record::metadata);
+
+            if let Some(metadata) = metadata_option {
+                let template_name = FileOrName::from(metadata.template());
+
+                let arguments = metadata.arguments().to_owned();
+
+                println!(
+                    "Re-using template '{template_name}' and arguments from previous rename."
+                );
+
+                debug!(
+                    "Using previous rename data:\ntemplate: '{}'\narguments: '{}'",
+                    template_name,
+                    arguments.join("', '")
+                );
+
+                return Ok((template_name, arguments));
+            }
+        }
+
+        Err(eyre!(
+            "No template specified and no data from previous run available."
+        ))
+    }
+}
+
+fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
+    let spinner = ProgressBar::spinner(
+        "audio",
+        "total files",
+        "Gathering files...",
+        "Gathered files.",
+    );
+
+    let file_paths = PathIterator::new(context.path_iterator_options)
+        .flatten()
+        .inspect(|_| spinner.inc_total())
+        .filter(|path| AudioFile::path_predicate(path))
+        .inspect(|_| {
+            spinner.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .collect::<Vec<_>>();
+
+    spinner.finish();
+
+    file_paths
+}
+
+fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
+    let bar = ProgressBar::bar(
+        "Reading files...",
+        "Read files.",
+        file_paths.len() as u64,
+    );
+
+    let audio_files = file_paths
+        .into_iter()
+        .inspect(|_| {
+            bar.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .map(AudioFile::new)
+        .collect::<TFMTResult<Vec<_>>>();
+
+    bar.finish();
+
+    Ok(audio_files?)
+}
+
+fn create_rename_actions(
+    context: &RenameContext,
+    template: &Template,
+    files: &[AudioFile],
+) -> Result<Vec<RenameAction>> {
+    let cwd = context.app_paths.working_directory()?;
+
+    let bar = ProgressBar::bar(
+        "Determining output paths:",
+        "Determined output paths.",
+        files.len() as u64,
+    );
+
+    let rename_actions: Result<Vec<RenameAction>> = files
+        .iter()
+        .map(|audiofile| {
+            Ok(RenameAction::new(
+                audiofile.path().to_owned(),
+                audiofile.construct_target_path(template, &cwd)?,
+            ))
+        })
+        .inspect(|_| {
+            bar.inc_found();
+
+            #[cfg(feature = "debug")]
+            crate::debug::delay();
+        })
+        .collect();
+
+    bar.finish();
+
+    println!();
+
+    rename_actions
+}

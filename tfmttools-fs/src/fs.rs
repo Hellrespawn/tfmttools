@@ -236,3 +236,42 @@ pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
         Some(common_path)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use assert_fs::TempDir;
+    use color_eyre::Result;
+
+    #[test]
+    fn test_remove_dir_error_codes() -> Result<()> {
+        let tempdir = TempDir::new()?;
+
+        let test_folder = tempdir.path().join("test_folder");
+        let test_file = test_folder.join("test.file");
+
+        #[cfg(windows)]
+        let expected_code = 145;
+
+        #[cfg(unix)]
+        let expected_code = 39;
+
+        fs_err::create_dir(&test_folder)?;
+        fs_err::write(test_file, "")?;
+
+        if let Err(err) = fs_err::remove_dir(test_folder) {
+            if let Some(error_code) =
+                std::io::Error::last_os_error().raw_os_error()
+            {
+                assert_eq!(
+                    error_code, expected_code,
+                    "Expected code {expected_code}, got {error_code}",
+                );
+                Ok(())
+            } else {
+                panic!("Received unexpected error:\n{err}");
+            }
+        } else {
+            Ok(())
+        }
+    }
+}

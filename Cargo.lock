@@ -1133,6 +1133,7 @@ dependencies = [
 name = "tfmttools-cli"
 version = "0.22.0"
 dependencies = [
+ "adler",
  "assert_fs",
  "camino",
  "clap",
@@ -1175,7 +1176,9 @@ dependencies = [
 name = "tfmttools-fs"
 version = "0.22.0"
 dependencies = [
+ "assert_fs",
  "camino",
+ "color-eyre",
  "fs-err",
  "ignore",
  "minijinja",

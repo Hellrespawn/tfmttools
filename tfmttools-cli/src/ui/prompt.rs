@@ -4,15 +4,14 @@ use color_eyre::Result;
 
 pub struct ConfirmationPrompt<'cp> {
     prompt: &'cp str,
-    error_prompt: &'cp str,
     default: Option<bool>,
 }
 
 impl<'cp> ConfirmationPrompt<'cp> {
-    const ERROR_PROMPT: &'static str = "Please enter 'y' or 'n'";
+    const REQUIRED_PROMPT: &'static str = "Please enter 'y' or 'n'";
 
     pub fn new(prompt: &'cp str) -> Self {
-        Self { prompt, error_prompt: Self::ERROR_PROMPT, default: Some(false) }
+        Self { prompt, default: Some(false) }
     }
 
     pub fn prompt(&self) -> Result<bool> {
@@ -36,7 +35,7 @@ impl<'cp> ConfirmationPrompt<'cp> {
                     return Ok(self.default.unwrap());
                 },
                 _ => {
-                    print!("{} {} ", self.error_prompt, options);
+                    print!("{} {} ", Self::REQUIRED_PROMPT, options);
                     stdout.flush()?;
                 },
             }

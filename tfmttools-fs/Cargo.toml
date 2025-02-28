@@ -24,3 +24,7 @@ minijinja = { workspace = true, features = [
 regex = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+assert_fs = { workspace = true }
+color-eyre = { workspace = true }
