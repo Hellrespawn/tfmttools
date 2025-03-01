@@ -25,7 +25,11 @@ pub fn apply_actions(
             || confirm_rename_actions(context, &rename_actions)?;
 
         if confirmation {
-            Ok(Some(move_files(context, rename_actions)?))
+            let applied_actions = move_files(context, rename_actions)?;
+
+            println!();
+
+            Ok(Some(applied_actions))
         } else {
             println!("Aborting!");
             Ok(None)

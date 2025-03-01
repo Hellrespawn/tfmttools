@@ -74,7 +74,7 @@ impl HistoryFormatter {
             if let Some(string) = undo_string {
                 buffer.push_str("Undo history:\n");
                 buffer.push_str(&string);
-                buffer.push('\n');
+                buffer.push_str("\n\n");
             } else {
                 buffer.push_str("There is nothing to undo.\n\n");
             }
@@ -84,7 +84,7 @@ impl HistoryFormatter {
                 buffer.push_str(&string);
                 buffer.push('\n');
             } else {
-                buffer.push_str("There is nothing to redo.\n\n");
+                buffer.push_str("There is nothing to redo.\n");
             }
 
             Ok(buffer)
@@ -132,8 +132,12 @@ impl HistoryFormatter {
     pub fn format_record(&self, record: &ActionRecord) -> String {
         let summary = RecordSummary::from_record(record);
 
-        let base_string =
-            format!("{} ({summary})", record.timestamp().format(DATE_FORMAT));
+        let base_string = format!(
+            "{} [#{}] ({})",
+            record.timestamp().format(DATE_FORMAT),
+            summary.run_id,
+            summary
+        );
 
         match self.format {
             HistoryFormat::Normal => base_string,
@@ -157,11 +161,15 @@ pub struct RecordSummary {
     rm_file: usize,
     mk_dir: usize,
     rm_dir: usize,
+    run_id: String,
 }
 
 impl RecordSummary {
     pub fn from_record(record: &ActionRecord) -> Self {
-        let mut summary = Self::default();
+        let mut summary = Self {
+            run_id: record.metadata().run_id().to_owned(),
+            ..Default::default()
+        };
 
         for action in record.iter() {
             match action {

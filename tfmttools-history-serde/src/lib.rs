@@ -161,6 +161,10 @@ where
             .map_err(|err| HistoryError::RemoveError(err.to_string()))?;
         Ok(())
     }
+
+    fn is_empty(&mut self) -> bool {
+        self.records.is_empty()
+    }
 }
 
 impl<A, M> SerdeHistory<A, M>

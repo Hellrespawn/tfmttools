@@ -83,4 +83,6 @@ pub trait History<A, M> {
     }
 
     fn remove(&mut self) -> Result<()>;
+
+    fn is_empty(&mut self) -> bool;
 }

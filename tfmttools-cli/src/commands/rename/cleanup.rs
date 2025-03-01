@@ -42,17 +42,19 @@ fn handle_remaining_files(
         let (files, folders): (Vec<_>, Vec<_>) =
             remaining_paths.into_iter().partition(|p| p.is_file());
 
-        let (known_files, other_files): (Vec<_>, Vec<_>) =
-            files.into_iter().partition(|path| file_is_safe_to_delete(path));
+        let has_unknown_files =
+            files.iter().any(|path| !file_is_safe_to_delete(path));
 
         let run_id = context.misc_options().run_id();
 
-        if !other_files.is_empty() {
-            preview_files_to_delete(context, &other_files)?;
+        if has_unknown_files {
+            println!("Found {} remaining files.", files.len());
 
-            let rename_actions = other_files
+            preview_files_to_delete(context, &files)?;
+
+            let rename_actions = files
                 .into_iter()
-                .map(|path| create_rename_action(context, path, run_id))
+                .map(|path| create_rename_action(context, path.clone(), run_id))
                 .collect::<Result<Vec<_>>>()?;
 
             let confirmation = context.misc_options().no_confirm()
@@ -65,23 +67,21 @@ fn handle_remaining_files(
             }
 
             applied_actions.extend(move_files(context, rename_actions)?);
-        }
-
-        if !known_files.is_empty() {
-            println!("Deleting the following files:");
-            preview_files_to_delete(context, &known_files)?;
-
-            let rename_actions = known_files
-                .into_iter()
-                .map(|path| create_rename_action(context, path, run_id))
+        } else if !files.is_empty() {
+            let rename_actions = files
+                .iter()
+                .map(|path| create_rename_action(context, path.clone(), run_id))
                 .collect::<Result<Vec<_>>>()?;
+
+            println!("Deleted the following files:");
+            preview_files_to_delete(context, &files)?;
 
             applied_actions.extend(move_files(context, rename_actions)?);
         }
 
         if !folders.is_empty() {
-            println!("Removing empty folders");
             applied_actions.extend(remove_directories(context, folders)?);
+            println!("Removed empty folders.");
         }
     } else {
         println!(
