@@ -19,18 +19,18 @@ members = [
     "tfmttools-test",
 ]
 default-members = ["tfmttools-cli"]
-resolver = "2"
+resolver = "3"
 
 [workspace.dependencies]
 adler = "1.0.2"
 assert_cmd = "2.0.14"
 assert_fs = "1.1.1"
 camino = "1.1.7"
-chrono = "0.4.38"
-clap = "4.5.29"
+chrono = "0.4.40"
+clap = "4.5.31"
 color-eyre = "0.6.3"
 console = "0.15.8"
-convert_case = "0.7.1"
+convert_case = "0.8.0"
 ctrlc = "3.4.4"
 directories = "6.0.0"
 fastrand = "2.3.0"
