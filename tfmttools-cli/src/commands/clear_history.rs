@@ -10,7 +10,7 @@ pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {
 
     let (mut history, _) = load_history(path)?;
 
-    println!("Showing history from: {path}");
+    println!("Showing history from: {path}\n");
 
     let formatter =
         HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));

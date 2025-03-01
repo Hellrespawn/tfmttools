@@ -4,6 +4,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_fs::{FileOrName, FsHandler, PathIteratorOptions};
 
 use crate::config::paths::AppPaths;
+use crate::ui::PreviewListSize;
 
 #[derive(Debug)]
 pub struct RenameTemplateOptions {
@@ -40,23 +41,25 @@ pub struct RenameMiscOptions {
     always_copy: bool,
     no_confirm: bool,
     dry_run: bool,
+    preview_list_size: PreviewListSize,
     run_id: String,
 }
 
 impl RenameMiscOptions {
-    pub fn new(always_copy: bool, no_confirm: bool, dry_run: bool) -> Self {
-        let run_id = repeat_with(fastrand::alphanumeric).take(12).collect();
-
-        Self::with_run_id(always_copy, no_confirm, dry_run, run_id)
-    }
-
-    pub fn with_run_id(
+    pub fn new(
         always_copy: bool,
         no_confirm: bool,
         dry_run: bool,
-        run_id: String,
+        preview_list_size: PreviewListSize,
     ) -> Self {
-        Self { always_copy, no_confirm, dry_run, run_id }
+        let run_id = repeat_with(fastrand::alphanumeric).take(12).collect();
+
+        Self { always_copy, no_confirm, dry_run, preview_list_size, run_id }
+    }
+
+    pub fn with_run_id(mut self, run_id: String) -> Self {
+        self.run_id = run_id;
+        self
     }
 
     pub fn always_copy(&self) -> bool {
@@ -69,6 +72,10 @@ impl RenameMiscOptions {
 
     pub fn dry_run(&self) -> bool {
         self.dry_run
+    }
+
+    pub fn preview_list_size(&self) -> PreviewListSize {
+        self.preview_list_size
     }
 
     pub fn run_id(&self) -> &str {

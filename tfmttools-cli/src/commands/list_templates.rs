@@ -4,7 +4,7 @@ use textwrap::Options;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::TemplateLoader;
 
-use crate::TERM;
+use crate::term::terminal_width;
 
 pub fn list_templates(template_directory: &Utf8Path) -> Result<()> {
     let loader = TemplateLoader::read_directory(template_directory)?;
@@ -39,7 +39,7 @@ fn format_template(template: &Template) -> String {
 
     textwrap::fill(
         &string,
-        Options::new(TERM.size().1 as usize)
+        Options::new(terminal_width())
             .subsequent_indent(&" ".repeat(name.len() + 2)),
     )
 }

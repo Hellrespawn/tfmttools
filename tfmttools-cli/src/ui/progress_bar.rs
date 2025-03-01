@@ -2,8 +2,7 @@ use indicatif::{
     ProgressBar as IndicatifProgressBar, ProgressDrawTarget, ProgressStyle,
 };
 
-use crate::TERM;
-use crate::cli::show_cursor;
+use crate::term::{hide_cursor, show_cursor};
 
 pub struct ProgressBar {
     inner: IndicatifProgressBar,
@@ -68,7 +67,7 @@ impl ProgressBar {
         #[cfg(not(test))]
         let draw_target = ProgressDrawTarget::stderr();
 
-        let _ = TERM.hide_cursor();
+        hide_cursor();
 
         // Need to pass Some(..) to indicatif, otherwise it will substitute pos
         // for len.

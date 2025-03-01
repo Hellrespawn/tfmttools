@@ -1,9 +1,59 @@
 use std::fmt::Write;
+use std::str::FromStr;
 
 use color_eyre::Result;
 
 use super::ItemName;
-use crate::TERM;
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParsePreviewListSizeError;
+
+impl std::fmt::Display for ParsePreviewListSizeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Valid options: small, medium, large")
+    }
+}
+
+impl std::error::Error for ParsePreviewListSizeError {
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PreviewListSize {
+    Small,
+    Medium,
+    Large,
+}
+
+impl PreviewListSize {
+    pub fn new(columns: usize) -> Self {
+        match columns {
+            0..24 => Self::Small,
+            24..36 => Self::Medium,
+            36.. => Self::Large,
+        }
+    }
+
+    fn preview_amount(self) -> usize {
+        match self {
+            PreviewListSize::Small => 8,
+            PreviewListSize::Medium => 12,
+            PreviewListSize::Large => 16,
+        }
+    }
+}
+
+impl FromStr for PreviewListSize {
+    type Err = ParsePreviewListSizeError;
+
+    fn from_str(s: &str) -> Result<Self, ParsePreviewListSizeError> {
+        match s.to_lowercase().as_str() {
+            "small" | "sm" | "s" => Ok(Self::Small),
+            "medium" | "md" | "m" => Ok(Self::Medium),
+            "large" | "lg" | "l" => Ok(Self::Large),
+            _ => Err(ParsePreviewListSizeError),
+        }
+    }
+}
 
 pub struct PreviewList<'s, S, I>
 where
@@ -12,8 +62,7 @@ where
 {
     iter: I,
     item_name: ItemName<'s>,
-    leading_lines: usize,
-    trailing_lines: usize,
+    list_size: PreviewListSize,
 }
 
 impl<'s, S, I> PreviewList<'s, S, I>
@@ -21,25 +70,8 @@ where
     S: ToString,
     I: ExactSizeIterator<Item = S>,
 {
-    const MIN_PREVIEW_AMOUNT: usize = 8;
-
-    pub fn new(iter: I) -> Self {
-        Self {
-            iter,
-            item_name: ItemName::default(),
-            leading_lines: 0,
-            trailing_lines: 0,
-        }
-    }
-
-    pub fn with_leading(mut self, leading_lines: usize) -> Self {
-        self.leading_lines = leading_lines;
-        self
-    }
-
-    pub fn with_trailing(mut self, trailing_lines: usize) -> Self {
-        self.trailing_lines = trailing_lines;
-        self
+    pub fn new(iter: I, list_size: PreviewListSize) -> Self {
+        Self { iter, item_name: ItemName::default(), list_size }
     }
 
     pub fn with_item_name(mut self, item_name: ItemName<'s>) -> Self {
@@ -47,23 +79,16 @@ where
         self
     }
 
-    fn padding(&self) -> usize {
-        self.leading_lines + self.trailing_lines
+    fn preview_amount(&self) -> usize {
+        self.list_size.preview_amount()
     }
 
-    pub fn total(&self) -> usize {
+    fn total(&self) -> usize {
         self.iter.len()
     }
 
-    pub fn can_preview_all(&self) -> bool {
+    fn can_preview_all(&self) -> bool {
         self.total() <= self.preview_amount()
-    }
-
-    pub fn preview_amount(&self) -> usize {
-        std::cmp::max(
-            Self::MIN_PREVIEW_AMOUNT,
-            TERM.size().0 as usize - self.padding(),
-        )
     }
 
     pub fn title(&self) -> String {

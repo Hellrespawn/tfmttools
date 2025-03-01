@@ -9,14 +9,14 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt, registry};
 
-use crate::TERM;
-use crate::args::{Args, Subcommand};
+use crate::args::{TFMTArgs, TFMTSubcommand};
 use crate::commands::{
-    FixCommand, RenameContext, RenameMiscOptions, RenameTemplateOptions,
-    UndoRedoCommand, clear_history, copy_tags, list_templates, rename,
-    show_history,
+    RenameContext, RenameMiscOptions, RenameTemplateOptions, UndoRedoCommand,
+    clear_history, list_templates, rename, show_history,
 };
 use crate::config::paths::AppPaths;
+use crate::term::{show_cursor, terminal_height};
+use crate::ui::PreviewListSize;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
@@ -31,14 +31,14 @@ pub fn main() -> Result<()> {
         std::env::args().next().unwrap_or("Unknown".to_owned())
     );
 
-    let args = Args::parse();
+    let args = TFMTArgs::parse();
 
     let name = args.command.name();
 
     let result = run(args);
 
     if let Err(err) = result {
-        let mut command = Args::command();
+        let mut command = TFMTArgs::command();
 
         let subcommand = command.find_subcommand_mut(name);
 
@@ -58,25 +58,31 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn run(args: Args) -> Result<()> {
+fn run(args: TFMTArgs) -> Result<()> {
     if args.dry_run {
         println!("Doing dry run. No files will be modified.");
     }
     let app_paths = AppPaths::from_args(&args)?;
     let fs_handler = FsHandler::new(args.dry_run);
 
+    let preview_list_size = args
+        .preview_list_size
+        .unwrap_or_else(|| PreviewListSize::new(terminal_height()));
+
     install_restore_cursor_hooks();
 
     match args.command {
-        Subcommand::ClearHistory => clear_history(&app_paths, args.dry_run)?,
-        Subcommand::Templates(list_templates_args) => {
+        TFMTSubcommand::ClearHistory => {
+            clear_history(&app_paths, args.dry_run)?;
+        },
+        TFMTSubcommand::Templates(list_templates_args) => {
             let template_directory = list_templates_args
                 .custom_template_directory
                 .unwrap_or(app_paths.config_directory().to_owned());
 
             list_templates(&template_directory)?;
         },
-        Subcommand::Rename(rename_args) => {
+        TFMTSubcommand::Rename(rename_args) => {
             let input_directory =
                 get_input_directory(rename_args.custom_input_directory)?;
 
@@ -95,20 +101,16 @@ fn run(args: Args) -> Result<()> {
                 rename_args.arguments,
             );
 
-            let misc_options = if let Some(run_id) = args.custom_run_id {
-                RenameMiscOptions::with_run_id(
-                    rename_args.always_copy,
-                    rename_args.yes,
-                    args.dry_run,
-                    run_id,
-                )
-            } else {
-                RenameMiscOptions::new(
-                    rename_args.always_copy,
-                    rename_args.yes,
-                    args.dry_run,
-                )
-            };
+            let mut misc_options = RenameMiscOptions::new(
+                rename_args.always_copy,
+                rename_args.yes,
+                args.dry_run,
+                preview_list_size,
+            );
+
+            if let Some(run_id) = args.custom_run_id {
+                misc_options = misc_options.with_run_id(run_id);
+            }
 
             let rename_context = RenameContext::new(
                 &app_paths,
@@ -120,44 +122,26 @@ fn run(args: Args) -> Result<()> {
 
             rename(&rename_context)?;
         },
-        Subcommand::Undo(undo_redo) => {
+        TFMTSubcommand::Undo(undo_redo) => {
             UndoRedoCommand::new(
                 undo_redo.yes,
                 undo_redo.amount.unwrap_or(1),
                 HistoryMode::Undo,
+                preview_list_size,
             )
             .run(&app_paths, &fs_handler)?;
         },
-        Subcommand::Redo(undo_redo) => {
+        TFMTSubcommand::Redo(undo_redo) => {
             UndoRedoCommand::new(
                 undo_redo.yes,
                 undo_redo.amount.unwrap_or(1),
                 HistoryMode::Redo,
+                preview_list_size,
             )
             .run(&app_paths, &fs_handler)?;
         },
-        Subcommand::History(show_history_args) => {
+        TFMTSubcommand::History(show_history_args) => {
             show_history(&app_paths, show_history_args.verbose)?;
-        },
-        Subcommand::Fix(fix) => {
-            let input_dir = get_input_directory(fix.custom_input_directory)?;
-
-            FixCommand::new(
-                input_dir,
-                fix.yes,
-                args.dry_run,
-                fix.recursion_depth,
-            )
-            .run(&app_paths)?;
-        },
-
-        Subcommand::CopyTags(copy_tags_args) => {
-            copy_tags(
-                &copy_tags_args.source,
-                &copy_tags_args.target,
-                copy_tags_args.yes,
-                args.dry_run,
-            )?;
         },
     }
 
@@ -202,11 +186,6 @@ fn install_restore_cursor_hooks() {
         std::process::exit(-1);
     })
     .expect("Unable to intercept Ctrl-c.");
-}
-
-/// Make the cursor visible again, ignoring the result.
-pub fn show_cursor() {
-    let _ = TERM.show_cursor();
 }
 
 pub fn default_input_dir() -> Result<Utf8PathBuf> {

@@ -41,8 +41,11 @@ pub fn create_actions(
         .get_template(template_name, arguments.clone())
         .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
-    let metadata =
-        ActionRecordMetadata::new(template_name.to_owned(), arguments.clone());
+    let metadata = ActionRecordMetadata::new(
+        template_name.to_owned(),
+        arguments.clone(),
+        context.misc_options().run_id().to_owned(),
+    );
 
     let paths = gather_file_paths(context);
 
@@ -54,6 +57,8 @@ pub fn create_actions(
 
     let rename_actions =
         create_rename_actions(context, &template, &audio_files)?;
+
+    println!();
 
     Ok((rename_actions, metadata))
 }

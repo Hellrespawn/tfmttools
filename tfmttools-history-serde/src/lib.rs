@@ -6,8 +6,6 @@ use tfmttools_history_core::{
 };
 use tracing::{debug, trace};
 
-const CURRENT_VERSION: u8 = 1;
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(
     bound = "A: Serialize + DeserializeOwned, M: Serialize + DeserializeOwned"
@@ -21,9 +19,6 @@ where
     path: Utf8PathBuf,
 
     records: Vec<Record<A, M>>,
-
-    #[serde(default)]
-    version: u8,
 }
 
 impl<A, M> History<A, M> for SerdeHistory<A, M>
@@ -184,8 +179,6 @@ where
 
             debug!("Loaded history from {path}");
 
-            history.validate_version()?;
-
             Ok((history, LoadHistoryResult::Loaded))
         } else if path.exists() {
             Err(HistoryError::LoadError(format!(
@@ -195,11 +188,7 @@ where
         } else {
             debug!("Loading empty history");
             Ok((
-                SerdeHistory {
-                    path,
-                    records: Vec::new(),
-                    version: CURRENT_VERSION,
-                },
+                SerdeHistory { path, records: Vec::new() },
                 LoadHistoryResult::New,
             ))
         }
@@ -230,16 +219,5 @@ where
         trace!("Deserialized history:\n{:#?}", history);
 
         Ok(history)
-    }
-
-    fn validate_version(&self) -> Result<()> {
-        if self.version < CURRENT_VERSION {
-            Err(HistoryError::LoadError(format!(
-                "History file at {} is not compatible with current version.",
-                self.path
-            )))
-        } else {
-            Ok(())
-        }
     }
 }

@@ -1,10 +1,9 @@
 use camino::Utf8PathBuf;
-use clap::{
-    Args as ClapArgs, Command, CommandFactory, Parser,
-    Subcommand as ClapSubcommand,
-};
+use clap::{Args, Command, CommandFactory, Parser, Subcommand};
 use tfmttools_fs::FileOrName;
 use tracing::debug;
+
+use crate::ui::PreviewListSize;
 
 fn default_recursion_depth() -> usize {
     4
@@ -13,7 +12,7 @@ fn default_recursion_depth() -> usize {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
-pub struct Args {
+pub struct TFMTArgs {
     /// Sets a custom configuration directory. Defaults to '~/.tfmttools'.
     #[arg(short = 'c', long = "config-directory")]
     pub custom_config_directory: Option<Utf8PathBuf>,
@@ -22,18 +21,21 @@ pub struct Args {
     #[arg(short, long)]
     pub dry_run: bool,
 
-    #[arg(long = "run-id", hide = true)]
+    #[command(subcommand)]
+    pub command: TFMTSubcommand,
+
+    #[arg(hide = true, long = "run-id")]
     pub custom_run_id: Option<String>,
 
-    #[command(subcommand)]
-    pub command: Subcommand,
+    #[arg(hide = true, long)]
+    pub preview_list_size: Option<PreviewListSize>,
 }
 
-impl Args {
+impl TFMTArgs {
     pub fn parse() -> Self {
         let args = <Self as Parser>::parse();
 
-        debug!("Command-line arguments:\n{:?}", args);
+        debug!("Command-line arguments:\n{:#?}", args);
 
         args
     }
@@ -43,8 +45,8 @@ impl Args {
     }
 }
 
-#[derive(ClapSubcommand, Debug)]
-pub enum Subcommand {
+#[derive(Subcommand, Debug)]
+pub enum TFMTSubcommand {
     /// Clear the rename history.
     ClearHistory,
 
@@ -64,46 +66,37 @@ pub enum Subcommand {
 
     /// Redo actions.
     Redo(UndoRedo),
-
-    /// Fix tags.
-    #[command(hide = true)]
-    Fix(Fix),
-
-    #[command(hide = true)]
-    CopyTags(CopyTags),
 }
 
-impl Subcommand {
+impl TFMTSubcommand {
     pub fn name(&self) -> String {
         match self {
-            Subcommand::ClearHistory => "clear-history",
-            Subcommand::History(..) => "history",
-            Subcommand::Templates(..) => "templates",
-            Subcommand::Rename(..) => "rename",
-            Subcommand::Undo(..) => "undo",
-            Subcommand::Redo(..) => "redo",
-            Subcommand::Fix(..) => "fix",
-            Subcommand::CopyTags(..) => "copy-tags",
+            TFMTSubcommand::ClearHistory => "clear-history",
+            TFMTSubcommand::History(..) => "history",
+            TFMTSubcommand::Templates(..) => "templates",
+            TFMTSubcommand::Rename(..) => "rename",
+            TFMTSubcommand::Undo(..) => "undo",
+            TFMTSubcommand::Redo(..) => "redo",
         }
         .to_owned()
     }
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(Args, Debug)]
 pub struct History {
     #[arg(short, long, action = clap::ArgAction::Count)]
     /// Increase output verbosity.
     pub verbose: u8,
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(Args, Debug)]
 pub struct Templates {
     #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(Args, Debug)]
 pub struct Rename {
     #[arg(short = 'i', long = "input-directory")]
     /// Directory to scan for input files. Defaults to the current directory.
@@ -131,11 +124,11 @@ pub struct Rename {
     /// Template arguments.
     pub arguments: Vec<String>,
 
-    #[arg(long, hide = true)]
+    #[arg(hide = true, long)]
     pub always_copy: bool,
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(Args, Debug)]
 pub struct Seed {
     #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
@@ -146,7 +139,7 @@ pub struct Seed {
     pub yes: bool,
 }
 
-#[derive(ClapArgs, Debug)]
+#[derive(Args, Debug)]
 pub struct UndoRedo {
     #[arg(short, long)]
     /// Skips confirmation prompt. Suitable for non-interactive use.
@@ -154,28 +147,4 @@ pub struct UndoRedo {
 
     /// Amount of actions.
     pub amount: Option<usize>,
-}
-
-#[derive(ClapArgs, Debug)]
-pub struct Fix {
-    #[arg(short = 'i', long = "template-directory")]
-    /// Directory to scan for input files. Defaults to the current directory.
-    pub custom_input_directory: Option<Utf8PathBuf>,
-
-    #[arg(short, long, default_value_t = default_recursion_depth())]
-    /// Set custom recursion depth for scan.
-    pub recursion_depth: usize,
-
-    #[arg(short, long)]
-    /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub yes: bool,
-}
-
-#[derive(ClapArgs, Debug)]
-pub struct CopyTags {
-    pub source: Utf8PathBuf,
-    pub target: Utf8PathBuf,
-
-    #[arg(short, long)]
-    pub yes: bool,
 }

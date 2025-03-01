@@ -1,4 +1,3 @@
-use camino::Utf8Path;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
@@ -55,9 +54,7 @@ fn confirm_rename_actions(
     context: &RenameContext,
     rename_actions: &[RenameAction],
 ) -> Result<bool> {
-    let cwd = context.app_paths().working_directory()?;
-
-    preview_rename_actions(rename_actions, &cwd)?;
+    preview_rename_actions(context, rename_actions)?;
 
     let confirmation_prompt = ConfirmationPrompt::new("Move files?");
 
@@ -65,20 +62,18 @@ fn confirm_rename_actions(
 }
 
 fn preview_rename_actions(
+    context: &RenameContext,
     rename_actions: &[RenameAction],
-    working_directory: &Utf8Path,
 ) -> Result<()> {
-    const LEADING_LINES: usize = 3;
-    const TRAILING_LINES: usize = 3;
+    let working_directory = context.app_paths().working_directory()?;
 
     let iter = rename_actions.iter().map(|rename_action| {
-        super::strip_path_prefix(rename_action.target(), working_directory)
+        super::strip_path_prefix(rename_action.target(), &working_directory)
     });
 
-    let preview_list = PreviewList::new(iter)
-        .with_leading(LEADING_LINES)
-        .with_trailing(TRAILING_LINES)
-        .with_item_name(ItemName::simple("file"));
+    let preview_list =
+        PreviewList::new(iter, context.misc_options().preview_list_size())
+            .with_item_name(ItemName::simple("destination"));
 
     preview_list.print()?;
 

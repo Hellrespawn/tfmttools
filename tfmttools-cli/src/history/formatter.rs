@@ -67,24 +67,24 @@ impl HistoryFormatter {
         let redo_string = self.format_records(&redo);
 
         if undo_string.is_none() && redo_string.is_none() {
-            Ok("There is nothing to undo or redo".to_owned())
+            Ok("There is nothing to undo or redo.".to_owned())
         } else {
             let mut buffer = String::new();
 
-            buffer.push_str("Undo history:\n");
-
             if let Some(string) = undo_string {
+                buffer.push_str("Undo history:\n");
                 buffer.push_str(&string);
+                buffer.push('\n');
             } else {
-                buffer.push_str("There is nothing to undo.");
+                buffer.push_str("There is nothing to undo.\n\n");
             }
 
-            buffer.push_str("Redo history:\n");
-
             if let Some(string) = redo_string {
+                buffer.push_str("Redo history:\n");
                 buffer.push_str(&string);
+                buffer.push('\n');
             } else {
-                buffer.push_str("There is nothing to redo.");
+                buffer.push_str("There is nothing to redo.\n\n");
             }
 
             Ok(buffer)

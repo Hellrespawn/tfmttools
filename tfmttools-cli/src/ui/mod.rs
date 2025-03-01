@@ -6,6 +6,6 @@ mod progress_bar;
 mod prompt;
 
 pub use item_name::ItemName;
-pub use preview_list::PreviewList;
+pub use preview_list::{PreviewList, PreviewListSize};
 pub use progress_bar::ProgressBar;
 pub use prompt::ConfirmationPrompt;

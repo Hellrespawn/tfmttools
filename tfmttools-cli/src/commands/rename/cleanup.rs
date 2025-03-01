@@ -48,10 +48,7 @@ fn handle_remaining_files(
         let run_id = context.misc_options().run_id();
 
         if !other_files.is_empty() {
-            preview_files_to_delete(
-                &other_files,
-                &context.app_paths().working_directory()?,
-            )?;
+            preview_files_to_delete(context, &other_files)?;
 
             let rename_actions = other_files
                 .into_iter()
@@ -72,10 +69,7 @@ fn handle_remaining_files(
 
         if !known_files.is_empty() {
             println!("Deleting the following files:");
-            preview_files_to_delete(
-                &known_files,
-                &context.app_paths().working_directory()?,
-            )?;
+            preview_files_to_delete(context, &known_files)?;
 
             let rename_actions = known_files
                 .into_iter()
@@ -165,13 +159,16 @@ fn get_checksum(filename: &str) -> String {
 }
 
 fn preview_files_to_delete(
+    context: &RenameContext,
     paths: &[Utf8PathBuf],
-    working_directory: &Utf8Path,
 ) -> Result<()> {
+    let working_directory = context.app_paths().working_directory()?;
+
     let items = PreviewList::new(
         paths
             .iter()
-            .map(|path| super::strip_path_prefix(path, working_directory)),
+            .map(|path| super::strip_path_prefix(path, &working_directory)),
+        context.misc_options().preview_list_size(),
     )
     .into_string()?;
 

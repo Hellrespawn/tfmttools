@@ -10,11 +10,16 @@ pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 pub struct ActionRecordMetadata {
     template: String,
     arguments: Vec<String>,
+    run_id: String,
 }
 
 impl ActionRecordMetadata {
-    pub fn new(template: String, arguments: Vec<String>) -> Self {
-        Self { template, arguments }
+    pub fn new(
+        template: String,
+        arguments: Vec<String>,
+        run_id: String,
+    ) -> Self {
+        Self { template, arguments, run_id }
     }
 
     pub fn template(&self) -> &str {
@@ -23,5 +28,9 @@ impl ActionRecordMetadata {
 
     pub fn arguments(&self) -> &[String] {
         self.arguments.as_ref()
+    }
+
+    pub fn run_id(&self) -> &str {
+        &self.run_id
     }
 }

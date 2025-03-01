@@ -8,7 +8,7 @@ use tfmttools_history_core::{
 
 use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
-use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
+use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, PreviewListSize};
 
 #[derive(Debug)]
 pub struct UndoRedoCommand {
@@ -17,14 +17,21 @@ pub struct UndoRedoCommand {
     amount: usize,
     mode: HistoryMode,
     formatter: HistoryFormatter,
+    preview_list_size: PreviewListSize,
 }
 
 impl UndoRedoCommand {
-    pub fn new(yes: bool, amount: usize, mode: HistoryMode) -> Self {
+    pub fn new(
+        yes: bool,
+        amount: usize,
+        mode: HistoryMode,
+        preview_list_size: PreviewListSize,
+    ) -> Self {
         Self {
             yes,
             amount,
             mode,
+            preview_list_size,
             formatter: HistoryFormatter::new()
                 .with_prefix(HistoryPrefix::Ordered(')')),
         }
@@ -117,15 +124,10 @@ impl UndoRedoCommand {
     }
 
     fn preview_undo_redo(&self, records: &[&mut ActionRecord]) -> Result<()> {
-        const LEADING_LINES: usize = 3;
-        const TRAILING_LINES: usize = 3;
-
         let iter =
             records.iter().map(|record| self.formatter.format_record(record));
 
-        let preview_list = PreviewList::new(iter)
-            .with_leading(LEADING_LINES)
-            .with_trailing(TRAILING_LINES)
+        let preview_list = PreviewList::new(iter, self.preview_list_size)
             .with_item_name(ItemName::simple("record"));
 
         preview_list.print()?;

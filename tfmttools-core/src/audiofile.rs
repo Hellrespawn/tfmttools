@@ -6,8 +6,6 @@ use crate::error::{TFMTError, TFMTResult};
 use crate::templates::Template;
 use crate::util::normalize_separators;
 
-pub mod encoding;
-
 #[derive(Clone)]
 pub struct AudioFile {
     path: Utf8PathBuf,
