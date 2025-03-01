@@ -13,6 +13,7 @@
     "Nightwish - Elvenpath (Live).mp3": "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
     "Nightwish - Nemo.mp3": "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
     "Nightwish - While Your Lips Are Still Red.mp3": "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-    "cover.jpg": null
+    "cover.jpg": "config/bin/run_id/cover.jpg_1699048E",
+    "description.txt": "config/bin/run_id/description.txt_38C50732"
   }
 }

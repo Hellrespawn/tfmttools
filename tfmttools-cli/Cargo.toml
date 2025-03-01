@@ -32,14 +32,17 @@ clap = { workspace = true, features = ["derive", "wrap_help"] }
 color-eyre = { workspace = true }
 console = { workspace = true }
 ctrlc = { workspace = true, features = ["termination"] }
+fastrand = { workspace = true }
 directories = { workspace = true }
 fs-err = { workspace = true }
 id3 = { workspace = true }
+itertools = { workspace = true }
 indicatif = { workspace = true, features = ["improved_unicode"] }
 textwrap = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
 
 [dev-dependencies]
 tfmttools-test = { path = "../tfmttools-test" }

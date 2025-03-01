@@ -2,7 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use crate::args::{Args, Subcommand};
+use crate::args::{Args, Rename, Subcommand};
 
 #[derive(Debug)]
 pub struct AppPaths {
@@ -15,16 +15,15 @@ impl AppPaths {
         let config_directory =
             Self::path_or_default(args.custom_config_directory.as_deref())?;
 
-        let bin_directory = if let Subcommand::Rename(rename) = &args.command {
-            rename.custom_bin_directory.clone()
+        let bin_directory = if let Subcommand::Rename(Rename {
+            custom_bin_directory: Some(custom_bin_directory),
+            ..
+        }) = &args.command
+        {
+            custom_bin_directory.clone()
         } else {
-            None
+            config_directory.join("bin")
         };
-
-        let bin_directory = Self::path_or_subfolder_of_default(
-            bin_directory.as_deref(),
-            "bin",
-        )?;
 
         Ok(Self { config_directory, bin_directory })
     }
@@ -34,17 +33,6 @@ impl AppPaths {
             Ok(path.to_owned())
         } else {
             Ok(Self::default_application_dir()?)
-        }
-    }
-
-    fn path_or_subfolder_of_default(
-        path: Option<&Utf8Path>,
-        subfolder: &str,
-    ) -> Result<Utf8PathBuf> {
-        if let Some(path) = path {
-            Ok(path.to_owned())
-        } else {
-            Ok(Self::default_application_dir()?.join(subfolder))
         }
     }
 

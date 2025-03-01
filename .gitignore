@@ -1,3 +1,6 @@
 /target
 *.log
 *.hist
+
+test-output
+test-conf

@@ -3,7 +3,6 @@ use std::sync::LazyLock;
 
 use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
-use tracing::trace;
 
 use crate::error::{TFMTError, TFMTResult};
 
@@ -43,8 +42,6 @@ static STRING_TO_ITEM_KEY_MAP: LazyLock<HashMap<String, ItemKey>> =
         insert_case("AlbumSort", &ItemKey::AlbumTitleSortOrder, &mut map);
         insert_case("DiskNumber", &ItemKey::DiscNumber, &mut map);
         insert_case("Title", &ItemKey::TrackTitle, &mut map);
-
-        trace!("STRING_TO_ITEM_KEY_MAP:\n{:#?}", map);
 
         map
     });

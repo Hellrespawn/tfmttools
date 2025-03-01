@@ -2,7 +2,7 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
-use tfmttools_fs::ActionHandler;
+use tracing::info;
 
 use super::RenameContext;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
@@ -15,12 +15,14 @@ pub fn apply_actions(
         RenameAction::filter_unchanged_destinations(rename_actions);
 
     if rename_actions.is_empty() {
-        println!("There are no audio files to rename.");
+        let msg = "There are no audio files to rename.";
+        println!("{msg}");
+        info!("{msg}");
         Ok(None)
     } else {
         validate_rename_action_errors(&rename_actions)?;
 
-        let confirmation = context.misc_options.no_confirm
+        let confirmation = context.misc_options().no_confirm()
             || confirm_rename_actions(context, &rename_actions)?;
 
         if confirmation {
@@ -53,7 +55,7 @@ fn confirm_rename_actions(
     context: &RenameContext,
     rename_actions: &[RenameAction],
 ) -> Result<bool> {
-    let cwd = context.app_paths.working_directory()?;
+    let cwd = context.app_paths().working_directory()?;
 
     preview_rename_actions(rename_actions, &cwd)?;
 
@@ -70,22 +72,13 @@ fn preview_rename_actions(
     const TRAILING_LINES: usize = 3;
 
     let iter = rename_actions.iter().map(|rename_action| {
-        let path = rename_action
-            .target()
-            .strip_prefix(working_directory)
-            .unwrap_or(rename_action.target());
-
-        if path.is_relative() {
-            format!(".{}{path}", std::path::MAIN_SEPARATOR)
-        } else {
-            format!("{path}")
-        }
+        super::strip_path_prefix(rename_action.target(), working_directory)
     });
 
     let preview_list = PreviewList::new(iter)
-        .leading(LEADING_LINES)
-        .trailing(TRAILING_LINES)
-        .item_name(ItemName::simple("file"));
+        .with_leading(LEADING_LINES)
+        .with_trailing(TRAILING_LINES)
+        .with_item_name(ItemName::simple("file"));
 
     preview_list.print()?;
 
@@ -102,34 +95,20 @@ fn move_files(
         rename_actions.len() as u64,
     );
 
-    let initial_actions = RenameAction::create_actions(rename_actions);
+    let applied_actions = super::move_files_iter(context, rename_actions)
+        .inspect(|result| {
+            if let Ok(action) = result {
+                if action.is_rename_action() {
+                    bar.inc_found();
 
-    let mut applied_actions = Vec::new();
-
-    let handler = ActionHandler::new(
-        context.fs_handler,
-        context.misc_options.always_copy,
-        false,
-    );
-
-    for action in initial_actions {
-        let actions = handler.apply(action)?;
-
-        let is_rename_action = actions
-            .iter()
-            .any(tfmttools_core::action::Action::is_rename_action);
-
-        applied_actions.extend(actions);
-
-        if is_rename_action {
-            bar.inc_found();
-
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
-        }
-    }
+                    #[cfg(feature = "debug")]
+                    crate::debug::delay();
+                }
+            }
+        })
+        .collect();
 
     bar.finish();
 
-    Ok(applied_actions)
+    applied_actions
 }

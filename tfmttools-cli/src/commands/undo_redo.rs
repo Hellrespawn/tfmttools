@@ -124,9 +124,9 @@ impl UndoRedoCommand {
             records.iter().map(|record| self.formatter.format_record(record));
 
         let preview_list = PreviewList::new(iter)
-            .leading(LEADING_LINES)
-            .trailing(TRAILING_LINES)
-            .item_name(ItemName::simple("record"));
+            .with_leading(LEADING_LINES)
+            .with_trailing(TRAILING_LINES)
+            .with_item_name(ItemName::simple("record"));
 
         preview_list.print()?;
 

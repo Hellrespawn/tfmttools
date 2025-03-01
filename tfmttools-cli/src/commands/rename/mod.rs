@@ -3,14 +3,18 @@ mod cleanup;
 mod context;
 mod setup;
 
+use camino::Utf8Path;
 use color_eyre::Result;
 pub use context::{RenameContext, RenameMiscOptions, RenameTemplateOptions};
+use itertools::Itertools;
+use tfmttools_core::action::{Action, RenameAction};
+use tfmttools_fs::ActionHandler;
 
 use crate::history::load_history;
 
 pub fn rename(context: &RenameContext) -> Result<()> {
     let (mut history, load_history_result) =
-        load_history(&context.app_paths.history_file())?;
+        load_history(&context.app_paths().history_file())?;
 
     let (rename_actions, metadata) =
         setup::create_actions(context, &mut history, load_history_result)?;
@@ -22,4 +26,34 @@ pub fn rename(context: &RenameContext) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn move_files_iter(
+    context: &RenameContext,
+    rename_actions: Vec<RenameAction>,
+) -> impl Iterator<Item = Result<Action>> {
+    let initial_actions = RenameAction::create_actions(rename_actions);
+
+    initial_actions
+        .into_iter()
+        .map(|action| {
+            let handler = ActionHandler::new(
+                context.fs_handler(),
+                context.misc_options().always_copy(),
+                false,
+            );
+
+            Ok(handler.apply(action)?)
+        })
+        .flatten_ok()
+}
+
+fn strip_path_prefix(path: &Utf8Path, prefix: &Utf8Path) -> String {
+    let path = path.strip_prefix(prefix).unwrap_or(path);
+
+    if path.is_relative() {
+        format!(".{}{path}", std::path::MAIN_SEPARATOR)
+    } else {
+        format!("{path}")
+    }
 }

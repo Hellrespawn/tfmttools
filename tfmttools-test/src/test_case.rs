@@ -15,7 +15,7 @@ use crate::test_case_data::TestCaseData;
 use crate::test_failure::{CommandOutput, TestFailure};
 use crate::{
     TEST_AUDIO_FILE_DIR_NAME, TEST_CASE_DIR_NAME, TEST_CONFIG_DIR_NAME,
-    TEST_DATA_DIRECTORY, TEST_TEMPLATE_DIR_NAME,
+    TEST_DATA_DIRECTORY, TEST_RUN_ID, TEST_TEMPLATE_DIR_NAME,
 };
 
 #[derive(Debug, Deserialize, Copy, Clone)]
@@ -234,7 +234,8 @@ impl TestCase {
     fn create_command(&self, test_type: TestType) -> Command {
         let mut cmd = Command::cargo_bin("tfmt").unwrap();
 
-        cmd.arg("--custom-config-directory").arg(self.get_config_dest_dir());
+        cmd.arg("--config-directory").arg(self.get_config_dest_dir());
+        cmd.arg("--run-id").arg(TEST_RUN_ID);
 
         match test_type {
             TestType::Apply => {
@@ -243,7 +244,7 @@ impl TestCase {
                 }
 
                 cmd.arg("rename")
-                    .arg("--custom-template-directory")
+                    .arg("--template-directory")
                     .arg(self.get_template_dest_dir())
                     .arg("--yes");
 
@@ -270,7 +271,7 @@ impl TestCase {
                 }
 
                 cmd.arg("rename")
-                    .arg("--custom-template-directory")
+                    .arg("--template-directory")
                     .arg(self.get_template_dest_dir())
                     .arg("--yes");
 
@@ -453,7 +454,7 @@ fn get_template_data_dir() -> Utf8PathBuf {
 }
 
 fn get_audio_data_dir() -> Utf8PathBuf {
-    get_test_data_dir().join("music")
+    get_test_data_dir().join("files")
 }
 
 // fn indent<S: AsRef<str>>(string: S) -> String {

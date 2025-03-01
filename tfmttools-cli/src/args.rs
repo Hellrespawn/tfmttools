@@ -4,6 +4,7 @@ use clap::{
     Subcommand as ClapSubcommand,
 };
 use tfmttools_fs::FileOrName;
+use tracing::debug;
 
 fn default_recursion_depth() -> usize {
     4
@@ -14,11 +15,15 @@ fn default_recursion_depth() -> usize {
 /// Holds application-wide command line arguments.
 pub struct Args {
     /// Sets a custom configuration directory. Defaults to '~/.tfmttools'.
-    #[arg(short = 'c', long)]
+    #[arg(short = 'c', long = "config-directory")]
     pub custom_config_directory: Option<Utf8PathBuf>,
 
-    #[arg(short, long, hide = true)]
+    /// Don't actually perform actions.
+    #[arg(short, long)]
     pub dry_run: bool,
+
+    #[arg(long = "run-id", hide = true)]
+    pub custom_run_id: Option<String>,
 
     #[command(subcommand)]
     pub command: Subcommand,
@@ -26,7 +31,11 @@ pub struct Args {
 
 impl Args {
     pub fn parse() -> Self {
-        <Self as Parser>::parse()
+        let args = <Self as Parser>::parse();
+
+        debug!("Command-line arguments:\n{:?}", args);
+
+        args
     }
 
     pub fn command() -> Command {

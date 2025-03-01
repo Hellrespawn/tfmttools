@@ -1,10 +1,10 @@
 use std::hash::Hash;
-use std::sync::LazyLock;
 
 use adler::Adler32;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
+use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
@@ -12,10 +12,10 @@ use tfmttools_fs::{
     ActionHandler, PathIterator, PathIteratorOptions, get_longest_common_prefix,
 };
 use tfmttools_history_core::{History, HistoryError};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use super::RenameContext;
-use crate::ui::{ConfirmationPrompt, ItemName, PreviewList};
+use crate::ui::{ConfirmationPrompt, PreviewList};
 
 const IMAGE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 
@@ -45,12 +45,12 @@ fn handle_remaining_files(
         let (known_files, other_files): (Vec<_>, Vec<_>) =
             files.into_iter().partition(|path| file_is_safe_to_delete(path));
 
-        let run_id = "abcdef";
+        let run_id = context.misc_options().run_id();
 
         if !other_files.is_empty() {
             preview_files_to_delete(
                 &other_files,
-                &context.app_paths.working_directory()?,
+                &context.app_paths().working_directory()?,
             )?;
 
             let rename_actions = other_files
@@ -58,8 +58,8 @@ fn handle_remaining_files(
                 .map(|path| create_rename_action(context, path, run_id))
                 .collect::<Result<Vec<_>>>()?;
 
-            let confirmation =
-                ConfirmationPrompt::new("Delete these remaining files?")
+            let confirmation = context.misc_options().no_confirm()
+                || ConfirmationPrompt::new("Delete these remaining files?")
                     .prompt()?;
 
             if !confirmation {
@@ -74,7 +74,7 @@ fn handle_remaining_files(
             println!("Deleting the following files:");
             preview_files_to_delete(
                 &known_files,
-                &context.app_paths.working_directory()?,
+                &context.app_paths().working_directory()?,
             )?;
 
             let rename_actions = known_files
@@ -142,20 +142,24 @@ fn create_rename_action(
     let filename =
         path.file_name().ok_or(eyre!("source should have a filename"))?;
 
-    let checksum = get_checksum(&path);
+    let checksum = get_checksum(filename);
 
     let target_name = format!("{filename}_{checksum}");
 
-    Ok(RenameAction::new(
+    let rename_action = RenameAction::new(
         path,
-        context.app_paths.bin_directory().join(run_id).join(target_name),
-    ))
+        context.app_paths().bin_directory().join(run_id).join(target_name),
+    );
+
+    trace!("Created rename action: {rename_action:?}");
+
+    Ok(rename_action)
 }
 
-fn get_checksum(path: &Utf8Path) -> String {
+fn get_checksum(filename: &str) -> String {
     let mut adler = Adler32::new();
 
-    path.hash(&mut adler);
+    filename.hash(&mut adler);
 
     format!("{:X}", adler.checksum())
 }
@@ -164,21 +168,41 @@ fn preview_files_to_delete(
     paths: &[Utf8PathBuf],
     working_directory: &Utf8Path,
 ) -> Result<()> {
-    todo!()
+    let items = PreviewList::new(
+        paths
+            .iter()
+            .map(|path| super::strip_path_prefix(path, working_directory)),
+    )
+    .into_string()?;
+
+    println!("{items}");
+
+    Ok(())
 }
 
 fn move_files(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
-    todo!()
+    super::move_files_iter(context, rename_actions).collect()
 }
 
 fn remove_directories(
     context: &RenameContext,
     directories: Vec<Utf8PathBuf>,
 ) -> Result<Vec<Action>> {
-    todo!()
+    let handler = ActionHandler::new(
+        context.fs_handler(),
+        context.misc_options().always_copy(),
+        false,
+    );
+
+    directories
+        .into_iter()
+        .rev()
+        .map(|path| Ok(handler.apply(Action::RemoveDir(path))?))
+        .flatten_ok()
+        .collect()
 }
 
 fn store_history(
@@ -187,7 +211,7 @@ fn store_history(
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
-    if context.misc_options.dry_run {
+    if context.misc_options().dry_run() {
         Ok(())
     } else {
         history.push(actions, metadata)?;

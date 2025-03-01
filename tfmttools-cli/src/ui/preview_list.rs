@@ -1,43 +1,9 @@
+use std::fmt::Write;
+
 use color_eyre::Result;
 
+use super::ItemName;
 use crate::TERM;
-
-pub struct ItemName<'i> {
-    single: &'i str,
-    plural: Option<&'i str>,
-}
-
-impl<'i> ItemName<'i> {
-    pub fn simple(single: &'i str) -> Self {
-        Self { single, plural: None }
-    }
-
-    #[allow(dead_code)]
-    pub fn new(single: &'i str, plural: &'i str) -> Self {
-        Self { single, plural: Some(plural) }
-    }
-
-    pub fn single(&self) -> String {
-        self.single.to_owned()
-    }
-
-    pub fn plural(&self) -> String {
-        self.plural.map_or(
-            format!("{}s", self.single()),
-            std::borrow::ToOwned::to_owned,
-        )
-    }
-
-    pub fn by_amount(&self, amount: usize) -> String {
-        if amount == 1 { self.single() } else { self.plural() }
-    }
-}
-
-impl Default for ItemName<'_> {
-    fn default() -> Self {
-        Self { single: "item", plural: None }
-    }
-}
 
 pub struct PreviewList<'s, S, I>
 where
@@ -66,45 +32,64 @@ where
         }
     }
 
-    pub fn leading(mut self, leading_lines: usize) -> Self {
+    pub fn with_leading(mut self, leading_lines: usize) -> Self {
         self.leading_lines = leading_lines;
         self
     }
 
-    pub fn trailing(mut self, trailing_lines: usize) -> Self {
+    pub fn with_trailing(mut self, trailing_lines: usize) -> Self {
         self.trailing_lines = trailing_lines;
         self
     }
 
-    pub fn item_name(mut self, item_name: ItemName<'s>) -> Self {
+    pub fn with_item_name(mut self, item_name: ItemName<'s>) -> Self {
         self.item_name = item_name;
         self
     }
 
-    pub fn print(self) -> Result<()> {
-        let padding = self.leading_lines + self.trailing_lines;
+    fn padding(&self) -> usize {
+        self.leading_lines + self.trailing_lines
+    }
 
-        let preview_amount = std::cmp::max(
+    pub fn total(&self) -> usize {
+        self.iter.len()
+    }
+
+    pub fn can_preview_all(&self) -> bool {
+        self.total() <= self.preview_amount()
+    }
+
+    pub fn preview_amount(&self) -> usize {
+        std::cmp::max(
             Self::MIN_PREVIEW_AMOUNT,
-            TERM.size().0 as usize - padding,
-        );
+            TERM.size().0 as usize - self.padding(),
+        )
+    }
 
-        let total = self.iter.len();
+    pub fn title(&self) -> String {
+        let preview_amount = self.preview_amount();
+        let total = self.total();
 
-        let indices = if total >= preview_amount {
-            println!(
-                "Previewing {preview_amount} of {total} {}:",
-                self.item_name.by_amount(total)
-            );
-
-            rounded_linear_space(0, total, preview_amount)?
+        if self.can_preview_all() {
+            format!("Previewing {total} {}", self.item_name.by_amount(total))
         } else {
-            println!("Previewing {total} {}:", self.item_name.by_amount(total));
+            format!(
+                "Previewing {preview_amount} of {total} {}",
+                self.item_name.by_amount(total)
+            )
+        }
+    }
 
+    pub fn into_string(self) -> Result<String> {
+        let preview_amount = self.preview_amount();
+
+        let total = self.total();
+
+        let indices = if self.can_preview_all() {
             (0..total).collect()
+        } else {
+            rounded_linear_space(0, total, preview_amount)?
         };
-
-        // let step = total.div_ceil(preview_amount);
 
         let iter = self
             .iter
@@ -114,11 +99,23 @@ where
 
         let enumeration_width = total.to_string().len();
 
-        for (index, item) in iter {
-            print!("{index:>enumeration_width$}) ");
+        let mut string = String::new();
 
-            println!("{}", item.to_string());
+        for (index, item) in iter {
+            writeln!(
+                string,
+                "{:>enumeration_width$}) {}",
+                index,
+                item.to_string()
+            )
+            .expect("writeln! into mut string should never fail");
         }
+
+        Ok(string)
+    }
+
+    pub fn print(self) -> Result<()> {
+        println!("{}:\n{}", self.title(), self.into_string()?);
 
         Ok(())
     }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tfmttools_history_core::{
     History, HistoryError, LoadHistoryResult, Record, RecordState, Result,
 };
-use tracing::trace;
+use tracing::{debug, trace};
 
 const CURRENT_VERSION: u8 = 1;
 
@@ -180,7 +180,9 @@ where
             let body = fs_err::read(&path)
                 .map_err(|err| HistoryError::LoadError(err.to_string()))?;
 
-            let history = Self::deserialize_self(&body, path)?;
+            let history = Self::deserialize_self(&body, &path)?;
+
+            debug!("Loaded history from {path}");
 
             history.validate_version()?;
 
@@ -191,6 +193,7 @@ where
                 path.to_owned()
             )))
         } else {
+            debug!("Loading empty history");
             Ok((
                 SerdeHistory {
                     path,
@@ -213,7 +216,7 @@ where
         })
     }
 
-    fn deserialize_self(bytes: &[u8], path: Utf8PathBuf) -> Result<Self> {
+    fn deserialize_self(bytes: &[u8], path: &Utf8Path) -> Result<Self> {
         let mut history: SerdeHistory<A, M> = serde_json::from_slice(bytes)
             .map_err(|source| {
                 HistoryError::LoadError(format!(
@@ -222,7 +225,7 @@ where
                 ))
             })?;
 
-        history.path = path;
+        history.path = path.to_owned();
 
         trace!("Deserialized history:\n{:#?}", history);
 

@@ -8,7 +8,7 @@ use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
 use tfmttools_history_core::{History, LoadHistoryResult, Record};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use super::RenameContext;
 use crate::ui::ProgressBar;
@@ -21,13 +21,16 @@ pub fn create_actions(
     let (file_or_name, arguments) =
         get_template_name_and_arguments(context, history, load_history_result)?;
 
+    debug!("Using template: '{file_or_name}'");
+    debug!("Template arguments: '{}'", arguments.join("', '"));
+
     let loader = match &file_or_name {
         FileOrName::File(path, string) => {
             TemplateLoader::read_filename(path, string)
         },
         FileOrName::Name(_) => {
             TemplateLoader::read_directory(
-                &context.template_options.template_directory,
+                context.template_options().template_directory(),
             )
         },
     }?;
@@ -43,7 +46,11 @@ pub fn create_actions(
 
     let paths = gather_file_paths(context);
 
+    debug!("Read {} files.", paths.len());
+
     let audio_files = read_files(paths)?;
+
+    debug!("Found {} audio files.", audio_files.len());
 
     let rename_actions =
         create_rename_actions(context, &template, &audio_files)?;
@@ -56,10 +63,13 @@ fn get_template_name_and_arguments(
     history: &mut impl History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<(FileOrName, Vec<String>)> {
-    if let Some(file_or_name) = &context.template_options.template {
+    if let Some(file_or_name) = context.template_options().template() {
         debug!("Using template and arguments from command line.");
 
-        Ok((file_or_name.clone(), context.template_options.arguments.clone()))
+        Ok((
+            file_or_name.clone(),
+            context.template_options().arguments().to_vec(),
+        ))
     } else {
         if let LoadHistoryResult::Loaded = load_history_result {
             let metadata_option =
@@ -74,11 +84,7 @@ fn get_template_name_and_arguments(
                     "Re-using template '{template_name}' and arguments from previous rename."
                 );
 
-                debug!(
-                    "Using previous rename data:\ntemplate: '{}'\narguments: '{}'",
-                    template_name,
-                    arguments.join("', '")
-                );
+                debug!("Using data from previous rename");
 
                 return Ok((template_name, arguments));
             }
@@ -98,7 +104,7 @@ fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
         "Gathered files.",
     );
 
-    let file_paths = PathIterator::new(context.path_iterator_options)
+    let file_paths = PathIterator::new(context.path_iterator_options())
         .flatten()
         .inspect(|_| spinner.inc_total())
         .filter(|path| AudioFile::path_predicate(path))
@@ -130,7 +136,13 @@ fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
             #[cfg(feature = "debug")]
             crate::debug::delay();
         })
-        .map(AudioFile::new)
+        .map(|path| {
+            let audio_file = AudioFile::new(path)?;
+
+            trace!("Found audio file: {audio_file:?}");
+
+            Ok(audio_file)
+        })
         .collect::<TFMTResult<Vec<_>>>();
 
     bar.finish();
@@ -143,7 +155,7 @@ fn create_rename_actions(
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<RenameAction>> {
-    let cwd = context.app_paths.working_directory()?;
+    let cwd = context.app_paths().working_directory()?;
 
     let bar = ProgressBar::bar(
         "Determining output paths:",
@@ -154,16 +166,18 @@ fn create_rename_actions(
     let rename_actions: Result<Vec<RenameAction>> = files
         .iter()
         .map(|audiofile| {
-            Ok(RenameAction::new(
+            let rename_action = RenameAction::new(
                 audiofile.path().to_owned(),
                 audiofile.construct_target_path(template, &cwd)?,
-            ))
-        })
-        .inspect(|_| {
+            );
+
             bar.inc_found();
+            trace!("Created rename action: {rename_action:?}");
 
             #[cfg(feature = "debug")]
             crate::debug::delay();
+
+            Ok(rename_action)
         })
         .collect();
 

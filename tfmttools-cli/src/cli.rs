@@ -95,18 +95,27 @@ fn run(args: Args) -> Result<()> {
                 rename_args.arguments,
             );
 
-            let misc_options = RenameMiscOptions::new(
-                rename_args.always_copy,
-                rename_args.yes,
-                args.dry_run,
-            );
+            let misc_options = if let Some(run_id) = args.custom_run_id {
+                RenameMiscOptions::with_run_id(
+                    rename_args.always_copy,
+                    rename_args.yes,
+                    args.dry_run,
+                    run_id,
+                )
+            } else {
+                RenameMiscOptions::new(
+                    rename_args.always_copy,
+                    rename_args.yes,
+                    args.dry_run,
+                )
+            };
 
             let rename_context = RenameContext::new(
                 &app_paths,
                 &fs_handler,
                 &path_iterator_options,
                 &template_options,
-                misc_options,
+                &misc_options,
             );
 
             rename(&rename_context)?;
