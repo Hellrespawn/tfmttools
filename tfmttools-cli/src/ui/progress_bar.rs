@@ -7,6 +7,7 @@ use crate::term::{hide_cursor, show_cursor};
 pub struct ProgressBar {
     inner: IndicatifProgressBar,
     finished_message: &'static str,
+    println_on_finish: bool,
 }
 
 impl ProgressBar {
@@ -14,6 +15,7 @@ impl ProgressBar {
         working_message: &'static str,
         finished_message: &'static str,
         length: u64,
+        println_on_finish: bool,
     ) -> Self {
         Self::new(
             ProgressStyle::default_bar(),
@@ -21,6 +23,7 @@ impl ProgressBar {
             working_message,
             finished_message,
             Some(length),
+            println_on_finish,
         )
     }
 
@@ -38,6 +41,7 @@ impl ProgressBar {
             working_message,
             finished_message,
             None,
+            false,
         )
     }
 
@@ -51,6 +55,7 @@ impl ProgressBar {
         working_message: &'static str,
         finished_message: &'static str,
         length: Option<u64>,
+        println_on_finish: bool,
     ) -> Self {
         let style = match style.template(template) {
             Ok(style) => style,
@@ -78,7 +83,7 @@ impl ProgressBar {
         .with_style(style)
         .with_message(working_message);
 
-        Self { inner, finished_message }
+        Self { inner, finished_message, println_on_finish }
     }
 
     pub fn inc_found(&self) {
@@ -92,6 +97,11 @@ impl ProgressBar {
     pub fn finish(&self) {
         self.inner.set_message(self.finished_message);
         self.inner.abandon();
+
+        if self.println_on_finish {
+            println!();
+            println!();
+        }
 
         show_cursor();
     }

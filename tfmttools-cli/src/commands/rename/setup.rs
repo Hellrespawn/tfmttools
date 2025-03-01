@@ -28,11 +28,9 @@ pub fn create_actions(
         FileOrName::File(path, string) => {
             TemplateLoader::read_filename(path, string)
         },
-        FileOrName::Name(_) => {
-            TemplateLoader::read_directory(
-                context.template_options().template_directory(),
-            )
-        },
+        FileOrName::Name(_) => TemplateLoader::read_directory(
+            context.template_options().template_directory(),
+        ),
     }?;
 
     let template_name = file_or_name.as_str();
@@ -57,8 +55,6 @@ pub fn create_actions(
 
     let rename_actions =
         create_rename_actions(context, &template, &audio_files)?;
-
-    println!();
 
     Ok((rename_actions, metadata))
 }
@@ -131,6 +127,7 @@ fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
         "Reading files...",
         "Read files.",
         file_paths.len() as u64,
+        false,
     );
 
     let audio_files = file_paths
@@ -166,6 +163,7 @@ fn create_rename_actions(
         "Determining output paths:",
         "Determined output paths.",
         files.len() as u64,
+        true,
     );
 
     let rename_actions: Result<Vec<RenameAction>> = files
@@ -187,8 +185,6 @@ fn create_rename_actions(
         .collect();
 
     bar.finish();
-
-    println!();
 
     rename_actions
 }

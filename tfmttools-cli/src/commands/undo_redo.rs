@@ -61,16 +61,16 @@ impl UndoRedoCommand {
                 let amount = self.amount;
                 let actual = records.len();
 
-                if actual < amount {
-                    println!(
-                        "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
-                        verb = self.mode.verb()
-                    );
-                }
-
                 if records.is_empty() {
                     println!("There are no runs to {verb}.");
                 } else {
+                    if actual < amount {
+                        println!(
+                            "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
+                            verb = self.mode.verb()
+                        );
+                    }
+
                     let confirmation =
                         self.yes || self.confirm_undo_redo(&records)?;
 

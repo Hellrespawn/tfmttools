@@ -67,6 +67,8 @@ fn handle_remaining_files(
             }
 
             applied_actions.extend(move_files(context, rename_actions)?);
+
+            println!("Deleted.");
         } else if !files.is_empty() {
             let rename_actions = files
                 .iter()

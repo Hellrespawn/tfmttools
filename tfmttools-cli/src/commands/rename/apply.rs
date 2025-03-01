@@ -27,8 +27,6 @@ pub fn apply_actions(
         if confirmation {
             let applied_actions = move_files(context, rename_actions)?;
 
-            println!();
-
             Ok(Some(applied_actions))
         } else {
             println!("Aborting!");
@@ -92,6 +90,7 @@ fn move_files(
         "Moving files:",
         "Moved files.",
         rename_actions.len() as u64,
+        true,
     );
 
     let applied_actions = super::move_files_iter(context, rename_actions)
