@@ -13,14 +13,10 @@ version.workspace = true
 
 [dependencies]
 tfmttools-core = { path = "../tfmttools-core" }
-camino = { workspace = true, features = ["serde", "serde1"] }
+camino = { workspace = true }
 fs-err = { workspace = true }
 ignore = { workspace = true }
-minijinja = { workspace = true, features = [
-    "loader",
-    "custom_syntax",
-    "debug",
-] }
+minijinja = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

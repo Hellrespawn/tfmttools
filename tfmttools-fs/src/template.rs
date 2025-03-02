@@ -79,13 +79,13 @@ impl<'tl> TemplateLoader<'tl> {
     fn description(&self, template: &minijinja::Template) -> Option<String> {
         let source = template.source();
 
-        let syntax = self.environment.syntax();
-        let (comment_start, comment_end) = syntax.comment_delimiters();
+        const COMMENT_START: &str = "{#";
+        const COMMENT_END: &str = "{#";
 
-        if source.trim().starts_with(comment_start) {
-            let option = source.split_once(comment_end).map(|(left, _)| {
-                left.replace(comment_start, "")
-                    .replace(comment_end, "")
+        if source.trim().starts_with(COMMENT_START) {
+            let option = source.split_once(COMMENT_END).map(|(left, _)| {
+                left.replace(COMMENT_START, "")
+                    .replace(COMMENT_END, "")
                     .trim()
                     .to_owned()
             });

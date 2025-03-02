@@ -15,17 +15,13 @@ debug = []
 
 [dependencies]
 tfmttools-history-core = { path = "../tfmttools-history-core" }
-camino = { workspace = true, features = ["serde", "serde1"] }
+camino = { workspace = true }
 convert_case = { workspace = true }
 id3 = { workspace = true }
 ignore = { workspace = true }
 lofty = { workspace = true }
-minijinja = { workspace = true, features = [
-    "loader",
-    "custom_syntax",
-    "debug",
-] }
-serde = { workspace = true, features = ["derive"] }
+minijinja = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

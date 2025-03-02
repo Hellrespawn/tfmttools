@@ -17,11 +17,6 @@ See also the "examples"-folder.
 
 ## TODO
 
-- TODO Decouple PreviewList from term size logic
-
-- TODO Save removed files to temporary folder
-- TODO? Prompt before deleting remaining image files? Only prompt if there are other remaining files?
-
 - TODO Handle exit codes properly
 
 - TODO? Add year to singles?
