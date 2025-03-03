@@ -1,15 +1,17 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RecordState {
     Applied,
     Undone,
     Redone,
+    Superseded,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Record<A, M> {
+    id: Option<usize>,
     actions: Vec<A>,
     state: RecordState,
     timestamp: DateTime<Local>,
@@ -19,6 +21,7 @@ pub struct Record<A, M> {
 impl<A, M> Record<A, M> {
     pub fn new(items: Vec<A>, metadata: M) -> Self {
         Self {
+            id: None,
             actions: items,
             state: RecordState::Applied,
             timestamp: Local::now(),
@@ -36,6 +39,14 @@ impl<A, M> Record<A, M> {
 
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
+    }
+
+    pub fn id(&self) -> Option<usize> {
+        self.id
+    }
+
+    pub fn id_mut(&mut self) -> &mut Option<usize> {
+        &mut self.id
     }
 
     pub fn actions(&self) -> &[A] {

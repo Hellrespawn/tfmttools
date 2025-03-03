@@ -11,6 +11,9 @@ pub enum HistoryError {
     #[error("Unable to save history: {0}")]
     SaveError(String),
 
+    #[error("Unable to change history: {0}")]
+    MutError(String),
+
     #[error("Unable to remove history: {0}")]
     RemoveError(String),
 

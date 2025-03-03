@@ -74,24 +74,39 @@ where
     }
 
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()> {
-        let record = Record::new(actions, metadata);
+        let mut new_record = Record::new(actions, metadata);
 
-        self.records.push(record);
+        *new_record.id_mut() = Some(self.records.len());
+
+        self.records.push(new_record);
+
+        let undone_records = self.get_all_records_to_redo()?;
+
+        undone_records.into_iter().try_for_each(|record| {
+            self.set_record_state(record, RecordState::Superseded)?;
+
+            Ok(())
+        })?;
 
         Ok(())
     }
 
-    fn get_previous_record(&mut self) -> Result<Option<&Record<A, M>>> {
-        Ok(self.records.last())
+    fn get_previous_record(&mut self) -> Result<Option<Record<A, M>>> {
+        Ok(self.records.last().cloned())
     }
 
     fn get_records_to_undo(
         &mut self,
         amount: Option<usize>,
-    ) -> Result<Vec<&Record<A, M>>> {
-        let iter = self.records.iter().rev().filter(|r| {
-            matches!(r.state(), RecordState::Applied | RecordState::Redone)
-        });
+    ) -> Result<Vec<Record<A, M>>> {
+        let iter = self
+            .records
+            .iter()
+            .rev()
+            .filter(|r| {
+                matches!(r.state(), RecordState::Applied | RecordState::Redone)
+            })
+            .cloned();
 
         let actions = if let Some(amount) = amount {
             iter.take(amount).collect()
@@ -105,11 +120,12 @@ where
     fn get_records_to_redo(
         &mut self,
         amount: Option<usize>,
-    ) -> Result<Vec<&Record<A, M>>> {
+    ) -> Result<Vec<Record<A, M>>> {
         let iter = self
             .records
             .iter()
-            .filter(|r| matches!(r.state(), RecordState::Undone));
+            .filter(|r| matches!(r.state(), RecordState::Undone))
+            .cloned();
 
         let actions = if let Some(amount) = amount {
             iter.take(amount).collect()
@@ -120,39 +136,41 @@ where
         Ok(actions)
     }
 
-    fn get_records_to_undo_mut(
+    fn set_record_state(
         &mut self,
-        amount: Option<usize>,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        let iter = self.records.iter_mut().rev().filter(|r| {
-            matches!(r.state(), RecordState::Applied | RecordState::Redone)
-        });
+        mut record: Record<A, M>,
+        state: RecordState,
+    ) -> Result<Record<A, M>> {
+        if let Some(id) = record.id() {
+            let found_records = self
+                .records
+                .iter_mut()
+                .filter(|r| r.id().is_some_and(|r_id| r_id == id))
+                .collect::<Vec<_>>();
 
-        let actions = if let Some(amount) = amount {
-            iter.take(amount).collect()
+            if found_records.is_empty() {
+                Err(HistoryError::MutError(format!(
+                    "Unable to find saved record with id {}",
+                    id
+                )))
+            } else if found_records.len() > 1 {
+                Err(HistoryError::MutError(format!(
+                    "Found multiple saved records with id {}",
+                    id
+                )))
+            } else {
+                record.set_state(state);
+                for found_record in found_records {
+                    found_record.set_state(state);
+                }
+
+                Ok(record)
+            }
         } else {
-            iter.collect()
-        };
-
-        Ok(actions)
-    }
-
-    fn get_records_to_redo_mut(
-        &mut self,
-        amount: Option<usize>,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        let iter = self
-            .records
-            .iter_mut()
-            .filter(|r| matches!(r.state(), RecordState::Undone));
-
-        let actions = if let Some(amount) = amount {
-            iter.take(amount).collect()
-        } else {
-            iter.collect()
-        };
-
-        Ok(actions)
+            Err(HistoryError::MutError(
+                "Unable to set the state of unsaved record.".to_owned(),
+            ))
+        }
     }
 
     fn remove(&mut self) -> Result<()> {

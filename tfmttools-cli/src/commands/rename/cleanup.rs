@@ -222,6 +222,10 @@ fn store_history(
             Ok(())
         } else {
             result?;
+            println!(
+                "Saved run #{} to history.",
+                context.misc_options().run_id()
+            );
             Ok(())
         }
     }

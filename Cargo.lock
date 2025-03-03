@@ -1150,6 +1150,7 @@ dependencies = [
  "adler",
  "assert_fs",
  "camino",
+ "chrono",
  "clap",
  "color-eyre",
  "console",

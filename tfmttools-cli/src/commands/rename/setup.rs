@@ -7,7 +7,7 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
-use tfmttools_history_core::{History, LoadHistoryResult, Record};
+use tfmttools_history_core::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
 use super::RenameContext;
@@ -28,9 +28,11 @@ pub fn create_actions(
         FileOrName::File(path, string) => {
             TemplateLoader::read_filename(path, string)
         },
-        FileOrName::Name(_) => TemplateLoader::read_directory(
-            context.template_options().template_directory(),
-        ),
+        FileOrName::Name(_) => {
+            TemplateLoader::read_directory(
+                context.template_options().template_directory(),
+            )
+        },
     }?;
 
     let template_name = file_or_name.as_str();
@@ -73,10 +75,11 @@ fn get_template_name_and_arguments(
         ))
     } else {
         if let LoadHistoryResult::Loaded = load_history_result {
-            let metadata_option =
-                history.get_previous_record()?.map(Record::metadata);
+            let record = history.get_previous_record()?;
 
-            if let Some(metadata) = metadata_option {
+            if let Some(record) = record {
+                let metadata = record.metadata();
+
                 let template_name = FileOrName::from(metadata.template());
 
                 let arguments = metadata.arguments().to_owned();

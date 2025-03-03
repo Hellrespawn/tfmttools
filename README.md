@@ -23,7 +23,11 @@ See also the "examples"-folder.
 - TODO? Update tag with leading/trailing whitespace?
 
 - TODO? Replace custom history format with SQLite?
-    This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).
+    ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
+
+    This is now fixed
+
+    TODO Handle undone records superseded by new actions.
 
 - Handle UTF-16 odd length error manually?
 

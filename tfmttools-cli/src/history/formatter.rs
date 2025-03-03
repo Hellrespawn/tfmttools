@@ -91,7 +91,7 @@ impl HistoryFormatter {
         }
     }
 
-    pub fn format_records(&self, records: &[&ActionRecord]) -> Option<String> {
+    pub fn format_records(&self, records: &[ActionRecord]) -> Option<String> {
         if records.is_empty() {
             None
         } else {

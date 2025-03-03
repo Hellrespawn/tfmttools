@@ -100,7 +100,11 @@ impl FsHandler {
                     fs_err::remove_file(source)?;
                     Ok(MoveFileResult::CopiedAndRemoved)
                 } else {
-                    Err(err.into())
+                    Err(TFMTError::UnexpectedMoveError(
+                        source.to_owned(),
+                        target.to_owned(),
+                        err.to_string(),
+                    ))
                 }
             } else {
                 Ok(MoveFileResult::Moved)

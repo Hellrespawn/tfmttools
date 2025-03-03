@@ -75,7 +75,11 @@ impl UndoRedoCommand {
                         self.yes || self.confirm_undo_redo(&records)?;
 
                     if confirmation {
-                        self.perform_undo_redo_actions(records, fs_handler)?;
+                        self.perform_undo_redo_actions(
+                            &mut history,
+                            records,
+                            fs_handler,
+                        )?;
 
                         history.save()?;
                     } else {
@@ -88,23 +92,19 @@ impl UndoRedoCommand {
         }
     }
 
-    fn get_records<'h>(
+    fn get_records(
         &self,
-        history: &'h mut impl History<Action, ActionRecordMetadata>,
-    ) -> Result<Vec<&'h mut ActionRecord>> {
+        history: &mut impl History<Action, ActionRecordMetadata>,
+    ) -> Result<Vec<ActionRecord>> {
         let records = match self.mode {
-            HistoryMode::Undo => {
-                history.get_n_records_to_undo_mut(self.amount)?
-            },
-            HistoryMode::Redo => {
-                history.get_n_records_to_redo_mut(self.amount)?
-            },
+            HistoryMode::Undo => history.get_n_records_to_undo(self.amount)?,
+            HistoryMode::Redo => history.get_n_records_to_redo(self.amount)?,
         };
 
         Ok(records)
     }
 
-    fn confirm_undo_redo(&self, records: &[&mut ActionRecord]) -> Result<bool> {
+    fn confirm_undo_redo(&self, records: &[ActionRecord]) -> Result<bool> {
         self.preview_undo_redo(records)?;
 
         let item_name = ItemName::simple("record");
@@ -123,7 +123,7 @@ impl UndoRedoCommand {
         confirmation_prompt.prompt()
     }
 
-    fn preview_undo_redo(&self, records: &[&mut ActionRecord]) -> Result<()> {
+    fn preview_undo_redo(&self, records: &[ActionRecord]) -> Result<()> {
         let iter =
             records.iter().map(|record| self.formatter.format_record(record));
 
@@ -137,7 +137,8 @@ impl UndoRedoCommand {
 
     fn perform_undo_redo_actions(
         &self,
-        records: Vec<&mut ActionRecord>,
+        history: &mut impl History<Action, ActionRecordMetadata>,
+        records: Vec<ActionRecord>,
         fs_handler: &FsHandler,
     ) -> Result<()> {
         let action_handler = ActionHandler::new(fs_handler, false, true);
@@ -146,7 +147,7 @@ impl UndoRedoCommand {
             println!(
                 "{}ing {}...",
                 self.mode.verb_capitalized(),
-                self.formatter.format_record(record)
+                self.formatter.format_record(&record)
             );
 
             let actions: Vec<&Action> = match self.mode {
@@ -162,8 +163,12 @@ impl UndoRedoCommand {
             }
 
             match self.mode {
-                HistoryMode::Undo => record.set_state(RecordState::Undone),
-                HistoryMode::Redo => record.set_state(RecordState::Redone),
+                HistoryMode::Undo => {
+                    history.set_record_state(record, RecordState::Undone)?;
+                },
+                HistoryMode::Redo => {
+                    history.set_record_state(record, RecordState::Redone)?;
+                },
             }
 
             println!("Done.");

@@ -17,6 +17,9 @@ pub enum TFMTError {
     #[error("Path exists but is not a file: {0}")]
     NotAFile(Utf8PathBuf),
 
+    #[error("Unexpected error while trying to move {0} to {1}: {2} ")]
+    UnexpectedMoveError(Utf8PathBuf, Utf8PathBuf, String),
+
     // Passthrough errors
     #[error(transparent)]
     Camino(#[from] camino::FromPathBufError),

@@ -1,4 +1,5 @@
 use camino::Utf8PathBuf;
+use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
@@ -42,10 +43,10 @@ pub fn main() -> Result<()> {
 
         let subcommand = command.find_subcommand_mut(name);
 
-        if let Some(command) = subcommand {
+        if let Some(subcommand) = subcommand {
             eprintln!(
                 "{}",
-                command.error(ErrorKind::DisplayHelp, err.to_string())
+                subcommand.error(ErrorKind::DisplayHelp, err.to_string())
             );
         } else {
             eprintln!(
@@ -152,9 +153,13 @@ fn run(args: TFMTArgs) -> Result<()> {
 // directory.
 fn init_tracing() -> Option<WorkerGuard> {
     if std::env::var_os(LOG_ENV_VAR).is_some() {
+        let now = Local::now();
+
+        let formatted = now.format("%Y%m%d.%H%M%S%3f");
+
         let file_appender = tracing_appender::rolling::never(
             std::env::current_dir().expect("Unable to get current directory."),
-            format!("{}.log", crate::PKG_NAME),
+            format!("{}-{}.log", crate::PKG_NAME, formatted),
         );
 
         let (non_blocking, guard) =

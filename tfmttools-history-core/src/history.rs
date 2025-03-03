@@ -1,5 +1,5 @@
 use super::record::Record;
-use crate::Result;
+use crate::{RecordState, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -12,75 +12,45 @@ pub trait History<A, M> {
 
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()>;
 
-    fn get_previous_record(&mut self) -> Result<Option<&Record<A, M>>>;
+    fn get_previous_record(&mut self) -> Result<Option<Record<A, M>>>;
 
     fn get_records_to_undo(
         &mut self,
         amount: Option<usize>,
-    ) -> Result<Vec<&Record<A, M>>>;
+    ) -> Result<Vec<Record<A, M>>>;
 
     fn get_records_to_redo(
         &mut self,
         amount: Option<usize>,
-    ) -> Result<Vec<&Record<A, M>>>;
-
-    fn get_records_to_undo_mut(
-        &mut self,
-        amount: Option<usize>,
-    ) -> Result<Vec<&mut Record<A, M>>>;
-
-    fn get_records_to_redo_mut(
-        &mut self,
-        amount: Option<usize>,
-    ) -> Result<Vec<&mut Record<A, M>>>;
+    ) -> Result<Vec<Record<A, M>>>;
 
     fn get_n_records_to_undo(
         &mut self,
         amount: usize,
-    ) -> Result<Vec<&Record<A, M>>> {
+    ) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_undo(Some(amount))
-    }
-
-    fn get_n_records_to_undo_mut(
-        &mut self,
-        amount: usize,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        self.get_records_to_undo_mut(Some(amount))
     }
 
     fn get_n_records_to_redo(
         &mut self,
         amount: usize,
-    ) -> Result<Vec<&Record<A, M>>> {
+    ) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_redo(Some(amount))
     }
 
-    fn get_n_records_to_redo_mut(
-        &mut self,
-        amount: usize,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        self.get_records_to_redo_mut(Some(amount))
-    }
-
-    fn get_all_records_to_undo(&mut self) -> Result<Vec<&Record<A, M>>> {
+    fn get_all_records_to_undo(&mut self) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_undo(None)
     }
 
-    fn get_all_records_to_undo_mut(
-        &mut self,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        self.get_records_to_undo_mut(None)
-    }
-
-    fn get_all_records_to_redo(&mut self) -> Result<Vec<&Record<A, M>>> {
+    fn get_all_records_to_redo(&mut self) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_redo(None)
     }
 
-    fn get_all_records_to_redo_mut(
+    fn set_record_state(
         &mut self,
-    ) -> Result<Vec<&mut Record<A, M>>> {
-        self.get_records_to_redo_mut(None)
-    }
+        record: Record<A, M>,
+        state: RecordState,
+    ) -> Result<Record<A, M>>;
 
     fn remove(&mut self) -> Result<()>;
 
