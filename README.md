@@ -17,6 +17,8 @@ See also the "examples"-folder.
 
 ## TODO
 
+- TODO Actually check the moved files is the same file in tests
+
 - TODO Handle exit codes properly
 
 - TODO? Add year to singles?
