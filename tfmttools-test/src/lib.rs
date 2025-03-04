@@ -1,9 +1,6 @@
 mod context;
 mod data;
+mod outcome;
 mod runner;
 
 pub use runner::test_runner;
-
-const TEST_DATA_DIRECTORY: &str = "../testdata";
-
-pub const TEST_RUN_ID: &str = "run_id";

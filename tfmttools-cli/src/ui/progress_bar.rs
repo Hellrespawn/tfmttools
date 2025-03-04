@@ -99,8 +99,17 @@ impl ProgressBar {
         self.inner.abandon();
 
         if self.println_on_finish {
-            println!();
-            println!();
+            #[cfg(test)]
+            {
+                println!();
+                println!();
+            }
+
+            #[cfg(not(test))]
+            {
+                eprintln!();
+                eprintln!();
+            }
         }
 
         show_cursor();

@@ -17,12 +17,15 @@ See also the "examples"-folder.
 
 ## TODO
 
-- TODO Actually check the moved files is the same file in tests
+- TODO Add more description when running `rename` under `--yes`
 
-- TODO Handle exit codes properly
+- TODO? Explicitly handle exit codes?
+- TODO? Do test with interactive app?
+- TODO? Actually check the moved files is the same file in tests?
+- TODO? Some sort of transactions mechanism?
+- TODO? Fix/warn tag with leading/trailing whitespace?
 
 - TODO? Add year to singles?
-- TODO? Update tag with leading/trailing whitespace?
 
 - TODO? Replace custom history format with SQLite?
     ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
@@ -31,8 +34,14 @@ See also the "examples"-folder.
 
     TODO Handle undone records superseded by new actions.
 
+<!--
+## Miscellaneous
+
+Don't remember what this was about, probably related to the file in question:
+
 - Handle UTF-16 odd length error manually?
 
 Check:
 
 - .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3
+-->

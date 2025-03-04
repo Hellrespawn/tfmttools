@@ -35,8 +35,6 @@ console = { workspace = true }
 ctrlc = { workspace = true }
 fastrand = { workspace = true }
 directories = { workspace = true }
-fs-err = { workspace = true }
-id3 = { workspace = true }
 itertools = { workspace = true }
 indicatif = { workspace = true }
 textwrap = { workspace = true }

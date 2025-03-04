@@ -1,6 +1,6 @@
 {
   "description": "Single apply, undo and redo of typical_input.tfmt with always copy",
-  "reference": {
+  "expectations": {
     "initial-state": [
       "input/Amon Amarth - Under Siege.mp3",
       "input/Damjan Mravunac - Welcome To Heaven.ogg",

@@ -23,6 +23,10 @@ impl TestContext {
     pub fn source_dirs(&self) -> &SourceDirs {
         &self.source_dirs
     }
+
+    pub fn persist_work_dir_if(self, bool: bool) {
+        self.work_dir.into_persistent_if(bool)
+    }
 }
 
 #[derive(Clone)]
@@ -70,5 +74,9 @@ impl WorkDir {
 
     pub fn config_dir(&self) -> Utf8PathBuf {
         self.path().join(CONFIG_DIR_NAME)
+    }
+
+    pub fn into_persistent_if(self, bool: bool) {
+        let _ = self.inner.into_persistent_if(bool);
     }
 }

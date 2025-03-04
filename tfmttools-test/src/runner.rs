@@ -9,10 +9,12 @@ use libtest_mimic::{Arguments, Trial};
 use tfmttools_fs::PathIterator;
 
 use crate::context::{SourceDirs, TestContext};
-use crate::data::TestCaseData;
-use crate::{TEST_DATA_DIRECTORY, TEST_RUN_ID};
+use crate::data::{Expectation, TestCaseData};
+use crate::outcome::{CommandOutcome, TestCaseOutcome, TestOutcome};
 
-const INITIAL_STATE_REFERENCE_NAME: &str = "initial-state";
+const TEST_DATA_DIRECTORY: &str = "../testdata";
+const INITIAL_EXPECTATION_NAME: &str = "initial-state";
+const TEST_RUN_ID: &str = "run_id";
 
 pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let args = Arguments::from_args();
@@ -56,8 +58,10 @@ fn generate_tests(
         .map(|(name, data)| {
             let source_dirs = source_dirs.clone();
 
-            Trial::test(name, || {
-                run_test_case(source_dirs, data).map_err(|tr| tr.into())
+            Trial::test(name.clone(), || {
+                let outcome = run_test_case(source_dirs, name, data)?;
+
+                if outcome.passed() { Ok(()) } else { Err(outcome.into()) }
             })
         })
         .collect::<Vec<_>>()
@@ -65,54 +69,73 @@ fn generate_tests(
 
 fn run_test_case(
     source_dirs: SourceDirs,
+    name: String,
     test_case_data: TestCaseData,
-) -> Result<()> {
-    let mut context = TestContext::new(source_dirs)?;
+) -> Result<TestCaseOutcome> {
+    let context = TestContext::new(source_dirs)?;
 
-    populate_files(&mut context)?;
+    populate_files(&context)?;
+
+    let mut test_case_outcome = TestCaseOutcome::new(
+        name,
+        test_case_data.description().to_owned(),
+        context.work_dir().path(),
+    );
 
     let mut previous_expectation =
-        test_case_data.reference().get(INITIAL_STATE_REFERENCE_NAME);
+        test_case_data.expectations().get(INITIAL_EXPECTATION_NAME);
 
-    if let Some(initial_state) = previous_expectation {
-        verify_expectations(&mut context, initial_state, None)?;
-    }
+    test_case_outcome.missing_files =
+        previous_expectation.map(|initial_state| {
+            let (missing_files, _) =
+                verify_expectations(&context, initial_state, None);
 
-    println!("Verified initial state.");
+            missing_files
+        });
 
-    for (name, test_data) in test_case_data.tests() {
-        println!("Running test {}...", name);
+    if test_case_outcome.passed_initial_expectation() {
+        for (name, test_data) in test_case_data.tests() {
+            let mut test_outcome = TestOutcome::new(name.clone());
 
-        if let Some(command) = test_data.command() {
-            run_command(&mut context, command)?;
+            if let Some(command) = test_data.command() {
+                test_outcome.command_outcome =
+                    Some(run_command(&context, command)?);
+            }
+
+            let expectation_name = test_data.expectation();
+
+            let expectation =
+                test_case_data.expectations().get(expectation_name).ok_or(
+                    eyre!("No expectation with name '{}'", expectation_name),
+                )?;
+
+            let (missing_files, remaining_files) = verify_expectations(
+                &context,
+                expectation,
+                previous_expectation.map(|v| &**v),
+            );
+
+            test_outcome.missing_files = missing_files;
+            test_outcome.remaining_files = remaining_files;
+
+            let passed = test_outcome.passed();
+
+            test_case_outcome.test_outcomes.push(test_outcome);
+
+            if !passed {
+                break;
+            }
+
+            previous_expectation = Some(expectation);
         }
-
-        println!("Ran command...");
-
-        let expectation_name = test_data.expectation();
-
-        let expectation = test_case_data
-            .reference()
-            .get(expectation_name)
-            .ok_or(eyre!("No reference with name '{}'", expectation_name))?;
-
-        verify_expectations(
-            &mut context,
-            expectation,
-            previous_expectation.map(|v| &**v),
-        )?;
-
-        println!("Verified expectation...");
-
-        previous_expectation = Some(expectation);
-
-        println!("Done with {}.", name)
     }
 
-    Ok(())
+    context.persist_work_dir_if(!test_case_outcome.passed());
+
+    Ok(test_case_outcome)
 }
 
-fn populate_files(context: &mut TestContext) -> Result<()> {
+fn populate_files(context: &TestContext) -> Result<()> {
     copy_files(
         context.source_dirs().template_dir(),
         context.work_dir().config_dir(),
@@ -149,7 +172,7 @@ fn copy_files(source_dir: Utf8PathBuf, target_dir: Utf8PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn run_command(context: &mut TestContext, command: &str) -> Result<()> {
+fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
     let arguments = format!("{} {}", get_fixed_arguments(context), command);
 
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
@@ -159,14 +182,9 @@ fn run_command(context: &mut TestContext, command: &str) -> Result<()> {
         cmd.arg(arg);
     }
 
-    let result = cmd.output();
+    let output = cmd.output()?;
 
-    match result {
-        Ok(output) => println!("{}", String::from_utf8_lossy(&output.stdout)),
-        Err(err) => println!("{}", err),
-    }
-
-    Ok(())
+    Ok(CommandOutcome::new(arguments, output))
 }
 
 fn get_fixed_arguments(context: &TestContext) -> String {
@@ -178,94 +196,41 @@ fn get_fixed_arguments(context: &TestContext) -> String {
 }
 
 fn verify_expectations(
-    context: &mut TestContext,
-    reference: &[String],
-    previous_reference: Option<&[String]>,
-) -> Result<()> {
-    if let Some(previous_reference) = previous_reference {
-        let remaining_files = get_still_existing_file_paths(
+    context: &TestContext,
+    expectation: &[Expectation],
+    previous_expectation: Option<&[Expectation]>,
+) -> (Vec<Utf8PathBuf>, Option<Vec<Utf8PathBuf>>) {
+    let remaining_files = previous_expectation.map(|previous_expectation| {
+        get_still_existing_file_paths(
             &context.work_dir().path(),
-            previous_reference,
-        );
-
-        if !remaining_files.is_empty() {
-            return Err(eyre!(
-                "Files expected to be moved are still in place:\n{}",
-                remaining_files.join("\n")
-            ));
-        }
-    }
+            previous_expectation,
+        )
+    });
 
     let missing_files =
-        get_missing_file_paths(&context.work_dir().path(), reference);
+        get_missing_file_paths(&context.work_dir().path(), expectation);
 
-    if !missing_files.is_empty() {
-        return Err(eyre!(
-            "Files expected to be moved are not there:\n{}",
-            missing_files.join("\n")
-        ));
-    }
-
-    Ok(())
-}
-
-struct Expectation {
-    path: Utf8PathBuf,
-    no_previous: bool,
-}
-
-impl Expectation {
-    fn new(string: &str, path: &Utf8Path) -> Expectation {
-        let mut iter = string.split(':');
-
-        let suffix = iter.next().unwrap().to_owned();
-
-        let mut expectation =
-            Expectation { path: path.join(suffix), no_previous: false };
-
-        for option in iter {
-            match option {
-                "noprevious" => expectation.no_previous = true,
-                other => panic!("Unknown expectation option '{}'", other),
-            }
-        }
-
-        expectation
-    }
-
-    fn verify_exists(&self) -> bool {
-        self.path.exists()
-    }
-
-    fn verify_no_longer_exists(&self) -> bool {
-        self.no_previous || !self.path.exists()
-    }
-
-    fn path_to_string(&self) -> String {
-        self.path.to_string()
-    }
+    (missing_files, remaining_files)
 }
 
 fn get_still_existing_file_paths(
     prefix: &Utf8Path,
-    reference: &[String],
-) -> Vec<String> {
-    reference
+    expectation: &[Expectation],
+) -> Vec<Utf8PathBuf> {
+    expectation
         .iter()
-        .map(|string| Expectation::new(string, prefix))
-        .filter(|expectation| !expectation.verify_no_longer_exists())
-        .map(|expectation| expectation.path_to_string())
+        .filter(|expectation| !expectation.verify_no_longer_exists(prefix))
+        .map(|e| e.path().to_owned())
         .collect()
 }
 
 fn get_missing_file_paths(
     prefix: &Utf8Path,
-    reference: &[String],
-) -> Vec<String> {
-    reference
+    expectation: &[Expectation],
+) -> Vec<Utf8PathBuf> {
+    expectation
         .iter()
-        .map(|string| Expectation::new(string, prefix))
-        .filter(|expectation| !expectation.verify_exists())
-        .map(|expectation| expectation.path_to_string())
+        .filter(|expectation| !expectation.verify_exists(prefix))
+        .map(|e| e.path().to_owned())
         .collect()
 }
