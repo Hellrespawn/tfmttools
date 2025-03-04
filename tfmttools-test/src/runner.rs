@@ -8,8 +8,8 @@ use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
 use tfmttools_fs::PathIterator;
 
+use crate::context::{SourceDirs, TestContext};
 use crate::data::TestCaseData;
-use crate::dir::{SourceDirs, WorkDir};
 use crate::{TEST_DATA_DIRECTORY, TEST_RUN_ID};
 
 const INITIAL_STATE_REFERENCE_NAME: &str = "initial-state";
@@ -67,15 +67,15 @@ fn run_test_case(
     source_dirs: SourceDirs,
     test_case_data: TestCaseData,
 ) -> Result<()> {
-    let work_dir = WorkDir::new()?;
+    let mut context = TestContext::new(source_dirs)?;
 
-    populate_files(&source_dirs, &work_dir)?;
+    populate_files(&mut context)?;
 
     let mut previous_expectation =
         test_case_data.reference().get(INITIAL_STATE_REFERENCE_NAME);
 
     if let Some(initial_state) = previous_expectation {
-        verify_expectations(&work_dir, initial_state, None)?;
+        verify_expectations(&mut context, initial_state, None)?;
     }
 
     println!("Verified initial state.");
@@ -84,7 +84,7 @@ fn run_test_case(
         println!("Running test {}...", name);
 
         if let Some(command) = test_data.command() {
-            run_command(&work_dir, command)?;
+            run_command(&mut context, command)?;
         }
 
         println!("Ran command...");
@@ -97,7 +97,7 @@ fn run_test_case(
             .ok_or(eyre!("No reference with name '{}'", expectation_name))?;
 
         verify_expectations(
-            &work_dir,
+            &mut context,
             expectation,
             previous_expectation.map(|v| &**v),
         )?;
@@ -112,10 +112,16 @@ fn run_test_case(
     Ok(())
 }
 
-fn populate_files(source_dirs: &SourceDirs, work_dir: &WorkDir) -> Result<()> {
-    copy_files(source_dirs.template_dir(), work_dir.config_dir())?;
+fn populate_files(context: &mut TestContext) -> Result<()> {
+    copy_files(
+        context.source_dirs().template_dir(),
+        context.work_dir().config_dir(),
+    )?;
 
-    copy_files(source_dirs.files_dir(), work_dir.input_dir())?;
+    copy_files(
+        context.source_dirs().files_dir(),
+        context.work_dir().input_dir(),
+    )?;
 
     Ok(())
 }
@@ -143,11 +149,11 @@ fn copy_files(source_dir: Utf8PathBuf, target_dir: Utf8PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn run_command(work_dir: &WorkDir, command: &str) -> Result<()> {
-    let arguments = format!("{} {}", get_fixed_arguments(work_dir), command);
+fn run_command(context: &mut TestContext, command: &str) -> Result<()> {
+    let arguments = format!("{} {}", get_fixed_arguments(context), command);
 
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
-    cmd.current_dir(work_dir.path());
+    cmd.current_dir(context.work_dir().path());
 
     for arg in arguments.split_whitespace() {
         cmd.arg(arg);
@@ -163,22 +169,24 @@ fn run_command(work_dir: &WorkDir, command: &str) -> Result<()> {
     Ok(())
 }
 
-fn get_fixed_arguments(work_dir: &WorkDir) -> String {
+fn get_fixed_arguments(context: &TestContext) -> String {
     format!(
         "--config-directory {} --run-id {}",
-        work_dir.config_dir(),
+        context.work_dir().config_dir(),
         TEST_RUN_ID
     )
 }
 
 fn verify_expectations(
-    work_dir: &WorkDir,
+    context: &mut TestContext,
     reference: &[String],
     previous_reference: Option<&[String]>,
 ) -> Result<()> {
     if let Some(previous_reference) = previous_reference {
-        let remaining_files =
-            get_still_existing_file_paths(&work_dir.path(), previous_reference);
+        let remaining_files = get_still_existing_file_paths(
+            &context.work_dir().path(),
+            previous_reference,
+        );
 
         if !remaining_files.is_empty() {
             return Err(eyre!(
@@ -188,7 +196,8 @@ fn verify_expectations(
         }
     }
 
-    let missing_files = get_missing_file_paths(&work_dir.path(), reference);
+    let missing_files =
+        get_missing_file_paths(&context.work_dir().path(), reference);
 
     if !missing_files.is_empty() {
         return Err(eyre!(

@@ -6,6 +6,25 @@ const TEST_CASE_DIR_NAME: &str = "cases";
 const FILES_DIR_NAME: &str = "files";
 const TEMPLATE_DIR_NAME: &str = "template";
 
+pub struct TestContext {
+    work_dir: WorkDir,
+    source_dirs: SourceDirs,
+}
+
+impl TestContext {
+    pub fn new(source_dirs: SourceDirs) -> Result<Self> {
+        Ok(Self { source_dirs, work_dir: WorkDir::new()? })
+    }
+
+    pub fn work_dir(&self) -> &WorkDir {
+        &self.work_dir
+    }
+
+    pub fn source_dirs(&self) -> &SourceDirs {
+        &self.source_dirs
+    }
+}
+
 #[derive(Clone)]
 pub struct SourceDirs {
     path: Utf8PathBuf,
