@@ -20,11 +20,11 @@ fn write_list_of_paths(
 
 #[derive(Default, Debug)]
 pub struct TestCaseOutcome {
-    pub name: String,
-    pub description: String,
-    pub work_dir: Utf8PathBuf,
-    pub missing_files: Option<Vec<Utf8PathBuf>>,
-    pub test_outcomes: Vec<TestOutcome>,
+    name: String,
+    description: String,
+    work_dir: Utf8PathBuf,
+    missing_files: Option<Vec<Utf8PathBuf>>,
+    test_outcomes: Vec<TestOutcome>,
 }
 
 impl TestCaseOutcome {
@@ -43,6 +43,14 @@ impl TestCaseOutcome {
 
     pub fn passed_initial_expectation(&self) -> bool {
         self.missing_files.as_ref().is_none_or(|m| m.is_empty())
+    }
+
+    pub fn missing_files_mut(&mut self) -> &mut Option<Vec<Utf8PathBuf>> {
+        &mut self.missing_files
+    }
+
+    pub fn test_outcomes_mut(&mut self) -> &mut Vec<TestOutcome> {
+        &mut self.test_outcomes
     }
 }
 
@@ -86,10 +94,10 @@ impl std::fmt::Display for TestCaseOutcome {
 
 #[derive(Default, Debug)]
 pub struct TestOutcome {
-    pub name: String,
-    pub command_outcome: Option<CommandOutcome>,
-    pub remaining_files: Option<Vec<Utf8PathBuf>>,
-    pub missing_files: Vec<Utf8PathBuf>,
+    name: String,
+    command_outcome: Option<CommandOutcome>,
+    missing_files: Vec<Utf8PathBuf>,
+    remaining_files: Option<Vec<Utf8PathBuf>>,
 }
 
 impl TestOutcome {
@@ -102,6 +110,18 @@ impl TestOutcome {
             .as_ref()
             .is_none_or(|remaining_files| remaining_files.is_empty())
             && self.missing_files.is_empty()
+    }
+
+    pub fn command_outcome_mut(&mut self) -> &mut Option<CommandOutcome> {
+        &mut self.command_outcome
+    }
+
+    pub fn missing_files_mut(&mut self) -> &mut Vec<Utf8PathBuf> {
+        &mut self.missing_files
+    }
+
+    pub fn remaining_files_mut(&mut self) -> &mut Option<Vec<Utf8PathBuf>> {
+        &mut self.remaining_files
     }
 }
 impl std::fmt::Display for TestOutcome {
@@ -149,11 +169,11 @@ impl std::fmt::Display for TestOutcome {
 
 #[derive(Debug)]
 pub struct CommandOutcome {
-    pub command: String,
-    pub success: bool,
-    pub exit_code: Option<i32>,
-    pub stdout: String,
-    pub stderr: String,
+    command: String,
+    success: bool,
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
 }
 
 impl CommandOutcome {

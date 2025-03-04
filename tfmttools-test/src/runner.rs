@@ -85,7 +85,7 @@ fn run_test_case(
     let mut previous_expectation =
         test_case_data.expectations().get(INITIAL_EXPECTATION_NAME);
 
-    test_case_outcome.missing_files =
+    *test_case_outcome.missing_files_mut() =
         previous_expectation.map(|initial_state| {
             let (missing_files, _) =
                 verify_expectations(&context, initial_state, None);
@@ -98,7 +98,7 @@ fn run_test_case(
             let mut test_outcome = TestOutcome::new(name.clone());
 
             if let Some(command) = test_data.command() {
-                test_outcome.command_outcome =
+                *test_outcome.command_outcome_mut() =
                     Some(run_command(&context, command)?);
             }
 
@@ -115,12 +115,12 @@ fn run_test_case(
                 previous_expectation.map(|v| &**v),
             );
 
-            test_outcome.missing_files = missing_files;
-            test_outcome.remaining_files = remaining_files;
+            *test_outcome.missing_files_mut() = missing_files;
+            *test_outcome.remaining_files_mut() = remaining_files;
 
             let passed = test_outcome.passed();
 
-            test_case_outcome.test_outcomes.push(test_outcome);
+            test_case_outcome.test_outcomes_mut().push(test_outcome);
 
             if !passed {
                 break;
