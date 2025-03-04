@@ -1,5 +1,5 @@
 {
-  "description": "Single apply, undo and redo of typical_input.tfmt with always copy",
+  "description": "Double apply, undo and redo of typical_input.tfmt",
   "reference": {
     "initial-state": [
       "input/Amon Amarth - Under Siege.mp3",
@@ -15,7 +15,7 @@
       "input/cover.jpg",
       "input/description.txt"
     ],
-    "apply": [
+    "apply1": [
       "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
       "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
       "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
@@ -26,22 +26,48 @@
       "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
       "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
       "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-      "config/bin/run_id/cover.jpg_1699048E",
-      "config/bin/run_id/description.txt_38C50732"
+      "config/bin/run_id/cover.jpg_1699048E:noprevious",
+      "config/bin/run_id/description.txt_38C50732:noprevious"
+    ],
+    "apply2": [
+      "output_dir2/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
+      "output_dir2/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
+      "output_dir2/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
+      "output_dir2/MASTER BOOT RECORD/WAREZ/Dune.mp3",
+      "output_dir2/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
+      "output_dir2/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
+      "output_dir2/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+      "output_dir2/Nightwish/2004 - Once/03 - Nemo.mp3",
+      "output_dir2/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
+      "output_dir2/Nightwish/While Your Lips Are Still Red.mp3",
+      "config/bin/run_id/cover.jpg_1699048E:noprevious",
+      "config/bin/run_id/description.txt_38C50732:noprevious"
     ]
   },
   "tests": {
     "apply": {
-      "command": "rename --yes --always-copy typical_input -- output_dir/",
-      "expectation": "apply"
+      "command": "rename --yes typical_input -- output_dir/",
+      "expectation": "apply1"
     },
-    "undo": {
+    "apply2": {
+      "command": "rename --yes typical_input -- output_dir2/",
+      "expectation": "apply2"
+    },
+    "undo1": {
+      "command": "undo --yes",
+      "expectation": "apply1"
+    },
+    "undo2": {
       "command": "undo --yes",
       "expectation": "initial-state"
     },
-    "redo": {
+    "redo1": {
       "command": "redo --yes",
-      "expectation": "apply"
+      "expectation": "apply1"
+    },
+    "redo2": {
+      "command": "redo --yes",
+      "expectation": "apply2"
     }
   }
 }

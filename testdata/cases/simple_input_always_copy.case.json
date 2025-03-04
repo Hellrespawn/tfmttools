@@ -1,5 +1,0 @@
-{
-  "extends": "simple_input",
-  "types": ["apply", "undo", "redo"],
-  "rename_arguments": ["--always-copy"]
-}
