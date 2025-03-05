@@ -3,7 +3,7 @@ use std::process::Output;
 use camino::Utf8PathBuf;
 
 fn mark(bool: bool) -> &'static str {
-    if bool { "✅" } else { "❌" }
+    if bool { "✓" } else { "✗" }
 }
 
 fn write_list_of_paths(
@@ -23,7 +23,6 @@ pub struct TestCaseOutcome {
     name: String,
     description: String,
     work_dir: Utf8PathBuf,
-    missing_files: Option<Vec<Utf8PathBuf>>,
     test_outcomes: Vec<TestOutcome>,
 }
 
@@ -32,25 +31,13 @@ impl TestCaseOutcome {
         name: String,
         description: String,
         work_dir: Utf8PathBuf,
+        test_outcomes: Vec<TestOutcome>,
     ) -> Self {
-        Self { name, description, work_dir, ..Default::default() }
+        Self { name, description, work_dir, test_outcomes }
     }
 
     pub fn passed(&self) -> bool {
-        self.passed_initial_expectation()
-            && self.test_outcomes.iter().all(|outcome| outcome.passed())
-    }
-
-    pub fn passed_initial_expectation(&self) -> bool {
-        self.missing_files.as_ref().is_none_or(|m| m.is_empty())
-    }
-
-    pub fn missing_files_mut(&mut self) -> &mut Option<Vec<Utf8PathBuf>> {
-        &mut self.missing_files
-    }
-
-    pub fn test_outcomes_mut(&mut self) -> &mut Vec<TestOutcome> {
-        &mut self.test_outcomes
+        self.test_outcomes.iter().all(|outcome| outcome.passed())
     }
 }
 
@@ -68,21 +55,6 @@ impl std::fmt::Display for TestCaseOutcome {
 
         writeln!(f)?;
 
-        if let Some(missing_files) = &self.missing_files {
-            writeln!(
-                f,
-                "{}: passed initial expectation",
-                mark(missing_files.is_empty())
-            )?;
-
-            if !missing_files.is_empty() {
-                writeln!(f, "Missing files:")?;
-                write_list_of_paths(f, missing_files, 0)?;
-            }
-        }
-
-        writeln!(f)?;
-
         for outcome in &self.test_outcomes {
             writeln!(f, "{}", outcome)?;
         }
@@ -96,32 +68,34 @@ impl std::fmt::Display for TestCaseOutcome {
 pub struct TestOutcome {
     name: String,
     command_outcome: Option<CommandOutcome>,
-    missing_files: Vec<Utf8PathBuf>,
     remaining_files: Option<Vec<Utf8PathBuf>>,
+    missing_files: Option<Vec<Utf8PathBuf>>,
 }
 
 impl TestOutcome {
-    pub fn new(name: String) -> Self {
-        Self { name, ..Default::default() }
+    pub fn new(
+        name: String,
+        command_outcome: Option<CommandOutcome>,
+        remaining_files: Option<Vec<Utf8PathBuf>>,
+        missing_files: Option<Vec<Utf8PathBuf>>,
+    ) -> Self {
+        Self { name, remaining_files, command_outcome, missing_files }
     }
 
     pub fn passed(&self) -> bool {
+        self.passed_remaining_files() && self.passed_missing_files()
+    }
+
+    fn passed_remaining_files(&self) -> bool {
         self.remaining_files
             .as_ref()
             .is_none_or(|remaining_files| remaining_files.is_empty())
-            && self.missing_files.is_empty()
     }
 
-    pub fn command_outcome_mut(&mut self) -> &mut Option<CommandOutcome> {
-        &mut self.command_outcome
-    }
-
-    pub fn missing_files_mut(&mut self) -> &mut Vec<Utf8PathBuf> {
-        &mut self.missing_files
-    }
-
-    pub fn remaining_files_mut(&mut self) -> &mut Option<Vec<Utf8PathBuf>> {
-        &mut self.remaining_files
+    fn passed_missing_files(&self) -> bool {
+        self.missing_files
+            .as_ref()
+            .is_none_or(|missing_files| missing_files.is_empty())
     }
 }
 impl std::fmt::Display for TestOutcome {
@@ -151,16 +125,21 @@ impl std::fmt::Display for TestOutcome {
 
             writeln!(f)?;
         }
-        writeln!(
-            f,
-            "{}: passed expectation",
-            mark(self.missing_files.is_empty())
-        )?;
 
-        if !self.missing_files.is_empty() {
-            writeln!(f, "Missing files:")?;
+        if let Some(missing_files) = &self.missing_files {
+            writeln!(
+                f,
+                "{}: passed previous expectation",
+                mark(missing_files.is_empty())
+            )?;
 
-            write_list_of_paths(f, &self.missing_files, 2)?;
+            if !missing_files.is_empty() {
+                writeln!(f, "Missing files:")?;
+
+                write_list_of_paths(f, missing_files, 2)?;
+            }
+
+            writeln!(f)?;
         }
 
         Ok(())

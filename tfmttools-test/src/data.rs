@@ -95,7 +95,8 @@ impl<'de> Deserialize<'de> for Expectation {
 #[derive(Debug, Deserialize)]
 pub struct TestData {
     command: Option<String>,
-    expectation: String,
+    expectation: Option<String>,
+    previous_expectation: Option<String>,
 }
 
 impl TestData {
@@ -103,7 +104,11 @@ impl TestData {
         self.command.as_ref()
     }
 
-    pub fn expectation(&self) -> &str {
-        &self.expectation
+    pub fn expectation(&self) -> Option<&String> {
+        self.expectation.as_ref()
+    }
+
+    pub fn previous_expectation(&self) -> Option<&String> {
+        self.previous_expectation.as_ref()
     }
 }

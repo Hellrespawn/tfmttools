@@ -33,15 +33,18 @@
   "tests": {
     "apply": {
       "command": "rename --yes simple_input",
-      "expectation": "apply"
+      "expectation": "apply",
+      "previous-expectation": "initial-state"
     },
     "undo": {
       "command": "undo --yes",
-      "expectation": "initial-state"
+      "expectation": "initial-state",
+      "previous-expectation": "apply"
     },
     "redo": {
       "command": "redo --yes",
-      "expectation": "apply"
+      "expectation": "apply",
+      "previous-expectation": "initial-state"
     }
   }
 }

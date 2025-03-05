@@ -47,27 +47,33 @@
   "tests": {
     "apply": {
       "command": "rename --yes typical_input -- output_dir/",
-      "expectation": "apply1"
+      "expectation": "apply1",
+      "previous-expectation": "initial-state"
     },
     "apply2": {
       "command": "rename --yes typical_input -- output_dir2/",
-      "expectation": "apply2"
+      "expectation": "apply2",
+      "previous-expectation": "apply1"
     },
     "undo1": {
       "command": "undo --yes",
-      "expectation": "apply1"
+      "expectation": "apply1",
+      "previous-expectation": "apply2"
     },
     "undo2": {
       "command": "undo --yes",
-      "expectation": "initial-state"
+      "expectation": "initial-state",
+      "previous-expectation": "apply1"
     },
     "redo1": {
       "command": "redo --yes",
-      "expectation": "apply1"
+      "expectation": "apply1",
+      "previous-expectation": "initial-state"
     },
     "redo2": {
       "command": "redo --yes",
-      "expectation": "apply2"
+      "expectation": "apply2",
+      "previous-expectation": "apply1"
     }
   }
 }
