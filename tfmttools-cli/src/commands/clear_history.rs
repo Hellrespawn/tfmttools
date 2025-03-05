@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use tfmttools_history_core::{History, LoadHistoryResult};
 
-use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
+use crate::paths::AppPaths;
 use crate::ui::ConfirmationPrompt;
 
 pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {

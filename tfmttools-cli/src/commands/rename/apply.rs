@@ -21,8 +21,10 @@ pub fn apply_actions(
     } else {
         validate_rename_action_errors(&rename_actions)?;
 
+        preview_rename_actions(context, &rename_actions)?;
+
         let confirmation = context.misc_options().no_confirm()
-            || confirm_rename_actions(context, &rename_actions)?;
+            || ConfirmationPrompt::new("Move files?").prompt()?;
 
         if confirmation {
             let applied_actions = move_files(context, rename_actions)?;
@@ -50,17 +52,6 @@ fn validate_rename_action_errors(
             .join("\n");
         Err(eyre!("Had validation errors:\n{error_string}"))
     }
-}
-
-fn confirm_rename_actions(
-    context: &RenameContext,
-    rename_actions: &[RenameAction],
-) -> Result<bool> {
-    preview_rename_actions(context, rename_actions)?;
-
-    let confirmation_prompt = ConfirmationPrompt::new("Move files?");
-
-    confirmation_prompt.prompt()
 }
 
 fn preview_rename_actions(

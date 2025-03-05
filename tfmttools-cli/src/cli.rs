@@ -15,7 +15,7 @@ use crate::commands::{
     RenameContext, RenameMiscOptions, RenameTemplateOptions, UndoRedoCommand,
     clear_history, list_templates, rename, show_history,
 };
-use crate::config::paths::AppPaths;
+use crate::paths::AppPaths;
 use crate::term::{show_cursor, terminal_height};
 use crate::ui::PreviewListSize;
 

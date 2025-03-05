@@ -3,7 +3,7 @@ use std::iter::repeat_with;
 use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_fs::{FileOrName, FsHandler, PathIteratorOptions};
 
-use crate::config::paths::AppPaths;
+use crate::paths::AppPaths;
 use crate::ui::PreviewListSize;
 
 #[derive(Debug)]

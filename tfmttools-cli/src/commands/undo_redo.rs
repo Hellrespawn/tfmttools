@@ -6,8 +6,8 @@ use tfmttools_history_core::{
     History, HistoryMode, LoadHistoryResult, RecordState,
 };
 
-use crate::config::paths::AppPaths;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
+use crate::paths::AppPaths;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, PreviewListSize};
 
 #[derive(Debug)]

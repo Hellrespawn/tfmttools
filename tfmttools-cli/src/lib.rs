@@ -6,8 +6,8 @@
 
 mod args;
 mod commands;
-mod config;
 mod history;
+mod paths;
 mod term;
 mod ui;
 

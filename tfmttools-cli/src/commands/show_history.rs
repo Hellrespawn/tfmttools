@@ -1,10 +1,10 @@
 use color_eyre::Result;
 use tfmttools_core::history::LoadActionHistoryResult;
 
-use crate::config::paths::AppPaths;
 use crate::history::{
     HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,
 };
+use crate::paths::AppPaths;
 
 pub fn show_history(app_paths: &AppPaths, verbosity: u8) -> Result<()> {
     let formatter = get_history_formatter(verbosity);
