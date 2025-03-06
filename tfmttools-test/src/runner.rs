@@ -34,11 +34,11 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
                 if outcome.passed() {
                     Ok(())
                 } else {
-                    // let error_message = format!("Failed test case {name}");
+                    let error_message = format!("Failed test case {name}");
 
-                    // mutex.lock()?.push(outcome);
+                    mutex.lock()?.push(outcome);
 
-                    Err(outcome.into())
+                    Err(error_message.into())
                 }
             })
         })

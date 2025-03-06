@@ -4,11 +4,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Test report: {{ name }}</title>
+
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+
+    <style type="text/tailwindcss">
+
+    </style>
 </head>
 
-<body>
-    {{ name }}
+<body class="bg-gray-100 dark:bg-gray-700">
+    <main class="container mx-auto">
+
+
+        <div
+            class="block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">
+
+            <h2 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{name}}</h2>
+            <p class="font-normal text-gray-700 dark:text-gray-400">{{description}}</p>
+        </div>
+
+
+
+        <table>
+            <tbody>
+                <tr>
+                    <th>Test case</th>
+                    <td>{{name}}</td>
+                </tr>
+                <tr>
+                    <td colspan="2">{{description}}</td>
+                </tr>
+                <tr>
+                    <th>Directory</th>
+                    <td>
+                        <pre>{{work_dir}}</pre>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        {% for outcome in test_outcomes %}
+        <div>
+            <h2>
+                {{outcome.name}}
+            </h2>
+            {% if outcome.command_outcome %}
+            <table>
+                <caption>
+                    CMD result
+                </caption>
+                <tbody>
+                    <tr>
+                        <th>Command</th>
+                        <td>
+                            <pre>{{ outcome.command_outcome.command }}</pre>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Success</th>
+                        <td>{{ outcome.command_outcome.success }}</td>
+                    </tr>
+                    <tr>
+                        <th>Exit code</th>
+                        <td>{{ outcome.command_outcome.exit_code }}</td>
+                    </tr>
+
+                    {% if outcome.command_outcome.stdout %}
+                    <tr>
+                        <th colspan="2">
+                            <pre>stdout</pre>
+                        </th>
+                    </tr>
+                    <tr>
+
+                        <td colspan="2">
+                            <pre>{{outcome.command_outcome.stdout}}</pre>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if outcome.command_outcome.stderr %}
+                    <tr>
+                        <th colspan="2">
+                            <pre>stderr</pre>
+                        </th>
+                    </tr>
+                    <tr>
+
+                        <td colspan="2">
+                            <pre>{{outcome.command_outcome.stderr}}</pre>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            {% endif %}
+
+
+            {%if outcome.remaining_files %}
+            <table>
+                <caption>
+                    Remaining files
+                </caption>
+                <tbody>
+                    {% for file in outcome.remaining_files %}
+                    <tr>
+                        <td>
+                            {{file}}
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+
+            {%if outcome.missing_files %}
+            <table>
+                <caption>
+                    Missing files
+                </caption>
+                <tbody>
+                    {% for file in outcome.missing_files %}
+                    <tr>
+                        <td>
+                            {{file}}
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </main>
 </body>
 
 </html>

@@ -60,3 +60,6 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 [profile.release]
 strip = true # Automatically strip symbols from the binary.
 lto = "thin"
+
+[workspace.metadata.bacon]
+watch = ["tfmttools-test/testdata/test-template.html"]
