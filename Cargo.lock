@@ -1260,6 +1260,7 @@ dependencies = [
  "fs-err",
  "indexmap",
  "libtest-mimic",
+ "minijinja",
  "serde",
  "serde_json",
  "tfmttools-fs",

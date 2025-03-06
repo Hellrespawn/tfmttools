@@ -1,6 +1,7 @@
 use std::process::Output;
 
 use camino::Utf8PathBuf;
+use serde::Serialize;
 
 fn mark(bool: bool) -> &'static str {
     if bool { "✓" } else { "✗" }
@@ -18,7 +19,7 @@ fn write_list_of_paths(
     Ok(())
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize, Clone)]
 pub struct TestCaseOutcome {
     name: String,
     description: String,
@@ -38,6 +39,10 @@ impl TestCaseOutcome {
 
     pub fn passed(&self) -> bool {
         self.test_outcomes.iter().all(|outcome| outcome.passed())
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -64,7 +69,7 @@ impl std::fmt::Display for TestCaseOutcome {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Serialize, Clone)]
 pub struct TestOutcome {
     name: String,
     command_outcome: Option<CommandOutcome>,
@@ -146,7 +151,7 @@ impl std::fmt::Display for TestOutcome {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Clone)]
 pub struct CommandOutcome {
     command: String,
     success: bool,

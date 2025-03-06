@@ -1,11 +1,13 @@
 use std::error::Error;
 use std::process::ExitCode;
+use std::sync::{Arc, Mutex};
 
 use assert_cmd::Command;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
+use minijinja::Environment;
 use tfmttools_fs::PathIterator;
 
 use crate::context::{SourceDirs, TestContext};
@@ -18,9 +20,38 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let args = Arguments::from_args();
 
     let data = load_data()?;
-    let tests = generate_tests(data);
 
-    Ok(libtest_mimic::run(&args, tests).exit_code())
+    let arc = Arc::new(Mutex::new(Vec::new()));
+
+    let tests = data
+        .into_iter()
+        .map(|(name, data)| {
+            let mutex = arc.clone();
+
+            Trial::test(name.clone(), move || {
+                let outcome = run_test_case(name.clone(), data)?;
+
+                if outcome.passed() {
+                    Ok(())
+                } else {
+                    // let error_message = format!("Failed test case {name}");
+
+                    // mutex.lock()?.push(outcome);
+
+                    Err(outcome.into())
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let exit_code = libtest_mimic::run(&args, tests).exit_code();
+
+    let failed_test_outcomes =
+        Arc::into_inner(arc).expect("Arc dropped").into_inner()?;
+
+    create_test_reports(failed_test_outcomes)?;
+
+    Ok(exit_code)
 }
 
 fn load_data() -> Result<Vec<(String, TestCaseData)>> {
@@ -45,19 +76,6 @@ fn load_data() -> Result<Vec<(String, TestCaseData)>> {
         })
         .collect()
 }
-
-fn generate_tests(data: Vec<(String, TestCaseData)>) -> Vec<Trial> {
-    data.into_iter()
-        .map(|(name, data)| {
-            Trial::test(name.clone(), || {
-                let outcome = run_test_case(name, data)?;
-
-                if outcome.passed() { Ok(()) } else { Err(outcome.into()) }
-            })
-        })
-        .collect::<Vec<_>>()
-}
-
 fn run_test_case(
     test_case_name: String,
     test_case_data: TestCaseData,
@@ -219,4 +237,30 @@ fn get_missing_file_paths(
         .filter(|expectation| !expectation.verify_exists(prefix))
         .map(|e| e.path().to_owned())
         .collect()
+}
+
+fn create_test_reports(
+    failed_test_outcomes: Vec<TestCaseOutcome>,
+) -> Result<()> {
+    let template =
+        fs_err::read_to_string(SourceDirs::test_report_template_path())?;
+
+    let mut environment = Environment::new();
+    environment.add_template_owned("report", template)?;
+
+    let template = environment.get_template("report")?;
+
+    fs_err::create_dir_all(SourceDirs::test_report_output_dir())?;
+
+    for outcome in failed_test_outcomes {
+        let rendered = template.render(&outcome)?;
+
+        fs_err::write(
+            SourceDirs::test_report_output_dir()
+                .join(format!("{}.report.html", outcome.name())),
+            rendered,
+        )?
+    }
+
+    Ok(())
 }

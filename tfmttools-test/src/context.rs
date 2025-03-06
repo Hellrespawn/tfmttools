@@ -2,13 +2,16 @@ use assert_fs::TempDir;
 use camino::Utf8PathBuf;
 use color_eyre::Result;
 
-const TEST_DATA_DIRECTORY: &str = "../testdata";
+const TEST_DATA_DIRECTORY: &str = "../tfmttools-test/testdata";
 const TEST_CASE_DIR_NAME: &str = "cases";
 const FILES_DIR_NAME: &str = "files";
 const TEMPLATE_DIR_NAME: &str = "template";
 
 const INPUT_DIR_NAME: &str = "input";
 const CONFIG_DIR_NAME: &str = "config";
+
+const TEST_REPORT_TEMPLATE_NAME: &str = "test-template.html";
+const TEST_REPORT_DIR: &str = "report";
 
 pub struct TestContext {
     temp_dir: TempDir,
@@ -53,5 +56,13 @@ impl SourceDirs {
 
     pub fn template_dir() -> Utf8PathBuf {
         Self::test_data_dir().join(TEMPLATE_DIR_NAME)
+    }
+
+    pub fn test_report_template_path() -> Utf8PathBuf {
+        Self::test_data_dir().join(TEST_REPORT_TEMPLATE_NAME)
+    }
+
+    pub fn test_report_output_dir() -> Utf8PathBuf {
+        Self::test_data_dir().join(TEST_REPORT_DIR)
     }
 }
