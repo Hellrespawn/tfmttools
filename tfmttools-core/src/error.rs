@@ -25,9 +25,6 @@ pub enum TFMTError {
     Camino(#[from] camino::FromPathBufError),
 
     #[error(transparent)]
-    Id3(#[from] id3::Error),
-
-    #[error(transparent)]
     Ignore(#[from] ignore::Error),
 
     #[error(transparent)]
