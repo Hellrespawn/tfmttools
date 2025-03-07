@@ -11,6 +11,7 @@ use tfmttools_history_core::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
 use super::RenameContext;
+use crate::term::current_dir_utf8;
 use crate::ui::ProgressBar;
 
 pub fn create_actions(
@@ -30,7 +31,7 @@ pub fn create_actions(
         },
         FileOrName::Name(_) => {
             TemplateLoader::read_directory(
-                context.template_options().template_directory(),
+                context.rename_options().template_directory(),
             )
         },
     }?;
@@ -44,7 +45,7 @@ pub fn create_actions(
     let metadata = ActionRecordMetadata::new(
         template_name.to_owned(),
         arguments.clone(),
-        context.misc_options().run_id().to_owned(),
+        context.app_options().run_id().to_owned(),
     );
 
     let paths = gather_file_paths(context);
@@ -66,12 +67,12 @@ fn get_template_name_and_arguments(
     history: &mut impl History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<(FileOrName, Vec<String>)> {
-    if let Some(file_or_name) = context.template_options().template() {
+    if let Some(file_or_name) = context.rename_options().template() {
         debug!("Using template and arguments from command line.");
 
         Ok((
             file_or_name.clone(),
-            context.template_options().arguments().to_vec(),
+            context.rename_options().arguments().to_vec(),
         ))
     } else {
         if let LoadHistoryResult::Loaded = load_history_result {
@@ -156,11 +157,11 @@ fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
 }
 
 fn create_rename_actions(
-    context: &RenameContext,
+    _context: &RenameContext,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<RenameAction>> {
-    let cwd = context.app_paths().working_directory()?;
+    let cwd = current_dir_utf8()?;
 
     let bar = ProgressBar::bar(
         "Determining output paths:",

@@ -1,4 +1,3 @@
-use camino::Utf8PathBuf;
 use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
@@ -12,12 +11,11 @@ use tracing_subscriber::{EnvFilter, fmt, registry};
 
 use crate::args::{TFMTArgs, TFMTSubcommand};
 use crate::commands::{
-    RenameContext, RenameMiscOptions, RenameTemplateOptions, UndoRedoCommand,
-    clear_history, list_templates, rename, show_history,
+    RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
+    show_history,
 };
-use crate::paths::AppPaths;
-use crate::term::{show_cursor, terminal_height};
-use crate::ui::PreviewListSize;
+use crate::options::{ConfirmMode, RenameOptions, TFMTOptions};
+use crate::term::show_cursor;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
@@ -63,86 +61,60 @@ fn run(args: TFMTArgs) -> Result<()> {
     if args.dry_run {
         println!("Doing dry run. No files will be modified.");
     }
-    let app_paths = AppPaths::from_args(&args)?;
-    let fs_handler = FsHandler::new(args.dry_run);
-
-    let preview_list_size = args
-        .preview_list_size
-        .unwrap_or_else(|| PreviewListSize::new(terminal_height()));
+    let app_options = TFMTOptions::try_from(&args)?;
+    let fs_handler = FsHandler::new(app_options.action_mode());
 
     install_restore_cursor_hooks();
 
     match args.command {
         TFMTSubcommand::ClearHistory => {
-            clear_history(&app_paths, args.dry_run)?;
+            clear_history(&app_options)?;
         },
-        TFMTSubcommand::Templates(list_templates_args) => {
+        TFMTSubcommand::ListTemplates(list_templates_args) => {
             let template_directory = list_templates_args
                 .custom_template_directory
-                .unwrap_or(app_paths.config_directory().to_owned());
+                .unwrap_or(app_options.config_directory().to_owned());
 
             list_templates(&template_directory)?;
         },
         TFMTSubcommand::Rename(rename_args) => {
-            let input_directory =
-                get_input_directory(rename_args.custom_input_directory)?;
-
-            let template_directory = rename_args
-                .custom_template_directory
-                .unwrap_or(app_paths.config_directory().to_owned());
+            let rename_options =
+                RenameOptions::try_from((rename_args, &app_options))?;
 
             let path_iterator_options = PathIteratorOptions::with_depth(
-                &input_directory,
-                rename_args.recursion_depth,
+                rename_options.input_directory(),
+                rename_options.recursion_depth(),
             );
-
-            let template_options = RenameTemplateOptions::new(
-                template_directory,
-                rename_args.template,
-                rename_args.arguments,
-            );
-
-            let mut misc_options = RenameMiscOptions::new(
-                rename_args.always_copy,
-                rename_args.yes,
-                args.dry_run,
-                preview_list_size,
-            );
-
-            if let Some(run_id) = args.custom_run_id {
-                misc_options = misc_options.with_run_id(run_id);
-            }
 
             let rename_context = RenameContext::new(
-                &app_paths,
                 &fs_handler,
                 &path_iterator_options,
-                &template_options,
-                &misc_options,
+                &app_options,
+                &rename_options,
             );
 
             rename(&rename_context)?;
         },
-        TFMTSubcommand::Undo(undo_redo) => {
+        TFMTSubcommand::Undo(undo_redo_args) => {
             UndoRedoCommand::new(
-                undo_redo.yes,
-                undo_redo.amount.unwrap_or(1),
+                matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
+                undo_redo_args.amount.unwrap_or(1),
                 HistoryMode::Undo,
-                preview_list_size,
+                app_options.preview_list_size(),
             )
-            .run(&app_paths, &fs_handler)?;
+            .run(&app_options, &fs_handler)?;
         },
-        TFMTSubcommand::Redo(undo_redo) => {
+        TFMTSubcommand::Redo(undo_redo_args) => {
             UndoRedoCommand::new(
-                undo_redo.yes,
-                undo_redo.amount.unwrap_or(1),
+                matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
+                undo_redo_args.amount.unwrap_or(1),
                 HistoryMode::Redo,
-                preview_list_size,
+                app_options.preview_list_size(),
             )
-            .run(&app_paths, &fs_handler)?;
+            .run(&app_options, &fs_handler)?;
         },
-        TFMTSubcommand::History(show_history_args) => {
-            show_history(&app_paths, show_history_args.verbose)?;
+        TFMTSubcommand::ShowHistory => {
+            show_history(&app_options)?;
         },
     }
 
@@ -191,23 +163,4 @@ fn install_restore_cursor_hooks() {
         std::process::exit(-1);
     })
     .expect("Unable to intercept Ctrl-c.");
-}
-
-pub fn default_input_dir() -> Result<Utf8PathBuf> {
-    let path = std::env::current_dir()?;
-
-    Ok(path.clone().try_into()?)
-}
-
-fn get_input_directory(
-    custom_input_directory: Option<Utf8PathBuf>,
-) -> Result<Utf8PathBuf> {
-    let input_directory = if let Some(input_directory) = custom_input_directory
-    {
-        Ok(input_directory)
-    } else {
-        default_input_dir()
-    }?;
-
-    Ok(input_directory)
 }

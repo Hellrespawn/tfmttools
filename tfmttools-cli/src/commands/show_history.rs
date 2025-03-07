@@ -4,13 +4,13 @@ use tfmttools_core::history::LoadActionHistoryResult;
 use crate::history::{
     HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,
 };
-use crate::paths::AppPaths;
+use crate::options::TFMTOptions;
 
-pub fn show_history(app_paths: &AppPaths, verbosity: u8) -> Result<()> {
-    let formatter = get_history_formatter(verbosity);
+pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
+    let formatter = get_history_formatter(app_options.verbosity());
 
     let (mut history, load_history_result) =
-        load_history(&app_paths.history_file())?;
+        load_history(&app_options.history_file_path())?;
 
     match load_history_result {
         LoadActionHistoryResult::Loaded => {

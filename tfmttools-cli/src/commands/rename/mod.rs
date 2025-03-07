@@ -5,7 +5,7 @@ mod setup;
 
 use camino::Utf8Path;
 use color_eyre::Result;
-pub use context::{RenameContext, RenameMiscOptions, RenameTemplateOptions};
+pub use context::RenameContext;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_fs::ActionHandler;
@@ -14,7 +14,7 @@ use crate::history::load_history;
 
 pub fn rename(context: &RenameContext) -> Result<()> {
     let (mut history, load_history_result) =
-        load_history(&context.app_paths().history_file())?;
+        load_history(&context.app_options().history_file_path())?;
 
     let (rename_actions, metadata) =
         setup::create_actions(context, &mut history, load_history_result)?;
@@ -37,13 +37,9 @@ fn move_files_iter(
     initial_actions
         .into_iter()
         .map(|action| {
-            let handler = ActionHandler::new(
-                context.fs_handler(),
-                context.misc_options().always_copy(),
-                false,
-            );
+            let handler = ActionHandler::new(context.fs_handler(), false);
 
-            Ok(handler.apply(action)?)
+            Ok(handler.apply(action, context.rename_options().move_mode())?)
         })
         .flatten_ok()
 }

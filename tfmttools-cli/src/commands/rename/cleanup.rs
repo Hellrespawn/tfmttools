@@ -8,6 +8,7 @@ use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_core::util::ActionMode;
 use tfmttools_fs::{
     ActionHandler, PathIterator, PathIteratorOptions, get_longest_common_prefix,
 };
@@ -15,6 +16,8 @@ use tfmttools_history_core::{History, HistoryError};
 use tracing::{debug, trace};
 
 use super::RenameContext;
+use crate::options::ConfirmMode;
+use crate::term::current_dir_utf8;
 use crate::ui::{ConfirmationPrompt, PreviewList};
 
 const IMAGE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
@@ -45,7 +48,7 @@ fn handle_remaining_files(
         let has_unknown_files =
             files.iter().any(|path| !file_is_safe_to_delete(path));
 
-        let run_id = context.misc_options().run_id();
+        let run_id = context.app_options().run_id();
 
         if has_unknown_files {
             println!("Found {} remaining files.", files.len());
@@ -57,8 +60,11 @@ fn handle_remaining_files(
                 .map(|path| create_rename_action(context, path.clone(), run_id))
                 .collect::<Result<Vec<_>>>()?;
 
-            let confirmation = context.misc_options().no_confirm()
-                || ConfirmationPrompt::new("Delete these remaining files?")
+            let confirmation =
+                matches!(
+                    context.app_options().confirm_mode(),
+                    ConfirmMode::NoConfirm
+                ) || ConfirmationPrompt::new("Delete these remaining files?")
                     .prompt()?;
 
             if !confirmation {
@@ -144,7 +150,7 @@ fn create_rename_action(
 
     let rename_action = RenameAction::new(
         path,
-        context.app_paths().bin_directory().join(run_id).join(target_name),
+        context.rename_options().bin_directory().join(run_id).join(target_name),
     );
 
     trace!("Created rename action: {rename_action:?}");
@@ -164,13 +170,13 @@ fn preview_files_to_delete(
     context: &RenameContext,
     paths: &[Utf8PathBuf],
 ) -> Result<()> {
-    let working_directory = context.app_paths().working_directory()?;
+    let working_directory = current_dir_utf8()?;
 
     let items = PreviewList::new(
         paths
             .iter()
             .map(|path| super::strip_path_prefix(path, &working_directory)),
-        context.misc_options().preview_list_size(),
+        context.app_options().preview_list_size(),
     )
     .into_string()?;
 
@@ -190,16 +196,17 @@ fn remove_directories(
     context: &RenameContext,
     directories: Vec<Utf8PathBuf>,
 ) -> Result<Vec<Action>> {
-    let handler = ActionHandler::new(
-        context.fs_handler(),
-        context.misc_options().always_copy(),
-        false,
-    );
+    let handler = ActionHandler::new(context.fs_handler(), false);
 
     directories
         .into_iter()
         .rev()
-        .map(|path| Ok(handler.apply(Action::RemoveDir(path))?))
+        .map(|path| {
+            Ok(handler.apply(
+                Action::RemoveDir(path),
+                context.rename_options().move_mode(),
+            )?)
+        })
         .flatten_ok()
         .collect()
 }
@@ -210,7 +217,7 @@ fn store_history(
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
-    if context.misc_options().dry_run() {
+    if matches!(context.app_options().action_mode(), ActionMode::DryRun) {
         Ok(())
     } else {
         history.push(actions, metadata)?;
@@ -224,7 +231,7 @@ fn store_history(
             result?;
             println!(
                 "Saved run #{} to history.",
-                context.misc_options().run_id()
+                context.app_options().run_id()
             );
             Ok(())
         }

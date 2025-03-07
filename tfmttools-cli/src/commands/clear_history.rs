@@ -1,12 +1,13 @@
 use color_eyre::Result;
+use tfmttools_core::util::ActionMode;
 use tfmttools_history_core::{History, LoadHistoryResult};
 
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
-use crate::paths::AppPaths;
+use crate::options::TFMTOptions;
 use crate::ui::ConfirmationPrompt;
 
-pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {
-    let path = &app_paths.history_file();
+pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
+    let path = &app_options.history_file_path();
 
     let (mut history, load_history_result) = load_history(path)?;
 
@@ -24,7 +25,7 @@ pub fn clear_history(app_paths: &AppPaths, dry_run: bool) -> Result<()> {
             ConfirmationPrompt::new("Remove history file?").prompt()?;
 
         if confirmation {
-            if !dry_run {
+            if matches!(app_options.action_mode(), ActionMode::Default) {
                 history.remove()?;
             }
 

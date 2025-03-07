@@ -4,6 +4,8 @@ use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
 use tracing::info;
 
 use super::RenameContext;
+use crate::options::ConfirmMode;
+use crate::term::current_dir_utf8;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
 
 pub fn apply_actions(
@@ -23,8 +25,11 @@ pub fn apply_actions(
 
         preview_rename_actions(context, &rename_actions)?;
 
-        let confirmation = context.misc_options().no_confirm()
-            || ConfirmationPrompt::new("Move files?").prompt()?;
+        let confirmation = matches!(
+            context.app_options().confirm_mode(),
+            ConfirmMode::NoConfirm
+        ) || ConfirmationPrompt::new("Move files?")
+            .prompt()?;
 
         if confirmation {
             let applied_actions = move_files(context, rename_actions)?;
@@ -58,14 +63,14 @@ fn preview_rename_actions(
     context: &RenameContext,
     rename_actions: &[RenameAction],
 ) -> Result<()> {
-    let working_directory = context.app_paths().working_directory()?;
+    let working_directory = current_dir_utf8()?;
 
     let iter = rename_actions.iter().map(|rename_action| {
         super::strip_path_prefix(rename_action.target(), &working_directory)
     });
 
     let preview_list =
-        PreviewList::new(iter, context.misc_options().preview_list_size())
+        PreviewList::new(iter, context.app_options().preview_list_size())
             .with_item_name(ItemName::simple("destination"));
 
     preview_list.print()?;

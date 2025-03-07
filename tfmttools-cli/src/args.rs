@@ -5,10 +5,6 @@ use tracing::debug;
 
 use crate::ui::PreviewListSize;
 
-fn default_recursion_depth() -> usize {
-    4
-}
-
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
@@ -20,6 +16,14 @@ pub struct TFMTArgs {
     /// Don't actually perform actions.
     #[arg(short, long)]
     pub dry_run: bool,
+
+    /// Don't display progress bars.
+    #[arg(long)]
+    pub simple: bool,
+
+    #[arg(short, long, alias = "yes")]
+    /// Skips confirmation prompt. Suitable for non-interactive use.
+    pub no_confirm: bool,
 
     #[command(subcommand)]
     pub command: TFMTSubcommand,
@@ -50,30 +54,30 @@ pub enum TFMTSubcommand {
     /// Clear the rename history.
     ClearHistory,
 
-    #[command(alias = "show-history")]
+    #[command(alias = "history")]
     /// Show a summary of the rename history.
-    History(History),
+    ShowHistory,
 
-    #[command(alias = "list-templates")]
+    #[command(alias = "templates")]
     /// Show a summary of template in the current and application directory.
-    Templates(Templates),
+    ListTemplates(ListTemplatesArgs),
 
     /// Use a template to rename audio files according to their tags.
-    Rename(Rename),
+    Rename(RenameArgs),
 
     /// Undo actions.
-    Undo(UndoRedo),
+    Undo(UndoRedoArgs),
 
     /// Redo actions.
-    Redo(UndoRedo),
+    Redo(UndoRedoArgs),
 }
 
 impl TFMTSubcommand {
     pub fn name(&self) -> String {
         match self {
             TFMTSubcommand::ClearHistory => "clear-history",
-            TFMTSubcommand::History(..) => "history",
-            TFMTSubcommand::Templates(..) => "templates",
+            TFMTSubcommand::ShowHistory => "history",
+            TFMTSubcommand::ListTemplates(..) => "list-templates",
             TFMTSubcommand::Rename(..) => "rename",
             TFMTSubcommand::Undo(..) => "undo",
             TFMTSubcommand::Redo(..) => "redo",
@@ -83,21 +87,21 @@ impl TFMTSubcommand {
 }
 
 #[derive(Args, Debug)]
-pub struct History {
+pub struct ShowHistoryArgs {
     #[arg(short, long, action = clap::ArgAction::Count)]
     /// Increase output verbosity.
     pub verbose: u8,
 }
 
 #[derive(Args, Debug)]
-pub struct Templates {
+pub struct ListTemplatesArgs {
     #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 }
 
 #[derive(Args, Debug)]
-pub struct Rename {
+pub struct RenameArgs {
     #[arg(short = 'i', long = "input-directory")]
     /// Directory to scan for input files. Defaults to the current directory.
     pub custom_input_directory: Option<Utf8PathBuf>,
@@ -110,13 +114,9 @@ pub struct Rename {
     /// Directory to move deleted covers and such to. Defaults to a subfolder of the configuration directory
     pub custom_bin_directory: Option<Utf8PathBuf>,
 
-    #[arg(short, long, default_value_t = default_recursion_depth())]
-    /// Set custom recursion depth for scan.
-    pub recursion_depth: usize,
-
     #[arg(short, long)]
-    /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub yes: bool,
+    /// Set custom recursion depth for scan.
+    pub recursion_depth: Option<usize>,
 
     /// Path to or name of template.
     pub template: Option<FileOrName>,
@@ -133,18 +133,10 @@ pub struct Seed {
     #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
-
-    #[arg(short, long)]
-    /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub yes: bool,
 }
 
 #[derive(Args, Debug)]
-pub struct UndoRedo {
-    #[arg(short, long)]
-    /// Skips confirmation prompt. Suitable for non-interactive use.
-    pub yes: bool,
-
+pub struct UndoRedoArgs {
     /// Amount of actions.
     pub amount: Option<usize>,
 }

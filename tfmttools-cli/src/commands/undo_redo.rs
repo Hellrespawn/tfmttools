@@ -7,7 +7,7 @@ use tfmttools_history_core::{
 };
 
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
-use crate::paths::AppPaths;
+use crate::options::TFMTOptions;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, PreviewListSize};
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl UndoRedoCommand {
 
     pub fn run(
         &self,
-        app_paths: &AppPaths,
+        app_options: &TFMTOptions,
         fs_handler: &FsHandler,
     ) -> Result<()> {
         let verb = match self.mode {
@@ -48,7 +48,7 @@ impl UndoRedoCommand {
         };
 
         let (mut history, load_history_result) =
-            load_history(&app_paths.history_file())?;
+            load_history(&app_options.history_file_path())?;
 
         match load_history_result {
             LoadHistoryResult::New => {
@@ -141,7 +141,7 @@ impl UndoRedoCommand {
         records: Vec<ActionRecord>,
         fs_handler: &FsHandler,
     ) -> Result<()> {
-        let action_handler = ActionHandler::new(fs_handler, false, true);
+        let action_handler = ActionHandler::new(fs_handler, true);
 
         for record in records {
             println!(

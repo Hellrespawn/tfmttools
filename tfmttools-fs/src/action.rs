@@ -1,28 +1,28 @@
 use tfmttools_core::action::Action;
 use tfmttools_core::error::TFMTResult;
+use tfmttools_core::util::MoveMode;
 use tracing::trace;
 
 use crate::fs::{FsHandler, MoveFileResult};
 
 pub struct ActionHandler<'a> {
     fs_handler: &'a FsHandler,
-    always_copy: bool,
     allow_remove: bool,
 }
 
 impl<'a> ActionHandler<'a> {
-    pub fn new(
-        fs_handler: &'a FsHandler,
-        always_copy: bool,
-        allow_remove: bool,
-    ) -> Self {
-        Self { fs_handler, always_copy, allow_remove }
+    pub fn new(fs_handler: &'a FsHandler, allow_remove: bool) -> Self {
+        Self { fs_handler, allow_remove }
     }
 
-    pub fn apply(&self, action: Action) -> TFMTResult<Vec<Action>> {
+    pub fn apply(
+        &self,
+        action: Action,
+        move_mode: MoveMode,
+    ) -> TFMTResult<Vec<Action>> {
         let actions = match action {
             Action::MoveFile(rename_action) => {
-                if self.always_copy {
+                if matches!(move_mode, MoveMode::AlwaysCopy) {
                     self.fs_handler.copy_file(
                         rename_action.source(),
                         rename_action.target(),

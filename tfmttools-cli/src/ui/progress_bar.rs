@@ -65,11 +65,6 @@ impl ProgressBar {
                 )
             },
         };
-
-        #[cfg(test)]
-        let draw_target = ProgressDrawTarget::stdout();
-
-        #[cfg(not(test))]
         let draw_target = ProgressDrawTarget::stderr();
 
         hide_cursor();
@@ -99,17 +94,8 @@ impl ProgressBar {
         self.inner.abandon();
 
         if self.println_on_finish {
-            #[cfg(test)]
-            {
-                println!();
-                println!();
-            }
-
-            #[cfg(not(test))]
-            {
-                eprintln!();
-                eprintln!();
-            }
+            eprintln!();
+            eprintln!();
         }
 
         show_cursor();
