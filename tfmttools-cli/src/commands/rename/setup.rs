@@ -52,7 +52,7 @@ pub fn create_actions(
 
     debug!("Read {} files.", paths.len());
 
-    let audio_files = read_files(paths)?;
+    let audio_files = read_files(context, paths)?;
 
     debug!("Found {} audio files.", audio_files.len());
 
@@ -103,6 +103,7 @@ fn get_template_name_and_arguments(
 
 fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
     let spinner = ProgressBar::spinner(
+        context.app_options().display_mode(),
         "audio",
         "total files",
         "Gathering files...",
@@ -126,8 +127,12 @@ fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
     file_paths
 }
 
-fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
+fn read_files(
+    context: &RenameContext,
+    file_paths: Vec<Utf8PathBuf>,
+) -> Result<Vec<AudioFile>> {
     let bar = ProgressBar::bar(
+        context.app_options().display_mode(),
         "Reading files...",
         "Read files.",
         file_paths.len() as u64,
@@ -157,13 +162,14 @@ fn read_files(file_paths: Vec<Utf8PathBuf>) -> Result<Vec<AudioFile>> {
 }
 
 fn create_rename_actions(
-    _context: &RenameContext,
+    context: &RenameContext,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<RenameAction>> {
     let cwd = current_dir_utf8()?;
 
     let bar = ProgressBar::bar(
+        context.app_options().display_mode(),
         "Determining output paths:",
         "Determined output paths.",
         files.len() as u64,

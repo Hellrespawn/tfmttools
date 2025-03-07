@@ -176,26 +176,23 @@ fn copy_files(source_dir: Utf8PathBuf, target_dir: Utf8PathBuf) -> Result<()> {
 }
 
 fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
-    let arguments = format!("{} {}", get_fixed_arguments(context), command);
-
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
     cmd.current_dir(context.work_dir_path());
 
-    for arg in arguments.split_whitespace() {
+    cmd.arg("--config-directory");
+    cmd.arg(context.config_work_dir());
+    cmd.arg("--run-id");
+    cmd.arg(TEST_RUN_ID);
+
+    for arg in command.split_whitespace() {
         cmd.arg(arg);
     }
 
     let output = cmd.output()?;
+    let arguments =
+        cmd.get_args().map(|arg| arg.to_string_lossy().to_string()).collect();
 
     Ok(CommandOutcome::new(arguments, output))
-}
-
-fn get_fixed_arguments(context: &TestContext) -> String {
-    format!(
-        "--config-directory {} --run-id {}",
-        context.config_work_dir(),
-        TEST_RUN_ID
-    )
 }
 
 fn verify_expectations(

@@ -26,8 +26,8 @@
       "Nightwish/Elvenpath (Live).mp3",
       "Nightwish/Nemo.mp3",
       "Nightwish/While Your Lips Are Still Red.mp3",
-      "config/bin/run_id/cover.jpg_1699048E",
-      "config/bin/run_id/description.txt_38C50732"
+      "config/trash/run_id/cover.jpg_1699048E",
+      "config/trash/run_id/description.txt_38C50732"
     ]
   },
   "tests": {
@@ -35,17 +35,17 @@
       "expectation": "initial-state"
     },
     "apply": {
-      "command": "rename --yes simple_input",
+      "command": "--simple --yes rename simple_input",
       "expectation": "apply",
       "previous-expectation": "initial-state"
     },
     "undo": {
-      "command": "undo --yes",
+      "command": "--simple --yes undo",
       "expectation": "initial-state",
       "previous-expectation": "apply"
     },
     "redo": {
-      "command": "redo --yes",
+      "command": "--simple --yes redo",
       "expectation": "apply",
       "previous-expectation": "initial-state"
     }

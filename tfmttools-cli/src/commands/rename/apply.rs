@@ -83,6 +83,7 @@ fn move_files(
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
     let bar = ProgressBar::bar(
+        context.app_options().display_mode(),
         "Moving files:",
         "Moved files.",
         rename_actions.len() as u64,

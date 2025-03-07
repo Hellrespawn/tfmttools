@@ -29,10 +29,13 @@
 
                 {% if outcome.command_outcome %}
                 <div>
-                    <h3>Command</h3>
+                    <h3>Command arguments</h3>
 
-                    <pre><samp>{{ outcome.command_outcome.command }}</samp></pre>
-
+                    <pre><samp>
+                    {% for arg in outcome.command_outcome.arguments %}
+                        {{- arg }}
+                    {% endfor -%}
+                    </samp></pre>
                     <p>
                         <span>
                             {% if outcome.command_outcome.success %}
@@ -47,7 +50,7 @@
                     {% if outcome.command_outcome.stdout %}
                     <h3><code>stdout</code></h3>
                     <p>
-                        <pre>
+                    <pre>
                             <code>{{outcome.command_outcome.stdout}}</code>
                         </pre>
                     </p>
@@ -56,7 +59,7 @@
                     {% if outcome.command_outcome.stderr %}
                     <h3><code>stderr</code></h3>
                     <p>
-                        <pre>
+                    <pre>
                             <code>{{outcome.command_outcome.stderr}}</code>
                         </pre>
                     </p>

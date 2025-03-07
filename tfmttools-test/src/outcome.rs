@@ -162,7 +162,7 @@ impl std::fmt::Display for TestOutcome {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct CommandOutcome {
-    command: String,
+    arguments: Vec<String>,
     success: bool,
     exit_code: Option<i32>,
     stdout: String,
@@ -170,19 +170,19 @@ pub struct CommandOutcome {
 }
 
 impl CommandOutcome {
-    pub fn new(command: String, output: Output) -> Self {
+    pub fn new(arguments: Vec<String>, output: Output) -> Self {
         let success = output.status.success();
         let exit_code = output.status.code();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-        Self { command, success, exit_code, stdout, stderr }
+        Self { arguments, success, exit_code, stdout, stderr }
     }
 }
 
 impl std::fmt::Display for CommandOutcome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Command: {}", self.command)?;
+        writeln!(f, "Arguments:\n{}", self.arguments.join("\n"))?;
 
         let exit_code = self.exit_code.unwrap_or(-1);
 

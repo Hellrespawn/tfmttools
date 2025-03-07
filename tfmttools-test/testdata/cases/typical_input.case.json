@@ -17,17 +17,17 @@
     ],
     "apply": [
       "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
-      "output_dir/The Talos Principle/2015 - The Taalos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
+      "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
       "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
       "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-      "output_dir/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
+      "output_dir/MASTE BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
       "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
       "output_dir/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
       "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
       "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
       "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-      "config/bin/run_id/cover.jpg_1699048E",
-      "config/bin/run_id/description.txt_38C50732"
+      "config/trash/run_id/cover.jpg_1699048E",
+      "config/trash/run_id/description.txt_38C50732"
     ]
   },
   "tests": {
@@ -35,17 +35,17 @@
       "expectation": "initial-state"
     },
     "apply": {
-      "command": "rename --yes typical_input -- output_dir/",
+      "command": "--simple --yes rename typical_input -- output_dir/",
       "expectation": "apply",
       "previous-expectation": "initial-state"
     },
     "undo": {
-      "command": "undo --yes",
+      "command": "--simple --yes undo",
       "expectation": "initial-state",
       "previous-expectation": "apply"
     },
     "redo": {
-      "command": "redo --yes",
+      "command": "--simple --yes redo",
       "expectation": "apply",
       "previous-expectation": "initial-state"
     }
