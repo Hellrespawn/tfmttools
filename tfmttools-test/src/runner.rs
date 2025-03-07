@@ -7,7 +7,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
-use minijinja::Environment;
+use minijinja::{Environment, context};
 use tfmttools_fs::PathIterator;
 
 use crate::context::{SourceDirs, TestContext};
@@ -49,7 +49,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let failed_test_outcomes =
         Arc::into_inner(arc).expect("Arc dropped").into_inner()?;
 
-    create_test_reports(failed_test_outcomes)?;
+    create_test_report(failed_test_outcomes)?;
 
     Ok(exit_code)
 }
@@ -239,27 +239,29 @@ fn get_missing_file_paths(
         .collect()
 }
 
-fn create_test_reports(
+fn create_test_report(
     failed_test_outcomes: Vec<TestCaseOutcome>,
 ) -> Result<()> {
-    let template =
-        fs_err::read_to_string(SourceDirs::test_report_template_path())?;
+    let _ = fs_err::remove_dir_all(SourceDirs::test_report_output_dir());
 
-    let mut environment = Environment::new();
-    environment.add_template_owned("report", template)?;
+    if !failed_test_outcomes.is_empty() {
+        let template =
+            fs_err::read_to_string(SourceDirs::test_report_template_path())?;
 
-    let template = environment.get_template("report")?;
+        let mut environment = Environment::new();
+        environment.add_template_owned("report", template)?;
 
-    fs_err::create_dir_all(SourceDirs::test_report_output_dir())?;
+        let template = environment.get_template("report")?;
 
-    for outcome in failed_test_outcomes {
-        let rendered = template.render(&outcome)?;
+        fs_err::create_dir_all(SourceDirs::test_report_output_dir())?;
 
-        fs_err::write(
-            SourceDirs::test_report_output_dir()
-                .join(format!("{}.report.html", outcome.name())),
-            rendered,
-        )?
+        let rendered =
+            template.render(context!(test_cases => failed_test_outcomes))?;
+
+        let file_path =
+            SourceDirs::test_report_output_dir().join("test-report.html");
+
+        fs_err::write(&file_path, rendered)?;
     }
 
     Ok(())

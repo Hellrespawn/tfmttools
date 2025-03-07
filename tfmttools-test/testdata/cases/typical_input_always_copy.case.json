@@ -31,6 +31,9 @@
     ]
   },
   "tests": {
+    "initial": {
+      "expectation": "initial-state"
+    },
     "apply": {
       "command": "rename --yes --always-copy typical_input -- output_dir/",
       "expectation": "apply",

@@ -5,142 +5,103 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test report: {{ name }}</title>
-
-    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
-
-    <style type="text/tailwindcss">
-
-    </style>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
 </head>
 
-<body class="bg-gray-100 dark:bg-gray-700">
-    <main class="container mx-auto">
+<body>
+    {% for test_case in test_cases %}
+    <div>
+        <header>
+            <h2>{{test_case.name}}</h2>
+            <p>{{test_case.description}}</p>
+            Directory: <a href="file://{{test_case.work_dir}}"><code>{{test_case.work_dir}}</code></a>
+        </header>
+        <main>
 
+            {% for outcome in test_case.test_outcomes %}
+            {% if not outcome.passed %}
+            <section>
+                <header>
+                    <h3>
+                        Test {{loop.index}}: {{outcome.name}}
+                    </h3>
+                </header>
 
-        <div
-            class="block max-w-sm p-6 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700">
+                {% if outcome.command_outcome %}
+                <div>
+                    <h3>Command</h3>
 
-            <h2 class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{{name}}</h2>
-            <p class="font-normal text-gray-700 dark:text-gray-400">{{description}}</p>
-        </div>
+                    <pre><samp>{{ outcome.command_outcome.command }}</samp></pre>
 
-
-
-        <table>
-            <tbody>
-                <tr>
-                    <th>Test case</th>
-                    <td>{{name}}</td>
-                </tr>
-                <tr>
-                    <td colspan="2">{{description}}</td>
-                </tr>
-                <tr>
-                    <th>Directory</th>
-                    <td>
-                        <pre>{{work_dir}}</pre>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-
-        {% for outcome in test_outcomes %}
-        <div>
-            <h2>
-                {{outcome.name}}
-            </h2>
-            {% if outcome.command_outcome %}
-            <table>
-                <caption>
-                    CMD result
-                </caption>
-                <tbody>
-                    <tr>
-                        <th>Command</th>
-                        <td>
-                            <pre>{{ outcome.command_outcome.command }}</pre>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Success</th>
-                        <td>{{ outcome.command_outcome.success }}</td>
-                    </tr>
-                    <tr>
-                        <th>Exit code</th>
-                        <td>{{ outcome.command_outcome.exit_code }}</td>
-                    </tr>
+                    <p>
+                        <span>
+                            {% if outcome.command_outcome.success %}
+                            ✔️
+                            {% else %}
+                            ❌
+                            {% endif %}
+                        </span>
+                        <span>Exit code: {{outcome.command_outcome.exit_code}}</span>
+                    </p>
 
                     {% if outcome.command_outcome.stdout %}
-                    <tr>
-                        <th colspan="2">
-                            <pre>stdout</pre>
-                        </th>
-                    </tr>
-                    <tr>
-
-                        <td colspan="2">
-                            <pre>{{outcome.command_outcome.stdout}}</pre>
-                        </td>
-                    </tr>
+                    <h3><code>stdout</code></h3>
+                    <p>
+                        <pre>
+                            <code>{{outcome.command_outcome.stdout}}</code>
+                        </pre>
+                    </p>
                     {% endif %}
 
                     {% if outcome.command_outcome.stderr %}
-                    <tr>
-                        <th colspan="2">
-                            <pre>stderr</pre>
-                        </th>
-                    </tr>
-                    <tr>
-
-                        <td colspan="2">
-                            <pre>{{outcome.command_outcome.stderr}}</pre>
-                        </td>
-                    </tr>
+                    <h3><code>stderr</code></h3>
+                    <p>
+                        <pre>
+                            <code>{{outcome.command_outcome.stderr}}</code>
+                        </pre>
+                    </p>
                     {% endif %}
-                </tbody>
-            </table>
-            {% endif %}
+                </div>
+                {% endif %}
 
 
-            {%if outcome.remaining_files %}
-            <table>
-                <caption>
-                    Remaining files
-                </caption>
-                <tbody>
-                    {% for file in outcome.remaining_files %}
-                    <tr>
-                        <td>
+                {% if outcome.remaining_files %}
+                <div>
+                    <h3>Remaining files</h3>
+
+                    <ol>
+                        {% for file in outcome.remaining_files %}
+                        <li>
                             {{file}}
-                        </td>
-                    </tr>
+                        </li>
+                        {% endfor %}
 
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </ol>
+                </div>
+                {% endif %}
+
+
+                {% if outcome.missing_files %}
+                <div>
+                    <h3>Missing files</h3>
+
+                    <ol>
+                        {% for file in outcome.missing_files %}
+                        <li>
+                            <code>{{file}}</code>
+                        </li>
+                        {% endfor %}
+
+                    </ol>
+                </div>
+                {% endif %}
+            </section>
             {% endif %}
-
-
-            {%if outcome.missing_files %}
-            <table>
-                <caption>
-                    Missing files
-                </caption>
-                <tbody>
-                    {% for file in outcome.missing_files %}
-                    <tr>
-                        <td>
-                            {{file}}
-                        </td>
-                    </tr>
-
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </main>
+            {% endfor %}
+        </main>
+    </div>
+    <hr>
+    {% endfor %}
 </body>
 
 </html>

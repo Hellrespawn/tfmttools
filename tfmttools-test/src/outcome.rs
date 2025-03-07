@@ -40,10 +40,6 @@ impl TestCaseOutcome {
     pub fn passed(&self) -> bool {
         self.test_outcomes.iter().all(|outcome| outcome.passed())
     }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
 }
 
 impl std::fmt::Display for TestCaseOutcome {
@@ -75,6 +71,7 @@ pub struct TestOutcome {
     command_outcome: Option<CommandOutcome>,
     remaining_files: Option<Vec<Utf8PathBuf>>,
     missing_files: Option<Vec<Utf8PathBuf>>,
+    passed: bool,
 }
 
 impl TestOutcome {
@@ -84,11 +81,23 @@ impl TestOutcome {
         remaining_files: Option<Vec<Utf8PathBuf>>,
         missing_files: Option<Vec<Utf8PathBuf>>,
     ) -> Self {
-        Self { name, remaining_files, command_outcome, missing_files }
+        let mut outcome = Self {
+            name,
+            remaining_files,
+            command_outcome,
+            missing_files,
+            passed: false,
+        };
+
+        if outcome.passed_remaining_files() && outcome.passed_missing_files() {
+            outcome.passed = true;
+        }
+
+        outcome
     }
 
     pub fn passed(&self) -> bool {
-        self.passed_remaining_files() && self.passed_missing_files()
+        self.passed
     }
 
     fn passed_remaining_files(&self) -> bool {
@@ -164,8 +173,8 @@ impl CommandOutcome {
     pub fn new(command: String, output: Output) -> Self {
         let success = output.status.success();
         let exit_code = output.status.code();
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
         Self { command, success, exit_code, stdout, stderr }
     }

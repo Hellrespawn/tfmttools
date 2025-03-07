@@ -31,10 +31,13 @@
     ]
   },
   "tests": {
+    "initial": {
+      "expectation": "initial-state"
+    },
     "apply": {
       "command": "rename --yes typical_input -- output_dir/",
       "expectation": "apply",
-      "previous-expectation": "initial_state"
+      "previous-expectation": "initial-state"
     },
     "undo": {
       "command": "undo --yes",
@@ -44,7 +47,7 @@
     "previous_data": {
       "command": "rename --yes",
       "expectation": "apply",
-      "previous-expectation": "initial_state"
+      "previous-expectation": "initial-state"
     }
   }
 }

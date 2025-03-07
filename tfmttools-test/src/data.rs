@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TestCaseData {
     description: String,
 
@@ -93,9 +94,11 @@ impl<'de> Deserialize<'de> for Expectation {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TestData {
     command: Option<String>,
     expectation: Option<String>,
+    #[serde(alias = "previous-expectation")]
     previous_expectation: Option<String>,
 }
 
