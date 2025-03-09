@@ -14,8 +14,7 @@ impl std::fmt::Display for ParsePreviewListSizeError {
     }
 }
 
-impl std::error::Error for ParsePreviewListSizeError {
-}
+impl std::error::Error for ParsePreviewListSizeError {}
 
 #[derive(Debug, Clone, Copy)]
 pub enum PreviewListSize {
