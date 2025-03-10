@@ -62,6 +62,7 @@ fn run(args: TFMTArgs) -> Result<()> {
         println!("Doing dry run. No files will be modified.");
     }
     let app_options = TFMTOptions::try_from(&args)?;
+
     let fs_handler = FsHandler::new(app_options.action_mode());
 
     install_restore_cursor_hooks();

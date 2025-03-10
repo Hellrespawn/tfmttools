@@ -26,18 +26,3 @@ Don't remember what this was about, probably related to the file in question:
 >
 > .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3
 -->
-
-## TODO
-
-- TODO? Explicitly handle exit codes?
-- TODO? Do test with interactive app?
-- TODO? Actually check the moved files is the same file in tests?
-- TODO? Some sort of transactions mechanism?
-- TODO? Fix/warn tag with leading/trailing whitespace?
-- TODO? Add year to singles?
-- TODO? Replace custom history format with SQLite?
-    ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
-
-    This is now fixed
-- ~~TODO Add more description when running `rename` under `--yes`~~
-- ~~TODO Handle undone records superseded by new actions.~~
