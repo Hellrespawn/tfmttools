@@ -10,9 +10,6 @@ repository.workspace = true
 homepage.workspace = true
 version.workspace = true
 
-[features]
-debug = []
-
 [dependencies]
 tfmttools-fs = { path = "../tfmttools-fs" }
 

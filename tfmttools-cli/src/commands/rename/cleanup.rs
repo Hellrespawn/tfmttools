@@ -7,7 +7,7 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::ActionMode;
 use tfmttools_fs::{
-    ActionHandler, PathIterator, PathIteratorOptions, get_filename_checksum,
+    ActionHandler, PathIterator, PathIteratorOptions, get_file_checksum,
     get_longest_common_prefix,
 };
 use tfmttools_history_core::{History, HistoryError};
@@ -139,10 +139,10 @@ fn create_rename_action(
     path: Utf8PathBuf,
     run_id: &str,
 ) -> Result<RenameAction> {
+    let checksum = get_file_checksum(&path)?;
+
     let filename =
         path.file_name().ok_or(eyre!("source should have a filename"))?;
-
-    let checksum = get_filename_checksum(filename);
 
     let target_name = format!("{filename}_{checksum}");
 

@@ -14,6 +14,9 @@
 
 ## In progress
 
+- [ ] Handle reading checksum of too big file. Only read/checksum first x bytes?
+- [ ] Handle checksum of multiple files with same name and contents
+
 ## Done
 
 - [x] Add more description when running `rename` under `--yes`
