@@ -3,7 +3,6 @@
 ## Backlog
 
 - [ ] Do test with interactive app?
-- [ ] Actually check the moved files is the same file in tests?
 - [ ] Some sort of transactions mechanism?
 - [ ] Fix/warn tag with leading/trailing whitespace?
 - [ ] Add year to singles?
@@ -19,3 +18,5 @@
 
 - [x] Add more description when running `rename` under `--yes`
 - [x] Handle undone records superseded by new actions.
+- [x] Actually check the moved files is the same file in tests?
+  - [x] Add checksum to testcase

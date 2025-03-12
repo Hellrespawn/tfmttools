@@ -26,7 +26,6 @@ tfmttools-core = { path = "../tfmttools-core" }
 tfmttools-fs = { path = "../tfmttools-fs" }
 tfmttools-history-core = { path = "../tfmttools-history-core" }
 tfmttools-history-serde = { path = "../tfmttools-history-serde" }
-adler = { workspace = true }
 camino = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

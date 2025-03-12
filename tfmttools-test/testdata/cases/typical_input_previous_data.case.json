@@ -2,52 +2,105 @@
   "description": "Apply, undo and apply with previous data of typical_input.tfmt",
   "expectations": {
     "initial-state": [
-      "input/Amon Amarth - Under Siege.mp3",
-      "input/Damjan Mravunac - Welcome To Heaven.ogg",
-      "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
-      "input/MASTER BOOT RECORD - Dune.mp3",
-      "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
-      "input/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
-      "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-      "input/Nightwish - Elvenpath (Live).mp3",
-      "input/Nightwish - Nemo.mp3",
-      "input/Nightwish - While Your Lips Are Still Red.mp3",
-      "input/cover.jpg",
-      "input/description.txt"
+      { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "64E9A6E7" },
+      {
+        "path": "input/Damjan Mravunac - Welcome To Heaven.ogg",
+        "checksum": "FFC58E16"
+      },
+      {
+        "path": "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
+        "checksum": "3490B59A"
+      },
+      { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "5F144F41" },
+      {
+        "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
+        "checksum": "D4FA9F57"
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
+        "checksum": "C3149CF3"
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "checksum": "C756AE33"
+      },
+      {
+        "path": "input/Nightwish - Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" },
+      {
+        "path": "input/Nightwish - While Your Lips Are Still Red.mp3",
+        "checksum": "DCBC7996"
+      },
+      { "path": "input/cover.jpg" },
+      { "path": "input/description.txt" }
     ],
     "apply": [
-      "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
-      "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
-      "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
-      "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-      "output_dir/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
-      "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
-      "output_dir/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-      "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
-      "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
-      "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-      "config/trash/run_id/cover.jpg_1699048E",
-      "config/trash/run_id/description.txt_38C50732"
+      {
+        "path": "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
+        "checksum": "64E9A6E7"
+      },
+      {
+        "path": "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
+        "checksum": "FFC58E16"
+      },
+      {
+        "path": "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
+        "checksum": "3490B59A"
+      },
+      {
+        "path": "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
+        "checksum": "5F144F41"
+      },
+      {
+        "path": "output_dir/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
+        "checksum": "D4FA9F57"
+      },
+      {
+        "path": "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
+        "checksum": "C3149CF3"
+      },
+      {
+        "path": "output_dir/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "checksum": "C756AE33"
+      },
+      {
+        "path": "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      {
+        "path": "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
+        "checksum": "820F92DA"
+      },
+      {
+        "path": "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
+        "checksum": "DCBC7996"
+      },
+      { "path": "config/trash/run_id/cover.jpg_1699048E" },
+      {
+        "path": "config/trash/run_id/description.txt_38C50732"
+      }
     ]
   },
   "tests": {
     "initial": {
-      "expectation": "initial-state"
+      "expectations": "initial-state"
     },
     "apply": {
       "command": "--simple --yes rename typical_input -- output_dir/",
-      "expectation": "apply",
-      "previous-expectation": "initial-state"
+      "expectations": "apply",
+      "previous-expectations": "initial-state"
     },
     "undo": {
       "command": "--simple --yes undo",
-      "expectation": "initial-state",
-      "previous-expectation": "apply"
+      "expectations": "initial-state",
+      "previous-expectations": "apply"
     },
     "previous_data": {
       "command": "--simple --yes rename",
-      "expectation": "apply",
-      "previous-expectation": "initial-state"
+      "expectations": "apply",
+      "previous-expectations": "initial-state"
     }
   }
 }

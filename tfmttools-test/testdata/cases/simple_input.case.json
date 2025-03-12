@@ -2,52 +2,105 @@
   "description": "Single apply, undo and redo of simple_input.tfmt",
   "expectations": {
     "initial-state": [
-      "input/Amon Amarth - Under Siege.mp3",
-      "input/Damjan Mravunac - Welcome To Heaven.ogg",
-      "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
-      "input/MASTER BOOT RECORD - Dune.mp3",
-      "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
-      "input/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
-      "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-      "input/Nightwish - Elvenpath (Live).mp3",
-      "input/Nightwish - Nemo.mp3",
-      "input/Nightwish - While Your Lips Are Still Red.mp3",
-      "input/cover.jpg",
-      "input/description.txt"
+      { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "64E9A6E7" },
+      {
+        "path": "input/Damjan Mravunac - Welcome To Heaven.ogg",
+        "checksum": "FFC58E16"
+      },
+      {
+        "path": "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
+        "checksum": "3490B59A"
+      },
+      { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "5F144F41" },
+      {
+        "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
+        "checksum": "D4FA9F57"
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
+        "checksum": "C3149CF3"
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "checksum": "C756AE33"
+      },
+      {
+        "path": "input/Nightwish - Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" },
+      {
+        "path": "input/Nightwish - While Your Lips Are Still Red.mp3",
+        "checksum": "DCBC7996"
+      },
+      { "path": "input/cover.jpg" },
+      { "path": "input/description.txt" }
     ],
     "apply": [
-      "Amon Amarth/Under Siege.mp3",
-      "Damjan Mravunac/Welcome To Heaven.ogg",
-      "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
-      "MASTER BOOT RECORD/Dune.mp3",
-      "MASTER BOOT RECORD/MYTH.NFO.mp3",
-      "MASTER BOOT RECORD/RAMDRIVE.SYS.mp3",
-      "MASTER BOOT RECORD/SET MIDI=SYNTH1 MAPG MODE1.mp3",
-      "Nightwish/Elvenpath (Live).mp3",
-      "Nightwish/Nemo.mp3",
-      "Nightwish/While Your Lips Are Still Red.mp3",
-      "config/trash/run_id/cover.jpg_1699048E",
-      "config/trash/run_id/description.txt_38C50732"
+      {
+        "path": "Amon Amarth/Under Siege.mp3",
+        "checksum": "64E9A6E7"
+      },
+      {
+        "path": "Damjan Mravunac/Welcome To Heaven.ogg",
+        "checksum": "FFC58E16"
+      },
+      {
+        "path": "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
+        "checksum": "3490B59A"
+      },
+      {
+        "path": "MASTER BOOT RECORD/Dune.mp3",
+        "checksum": "5F144F41"
+      },
+      {
+        "path": "MASTER BOOT RECORD/MYTH.NFO.mp3",
+        "checksum": "D4FA9F57"
+      },
+      {
+        "path": "MASTER BOOT RECORD/RAMDRIVE.SYS.mp3",
+        "checksum": "C3149CF3"
+      },
+      {
+        "path": "MASTER BOOT RECORD/SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "checksum": "C756AE33"
+      },
+      {
+        "path": "Nightwish/Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      {
+        "path": "Nightwish/Nemo.mp3",
+        "checksum": "820F92DA"
+      },
+      {
+        "path": "Nightwish/While Your Lips Are Still Red.mp3",
+        "checksum": "DCBC7996"
+      },
+      { "path": "config/trash/run_id/cover.jpg_1699048E" },
+      {
+        "path": "config/trash/run_id/description.txt_38C50732"
+      }
     ]
   },
   "tests": {
     "initial": {
-      "expectation": "initial-state"
+      "expectations": "initial-state"
     },
     "apply": {
       "command": "--simple --yes rename simple_input",
-      "expectation": "apply",
-      "previous-expectation": "initial-state"
+      "expectations": "apply",
+      "previous-expectations": "initial-state"
     },
     "undo": {
       "command": "--simple --yes undo",
-      "expectation": "initial-state",
-      "previous-expectation": "apply"
+      "expectations": "initial-state",
+      "previous-expectations": "apply"
     },
     "redo": {
       "command": "--simple --yes redo",
-      "expectation": "apply",
-      "previous-expectation": "initial-state"
+      "expectations": "apply",
+      "previous-expectations": "initial-state"
     }
   }
 }

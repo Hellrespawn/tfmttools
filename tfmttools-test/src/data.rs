@@ -1,6 +1,5 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
 use indexmap::IndexMap;
 use serde::Deserialize;
 
@@ -35,61 +34,42 @@ impl TestCaseData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExpectationOption {
+    NoPrevious,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Expectation {
     path: Utf8PathBuf,
-    no_previous: bool,
+    checksum: Option<String>,
+    #[serde(default)]
+    options: Vec<ExpectationOption>,
 }
 
 impl Expectation {
-    fn new(string: &str) -> Result<Expectation> {
-        let mut iter = string.split(':');
-
-        let path = iter
-            .next()
-            .ok_or(eyre!("Expectation was None (but valid string?"))?;
-
-        let mut expectation =
-            Expectation { path: Utf8PathBuf::from(path), no_previous: false };
-
-        for option in iter {
-            match option {
-                "noprevious" => expectation.no_previous = true,
-                other => {
-                    return Err(eyre!(
-                        "Unknown expectation option '{}'",
-                        other,
-                    ));
-                },
-            }
-        }
-
-        Ok(expectation)
-    }
-
     pub fn verify_exists(&self, prefix: &Utf8Path) -> bool {
         prefix.join(&self.path).exists()
     }
 
     pub fn verify_no_longer_exists(&self, prefix: &Utf8Path) -> bool {
-        self.no_previous || !self.verify_exists(prefix)
+        self.options.iter().any(|o| matches!(o, ExpectationOption::NoPrevious))
+            || !self.verify_exists(prefix)
+    }
+
+    pub fn verify_checksum(&self, checksum: &str) -> bool {
+        self.checksum
+            .as_ref()
+            .is_none_or(|self_checksum| self_checksum == checksum)
     }
 
     pub fn path(&self) -> &Utf8Path {
         self.path.as_ref()
     }
-}
 
-impl<'de> Deserialize<'de> for Expectation {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let string = String::deserialize(deserializer)?;
-        let expectation =
-            Expectation::new(&string).map_err(serde::de::Error::custom)?;
-
-        Ok(expectation)
+    pub fn checksum(&self) -> Option<&String> {
+        self.checksum.as_ref()
     }
 }
 
@@ -97,9 +77,9 @@ impl<'de> Deserialize<'de> for Expectation {
 #[serde(deny_unknown_fields)]
 pub struct TestData {
     command: Option<String>,
-    expectation: Option<String>,
-    #[serde(alias = "previous-expectation")]
-    previous_expectation: Option<String>,
+    expectations: Option<String>,
+    #[serde(alias = "previous-expectations")]
+    previous_expectations: Option<String>,
 }
 
 impl TestData {
@@ -107,11 +87,11 @@ impl TestData {
         self.command.as_ref()
     }
 
-    pub fn expectation(&self) -> Option<&String> {
-        self.expectation.as_ref()
+    pub fn expectations(&self) -> Option<&String> {
+        self.expectations.as_ref()
     }
 
-    pub fn previous_expectation(&self) -> Option<&String> {
-        self.previous_expectation.as_ref()
+    pub fn previous_expectations(&self) -> Option<&String> {
+        self.previous_expectations.as_ref()
     }
 }

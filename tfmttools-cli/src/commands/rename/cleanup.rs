@@ -1,6 +1,3 @@
-use std::hash::Hash;
-
-use adler::Adler32;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -10,7 +7,8 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::ActionMode;
 use tfmttools_fs::{
-    ActionHandler, PathIterator, PathIteratorOptions, get_longest_common_prefix,
+    ActionHandler, PathIterator, PathIteratorOptions, get_filename_checksum,
+    get_longest_common_prefix,
 };
 use tfmttools_history_core::{History, HistoryError};
 use tracing::{debug, trace};
@@ -144,7 +142,7 @@ fn create_rename_action(
     let filename =
         path.file_name().ok_or(eyre!("source should have a filename"))?;
 
-    let checksum = get_checksum(filename);
+    let checksum = get_filename_checksum(filename);
 
     let target_name = format!("{filename}_{checksum}");
 
@@ -156,14 +154,6 @@ fn create_rename_action(
     trace!("Created rename action: {rename_action:?}");
 
     Ok(rename_action)
-}
-
-fn get_checksum(filename: &str) -> String {
-    let mut adler = Adler32::new();
-
-    filename.hash(&mut adler);
-
-    format!("{:X}", adler.checksum())
 }
 
 fn preview_files_to_delete(

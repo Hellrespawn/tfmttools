@@ -32,10 +32,10 @@
                     <h3>Command arguments</h3>
 
                     <pre><samp>
-                    {% for arg in outcome.command_outcome.arguments %}
-                        {{- arg }}
-                    {% endfor -%}
-                    </samp></pre>
+                        {% for arg in outcome.command_outcome.arguments %}
+                            {{- arg }}
+                        {% endfor -%}
+                        </samp></pre>
                     <p>
                         <span>
                             {% if outcome.command_outcome.success %}
@@ -51,8 +51,8 @@
                     <h3><code>stdout</code></h3>
                     <p>
                     <pre>
-                            <code>{{outcome.command_outcome.stdout}}</code>
-                        </pre>
+                                <code>{{outcome.command_outcome.stdout}}</code>
+                            </pre>
                     </p>
                     {% endif %}
 
@@ -60,36 +60,21 @@
                     <h3><code>stderr</code></h3>
                     <p>
                     <pre>
-                            <code>{{outcome.command_outcome.stderr}}</code>
-                        </pre>
+                                <code>{{outcome.command_outcome.stderr}}</code>
+                            </pre>
                     </p>
                     {% endif %}
                 </div>
                 {% endif %}
 
+                {% set expectations_outcome = outcome.expectations_outcome %}
 
-                {% if outcome.remaining_files %}
+                {% if expectations_outcome.files_remaining_after_previous %}
                 <div>
-                    <h3>Remaining files</h3>
+                    <h3>Files remaining after previous test</h3>
 
                     <ol>
-                        {% for file in outcome.remaining_files %}
-                        <li>
-                            {{file}}
-                        </li>
-                        {% endfor %}
-
-                    </ol>
-                </div>
-                {% endif %}
-
-
-                {% if outcome.missing_files %}
-                <div>
-                    <h3>Missing files</h3>
-
-                    <ol>
-                        {% for file in outcome.missing_files %}
+                        {% for file in expectations_outcome.files_remaining_after_previous %}
                         <li>
                             <code>{{file}}</code>
                         </li>
@@ -98,6 +83,20 @@
                     </ol>
                 </div>
                 {% endif %}
+
+                <div>
+                    <h3>Expectations</h3>
+
+                    <ol>
+                        {% for outcome in expectations_outcome.outcomes %}
+                        <li>
+                            <code>{{outcome}}</code>
+                        </li>
+                        {% endfor %}
+
+                    </ol>
+                </div>
+
             </section>
             {% endif %}
             {% endfor %}

@@ -13,6 +13,7 @@ version.workspace = true
 
 [dependencies]
 tfmttools-core = { path = "../tfmttools-core" }
+adler = { workspace = true }
 camino = { workspace = true }
 fs-err = { workspace = true }
 ignore = { workspace = true }

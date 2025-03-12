@@ -3,23 +3,7 @@ use std::process::Output;
 use camino::Utf8PathBuf;
 use serde::Serialize;
 
-fn mark(bool: bool) -> &'static str {
-    if bool { "✓" } else { "✗" }
-}
-
-fn write_list_of_paths(
-    f: &mut std::fmt::Formatter<'_>,
-    paths: &[Utf8PathBuf],
-    indent: usize,
-) -> std::fmt::Result {
-    for path in paths {
-        writeln!(f, "{}- {}", " ".repeat(indent), path)?;
-    }
-
-    Ok(())
-}
-
-#[derive(Default, Debug, Serialize, Clone)]
+#[derive(Default, Debug, Clone, Serialize)]
 pub struct TestCaseOutcome {
     name: String,
     description: String,
@@ -42,35 +26,11 @@ impl TestCaseOutcome {
     }
 }
 
-impl std::fmt::Display for TestCaseOutcome {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test case: '{}'", self.name)?;
-        writeln!(f, "Description: {}", self.description)?;
-
-        write!(f, "Working directory: {}", self.work_dir)?;
-        if self.passed() {
-            writeln!(f)?;
-        } else {
-            writeln!(f, " (persisted for debugging)")?;
-        }
-
-        writeln!(f)?;
-
-        for outcome in &self.test_outcomes {
-            writeln!(f, "{}", outcome)?;
-        }
-        writeln!(f, "{}: Outcome of test case.", mark(self.passed()))?;
-
-        Ok(())
-    }
-}
-
-#[derive(Default, Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TestOutcome {
     name: String,
     command_outcome: Option<CommandOutcome>,
-    remaining_files: Option<Vec<Utf8PathBuf>>,
-    missing_files: Option<Vec<Utf8PathBuf>>,
+    expectations_outcome: ExpectationsOutcome,
     passed: bool,
 }
 
@@ -78,89 +38,22 @@ impl TestOutcome {
     pub fn new(
         name: String,
         command_outcome: Option<CommandOutcome>,
-        remaining_files: Option<Vec<Utf8PathBuf>>,
-        missing_files: Option<Vec<Utf8PathBuf>>,
+        expectations_outcome: ExpectationsOutcome,
     ) -> Self {
-        let mut outcome = Self {
+        Self {
             name,
-            remaining_files,
             command_outcome,
-            missing_files,
-            passed: false,
-        };
-
-        if outcome.passed_remaining_files() && outcome.passed_missing_files() {
-            outcome.passed = true;
+            passed: expectations_outcome.passed,
+            expectations_outcome,
         }
-
-        outcome
     }
 
     pub fn passed(&self) -> bool {
         self.passed
     }
-
-    fn passed_remaining_files(&self) -> bool {
-        self.remaining_files
-            .as_ref()
-            .is_none_or(|remaining_files| remaining_files.is_empty())
-    }
-
-    fn passed_missing_files(&self) -> bool {
-        self.missing_files
-            .as_ref()
-            .is_none_or(|missing_files| missing_files.is_empty())
-    }
-}
-impl std::fmt::Display for TestOutcome {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Outcome of test '{}'", self.name)?;
-
-        writeln!(f)?;
-
-        if let Some(command_outcome) = &self.command_outcome {
-            writeln!(f, "{}", command_outcome)?;
-        } else {
-            writeln!(f, "Test failed before command outcome")?;
-        }
-
-        if let Some(remaining_files) = &self.remaining_files {
-            writeln!(
-                f,
-                "{}: passed previous expectation",
-                mark(remaining_files.is_empty())
-            )?;
-
-            if !remaining_files.is_empty() {
-                writeln!(f, "Remaining files:")?;
-
-                write_list_of_paths(f, remaining_files, 2)?;
-            }
-
-            writeln!(f)?;
-        }
-
-        if let Some(missing_files) = &self.missing_files {
-            writeln!(
-                f,
-                "{}: passed previous expectation",
-                mark(missing_files.is_empty())
-            )?;
-
-            if !missing_files.is_empty() {
-                writeln!(f, "Missing files:")?;
-
-                write_list_of_paths(f, missing_files, 2)?;
-            }
-
-            writeln!(f)?;
-        }
-
-        Ok(())
-    }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CommandOutcome {
     arguments: Vec<String>,
     success: bool,
@@ -180,35 +73,35 @@ impl CommandOutcome {
     }
 }
 
-impl std::fmt::Display for CommandOutcome {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Arguments:\n{}", self.arguments.join("\n"))?;
+#[derive(Debug, Clone, Serialize)]
+pub struct ExpectationsOutcome {
+    files_remaining_after_previous: Option<Vec<Utf8PathBuf>>,
+    outcomes: Vec<ExpectationOutcome>,
+    passed: bool,
+}
 
-        let exit_code = self.exit_code.unwrap_or(-1);
+impl ExpectationsOutcome {
+    pub fn new(
+        files_remaining_after_previous: Option<Vec<Utf8PathBuf>>,
+        outcomes: Vec<ExpectationOutcome>,
+    ) -> Self {
+        let passed = files_remaining_after_previous
+            .as_ref()
+            .is_none_or(|v| v.is_empty())
+            && outcomes.iter().all(|outcome| outcome.passed());
 
-        writeln!(
-            f,
-            "{}: Command exited with status code {}",
-            mark(self.success),
-            exit_code
-        )?;
+        Self { files_remaining_after_previous, outcomes, passed }
+    }
+}
+#[derive(Debug, Clone, Serialize)]
+pub enum ExpectationOutcome {
+    Ok(Utf8PathBuf),
+    NotPresent(Utf8PathBuf),
+    ChecksumMismatch { path: Utf8PathBuf, expected: String, actual: String },
+}
 
-        writeln!(f)?;
-
-        if !self.stdout.trim().is_empty() {
-            writeln!(f, "== stdout ==")?;
-            writeln!(f, "{}", self.stdout)?;
-            writeln!(f, "== end of stdout ==")?;
-            writeln!(f)?;
-        }
-
-        if !self.stderr.trim().is_empty() {
-            writeln!(f, "== stderr ==")?;
-            writeln!(f, "{}", self.stderr)?;
-            writeln!(f, "== end of stderr ==")?;
-            writeln!(f)?;
-        }
-
-        Ok(())
+impl ExpectationOutcome {
+    pub fn passed(&self) -> bool {
+        matches!(self, ExpectationOutcome::Ok(..))
     }
 }

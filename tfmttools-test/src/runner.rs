@@ -8,11 +8,14 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
 use minijinja::{Environment, context};
-use tfmttools_fs::PathIterator;
+use tfmttools_fs::{PathIterator, get_file_checksum};
 
 use crate::context::{SourceDirs, TestContext};
 use crate::data::{Expectation, TestCaseData};
-use crate::outcome::{CommandOutcome, TestCaseOutcome, TestOutcome};
+use crate::outcome::{
+    CommandOutcome, ExpectationOutcome, ExpectationsOutcome, TestCaseOutcome,
+    TestOutcome,
+};
 
 const TEST_RUN_ID: &str = "run_id";
 
@@ -87,8 +90,8 @@ fn run_test_case(
     let mut test_outcomes = Vec::new();
 
     for (test_name, test_data) in test_case_data.tests() {
-        let previous_expectation = test_data
-            .previous_expectation()
+        let previous_expectations = test_data
+            .previous_expectations()
             .map(|expectation_name| {
                 test_case_data.expectations().get(expectation_name).ok_or(
                     eyre!("No expectation with name '{}'", expectation_name),
@@ -97,7 +100,7 @@ fn run_test_case(
             .transpose()?;
 
         let expectation = test_data
-            .expectation()
+            .expectations()
             .map(|expectation_name| {
                 test_case_data.expectations().get(expectation_name).ok_or(
                     eyre!("No expectation with name '{}'", expectation_name),
@@ -110,17 +113,16 @@ fn run_test_case(
             .map(|command| run_command(&context, command))
             .transpose()?;
 
-        let (missing_files, remaining_files) = verify_expectations(
+        let expectations_outcome = verify_expectations(
             &context,
+            previous_expectations.map(|v| &**v),
             expectation.map(|v| &**v),
-            previous_expectation.map(|v| &**v),
         );
 
         let test_outcome = TestOutcome::new(
             test_name.clone(),
             command_outcome,
-            remaining_files,
-            missing_files,
+            expectations_outcome,
         );
 
         let passed = test_outcome.passed();
@@ -197,43 +199,58 @@ fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
 
 fn verify_expectations(
     context: &TestContext,
-    expectation: Option<&[Expectation]>,
-    previous_expectation: Option<&[Expectation]>,
-) -> (Option<Vec<Utf8PathBuf>>, Option<Vec<Utf8PathBuf>>) {
-    let remaining_files = previous_expectation.map(|previous_expectation| {
-        get_still_existing_file_paths(
-            &context.work_dir_path(),
-            previous_expectation,
-        )
+    previous_expectations: Option<&[Expectation]>,
+    expectations: Option<&[Expectation]>,
+) -> ExpectationsOutcome {
+    let prefix = context.work_dir_path();
+
+    let remaining_files = previous_expectations.map(|previous_expectation| {
+        get_still_existing_file_paths(&prefix, previous_expectation)
     });
 
-    let missing_files = expectation.map(|expectation| {
-        get_missing_file_paths(&context.work_dir_path(), expectation)
-    });
+    let outcomes = expectations
+        .map(|expectations| {
+            expectations
+                .iter()
+                .map(|expectation| verify_expectation(expectation, &prefix))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
 
-    (missing_files, remaining_files)
+    ExpectationsOutcome::new(remaining_files, outcomes)
 }
 
 fn get_still_existing_file_paths(
     prefix: &Utf8Path,
-    expectation: &[Expectation],
+    expectations: &[Expectation],
 ) -> Vec<Utf8PathBuf> {
-    expectation
+    expectations
         .iter()
         .filter(|expectation| !expectation.verify_no_longer_exists(prefix))
         .map(|e| e.path().to_owned())
         .collect()
 }
-
-fn get_missing_file_paths(
+fn verify_expectation(
+    expectation: &Expectation,
     prefix: &Utf8Path,
-    expectation: &[Expectation],
-) -> Vec<Utf8PathBuf> {
-    expectation
-        .iter()
-        .filter(|expectation| !expectation.verify_exists(prefix))
-        .map(|e| e.path().to_owned())
-        .collect()
+) -> ExpectationOutcome {
+    let path = prefix.join(expectation.path());
+
+    if !path.exists() {
+        ExpectationOutcome::NotPresent(path)
+    } else {
+        let checksum = get_file_checksum(&path).expect("");
+
+        if expectation.verify_checksum(&checksum) {
+            ExpectationOutcome::Ok(path)
+        } else {
+            ExpectationOutcome::ChecksumMismatch {
+                path,
+                expected: expectation.checksum().unwrap().to_string(),
+                actual: checksum,
+            }
+        }
+    }
 }
 
 fn create_test_report(
