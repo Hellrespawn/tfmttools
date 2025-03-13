@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test report: {{ name }}</title>
-    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <title>Test report</title>
+    <link rel="stylesheet" href="../mvp.css">
 </head>
 
 <body>
@@ -14,7 +14,9 @@
         <header>
             <h2>{{test_case.name}}</h2>
             <p>{{test_case.description}}</p>
-            Directory: <a href="file://{{test_case.work_dir}}"><code>{{test_case.work_dir}}</code></a>
+            Directory: <code style="font-weight: bold; cursor: pointer;"
+                onclick="navigator.clipboard.writeText('{{test_case.work_dir}}')">{{test_case.work_dir}}</code> (click
+            to copy)
         </header>
         <main>
 
