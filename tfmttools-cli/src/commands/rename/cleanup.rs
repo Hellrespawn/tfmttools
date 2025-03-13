@@ -1,6 +1,5 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
@@ -11,7 +10,7 @@ use tfmttools_fs::{
     get_longest_common_prefix,
 };
 use tfmttools_history_core::{History, HistoryError};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use super::RenameContext;
 use crate::options::ConfirmMode;
@@ -37,9 +36,25 @@ fn handle_remaining_files(
     context: &RenameContext,
     applied_actions: &mut Vec<Action>,
 ) -> Result<()> {
-    let remaining_paths = get_remaining_files_and_directories(applied_actions)?;
+    let common_prefix = get_longest_common_prefix(
+        &applied_actions
+            .iter()
+            .filter_map(|action| {
+                if let Action::MoveFile(rename_action)
+                | Action::CopyFile(rename_action) = action
+                {
+                    Some(rename_action.source())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>(),
+    );
 
-    if let Some(remaining_paths) = remaining_paths {
+    if let Some(common_path) = common_prefix {
+        let remaining_paths =
+            get_remaining_files_and_directories(context, &common_path)?;
+
         let (files, folders): (Vec<_>, Vec<_>) =
             remaining_paths.into_iter().partition(|p| p.is_file());
 
@@ -55,7 +70,14 @@ fn handle_remaining_files(
 
             let rename_actions = files
                 .into_iter()
-                .map(|path| create_rename_action(context, path.clone(), run_id))
+                .map(|path| {
+                    create_rename_action(
+                        context,
+                        &common_path,
+                        path.clone(),
+                        run_id,
+                    )
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             let confirmation =
@@ -76,7 +98,14 @@ fn handle_remaining_files(
         } else if !files.is_empty() {
             let rename_actions = files
                 .iter()
-                .map(|path| create_rename_action(context, path.clone(), run_id))
+                .map(|path| {
+                    create_rename_action(
+                        context,
+                        &common_path,
+                        path.clone(),
+                        run_id,
+                    )
+                })
                 .collect::<Result<Vec<_>>>()?;
 
             println!("Deleted the following files:");
@@ -98,35 +127,19 @@ fn handle_remaining_files(
 }
 
 fn get_remaining_files_and_directories(
-    actions: &[Action],
-) -> Result<Option<Vec<Utf8PathBuf>>> {
-    let common_prefix = get_longest_common_prefix(
-        &actions
-            .iter()
-            .filter_map(|action| {
-                if let Action::MoveFile(rename_action)
-                | Action::CopyFile(rename_action) = action
-                {
-                    Some(rename_action.source())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>(),
+    context: &RenameContext,
+    common_path: &Utf8Path,
+) -> Result<Vec<Utf8PathBuf>> {
+    let options = PathIteratorOptions::with_depth(
+        common_path,
+        context.rename_options().recursion_depth(),
     );
 
-    debug!("Common prefix of path: {:?}", common_prefix);
-    if let Some(common_path) = common_prefix {
-        let options = PathIteratorOptions::new(&common_path);
+    let remaining = PathIterator::new(&options)
+        // .rev()
+        .collect::<TFMTResult<Vec<_>>>()?;
 
-        let remaining = PathIterator::new(&options)
-            // .rev()
-            .collect::<TFMTResult<Vec<_>>>()?;
-
-        Ok(Some(remaining))
-    } else {
-        Ok(None)
-    }
+    Ok(remaining)
 }
 
 fn file_is_safe_to_delete(path: &Utf8Path) -> bool {
@@ -136,15 +149,21 @@ fn file_is_safe_to_delete(path: &Utf8Path) -> bool {
 
 fn create_rename_action(
     context: &RenameContext,
+    common_path: &Utf8Path,
     path: Utf8PathBuf,
     run_id: &str,
 ) -> Result<RenameAction> {
     let checksum = get_file_checksum(&path)?;
 
-    let filename =
-        path.file_name().ok_or(eyre!("source should have a filename"))?;
+    let relative_path = path.strip_prefix(common_path).expect(
+        "common_path is based on this file too, should always have prefix.",
+    );
 
-    let target_name = format!("{filename}_{checksum}");
+    let path_concat = relative_path.components().join("_");
+
+    dbg!(&path_concat);
+
+    let target_name = format!("{path_concat}_{checksum}");
 
     let rename_action = RenameAction::new(
         path,

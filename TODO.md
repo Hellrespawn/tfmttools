@@ -11,11 +11,9 @@
     ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
 
     This is now fixed
+- [ ] i18n?
 
 ## In progress
-
-- [ ] Handle reading checksum of too big file. Only read/checksum first x bytes?
-- [ ] Handle checksum of multiple files with same name and contents
 
 ## Done
 
@@ -23,3 +21,5 @@
 - [x] Handle undone records superseded by new actions.
 - [x] Actually check the moved files is the same file in tests?
   - [x] Add checksum to testcase
+- [x] Handle reading checksum of too big file. Only read/checksum first x bytes?
+- [x] Handle checksum of multiple files with same name and contents

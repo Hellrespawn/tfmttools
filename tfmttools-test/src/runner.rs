@@ -149,7 +149,9 @@ fn run_test_case(
 fn populate_files(context: &TestContext) -> Result<()> {
     copy_files(SourceDirs::template_dir(), context.config_work_dir())?;
 
-    copy_files(SourceDirs::files_dir(), context.input_work_dir())?;
+    copy_files(SourceDirs::audio_dir(), context.input_audio_dir())?;
+
+    copy_files(SourceDirs::extra_dir(), context.input_extra_dir())?;
 
     Ok(())
 }

@@ -33,8 +33,8 @@
         "path": "input/Nightwish - While Your Lips Are Still Red.mp3",
         "checksum": "DCBC7996"
       },
-      { "path": "input/cover.jpg", "options": ["no-previous"] },
-      { "path": "input/description.txt", "options": ["no-previous"] }
+      { "path": "input/extra/cover.jpg", "options": ["no-previous"] },
+      { "path": "input/extra/description.txt", "options": ["no-previous"] }
     ],
     "apply1": [
       {
@@ -78,11 +78,11 @@
         "checksum": "DCBC7996"
       },
       {
-        "path": "config/trash/run_id/cover.jpg_166003A3",
+        "path": "config/trash/run_id/extra_cover.jpg_166003A3",
         "options": ["no-previous"]
       },
       {
-        "path": "config/trash/run_id/description.txt_3958064D",
+        "path": "config/trash/run_id/extra_description.txt_3958064D",
         "options": ["no-previous"]
       }
     ],
@@ -128,11 +128,11 @@
         "checksum": "DCBC7996"
       },
       {
-        "path": "config/trash/run_id/cover.jpg_166003A3",
+        "path": "config/trash/run_id/extra_cover.jpg_166003A3",
         "options": ["no-previous"]
       },
       {
-        "path": "config/trash/run_id/description.txt_3958064D",
+        "path": "config/trash/run_id/extra_description.txt_3958064D",
         "options": ["no-previous"]
       }
     ]

@@ -4,10 +4,12 @@ use color_eyre::Result;
 
 const TEST_DATA_DIRECTORY: &str = "../tfmttools-test/testdata";
 const TEST_CASE_DIR_NAME: &str = "cases";
-const FILES_DIR_NAME: &str = "files";
+const AUDIO_DIR_NAME: &str = "audio";
+const EXTRA_DIR_NAME: &str = "extra";
 const TEMPLATE_DIR_NAME: &str = "template";
 
-const INPUT_DIR_NAME: &str = "input";
+const INPUT_AUDIO_DIR_NAME: &str = "input";
+const INPUT_EXTRA_DIR_NAME: &str = "extra";
 const CONFIG_DIR_NAME: &str = "config";
 
 const TEST_REPORT_TEMPLATE_NAME: &str = "test-template.html";
@@ -26,8 +28,12 @@ impl TestContext {
         self.temp_dir.to_path_buf().try_into().expect("tempdir should be UTF-8")
     }
 
-    pub fn input_work_dir(&self) -> Utf8PathBuf {
-        self.work_dir_path().join(INPUT_DIR_NAME)
+    pub fn input_audio_dir(&self) -> Utf8PathBuf {
+        self.work_dir_path().join(INPUT_AUDIO_DIR_NAME)
+    }
+
+    pub fn input_extra_dir(&self) -> Utf8PathBuf {
+        self.input_audio_dir().join(INPUT_EXTRA_DIR_NAME)
     }
 
     pub fn config_work_dir(&self) -> Utf8PathBuf {
@@ -50,8 +56,12 @@ impl SourceDirs {
         Self::test_data_dir().join(TEST_CASE_DIR_NAME)
     }
 
-    pub fn files_dir() -> Utf8PathBuf {
-        Self::test_data_dir().join(FILES_DIR_NAME)
+    pub fn audio_dir() -> Utf8PathBuf {
+        Self::test_data_dir().join(AUDIO_DIR_NAME)
+    }
+
+    pub fn extra_dir() -> Utf8PathBuf {
+        Self::test_data_dir().join(EXTRA_DIR_NAME)
     }
 
     pub fn template_dir() -> Utf8PathBuf {
