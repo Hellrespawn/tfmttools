@@ -23,3 +23,4 @@
   - [x] Add checksum to testcase
 - [x] Handle reading checksum of too big file. Only read/checksum first x bytes?
 - [x] Handle checksum of multiple files with same name and contents
+- [x] Add PKGBUILD
