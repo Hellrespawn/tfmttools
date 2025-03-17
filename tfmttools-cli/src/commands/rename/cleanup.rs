@@ -160,9 +160,6 @@ fn create_rename_action(
     );
 
     let path_concat = relative_path.components().join("_");
-
-    dbg!(&path_concat);
-
     let target_name = format!("{path_concat}_{checksum}");
 
     let rename_action = RenameAction::new(

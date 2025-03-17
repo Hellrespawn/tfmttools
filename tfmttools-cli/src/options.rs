@@ -68,13 +68,11 @@ impl TFMTOptions {
 
 impl TFMTOptions {
     pub fn default_application_dir() -> Result<Utf8PathBuf> {
-        let project_dirs =
-            directories::ProjectDirs::from("nl", "korpors", crate::PKG_NAME)
-                .ok_or(eyre!("Unable to determine home directory."))?;
+        let path = dirs::home_dir()
+            .ok_or(eyre!("Unable to determine home directory."))?
+            .join(crate::PKG_NAME);
 
-        let path = project_dirs.config_dir();
-
-        Ok(Utf8PathBuf::try_from(path.to_owned())?)
+        Ok(Utf8PathBuf::try_from(path)?)
     }
 
     pub fn history_file_path(&self) -> Utf8PathBuf {

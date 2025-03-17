@@ -33,7 +33,7 @@ color-eyre = { workspace = true }
 console = { workspace = true }
 ctrlc = { workspace = true }
 fastrand = { workspace = true }
-directories = { workspace = true }
+dirs = { workspace = true }
 itertools = { workspace = true }
 indicatif = { workspace = true }
 textwrap = { workspace = true }
