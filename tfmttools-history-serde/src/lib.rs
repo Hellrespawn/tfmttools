@@ -26,6 +26,31 @@ where
     A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
     M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
 {
+    fn load(&mut self) -> Result<LoadHistoryResult> {
+        let path = self.path.to_owned();
+
+        if path.is_file() {
+            let body = fs_err::read(&path)
+                .map_err(|err| HistoryError::LoadError(err.to_string()))?;
+
+            let history = Self::deserialize_self(&body, &path)?;
+
+            self.records = history.records;
+
+            debug!("Loaded history from {path}");
+
+            Ok(LoadHistoryResult::Loaded)
+        } else if path.exists() {
+            Err(HistoryError::LoadError(format!(
+                "{} exists but is not a file.",
+                path.to_owned()
+            )))
+        } else {
+            debug!("Loading empty history");
+            Ok(LoadHistoryResult::New)
+        }
+    }
+
     fn save(&mut self) -> Result<()> {
         let result = if !self.path.is_file() && self.path.exists() {
             let tmp_dir: Utf8PathBuf =
@@ -190,30 +215,8 @@ where
     A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
     M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
 {
-    pub fn load(path: &Utf8Path) -> Result<(Self, LoadHistoryResult)> {
-        let path = path.to_owned();
-
-        if path.is_file() {
-            let body = fs_err::read(&path)
-                .map_err(|err| HistoryError::LoadError(err.to_string()))?;
-
-            let history = Self::deserialize_self(&body, &path)?;
-
-            debug!("Loaded history from {path}");
-
-            Ok((history, LoadHistoryResult::Loaded))
-        } else if path.exists() {
-            Err(HistoryError::LoadError(format!(
-                "{} exists but is not a file.",
-                path.to_owned()
-            )))
-        } else {
-            debug!("Loading empty history");
-            Ok((
-                SerdeHistory { path, records: Vec::new() },
-                LoadHistoryResult::New,
-            ))
-        }
+    pub fn new(path: Utf8PathBuf) -> Self {
+        Self { path, records: Vec::new() }
     }
 
     fn serialize_self(&self) -> Result<Vec<u8>> {

@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use tfmttools_core::history::LoadActionHistoryResult;
+use tfmttools_history_core::LoadHistoryResult;
 
 use crate::history::{
     HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,
@@ -13,10 +13,10 @@ pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
         load_history(&app_options.history_file_path())?;
 
     match load_history_result {
-        LoadActionHistoryResult::Loaded => {
+        LoadHistoryResult::Loaded => {
             println!("{}", formatter.format_history(&mut history)?);
         },
-        LoadActionHistoryResult::New => {
+        LoadHistoryResult::New => {
             println!("There is no history.");
         },
     }

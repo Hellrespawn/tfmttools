@@ -8,6 +8,8 @@ pub enum LoadHistoryResult {
 }
 
 pub trait History<A, M> {
+    fn load(&mut self) -> Result<LoadHistoryResult>;
+
     fn save(&mut self) -> Result<()>;
 
     fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()>;
