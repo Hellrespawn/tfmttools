@@ -2,6 +2,9 @@
 
 ## Backlog
 
+- [ ] Notify user when files aren't moved
+- [ ] Don't offer to delete files when there are files with same destination
+
 - [ ] Do test with interactive app?
 - [ ] Some sort of transactions mechanism?
 - [ ] Fix/warn tag with leading/trailing whitespace?
