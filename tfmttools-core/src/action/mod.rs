@@ -18,13 +18,14 @@ impl RenameAction {
         Self { source, target }
     }
 
-    pub fn filter_unchanged_destinations(
+    pub fn separate_unchanged_destinations(
         rename_actions: Vec<RenameAction>,
-    ) -> Vec<RenameAction> {
-        rename_actions
+    ) -> (Vec<RenameAction>, Vec<Utf8PathBuf>) {
+        let (actions, unchanged_paths) = rename_actions
             .into_iter()
-            .filter(RenameAction::source_differs_from_target)
-            .collect()
+            .partition(RenameAction::source_differs_from_target);
+
+        (actions, unchanged_paths.into_iter().map(|ra| ra.target).collect())
     }
 
     pub fn source(&self) -> &Utf8Path {

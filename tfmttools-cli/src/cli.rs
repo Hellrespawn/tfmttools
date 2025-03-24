@@ -36,6 +36,7 @@ pub fn main() -> Result<()> {
 
     let result = run(args);
 
+    #[cfg(not(feature = "debug"))]
     if let Err(err) = result {
         let mut command = TFMTArgs::command();
 
@@ -53,6 +54,9 @@ pub fn main() -> Result<()> {
             );
         }
     }
+
+    #[cfg(feature = "debug")]
+    return result;
 
     Ok(())
 }

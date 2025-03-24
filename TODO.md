@@ -2,8 +2,7 @@
 
 ## Backlog
 
-- [ ] Notify user when files aren't moved
-- [ ] Don't offer to delete files when there are files with same destination
+- [ ] Handle in-situ renaming of files
 
 - [ ] Do test with interactive app?
 - [ ] Some sort of transactions mechanism?
@@ -20,6 +19,8 @@
 
 ## Done
 
+- [x] Don't (offer) to remove files that are renamed to the same location.
+- [x] Notify user when files are renamed to the same location.
 - [x] Add more description when running `rename` under `--yes`
 - [x] Handle undone records superseded by new actions.
 - [x] Actually check the moved files is the same file in tests?

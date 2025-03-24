@@ -1,9 +1,11 @@
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
+use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
-use tracing::info;
+use tracing::trace;
 
-use super::RenameContext;
+use super::{RenameContext, RenameResult};
 use crate::options::ConfirmMode;
 use crate::term::current_dir_utf8;
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
@@ -11,19 +13,29 @@ use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
 pub fn apply_actions(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
-) -> Result<Option<Vec<Action>>> {
-    let rename_actions =
-        RenameAction::filter_unchanged_destinations(rename_actions);
+) -> Result<RenameResult> {
+    let (rename_actions, unchanged_paths) =
+        RenameAction::separate_unchanged_destinations(rename_actions);
+
+    // Can't apply compiler attribute to macro invocation directly.
+    #[allow(unstable_name_collisions)]
+    {
+        trace!(
+            "Unchanged paths:\n{}",
+            unchanged_paths
+                .iter()
+                .map(Utf8PathBuf::to_string)
+                .intersperse("\n".to_owned())
+                .collect::<String>()
+        );
+    }
 
     if rename_actions.is_empty() {
-        let msg = "There are no audio files to rename.";
-        println!("{msg}");
-        info!("{msg}");
-        Ok(None)
+        Ok(RenameResult::NothingToRename(unchanged_paths))
     } else {
         validate_rename_action_errors(&rename_actions)?;
 
-        preview_rename_actions(context, &rename_actions)?;
+        preview_rename_actions(context, &rename_actions, &unchanged_paths)?;
 
         let confirmation = matches!(
             context.app_options().confirm_mode(),
@@ -34,10 +46,9 @@ pub fn apply_actions(
         if confirmation {
             let applied_actions = move_files(context, rename_actions)?;
 
-            Ok(Some(applied_actions))
+            Ok(RenameResult::Ok { applied_actions, unchanged_paths })
         } else {
-            println!("Aborting!");
-            Ok(None)
+            Ok(RenameResult::Aborted)
         }
     }
 }
@@ -62,6 +73,7 @@ fn validate_rename_action_errors(
 fn preview_rename_actions(
     context: &RenameContext,
     rename_actions: &[RenameAction],
+    unchanged_paths: &[Utf8PathBuf],
 ) -> Result<()> {
     let working_directory = current_dir_utf8()?;
 
@@ -72,6 +84,10 @@ fn preview_rename_actions(
     let preview_list =
         PreviewList::new(iter, context.app_options().preview_list_size())
             .with_item_name(ItemName::simple("destination"));
+
+    if !unchanged_paths.is_empty() {
+        println!("There are {} unchanged files.\n", unchanged_paths.len());
+    }
 
     preview_list.print()?;
 

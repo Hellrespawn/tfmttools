@@ -6,7 +6,6 @@
 *.hist
 
 # Testing
-test-output
 test-conf
 
 # PKGBUILD

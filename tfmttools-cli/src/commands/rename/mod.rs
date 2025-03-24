@@ -3,14 +3,21 @@ mod cleanup;
 mod context;
 mod setup;
 
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 pub use context::RenameContext;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_fs::ActionHandler;
+use tracing::info;
 
 use crate::history::load_history;
+
+pub enum RenameResult {
+    Ok { applied_actions: Vec<Action>, unchanged_paths: Vec<Utf8PathBuf> },
+    NothingToRename(Vec<Utf8PathBuf>),
+    Aborted,
+}
 
 pub fn rename(context: &RenameContext) -> Result<()> {
     let (mut history, load_history_result) =
@@ -21,8 +28,24 @@ pub fn rename(context: &RenameContext) -> Result<()> {
 
     let applied_actions = apply::apply_actions(context, rename_actions)?;
 
-    if let Some(applied_actions) = applied_actions {
-        cleanup::clean_up(context, &mut history, applied_actions, metadata)?;
+    match applied_actions {
+        RenameResult::Ok { applied_actions, unchanged_paths } => {
+            cleanup::clean_up(
+                context,
+                &mut history,
+                applied_actions,
+                &unchanged_paths,
+                metadata,
+            )?;
+        },
+        RenameResult::NothingToRename(_unchanged_paths) => {
+            let msg = "There are no audio files to rename.";
+            println!("{msg}");
+            info!("{msg}");
+        },
+        RenameResult::Aborted => {
+            println!("Aborting!");
+        },
     }
 
     Ok(())

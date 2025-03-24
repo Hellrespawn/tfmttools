@@ -10,7 +10,7 @@ use tfmttools_fs::{
     get_longest_common_prefix,
 };
 use tfmttools_history_core::{History, HistoryError};
-use tracing::trace;
+use tracing::{debug, info, trace};
 
 use super::RenameContext;
 use crate::options::ConfirmMode;
@@ -22,10 +22,12 @@ const IMAGE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 pub(crate) fn clean_up(
     context: &RenameContext,
     history: &mut impl History<Action, ActionRecordMetadata>,
-    mut applied_actions: Vec<Action>,
+    applied_actions: Vec<Action>,
+    unchanged_paths: &[Utf8PathBuf],
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
-    handle_remaining_files(context, &mut applied_actions)?;
+    let applied_actions =
+        handle_remaining_files(context, applied_actions, unchanged_paths)?;
 
     store_history(context, history, applied_actions, metadata)?;
 
@@ -34,8 +36,9 @@ pub(crate) fn clean_up(
 
 fn handle_remaining_files(
     context: &RenameContext,
-    applied_actions: &mut Vec<Action>,
-) -> Result<()> {
+    mut applied_actions: Vec<Action>,
+    unchanged_paths: &[Utf8PathBuf],
+) -> Result<Vec<Action>> {
     let common_prefix = get_longest_common_prefix(
         &applied_actions
             .iter()
@@ -51,12 +54,39 @@ fn handle_remaining_files(
             .collect::<Vec<_>>(),
     );
 
-    if let Some(common_path) = common_prefix {
-        let remaining_paths =
-            get_remaining_files_and_directories(context, &common_path)?;
+    if let Some(common_prefix) = common_prefix {
+        debug!("Common prefix of renamed files: {}", common_prefix);
+
+        let remaining_paths = get_remaining_files_and_directories(
+            context,
+            &common_prefix,
+            unchanged_paths,
+        )?;
 
         let (files, folders): (Vec<_>, Vec<_>) =
             remaining_paths.into_iter().partition(|p| p.is_file());
+
+        // Can't apply compiler attribute to macro invocation directly.
+        #[allow(unstable_name_collisions)]
+        {
+            trace!(
+                "Remaining files:\n{}",
+                files
+                    .iter()
+                    .map(Utf8PathBuf::to_string)
+                    .intersperse("\n".to_owned())
+                    .collect::<String>()
+            );
+
+            trace!(
+                "Remaining folders:\n{}",
+                folders
+                    .iter()
+                    .map(Utf8PathBuf::to_string)
+                    .intersperse("\n".to_owned())
+                    .collect::<String>()
+            );
+        }
 
         let has_unknown_files =
             files.iter().any(|path| !file_is_safe_to_delete(path));
@@ -64,6 +94,8 @@ fn handle_remaining_files(
         let run_id = context.app_options().run_id();
 
         if has_unknown_files {
+            info!("Has files that are not safe to delete.");
+
             println!("Found {} remaining files.", files.len());
 
             preview_files_to_delete(context, &files)?;
@@ -73,7 +105,7 @@ fn handle_remaining_files(
                 .map(|path| {
                     create_rename_action(
                         context,
-                        &common_path,
+                        &common_prefix,
                         path.clone(),
                         run_id,
                     )
@@ -89,19 +121,20 @@ fn handle_remaining_files(
 
             if !confirmation {
                 println!("Skipping clean-up.");
-                return Ok(());
+                return Ok(applied_actions);
             }
 
             applied_actions.extend(move_files(context, rename_actions)?);
 
             println!("Deleted.");
         } else if !files.is_empty() {
+            info!("Has only files that are safe to delete.");
             let rename_actions = files
                 .iter()
                 .map(|path| {
                     create_rename_action(
                         context,
-                        &common_path,
+                        &common_prefix,
                         path.clone(),
                         run_id,
                     )
@@ -123,20 +156,22 @@ fn handle_remaining_files(
             "Unable to determine remaining files and folders, skipping clean-up."
         );
     }
-    Ok(())
+    Ok(applied_actions)
 }
 
 fn get_remaining_files_and_directories(
     context: &RenameContext,
-    common_path: &Utf8Path,
+    common_prefix: &Utf8Path,
+    unchanged_paths: &[Utf8PathBuf],
 ) -> Result<Vec<Utf8PathBuf>> {
     let options = PathIteratorOptions::with_depth(
-        common_path,
+        common_prefix,
         context.rename_options().recursion_depth(),
     );
 
     let remaining = PathIterator::new(&options)
         // .rev()
+        .filter_ok(|path| !unchanged_paths.contains(path))
         .collect::<TFMTResult<Vec<_>>>()?;
 
     Ok(remaining)
@@ -149,14 +184,14 @@ fn file_is_safe_to_delete(path: &Utf8Path) -> bool {
 
 fn create_rename_action(
     context: &RenameContext,
-    common_path: &Utf8Path,
+    common_prefix: &Utf8Path,
     path: Utf8PathBuf,
     run_id: &str,
 ) -> Result<RenameAction> {
     let checksum = get_file_checksum(&path)?;
 
-    let relative_path = path.strip_prefix(common_path).expect(
-        "common_path is based on this file too, should always have prefix.",
+    let relative_path = path.strip_prefix(common_prefix).expect(
+        "common_prefix is based on this file too, should always have prefix.",
     );
 
     let path_concat = relative_path.components().join("_");

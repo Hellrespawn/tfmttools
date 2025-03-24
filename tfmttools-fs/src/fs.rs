@@ -217,28 +217,36 @@ impl FsHandler {
 pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
     if paths.is_empty() {
         None
+    } else if paths.len() == 1 {
+        Some(
+            paths[0]
+                .parent()
+                .expect("File should always have parent.")
+                .to_owned(),
+        )
     } else {
         let mut iter = paths.iter();
 
         // We have already returned if no files were found, so this unwrap
         // should be safe.
-        let mut common_path = iter.next().unwrap().to_path_buf();
+        let mut common_prefix = iter.next().unwrap().to_path_buf();
 
         for path in iter {
-            let mut new_common_path = Utf8PathBuf::new();
+            let mut new_common_prefix = Utf8PathBuf::new();
 
-            for (left, right) in path.components().zip(common_path.components())
+            for (left, right) in
+                path.components().zip(common_prefix.components())
             {
                 if left == right {
-                    new_common_path.push(left);
+                    new_common_prefix.push(left);
                 } else {
                     break;
                 }
             }
-            common_path = new_common_path;
+            common_prefix = new_common_prefix;
         }
 
-        Some(common_path)
+        Some(common_prefix)
     }
 }
 
