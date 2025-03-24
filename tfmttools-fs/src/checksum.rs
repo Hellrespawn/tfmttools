@@ -1,5 +1,7 @@
+use std::hash::Hash;
 use std::io::Read;
 
+use adler::Adler32;
 use camino::Utf8Path;
 use tfmttools_core::error::TFMTResult;
 
@@ -19,5 +21,9 @@ pub fn get_file_checksum(path: &Utf8Path) -> TFMTResult<String> {
         // keep reading
     }
 
-    Ok(format!("{:X}", adler::adler32_slice(&buf)))
+    let mut adler = Adler32::new();
+
+    buf.hash(&mut adler);
+
+    Ok(format!("{:X}", adler.checksum()))
 }
