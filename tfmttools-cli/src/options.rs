@@ -70,7 +70,7 @@ impl TFMTOptions {
     pub fn default_application_dir() -> Result<Utf8PathBuf> {
         let path = dirs::home_dir()
             .ok_or(eyre!("Unable to determine home directory."))?
-            .join(crate::PKG_NAME);
+            .join(format!(".{}", crate::PKG_NAME));
 
         Ok(Utf8PathBuf::try_from(path)?)
     }
