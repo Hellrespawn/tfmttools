@@ -21,7 +21,7 @@ pub enum RenameResult {
 
 pub fn rename(context: &RenameContext) -> Result<()> {
     let (mut history, load_history_result) =
-        load_history(&context.app_options().history_file_path())?;
+        load_history(&context.app_options().history_file_path()?)?;
 
     let (rename_actions, metadata) =
         setup::create_actions(context, &mut history, load_history_result)?;

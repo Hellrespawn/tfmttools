@@ -181,7 +181,7 @@ fn create_rename_actions(
         .map(|audiofile| {
             let rename_action = RenameAction::new(
                 audiofile.path().to_owned(),
-                audiofile.construct_target_path(template, &cwd)?,
+                audiofile.construct_target_path(template, cwd.as_path())?,
             );
 
             bar.inc_found();

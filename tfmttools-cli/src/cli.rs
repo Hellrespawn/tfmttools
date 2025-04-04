@@ -1,6 +1,7 @@
 use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
+use tfmttools_core::util::Utf8Directory;
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history_core::HistoryMode;
 use tracing::{debug, info};
@@ -78,7 +79,8 @@ fn run(args: TFMTArgs) -> Result<()> {
         TFMTSubcommand::ListTemplates(list_templates_args) => {
             let template_directory = list_templates_args
                 .custom_template_directory
-                .unwrap_or(app_options.config_directory().to_owned());
+                .map(Utf8Directory::new)
+                .unwrap_or(Ok(app_options.config_directory().to_owned()))?;
 
             list_templates(&template_directory)?;
         },
@@ -87,7 +89,7 @@ fn run(args: TFMTArgs) -> Result<()> {
                 RenameOptions::try_from((rename_args, &app_options))?;
 
             let path_iterator_options = PathIteratorOptions::with_depth(
-                rename_options.input_directory(),
+                rename_options.input_directory().as_path(),
                 rename_options.recursion_depth(),
             );
 

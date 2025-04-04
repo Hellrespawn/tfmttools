@@ -1,7 +1,7 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use tfmttools_core::util::{ActionMode, MoveMode};
+use tfmttools_core::util::{ActionMode, MoveMode, Utf8Directory, Utf8File};
 use tfmttools_fs::FileOrName;
 
 use crate::args::{RenameArgs, TFMTArgs};
@@ -27,7 +27,7 @@ pub enum DisplayMode {
 
 #[derive(Debug, Clone)]
 pub struct TFMTOptions {
-    config_directory: Utf8PathBuf,
+    config_directory: Utf8Directory,
     action_mode: ActionMode,
     display_mode: DisplayMode,
     confirm_mode: ConfirmMode,
@@ -37,8 +37,8 @@ pub struct TFMTOptions {
 }
 
 impl TFMTOptions {
-    pub fn config_directory(&self) -> &Utf8Path {
-        self.config_directory.as_ref()
+    pub fn config_directory(&self) -> &Utf8Directory {
+        &self.config_directory
     }
 
     pub fn action_mode(&self) -> ActionMode {
@@ -67,22 +67,26 @@ impl TFMTOptions {
 }
 
 impl TFMTOptions {
-    pub fn default_application_dir() -> Result<Utf8PathBuf> {
+    pub fn default_application_dir() -> Result<Utf8Directory> {
         let path = dirs::home_dir()
             .ok_or(eyre!("Unable to determine home directory."))?
             .join(format!(".{}", crate::PKG_NAME));
 
-        Ok(Utf8PathBuf::try_from(path)?)
+        let utf8_path = Utf8PathBuf::try_from(path)?;
+
+        Ok(Utf8Directory::new(utf8_path)?)
     }
 
-    pub fn history_file_path(&self) -> Utf8PathBuf {
+    pub fn history_file_path(&self) -> Result<Utf8File> {
         let filename = format!("{}.hist", crate::PKG_NAME);
-        self.config_directory.join(filename)
+        let path = self.config_directory.as_path().join(filename);
+
+        Ok(Utf8File::new(path)?)
     }
 
-    fn path_or_default(path: Option<&Utf8Path>) -> Result<Utf8PathBuf> {
+    fn path_or_default(path: Option<&Utf8Path>) -> Result<Utf8Directory> {
         if let Some(path) = path {
-            Ok(path.to_owned())
+            Ok(Utf8Directory::new(path)?)
         } else {
             Ok(Self::default_application_dir()?)
         }
@@ -130,9 +134,9 @@ impl TryFrom<&TFMTArgs> for TFMTOptions {
 
 #[derive(Debug, Clone)]
 pub struct RenameOptions {
-    input_directory: Utf8PathBuf,
-    template_directory: Utf8PathBuf,
-    bin_directory: Utf8PathBuf,
+    input_directory: Utf8Directory,
+    template_directory: Utf8Directory,
+    bin_directory: Utf8Directory,
     recursion_depth: usize,
     move_mode: MoveMode,
     template: Option<FileOrName>,
@@ -140,16 +144,16 @@ pub struct RenameOptions {
 }
 
 impl RenameOptions {
-    pub fn input_directory(&self) -> &Utf8Path {
-        self.input_directory.as_ref()
+    pub fn input_directory(&self) -> &Utf8Directory {
+        &self.input_directory
     }
 
-    pub fn template_directory(&self) -> &Utf8Path {
-        self.template_directory.as_ref()
+    pub fn template_directory(&self) -> &Utf8Directory {
+        &self.template_directory
     }
 
-    pub fn bin_directory(&self) -> &Utf8Path {
-        self.bin_directory.as_ref()
+    pub fn bin_directory(&self) -> &Utf8Directory {
+        &self.bin_directory
     }
 
     pub fn recursion_depth(&self) -> usize {
@@ -179,23 +183,28 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             input_directory: if let Some(input_directory) =
                 rename_args.custom_input_directory
             {
-                input_directory
+                Utf8Directory::new(input_directory)?
             } else {
                 current_dir_utf8()?
             },
             template_directory: if let Some(template_directory) =
                 rename_args.custom_template_directory
             {
-                template_directory
+                Utf8Directory::new(template_directory)?
             } else {
                 options.config_directory().to_owned()
             },
             bin_directory: if let Some(bin_directory) =
                 rename_args.custom_bin_directory
             {
-                bin_directory
+                Utf8Directory::new(bin_directory)?
             } else {
-                options.config_directory().join(BIN_DIRECTORY_NAME)
+                Utf8Directory::new(
+                    options
+                        .config_directory()
+                        .as_path()
+                        .join(BIN_DIRECTORY_NAME),
+                )?
             },
             recursion_depth: rename_args
                 .recursion_depth

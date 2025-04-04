@@ -78,7 +78,10 @@ fn preview_rename_actions(
     let working_directory = current_dir_utf8()?;
 
     let iter = rename_actions.iter().map(|rename_action| {
-        super::strip_path_prefix(rename_action.target(), &working_directory)
+        super::strip_path_prefix(
+            rename_action.target(),
+            working_directory.as_path(),
+        )
     });
 
     let preview_list =

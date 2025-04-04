@@ -6,6 +6,7 @@ use minijinja::{Environment, Value, escape_formatter};
 use regex::Regex;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
+use tfmttools_core::util::Utf8Directory;
 
 use crate::PathIterator;
 
@@ -18,11 +19,13 @@ pub struct TemplateLoader<'tl> {
 }
 
 impl<'tl> TemplateLoader<'tl> {
-    pub fn read_directory(template_directory: &Utf8Path) -> TFMTResult<Self> {
+    pub fn read_directory(
+        template_directory: &Utf8Directory,
+    ) -> TFMTResult<Self> {
         let mut template_names = Vec::new();
         let mut environment = Self::create_environment();
 
-        let iter = PathIterator::single_directory(template_directory)
+        let iter = PathIterator::single_directory(template_directory.as_path())
             .flatten()
             .filter(|path| Self::path_is_template(path));
 

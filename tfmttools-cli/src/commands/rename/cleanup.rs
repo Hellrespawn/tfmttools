@@ -199,7 +199,12 @@ fn create_rename_action(
 
     let rename_action = RenameAction::new(
         path,
-        context.rename_options().bin_directory().join(run_id).join(target_name),
+        context
+            .rename_options()
+            .bin_directory()
+            .as_path()
+            .join(run_id)
+            .join(target_name),
     );
 
     trace!("Created rename action: {rename_action:?}");
@@ -214,9 +219,9 @@ fn preview_files_to_delete(
     let working_directory = current_dir_utf8()?;
 
     let items = PreviewList::new(
-        paths
-            .iter()
-            .map(|path| super::strip_path_prefix(path, &working_directory)),
+        paths.iter().map(|path| {
+            super::strip_path_prefix(path, working_directory.as_path())
+        }),
         context.app_options().preview_list_size(),
     )
     .into_string()?;

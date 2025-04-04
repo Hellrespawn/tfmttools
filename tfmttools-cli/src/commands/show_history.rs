@@ -10,7 +10,7 @@ pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
     let formatter = get_history_formatter(app_options.verbosity());
 
     let (mut history, load_history_result) =
-        load_history(&app_options.history_file_path())?;
+        load_history(&app_options.history_file_path()?)?;
 
     match load_history_result {
         LoadHistoryResult::Loaded => {

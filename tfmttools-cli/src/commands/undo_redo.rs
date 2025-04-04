@@ -48,7 +48,7 @@ impl UndoRedoCommand {
         };
 
         let (mut history, load_history_result) =
-            load_history(&app_options.history_file_path())?;
+            load_history(&app_options.history_file_path()?)?;
 
         match load_history_result {
             LoadHistoryResult::New => {

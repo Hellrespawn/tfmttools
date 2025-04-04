@@ -7,7 +7,7 @@ use crate::options::TFMTOptions;
 use crate::ui::ConfirmationPrompt;
 
 pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
-    let path = &app_options.history_file_path();
+    let path = &app_options.history_file_path()?;
 
     let (mut history, load_history_result) = load_history(path)?;
 
