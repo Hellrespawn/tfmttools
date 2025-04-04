@@ -44,3 +44,7 @@ tracing-subscriber = { workspace = true }
 [dev-dependencies]
 tfmttools-test = { path = "../tfmttools-test" }
 assert_fs = { workspace = true }
+
+[lints]
+workspace = true
+

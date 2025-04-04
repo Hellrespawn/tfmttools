@@ -61,7 +61,7 @@ impl<'tl> TemplateLoader<'tl> {
         let minijinja_template: minijinja::Template<'_, '_> =
             self.environment.get_template(name).ok()?;
 
-        let description = self.description(&minijinja_template);
+        let description = Self::description(&minijinja_template);
 
         let template = Template::new(
             minijinja_template,
@@ -79,11 +79,11 @@ impl<'tl> TemplateLoader<'tl> {
             .map(|name| self.get_template(name, Vec::new()).expect("Templates::template_names should not contain names of non-existent templates.")).collect()
     }
 
-    fn description(&self, template: &minijinja::Template) -> Option<String> {
-        let source = template.source();
-
+    fn description(template: &minijinja::Template) -> Option<String> {
         const COMMENT_START: &str = "{#";
         const COMMENT_END: &str = "{#";
+
+        let source = template.source();
 
         if source.trim().starts_with(COMMENT_START) {
             let option = source.split_once(COMMENT_END).map(|(left, _)| {
@@ -122,9 +122,7 @@ impl<'tl> TemplateLoader<'tl> {
         env
     }
 
-    fn year(date: Value) -> Result<String, minijinja::Error> {
-        let date = date.to_string();
-
+    fn year(date: &Value) -> Result<String, minijinja::Error> {
         static RE_ISO: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r"(\d{4})-\d{2}-\d{2}").unwrap());
 
@@ -133,6 +131,8 @@ impl<'tl> TemplateLoader<'tl> {
 
         static RE_YEAR: LazyLock<Regex> =
             LazyLock::new(|| Regex::new(r"(\d{4})").unwrap());
+
+        let date = date.to_string();
 
         if let Some(m) = RE_ISO.find(&date) {
             let year = &m.as_str()[0..4];
@@ -154,7 +154,7 @@ impl<'tl> TemplateLoader<'tl> {
         }
     }
 
-    fn zero_pad(value: Value, width: usize) -> String {
+    fn zero_pad(value: &Value, width: usize) -> String {
         format!("{value:0>width$}")
     }
 }

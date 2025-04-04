@@ -13,6 +13,7 @@ pub struct Template<'templates, 'source> {
 }
 
 impl<'templates, 'source> Template<'templates, 'source> {
+    #[must_use]
     pub fn new(
         inner: minijinja::Template<'templates, 'source>,
         name: String,
@@ -22,10 +23,12 @@ impl<'templates, 'source> Template<'templates, 'source> {
         Self { inner, name, description, arguments }
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name.as_ref()
     }
 
+    #[must_use]
     pub fn description(&self) -> Option<&String> {
         self.description.as_ref()
     }

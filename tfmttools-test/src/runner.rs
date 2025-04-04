@@ -32,7 +32,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
             let mutex = arc.clone();
 
             Trial::test(name.clone(), move || {
-                let outcome = run_test_case(name.clone(), data)?;
+                let outcome = run_test_case(name.clone(), &data)?;
 
                 if outcome.passed() {
                     Ok(())
@@ -52,7 +52,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let failed_test_outcomes =
         Arc::into_inner(arc).expect("Arc dropped").into_inner()?;
 
-    create_test_report(failed_test_outcomes)?;
+    create_test_report(&failed_test_outcomes)?;
 
     Ok(exit_code)
 }
@@ -81,7 +81,7 @@ fn load_data() -> Result<Vec<(String, TestCaseData)>> {
 }
 fn run_test_case(
     test_case_name: String,
-    test_case_data: TestCaseData,
+    test_case_data: &TestCaseData,
 ) -> Result<TestCaseOutcome> {
     let context = TestContext::new()?;
 
@@ -147,26 +147,24 @@ fn run_test_case(
 }
 
 fn populate_files(context: &TestContext) -> Result<()> {
-    copy_files(SourceDirs::template_dir(), context.config_work_dir())?;
+    copy_files(SourceDirs::template_dir(), &context.config_work_dir())?;
 
-    copy_files(SourceDirs::audio_dir(), context.input_audio_dir())?;
+    copy_files(SourceDirs::audio_dir(), &context.input_audio_dir())?;
 
-    copy_files(SourceDirs::extra_dir(), context.input_extra_dir())?;
+    copy_files(SourceDirs::extra_dir(), &context.input_extra_dir())?;
 
     Ok(())
 }
 
-fn copy_files(source_dir: Utf8PathBuf, target_dir: Utf8PathBuf) -> Result<()> {
+fn copy_files(source_dir: Utf8PathBuf, target_dir: &Utf8Path) -> Result<()> {
     let paths = fs_err::read_dir(source_dir)?
         .flat_map(|result| {
-            result.map(|entry| {
-                Utf8PathBuf::from_path_buf(entry.path().to_path_buf())
-            })
+            result.map(|entry| Utf8PathBuf::from_path_buf(entry.path().clone()))
         })
         .flatten()
         .collect::<Vec<_>>();
 
-    fs_err::create_dir(&target_dir)?;
+    fs_err::create_dir(target_dir)?;
 
     for path in &paths {
         // Templates are selected by is_file, should always have a filename
@@ -196,7 +194,7 @@ fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
     let arguments =
         cmd.get_args().map(|arg| arg.to_string_lossy().to_string()).collect();
 
-    Ok(CommandOutcome::new(arguments, output))
+    Ok(CommandOutcome::new(arguments, &output))
 }
 
 fn verify_expectations(
@@ -238,9 +236,7 @@ fn verify_expectation(
 ) -> ExpectationOutcome {
     let path = prefix.join(expectation.path());
 
-    if !path.exists() {
-        ExpectationOutcome::NotPresent(path)
-    } else {
+    if path.exists() {
         let checksum = get_file_checksum(&path).expect("");
 
         if expectation.verify_checksum(&checksum) {
@@ -252,12 +248,12 @@ fn verify_expectation(
                 actual: checksum,
             }
         }
+    } else {
+        ExpectationOutcome::NotPresent(path)
     }
 }
 
-fn create_test_report(
-    failed_test_outcomes: Vec<TestCaseOutcome>,
-) -> Result<()> {
+fn create_test_report(failed_test_outcomes: &[TestCaseOutcome]) -> Result<()> {
     let _ = fs_err::remove_dir_all(SourceDirs::test_report_output_dir());
 
     if !failed_test_outcomes.is_empty() {

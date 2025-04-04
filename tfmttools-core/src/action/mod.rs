@@ -14,6 +14,7 @@ pub struct RenameAction {
 }
 
 impl RenameAction {
+    #[must_use]
     pub fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
         Self { source, target }
     }
@@ -28,14 +29,17 @@ impl RenameAction {
         (actions, unchanged_paths.into_iter().map(|ra| ra.target).collect())
     }
 
+    #[must_use]
     pub fn source(&self) -> &Utf8Path {
         &self.source
     }
 
+    #[must_use]
     pub fn target(&self) -> &Utf8Path {
         &self.target
     }
 
+    #[must_use]
     pub fn source_differs_from_target(&self) -> bool {
         self.source() != self.target()
     }
@@ -89,27 +93,30 @@ pub enum Action {
 }
 
 impl Action {
+    #[must_use]
     pub fn is_rename_action(&self) -> bool {
         matches!(self, Self::MoveFile { .. } | Self::CopyFile(..))
     }
 
+    #[must_use]
     pub fn source(&self) -> Option<&Utf8Path> {
         match self {
-            Action::MoveFile(rename_action) => Some(rename_action.source()),
-            Action::CopyFile(rename_action) => Some(rename_action.source()),
-            Action::RemoveFile(_) => None,
-            Action::MakeDir(_) => None,
-            Action::RemoveDir(_) => None,
+            Action::CopyFile(rename_action)
+            | Action::MoveFile(rename_action) => Some(rename_action.source()),
+            Action::RemoveFile(_)
+            | Action::MakeDir(_)
+            | Action::RemoveDir(_) => None,
         }
     }
 
+    #[must_use]
     pub fn target(&self) -> &Utf8Path {
         match self {
-            Action::MoveFile(rename_action) => rename_action.target(),
-            Action::CopyFile(rename_action) => rename_action.target(),
-            Action::RemoveFile(path) => path,
-            Action::MakeDir(path) => path,
-            Action::RemoveDir(path) => path,
+            Action::CopyFile(rename_action)
+            | Action::MoveFile(rename_action) => rename_action.target(),
+            Action::RemoveFile(path)
+            | Action::MakeDir(path)
+            | Action::RemoveDir(path) => path,
         }
     }
 }

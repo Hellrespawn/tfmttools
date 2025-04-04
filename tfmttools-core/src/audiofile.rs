@@ -35,14 +35,20 @@ impl AudioFile {
         }
     }
 
+    #[must_use]
     pub fn path(&self) -> &Utf8Path {
         &self.path
     }
 
+    #[must_use]
     pub fn extension(&self) -> &str {
-        self.path.extension().as_ref().unwrap()
+        self.path
+            .extension()
+            .as_ref()
+            .expect("Audio file should always have extension.")
     }
 
+    #[must_use]
     pub fn tag(&self) -> &Tag {
         &self.tag
     }
@@ -68,6 +74,7 @@ impl AudioFile {
         &mut self.tag
     }
 
+    #[must_use]
     pub fn path_predicate(path: &Utf8Path) -> bool {
         path.extension().is_some_and(|extension| {
             for supported_extension in AudioFile::SUPPORTED_EXTENSIONS {

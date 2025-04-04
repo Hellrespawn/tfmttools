@@ -1,5 +1,3 @@
-#![allow(clippy::module_name_repetitions)]
-
 mod item_name;
 mod preview_list;
 mod progress_bar;

@@ -13,6 +13,7 @@ pub enum HistoryMode {
 }
 
 impl HistoryMode {
+    #[must_use]
     pub fn verb(&self) -> &str {
         match self {
             HistoryMode::Undo => "undo",
@@ -20,6 +21,7 @@ impl HistoryMode {
         }
     }
 
+    #[must_use]
     pub fn verb_capitalized(&self) -> &str {
         match self {
             HistoryMode::Undo => "Undo",

@@ -22,7 +22,7 @@ impl TestCaseOutcome {
     }
 
     pub fn passed(&self) -> bool {
-        self.test_outcomes.iter().all(|outcome| outcome.passed())
+        self.test_outcomes.iter().all(TestOutcome::passed)
     }
 }
 
@@ -63,7 +63,7 @@ pub struct CommandOutcome {
 }
 
 impl CommandOutcome {
-    pub fn new(arguments: Vec<String>, output: Output) -> Self {
+    pub fn new(arguments: Vec<String>, output: &Output) -> Self {
         let success = output.status.success();
         let exit_code = output.status.code();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -87,8 +87,8 @@ impl ExpectationsOutcome {
     ) -> Self {
         let passed = files_remaining_after_previous
             .as_ref()
-            .is_none_or(|v| v.is_empty())
-            && outcomes.iter().all(|outcome| outcome.passed());
+            .is_none_or(std::vec::Vec::is_empty)
+            && outcomes.iter().all(ExpectationOutcome::passed);
 
         Self { files_remaining_after_previous, outcomes, passed }
     }

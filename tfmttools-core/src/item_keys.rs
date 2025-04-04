@@ -9,6 +9,7 @@ use crate::error::{TFMTError, TFMTResult};
 pub struct ItemKeys;
 
 impl ItemKeys {
+    #[must_use]
     pub fn all() -> &'static [ItemKey] {
         &ITEM_KEYS
     }
@@ -56,9 +57,10 @@ fn insert_case(
         _ => pascal_case.to_owned(),
     };
 
-    if !pascal_case.is_case(Case::Pascal) {
-        panic!("Key '{}' is not pascal case!", pascal_case)
-    }
+    assert!(
+        pascal_case.is_case(Case::Pascal),
+        "Key '{pascal_case}' is not pascal case!",
+    );
 
     let all_cases = all_cases(&pascal_case);
 

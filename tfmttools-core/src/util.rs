@@ -2,6 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 
 use crate::error::{TFMTError, TFMTResult};
 
+#[must_use]
 pub fn normalize_separators(string: &str) -> String {
     string
         .split(['\\', '/'])
@@ -34,10 +35,12 @@ impl Utf8Directory {
         }
     }
 
+    #[must_use]
     pub fn as_path(&self) -> &Utf8Path {
         &self.0
     }
 
+    #[must_use]
     pub fn into_path(self) -> Utf8PathBuf {
         self.0
     }
@@ -61,10 +64,12 @@ impl Utf8File {
         }
     }
 
+    #[must_use]
     pub fn as_path(&self) -> &Utf8Path {
         &self.0
     }
 
+    #[must_use]
     pub fn into_path(self) -> Utf8PathBuf {
         self.0
     }

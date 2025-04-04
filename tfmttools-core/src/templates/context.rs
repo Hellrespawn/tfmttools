@@ -133,12 +133,12 @@ impl Object for AudioFileContext {
                 let key = ItemKeys::from_string(field).ok()?;
 
                 match key {
-                    ItemKey::DiscNumber => self.get_current(key),
-                    ItemKey::DiscTotal => self.get_total(key),
-                    ItemKey::TrackNumber => self.get_current(key),
-                    ItemKey::TrackTotal => self.get_total(key),
-                    ItemKey::MovementNumber => self.get_current(key),
-                    ItemKey::MovementTotal => self.get_total(key),
+                    ItemKey::DiscTotal
+                    | ItemKey::TrackTotal
+                    | ItemKey::MovementTotal => self.get_total(key),
+                    ItemKey::TrackNumber
+                    | ItemKey::DiscNumber
+                    | ItemKey::MovementNumber => self.get_current(key),
                     _ => self.get_value_for_item_key(key),
                 }
             },

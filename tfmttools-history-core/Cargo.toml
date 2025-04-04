@@ -15,3 +15,6 @@ camino = { workspace = true, features = ["serde", "serde1"] }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
+
+[lints]
+workspace = true

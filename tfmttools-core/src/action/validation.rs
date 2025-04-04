@@ -158,6 +158,7 @@ fn write_source_and_target(
     Ok(())
 }
 
+#[must_use]
 pub fn validate_rename_actions(
     rename_actions: &[RenameAction],
 ) -> Vec<ValidationError> {
@@ -229,13 +230,13 @@ fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
     let forbidden_leading_characters: Vec<&str> = forbidden_characters
         .iter()
         .filter(|f| f.leading())
-        .map(|f| f.char())
+        .map(ForbiddenLeadingOrTrailingChar::char)
         .collect();
 
     let forbidden_trailing_characters: Vec<&str> = forbidden_characters
         .iter()
         .filter(|f| f.trailing())
-        .map(|f| f.char())
+        .map(ForbiddenLeadingOrTrailingChar::char)
         .collect();
 
     rename_actions
@@ -415,7 +416,7 @@ mod test {
 
         let errors = assert_n_errors(&forbidden_leading, 3);
 
-        assert!(errors.into_iter().all(|e| matches!(e, ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent { .. })))
+        assert!(errors.into_iter().all(|e| matches!(e, ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent { .. })));
     }
 
     #[test]

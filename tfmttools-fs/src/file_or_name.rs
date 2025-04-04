@@ -26,6 +26,7 @@ impl From<&str> for FileOrName {
 }
 
 impl FileOrName {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             FileOrName::Name(s) | FileOrName::File(_, s) => s,

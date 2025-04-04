@@ -11,6 +11,7 @@ pub struct ActionHandler<'a> {
 }
 
 impl<'a> ActionHandler<'a> {
+    #[must_use]
     pub fn new(fs_handler: &'a FsHandler, allow_remove: bool) -> Self {
         Self { fs_handler, allow_remove }
     }

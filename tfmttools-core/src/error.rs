@@ -20,6 +20,9 @@ pub enum TFMTError {
     #[error("Unexpected error while trying to move {0} to {1}: {2} ")]
     UnexpectedMoveError(Utf8PathBuf, Utf8PathBuf, String),
 
+    #[error("File is too big for checksum: {0}")]
+    FileTooLargeError(Utf8PathBuf),
+
     // Passthrough errors
     #[error(transparent)]
     Camino(#[from] camino::FromPathBufError),

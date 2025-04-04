@@ -52,6 +52,7 @@ pub struct FsHandler {
 }
 
 impl FsHandler {
+    #[must_use]
     pub fn new(action_mode: ActionMode) -> Self {
         Self { action_mode }
     }
@@ -83,17 +84,17 @@ impl FsHandler {
             // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
 
             #[cfg(windows)]
-            const EXPECTED_ERROR_CODE: usize = 17;
+            const EXPECTED_ERROR_CODE: i32 = 17;
 
             #[cfg(unix)]
-            const EXPECTED_ERROR_CODE: usize = 18;
+            const EXPECTED_ERROR_CODE: i32 = 18;
 
             if let Err(err) = std::fs::rename(source, target) {
                 // HACK Unable to capture raw_os_error with fs_err, use
                 // std::fs::rename instead.
                 let is_expected_error =
                     err.raw_os_error().is_some_and(|code| {
-                        code > 0 && code as usize == EXPECTED_ERROR_CODE
+                        code > 0 && code == EXPECTED_ERROR_CODE
                     });
 
                 if is_expected_error {
@@ -214,6 +215,7 @@ impl FsHandler {
     }
 }
 
+#[must_use]
 pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
     if paths.is_empty() {
         None
