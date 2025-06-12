@@ -1219,6 +1219,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tfmttools-fs-ng"
+version = "0.23.1"
+dependencies = [
+ "assert_fs",
+ "color-eyre",
+ "fs-err",
+ "tfmttools-core",
+]
+
+[[package]]
 name = "tfmttools-history-core"
 version = "0.23.1"
 dependencies = [
