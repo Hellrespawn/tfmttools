@@ -1,24 +1,25 @@
-use std::path::Path;
-
+use camino::Utf8PathBuf;
+use serde::{Deserialize, Serialize};
 use tfmttools_core::error::TFMTResult;
 
-use crate::{FsOption, action::Action};
+use crate::FsOption;
+use crate::action::Action;
 
-pub struct CopyFile<P, Q>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    source: P,
-    target: Q,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CopyFile {
+    source: Utf8PathBuf,
+    target: Utf8PathBuf,
 }
 
-impl<P, Q> Action for CopyFile<P, Q>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    fn apply(&self, fs_options: &[FsOption]) -> TFMTResult {
+impl CopyFile {
+    pub fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
+        Self { source, target }
+    }
+}
+
+#[typetag::serde]
+impl Action for CopyFile {
+    fn apply_with(&self, fs_options: &[FsOption]) -> TFMTResult {
         if !fs_options.contains(&FsOption::DryRun) {
             fs_err::copy(&self.source, &self.target)?;
         }
@@ -26,9 +27,9 @@ where
         Ok(())
     }
 
-    fn undo(&self, fs_options: &[FsOption]) -> TFMTResult {
+    fn undo_with(&self, fs_options: &[FsOption]) -> TFMTResult {
         if !fs_options.contains(&FsOption::DryRun) {
-            fs_err::copy(&self.target, &self.source)?;
+            fs_err::remove_file(&self.target)?;
         }
 
         Ok(())

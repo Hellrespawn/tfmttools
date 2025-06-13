@@ -47,6 +47,7 @@ minijinja = { version = "2.10.2", default-features = false, features = [
     "serde",
     "builtins",
 ] }
+predicates = "3.1.3"
 regex = "1.11.1"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = { version = "1.0.139", features = ["preserve_order"] }
@@ -55,6 +56,9 @@ thiserror = "2.0.12"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+typetag = "0.2.20"
+
+[workspace.dev-dependencies]
 
 [profile.release]
 strip = true    # Automatically strip symbols from the binary.

@@ -59,13 +59,13 @@ impl FsHandler {
 
     pub fn write<P, C>(&self, path: P, contents: C) -> std::io::Result<()>
     where
-        P: AsRef<Path>,
+        P: AsRef<Utf8Path>,
         C: AsRef<[u8]>,
     {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(())
         } else {
-            fs_err::write(path, contents)
+            fs_err::write(path.as_ref(), contents)
         }
     }
 

@@ -47,4 +47,3 @@ assert_fs = { workspace = true }
 
 [lints]
 workspace = true
-
