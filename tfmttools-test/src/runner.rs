@@ -24,22 +24,26 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
 
     let data = load_data()?;
 
-    let arc = Arc::new(Mutex::new(Vec::new()));
+    let mutex = Arc::new(Mutex::new(Vec::new()));
 
     let tests = data
         .into_iter()
         .map(|(name, data)| {
-            let mutex = arc.clone();
+            let mutex = mutex.clone();
 
             Trial::test(name.clone(), move || {
                 let outcome = run_test_case(name.clone(), &data)?;
 
-                if outcome.passed() {
+                let passed = outcome.passed();
+
+                {
+                    mutex.lock()?.push(outcome);
+                }
+
+                if passed {
                     Ok(())
                 } else {
                     let error_message = format!("Failed test case {name}");
-
-                    mutex.lock()?.push(outcome);
 
                     Err(error_message.into())
                 }
@@ -49,10 +53,10 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
 
     let exit_code = libtest_mimic::run(&args, tests).exit_code();
 
-    let failed_test_outcomes =
-        Arc::into_inner(arc).expect("Arc dropped").into_inner()?;
+    let test_outcomes =
+        Arc::into_inner(mutex).expect("Arc dropped").into_inner()?;
 
-    create_test_report(&failed_test_outcomes)?;
+    create_test_report(&test_outcomes)?;
 
     Ok(exit_code)
 }
@@ -253,10 +257,10 @@ fn verify_expectation(
     }
 }
 
-fn create_test_report(failed_test_outcomes: &[TestCaseOutcome]) -> Result<()> {
+fn create_test_report(test_outcomes: &[TestCaseOutcome]) -> Result<()> {
     let _ = fs_err::remove_dir_all(SourceDirs::test_report_output_dir());
 
-    if !failed_test_outcomes.is_empty() {
+    if !test_outcomes.is_empty() {
         let template =
             fs_err::read_to_string(SourceDirs::test_report_template_path())?;
 
@@ -268,7 +272,7 @@ fn create_test_report(failed_test_outcomes: &[TestCaseOutcome]) -> Result<()> {
         fs_err::create_dir_all(SourceDirs::test_report_output_dir())?;
 
         let rendered =
-            template.render(context!(test_cases => failed_test_outcomes))?;
+            template.render(context!(test_cases => test_outcomes))?;
 
         let file_path =
             SourceDirs::test_report_output_dir().join("test-report.html");

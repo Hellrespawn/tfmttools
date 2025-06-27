@@ -1,24 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html color-mode="user" lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test report</title>
     <link rel="stylesheet" href="../mvp.css">
+
+    <style>
+        :root {
+            --color-passed: lch(80% 40 140);
+            --color-fail: lch(70% 35 25);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root[color-mode="user"] {
+                --color-passed: lch(50% 40 140);
+                --color-fail: lch(45% 35 25);
+            }
+        }
+    </style>
 </head>
 
 <body>
-    {% for test_case in test_cases %}
-    <div>
-        <header>
-            <h2>{{test_case.name}}</h2>
-            <p>{{test_case.description}}</p>
-            Directory: <code style="font-weight: bold; cursor: pointer;"
-                onclick="navigator.clipboard.writeText('{{test_case.work_dir}}')">{{test_case.work_dir}}</code> (click
-            to copy)
-        </header>
-        <main>
+    <main>
+        {% for test_case in test_cases %}
+        <div>
+            <header
+                style="{% if not test_case.passed -%} background-color: var(--color-fail) {% else -%} background-color: var(--color-passed) {%- endif %}">
+
+
+                <h2>{{test_case.name}}</h2>
+
+                <p>{{test_case.description}}</p>
+                Directory: <code style="font-weight: bold; cursor: pointer;"
+                    onclick="navigator.clipboard.writeText('{{test_case.work_dir}}')">{{test_case.work_dir}}</code>
+                (click
+                to copy)
+            </header>
 
             {% for outcome in test_case.test_outcomes %}
             {% if not outcome.passed %}
@@ -102,10 +121,10 @@
             </section>
             {% endif %}
             {% endfor %}
-        </main>
-    </div>
-    <hr>
-    {% endfor %}
+        </div>
+        <hr>
+        {% endfor %}
+    </main>
 </body>
 
 </html>

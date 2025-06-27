@@ -9,6 +9,7 @@ pub struct TestCaseOutcome {
     description: String,
     work_dir: Utf8PathBuf,
     test_outcomes: Vec<TestOutcome>,
+    passed: bool,
 }
 
 impl TestCaseOutcome {
@@ -18,11 +19,17 @@ impl TestCaseOutcome {
         work_dir: Utf8PathBuf,
         test_outcomes: Vec<TestOutcome>,
     ) -> Self {
-        Self { name, description, work_dir, test_outcomes }
+        Self {
+            name,
+            description,
+            work_dir,
+            passed: test_outcomes.iter().all(TestOutcome::passed),
+            test_outcomes,
+        }
     }
 
     pub fn passed(&self) -> bool {
-        self.test_outcomes.iter().all(TestOutcome::passed)
+        self.passed
     }
 }
 
