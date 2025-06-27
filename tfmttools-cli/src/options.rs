@@ -2,7 +2,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::util::{
-    ActionMode, MoveMode, Utf8Directory, Utf8File, Utf8PathExt,
+    FSMode, MoveMode, Utf8Directory, Utf8File, Utf8PathExt,
 };
 use tfmttools_fs::FileOrName;
 
@@ -30,7 +30,7 @@ pub enum DisplayMode {
 #[derive(Debug, Clone)]
 pub struct TFMTOptions {
     config_directory: Utf8Directory,
-    action_mode: ActionMode,
+    fs_mode: FSMode,
     display_mode: DisplayMode,
     confirm_mode: ConfirmMode,
     verbosity: u8,
@@ -43,8 +43,8 @@ impl TFMTOptions {
         &self.config_directory
     }
 
-    pub fn action_mode(&self) -> ActionMode {
-        self.action_mode
+    pub fn fs_mode(&self) -> FSMode {
+        self.fs_mode
     }
 
     pub fn display_mode(&self) -> DisplayMode {
@@ -108,10 +108,10 @@ impl TryFrom<&TFMTArgs> for TFMTOptions {
 
         Ok(Self {
             config_directory,
-            action_mode: if args.dry_run {
-                ActionMode::DryRun
+            fs_mode: if args.dry_run {
+                FSMode::DryRun
             } else {
-                ActionMode::Default
+                FSMode::Default
             },
             display_mode: if args.simple {
                 DisplayMode::Simple

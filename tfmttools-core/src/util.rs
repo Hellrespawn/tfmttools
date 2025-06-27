@@ -14,7 +14,7 @@ pub fn normalize_separators(string: &str) -> String {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub enum ActionMode {
+pub enum FSMode {
     #[default]
     Default,
     DryRun,

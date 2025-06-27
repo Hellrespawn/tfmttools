@@ -83,7 +83,6 @@ fn move_files_iter(
     let initial_actions = RenameAction::create_actions(rename_actions);
 
     let handler = ActionHandler::new(context.fs_handler())
-        .allow_delete(false)
         .move_mode(context.rename_options().move_mode());
 
     MoveFilesIter::new(initial_actions.into_iter(), handler).flatten_ok()

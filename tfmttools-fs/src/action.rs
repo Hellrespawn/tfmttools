@@ -1,5 +1,5 @@
 use tfmttools_core::action::Action;
-use tfmttools_core::error::{TFMTError, TFMTResult};
+use tfmttools_core::error::TFMTResult;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
@@ -8,24 +8,17 @@ use crate::fs::{FsHandler, MoveFileResult};
 pub struct ActionHandler<'a> {
     fs_handler: &'a FsHandler,
     move_mode: MoveMode,
-    allow_delete: bool,
 }
 
 impl<'a> ActionHandler<'a> {
     #[must_use]
     pub fn new(fs_handler: &'a FsHandler) -> Self {
-        Self { fs_handler, move_mode: MoveMode::Auto, allow_delete: false }
+        Self { fs_handler, move_mode: MoveMode::Auto }
     }
 
     #[must_use]
     pub fn move_mode(mut self, move_mode: MoveMode) -> Self {
         self.move_mode = move_mode;
-        self
-    }
-
-    #[must_use]
-    pub fn allow_delete(mut self, allow_delete: bool) -> Self {
-        self.allow_delete = allow_delete;
         self
     }
 
@@ -78,13 +71,7 @@ impl<'a> ActionHandler<'a> {
                 vec![Action::CopyFile(rename_action)]
             },
             Action::RemoveFile(path) => {
-                if self.allow_delete {
-                    self.fs_handler.remove_file(&path)?;
-
-                    vec![Action::RemoveFile(path)]
-                } else {
-                    return Err(TFMTError::HandlerCantDelete);
-                }
+                vec![Action::RemoveFile(path)]
             },
             Action::MakeDir(path) => {
                 self.fs_handler.create_dir(&path)?;

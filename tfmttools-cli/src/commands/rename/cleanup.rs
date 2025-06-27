@@ -4,7 +4,7 @@ use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
-use tfmttools_core::util::{ActionMode, Utf8Directory, Utf8File, Utf8PathExt};
+use tfmttools_core::util::{FSMode, Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
     ActionHandler, PathIterator, PathIteratorOptions, get_file_checksum,
     get_longest_common_prefix,
@@ -260,7 +260,7 @@ fn store_history(
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
-    if matches!(context.app_options().action_mode(), ActionMode::DryRun) {
+    if matches!(context.app_options().fs_mode(), FSMode::DryRun) {
         Ok(())
     } else {
         history.push(actions, metadata)?;

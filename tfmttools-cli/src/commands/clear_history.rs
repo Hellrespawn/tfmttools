@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use tfmttools_core::util::ActionMode;
+use tfmttools_core::util::FSMode;
 use tfmttools_history_core::{History, LoadHistoryResult};
 
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
@@ -25,7 +25,7 @@ pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
             ConfirmationPrompt::new("Remove history file?").prompt()?;
 
         if confirmation {
-            if matches!(app_options.action_mode(), ActionMode::Default) {
+            if matches!(app_options.fs_mode(), FSMode::Default) {
                 history.remove()?;
             }
 

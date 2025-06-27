@@ -2,7 +2,7 @@ use std::path::Path;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_core::error::{TFMTError, TFMTResult};
-use tfmttools_core::util::ActionMode;
+use tfmttools_core::util::FSMode;
 use tracing::trace;
 
 use crate::PathIterator;
@@ -48,13 +48,13 @@ pub fn gather_subdirectories(
 
 #[derive(Debug)]
 pub struct FsHandler {
-    action_mode: ActionMode,
+    fs_mode: FSMode,
 }
 
 impl FsHandler {
     #[must_use]
-    pub fn new(action_mode: ActionMode) -> Self {
-        Self { action_mode }
+    pub fn new(fs_mode: FSMode) -> Self {
+        Self { fs_mode }
     }
 
     pub fn write<P, C>(&self, path: P, contents: C) -> std::io::Result<()>
@@ -62,7 +62,7 @@ impl FsHandler {
         P: AsRef<Path>,
         C: AsRef<[u8]>,
     {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(())
         } else {
             fs_err::write(path, contents)
@@ -74,7 +74,7 @@ impl FsHandler {
         source: &Utf8Path,
         target: &Utf8Path,
     ) -> TFMTResult<MoveFileResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(MoveFileResult::DryRun)
         } else {
             // std::fs::rename does not work across filesystem boundaries.
@@ -119,7 +119,7 @@ impl FsHandler {
         source: &Utf8Path,
         target: &Utf8Path,
     ) -> TFMTResult<CopyFileResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(CopyFileResult::DryRun)
         } else {
             fs_err::copy(source, target)?;
@@ -129,7 +129,7 @@ impl FsHandler {
     }
 
     pub fn remove_file(&self, path: &Utf8Path) -> TFMTResult<RemoveFileResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveFileResult::DryRun)
         } else {
             fs_err::remove_file(path)?;
@@ -139,7 +139,7 @@ impl FsHandler {
     }
 
     pub fn create_dir(&self, path: &Utf8Path) -> TFMTResult<CreateDirResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(CreateDirResult::DryRun)
         } else if path.is_dir() {
             Ok(CreateDirResult::Exists)
@@ -153,7 +153,7 @@ impl FsHandler {
     }
 
     pub fn remove_dir(&self, path: &Utf8Path) -> TFMTResult<RemoveDirResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
             let result = fs_err::remove_dir(path);
@@ -186,7 +186,7 @@ impl FsHandler {
         &self,
         path: &Utf8Path,
     ) -> TFMTResult<RemoveDirResult> {
-        if matches!(self.action_mode, ActionMode::DryRun) {
+        if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
             fs_err::remove_dir_all(path)?;
