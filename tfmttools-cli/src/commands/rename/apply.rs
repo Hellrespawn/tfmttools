@@ -44,9 +44,15 @@ pub fn apply_actions(
             .prompt()?;
 
         if confirmation {
-            let applied_actions = move_files(context, rename_actions)?;
-
-            Ok(RenameResult::Ok { applied_actions, unchanged_files })
+            match move_files(context, rename_actions) {
+                Ok(applied_actions) => {
+                    Ok(RenameResult::Ok { applied_actions, unchanged_files })
+                },
+                Err((err, applied_actions)) => {
+                    let _ = handle_error_during_move(applied_actions);
+                    Err(err)
+                },
+            }
         } else {
             Ok(RenameResult::Aborted)
         }
@@ -100,7 +106,7 @@ fn preview_rename_actions(
 fn move_files(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
-) -> Result<Vec<Action>> {
+) -> Result<Vec<Action>, (color_eyre::Report, Vec<Action>)> {
     let bar = ProgressBar::bar(
         context.app_options().display_mode(),
         "Moving files:",
@@ -109,8 +115,10 @@ fn move_files(
         true,
     );
 
-    let applied_actions = super::move_files_iter(context, rename_actions)
-        .inspect(|result| {
+    let mut applied_actions = Vec::new();
+
+    let iter =
+        super::move_files_iter(context, rename_actions).inspect(|result| {
             if let Ok(action) = result {
                 if action.is_rename_action() {
                     bar.inc_found();
@@ -119,10 +127,23 @@ fn move_files(
                     crate::debug::delay();
                 }
             }
-        })
-        .collect();
+        });
+
+    for action in iter {
+        match action {
+            Ok(applied_action) => applied_actions.push(applied_action),
+            Err(err) => {
+                bar.finish();
+                return Err((err, applied_actions));
+            },
+        }
+    }
 
     bar.finish();
+    Ok(applied_actions)
+}
 
-    applied_actions
+#[allow(clippy::unnecessary_wraps)]
+fn handle_error_during_move(_applied_actions: Vec<Action>) -> Result<()> {
+    Ok(())
 }
