@@ -23,6 +23,9 @@ pub enum TFMTError {
     #[error("File is too big for checksum: {0}")]
     FileTooLargeError(Utf8PathBuf),
 
+    #[error("Action handler is configured not to remove files")]
+    HandlerCantDelete,
+
     // Passthrough errors
     #[error(transparent)]
     Camino(#[from] camino::FromPathBufError),

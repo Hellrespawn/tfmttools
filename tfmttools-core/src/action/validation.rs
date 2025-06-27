@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use camino::{Utf8Component, Utf8Path};
+use camino::Utf8Component;
 
 use crate::MAX_PATH_LENGTH;
 use crate::action::RenameAction;
+use crate::util::{Utf8File, Utf8PathExt};
 
 pub struct ForbiddenCharacter<'f> {
     char: &'f str,
@@ -206,7 +207,7 @@ fn validate_collisions(
             .push(rename_action);
     }
 
-    let collisions: HashMap<&Utf8Path, Vec<&RenameAction>> =
+    let collisions: HashMap<&Utf8File, Vec<&RenameAction>> =
         map.into_iter().filter(|(_, v)| v.len() > 1).collect();
 
     collisions.into_values().map(ValidationError::Collision).collect()
@@ -242,7 +243,7 @@ fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
     rename_actions
         .iter()
         .flat_map(|action| {
-            action.target().components().filter_map(|component| {
+            action.target().components().into_iter().filter_map(|component| {
                 if let Utf8Component::Normal(component_name) = component {
 
                     let leading = forbidden_leading_characters.iter().any(|c| component_name.starts_with(c));
@@ -286,8 +287,6 @@ fn validate_target_path_too_long(
 #[cfg(test)]
 mod test {
 
-    use camino::Utf8PathBuf;
-
     use super::*;
 
     fn assert_valid(rename_actions: &[RenameAction]) {
@@ -326,29 +325,29 @@ mod test {
     // TODO Test fails on Windows
     fn test_validate_double_separators() {
         let valid = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from("/d/e/f/"),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new("/d/e/f/").unwrap(),
         )];
 
         assert_valid(&valid);
 
         let leading = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from("//d/e/f/"),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new("//d/e/f/").unwrap(),
         )];
 
         assert_double_separator_error(&leading);
 
         let middle = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from("/d//e/f/"),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new("/d//e/f/").unwrap(),
         )];
 
         assert_double_separator_error(&middle);
 
         let trailing = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from("/d/e/f//"),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new("/d/e/f//").unwrap(),
         )];
 
         assert_double_separator_error(&trailing);
@@ -358,12 +357,12 @@ mod test {
     fn test_validate_collision() {
         let valid = [
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/e/f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/e/f/").unwrap(),
             ),
             RenameAction::new(
-                Utf8PathBuf::from("/g/h/i/"),
-                Utf8PathBuf::from("/j/k/l/"),
+                Utf8File::new("/g/h/i/").unwrap(),
+                Utf8File::new("/j/k/l/").unwrap(),
             ),
         ];
 
@@ -371,12 +370,12 @@ mod test {
 
         let colliding = [
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/e/f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/e/f/").unwrap(),
             ),
             RenameAction::new(
-                Utf8PathBuf::from("/g/h/i/"),
-                Utf8PathBuf::from("/d/e/f/"),
+                Utf8File::new("/g/h/i/").unwrap(),
+                Utf8File::new("/d/e/f/").unwrap(),
             ),
         ];
 
@@ -388,12 +387,12 @@ mod test {
     fn test_validate_forbidden() {
         let valid = [
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/e/f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/e/f/").unwrap(),
             ),
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/.e/f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/.e/f/").unwrap(),
             ),
         ];
 
@@ -401,16 +400,16 @@ mod test {
 
         let forbidden_leading = [
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/ e/f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/ e/f/").unwrap(),
             ),
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/e /f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/e /f/").unwrap(),
             ),
             RenameAction::new(
-                Utf8PathBuf::from("/a/b/c/"),
-                Utf8PathBuf::from("/d/e./f/"),
+                Utf8File::new("/a/b/c/").unwrap(),
+                Utf8File::new("/d/e./f/").unwrap(),
             ),
         ];
 
@@ -422,15 +421,15 @@ mod test {
     #[test]
     fn validate_path_too_long() {
         let valid = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from("/d/e/f/"),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new("/d/e/f/").unwrap(),
         )];
 
         assert_valid(&valid);
 
         let too_long = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from(format!("/d{}/f/", "/e".repeat(128))),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new(format!("/d{}/f/", "/e".repeat(128))).unwrap(),
         )];
 
         let error = assert_single_error(&too_long);
@@ -438,8 +437,8 @@ mod test {
         assert!(matches!(error, ValidationError::PathTooLong { .. }));
 
         let exact = [RenameAction::new(
-            Utf8PathBuf::from("/a/b/c/"),
-            Utf8PathBuf::from(format!("/d{}/f", "/e".repeat(126))),
+            Utf8File::new("/a/b/c/").unwrap(),
+            Utf8File::new(format!("/d{}/f", "/e".repeat(126))).unwrap(),
         )];
 
         let error = assert_single_error(&exact);

@@ -2,6 +2,8 @@
 
 ## Backlog
 
+- [ ] Separate type for rename actions and applied actions
+
 - [ ] Handle in-situ renaming of files
 
 - [ ] Do test with interactive app?
@@ -10,9 +12,10 @@
 - [ ] Add year to singles?
 - [ ] Standardize use of date/year?
 - [ ] Replace custom history format with SQLite?
-    ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
+      ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
 
-    This is now fixed
+  This is now fixed
+
 - [ ] i18n?
 
 ## In progress

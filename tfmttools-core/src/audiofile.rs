@@ -4,18 +4,18 @@ use lofty::tag::Tag;
 
 use crate::error::{TFMTError, TFMTResult};
 use crate::templates::Template;
-use crate::util::normalize_separators;
+use crate::util::{Utf8Directory, Utf8File, normalize_separators};
 
 #[derive(Clone)]
 pub struct AudioFile {
-    path: Utf8PathBuf,
+    file: Utf8File,
     tag: Tag,
 }
 
 impl std::fmt::Debug for AudioFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AudioFile")
-            .field("path", &self.path)
+            .field("path", &self.file)
             .finish_non_exhaustive()
     }
 }
@@ -24,28 +24,27 @@ impl AudioFile {
     pub const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
 
     pub fn new(path: Utf8PathBuf) -> TFMTResult<AudioFile> {
-        let tagged_file = match lofty::read_from_path(&path) {
+        let file = Utf8File::new(&path)?;
+
+        let tagged_file = match lofty::read_from_path(&file) {
             Ok(tagged_file) => tagged_file,
             Err(err) => return Err(TFMTError::Lofty(path, err)),
         };
 
         match tagged_file.primary_tag() {
-            Some(tag) => Ok(AudioFile { path, tag: tag.clone() }),
+            Some(tag) => Ok(AudioFile { file, tag: tag.clone() }),
             None => Err(TFMTError::NoPrimaryTag(path)),
         }
     }
 
     #[must_use]
-    pub fn path(&self) -> &Utf8Path {
-        &self.path
+    pub fn file(&self) -> &Utf8File {
+        &self.file
     }
 
     #[must_use]
     pub fn extension(&self) -> &str {
-        self.path
-            .extension()
-            .as_ref()
-            .expect("Audio file should always have extension.")
+        self.file.extension().expect("Audio file should always have extension.")
     }
 
     #[must_use]
@@ -56,8 +55,8 @@ impl AudioFile {
     pub fn construct_target_path(
         &self,
         template: &Template,
-        relative_path: &Utf8Path,
-    ) -> TFMTResult<Utf8PathBuf> {
+        relative_path: &Utf8Directory,
+    ) -> TFMTResult<Utf8File> {
         let string = template.render(self)?;
 
         let string = normalize_separators(&string);
@@ -67,7 +66,9 @@ impl AudioFile {
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
-        Ok(relative_path.join(target_path))
+        let target_path = relative_path.join_file(target_path)?;
+
+        Ok(target_path)
     }
 
     pub fn tag_mut(&mut self) -> &mut Tag {

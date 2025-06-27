@@ -141,7 +141,7 @@ impl UndoRedoCommand {
         records: Vec<ActionRecord>,
         fs_handler: &FsHandler,
     ) -> Result<()> {
-        let action_handler = ActionHandler::new(fs_handler, true);
+        let action_handler = ActionHandler::new(fs_handler);
 
         for record in records {
             println!(

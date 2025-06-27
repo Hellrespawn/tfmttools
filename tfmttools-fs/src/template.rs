@@ -6,7 +6,7 @@ use minijinja::{Environment, Value, escape_formatter};
 use regex::Regex;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
-use tfmttools_core::util::Utf8Directory;
+use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 
 use crate::PathIterator;
 

@@ -8,7 +8,7 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
 use minijinja::{Environment, context};
-use tfmttools_fs::{PathIterator, get_file_checksum};
+use tfmttools_fs::{PathIterator, get_path_checksum};
 
 use crate::context::{SourceDirs, TestContext};
 use crate::data::{Expectation, TestCaseData};
@@ -237,7 +237,7 @@ fn verify_expectation(
     let path = prefix.join(expectation.path());
 
     if path.exists() {
-        let checksum = get_file_checksum(&path).expect("");
+        let checksum = get_path_checksum(&path).expect("");
 
         if expectation.verify_checksum(&checksum) {
             ExpectationOutcome::Ok(path)

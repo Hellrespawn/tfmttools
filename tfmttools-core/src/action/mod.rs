@@ -7,21 +7,34 @@ mod validation;
 
 pub use validation::{FORBIDDEN_CHARACTERS, validate_rename_actions};
 
+use crate::error::TFMTResult;
+use crate::util::{Utf8Directory, Utf8File, Utf8PathExt};
+
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct RenameAction {
-    source: Utf8PathBuf,
-    target: Utf8PathBuf,
+    source: Utf8File,
+    target: Utf8File,
 }
 
 impl RenameAction {
     #[must_use]
-    pub fn new(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
+    pub fn new(source: Utf8File, target: Utf8File) -> Self {
         Self { source, target }
+    }
+
+    pub fn from_path_bufs(
+        source: Utf8PathBuf,
+        target: Utf8PathBuf,
+    ) -> TFMTResult<Self> {
+        Ok(Self {
+            source: Utf8File::new(source)?,
+            target: Utf8File::new(target)?,
+        })
     }
 
     pub fn separate_unchanged_destinations(
         rename_actions: Vec<RenameAction>,
-    ) -> (Vec<RenameAction>, Vec<Utf8PathBuf>) {
+    ) -> (Vec<RenameAction>, Vec<Utf8File>) {
         let (actions, unchanged_paths) = rename_actions
             .into_iter()
             .partition(RenameAction::source_differs_from_target);
@@ -30,12 +43,12 @@ impl RenameAction {
     }
 
     #[must_use]
-    pub fn source(&self) -> &Utf8Path {
+    pub fn source(&self) -> &Utf8File {
         &self.source
     }
 
     #[must_use]
-    pub fn target(&self) -> &Utf8Path {
+    pub fn target(&self) -> &Utf8File {
         &self.target
     }
 
@@ -51,8 +64,7 @@ impl RenameAction {
         let mut actions =
             Self::list_all_intermediate_paths_of_files(&target_paths)
                 .into_iter()
-                .filter(|p| !p.is_dir())
-                .map(Action::MakeDir)
+                .map(|dir| Action::MakeDir(dir.as_path().to_owned()))
                 .collect::<Vec<_>>();
 
         actions.extend(rename_actions.into_iter().map(Action::MoveFile));
@@ -61,18 +73,23 @@ impl RenameAction {
     }
 
     fn list_all_intermediate_paths_of_files(
-        paths: &[&Utf8Path],
-    ) -> Vec<Utf8PathBuf> {
+        paths: &[&Utf8File],
+    ) -> Vec<Utf8Directory> {
         let mut directories = paths
             .iter()
             .flat_map(|p| {
-                p.parent()
-                    .expect("Move::source() should always refer to a file.")
+                let parent = p.parent();
+
+                parent
                     .ancestors()
-                    .filter(|p| !p.as_str().is_empty())
+                    .into_iter()
+                    .filter(|p| {
+                        let path: &Utf8Path = p.as_ref();
+
+                        !path.as_str().is_empty()
+                    })
                     .collect::<Vec<_>>()
             })
-            .map(std::borrow::ToOwned::to_owned)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
@@ -102,7 +119,9 @@ impl Action {
     pub fn source(&self) -> Option<&Utf8Path> {
         match self {
             Action::CopyFile(rename_action)
-            | Action::MoveFile(rename_action) => Some(rename_action.source()),
+            | Action::MoveFile(rename_action) => {
+                Some(rename_action.source().as_path())
+            },
             Action::RemoveFile(_)
             | Action::MakeDir(_)
             | Action::RemoveDir(_) => None,
@@ -113,7 +132,9 @@ impl Action {
     pub fn target(&self) -> &Utf8Path {
         match self {
             Action::CopyFile(rename_action)
-            | Action::MoveFile(rename_action) => rename_action.target(),
+            | Action::MoveFile(rename_action) => {
+                rename_action.target().as_path()
+            },
             Action::RemoveFile(path)
             | Action::MakeDir(path)
             | Action::RemoveDir(path) => path,
@@ -138,14 +159,14 @@ mod test {
 
         let reference = ["a", "a/b", "a/b/c", "a/b/h"]
             .into_iter()
-            .map(Utf8PathBuf::from)
-            .collect::<Vec<_>>();
+            .map(Utf8Directory::new)
+            .collect::<TFMTResult<Vec<_>>>()
+            .unwrap();
 
-        let paths: Vec<Utf8PathBuf> =
-            paths.iter().map(Utf8PathBuf::from).collect();
+        let paths: Vec<Utf8File> =
+            paths.iter().map(Utf8File::new).collect::<TFMTResult<_>>().unwrap();
 
-        let paths_ref =
-            paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
+        let paths_ref = paths.iter().collect::<Vec<_>>();
 
         let directories =
             RenameAction::list_all_intermediate_paths_of_files(&paths_ref);
@@ -166,14 +187,17 @@ mod test {
 
         let reference = ["/", "/a", "/a/b", "/a/b/c", "/a/b/h"]
             .into_iter()
-            .map(Utf8PathBuf::from)
-            .collect::<Vec<_>>();
+            .map(Utf8Directory::new)
+            .collect::<TFMTResult<Vec<_>>>()
+            .unwrap();
 
-        let paths: Vec<Utf8PathBuf> =
-            paths.iter().map(Utf8PathBuf::from).collect();
+        let paths = paths
+            .iter()
+            .map(Utf8File::new)
+            .collect::<TFMTResult<Vec<_>>>()
+            .unwrap();
 
-        let paths_ref =
-            paths.iter().map(Utf8PathBuf::as_path).collect::<Vec<_>>();
+        let paths_ref = paths.iter().collect::<Vec<_>>();
 
         let directories =
             RenameAction::list_all_intermediate_paths_of_files(&paths_ref);

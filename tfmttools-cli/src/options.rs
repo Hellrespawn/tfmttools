@@ -1,7 +1,9 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use tfmttools_core::util::{ActionMode, MoveMode, Utf8Directory, Utf8File};
+use tfmttools_core::util::{
+    ActionMode, MoveMode, Utf8Directory, Utf8File, Utf8PathExt,
+};
 use tfmttools_fs::FileOrName;
 
 use crate::args::{RenameArgs, TFMTArgs};

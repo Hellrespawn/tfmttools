@@ -63,7 +63,7 @@ impl AudioFileContext {
 
         trace!(
             "[{}][{:?}] => '{}'",
-            self.audio_file.path().file_name().unwrap_or("unknown"),
+            self.audio_file.file().file_name(),
             key,
             if let Some(tag) = &tag { tag } else { "unknown" }
         );

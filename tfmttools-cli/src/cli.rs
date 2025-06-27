@@ -1,7 +1,7 @@
 use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
-use tfmttools_core::util::Utf8Directory;
+use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history_core::HistoryMode;
 use tracing::{debug, info};

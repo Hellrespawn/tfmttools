@@ -1,10 +1,10 @@
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
-use tfmttools_core::util::ActionMode;
+use tfmttools_core::util::{ActionMode, Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
     ActionHandler, PathIterator, PathIteratorOptions, get_file_checksum,
     get_longest_common_prefix,
@@ -17,17 +17,17 @@ use crate::options::ConfirmMode;
 use crate::term::current_dir_utf8;
 use crate::ui::{ConfirmationPrompt, PreviewList};
 
-const IMAGE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
+const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 
 pub(crate) fn clean_up(
     context: &RenameContext,
     history: &mut impl History<Action, ActionRecordMetadata>,
     applied_actions: Vec<Action>,
-    unchanged_paths: &[Utf8PathBuf],
+    unchanged_files: &[Utf8File],
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
     let applied_actions =
-        handle_remaining_files(context, applied_actions, unchanged_paths)?;
+        handle_remaining_files(context, applied_actions, unchanged_files)?;
 
     store_history(context, history, applied_actions, metadata)?;
 
@@ -37,7 +37,7 @@ pub(crate) fn clean_up(
 fn handle_remaining_files(
     context: &RenameContext,
     mut applied_actions: Vec<Action>,
-    unchanged_paths: &[Utf8PathBuf],
+    unchanged_files: &[Utf8File],
 ) -> Result<Vec<Action>> {
     let common_prefix = get_longest_common_prefix(
         &applied_actions
@@ -46,7 +46,7 @@ fn handle_remaining_files(
                 if let Action::MoveFile(rename_action)
                 | Action::CopyFile(rename_action) = action
                 {
-                    Some(rename_action.source())
+                    Some(rename_action.source().as_path())
                 } else {
                     None
                 }
@@ -57,14 +57,11 @@ fn handle_remaining_files(
     if let Some(common_prefix) = common_prefix {
         debug!("Common prefix of renamed files: {}", common_prefix);
 
-        let remaining_paths = get_remaining_files_and_directories(
+        let (files, folders) = get_remaining_files_and_directories(
             context,
             &common_prefix,
-            unchanged_paths,
+            unchanged_files,
         )?;
-
-        let (files, folders): (Vec<_>, Vec<_>) =
-            remaining_paths.into_iter().partition(|p| p.is_file());
 
         // Can't apply compiler attribute to macro invocation directly.
         #[allow(unstable_name_collisions)]
@@ -73,7 +70,7 @@ fn handle_remaining_files(
                 "Remaining files:\n{}",
                 files
                     .iter()
-                    .map(Utf8PathBuf::to_string)
+                    .map(Utf8File::to_string)
                     .intersperse("\n".to_owned())
                     .collect::<String>()
             );
@@ -82,7 +79,7 @@ fn handle_remaining_files(
                 "Remaining folders:\n{}",
                 folders
                     .iter()
-                    .map(Utf8PathBuf::to_string)
+                    .map(Utf8Directory::to_string)
                     .intersperse("\n".to_owned())
                     .collect::<String>()
             );
@@ -103,12 +100,7 @@ fn handle_remaining_files(
             let rename_actions = files
                 .into_iter()
                 .map(|path| {
-                    create_rename_action(
-                        context,
-                        &common_prefix,
-                        path.clone(),
-                        run_id,
-                    )
+                    create_rename_action(context, &common_prefix, path, run_id)
                 })
                 .collect::<Result<Vec<_>>>()?;
 
@@ -129,20 +121,16 @@ fn handle_remaining_files(
             println!("Deleted.");
         } else if !files.is_empty() {
             info!("Has only files that are safe to delete.");
-            let rename_actions = files
-                .iter()
-                .map(|path| {
-                    create_rename_action(
-                        context,
-                        &common_prefix,
-                        path.clone(),
-                        run_id,
-                    )
-                })
-                .collect::<Result<Vec<_>>>()?;
 
             println!("Deleted the following files:");
             preview_files_to_delete(context, &files)?;
+
+            let rename_actions = files
+                .into_iter()
+                .map(|file| {
+                    create_rename_action(context, &common_prefix, file, run_id)
+                })
+                .collect::<Result<Vec<_>>>()?;
 
             applied_actions.extend(move_files(context, rename_actions)?);
         }
@@ -162,35 +150,47 @@ fn handle_remaining_files(
 fn get_remaining_files_and_directories(
     context: &RenameContext,
     common_prefix: &Utf8Path,
-    unchanged_paths: &[Utf8PathBuf],
-) -> Result<Vec<Utf8PathBuf>> {
+    unchanged_files: &[Utf8File],
+) -> Result<(Vec<Utf8File>, Vec<Utf8Directory>)> {
     let options = PathIteratorOptions::with_depth(
         common_prefix,
         context.rename_options().recursion_depth(),
     );
+
+    let unchanged_paths = unchanged_files
+        .iter()
+        .map(|f| f.to_owned().into_path_buf())
+        .collect::<Vec<_>>();
 
     let remaining = PathIterator::new(&options)
         // .rev()
         .filter_ok(|path| !unchanged_paths.contains(path))
         .collect::<TFMTResult<Vec<_>>>()?;
 
-    Ok(remaining)
+    let (files, folders): (Vec<_>, Vec<_>) =
+        remaining.into_iter().partition(|p| p.is_file());
+
+    Ok((
+        files.into_iter().map(Utf8File::new_unchecked).collect(),
+        folders.into_iter().map(Utf8Directory::new_unchecked).collect(),
+    ))
+
+    // Ok(remaining)
 }
 
-fn file_is_safe_to_delete(path: &Utf8Path) -> bool {
-    path.is_file()
-        && path.extension().is_some_and(|ext| IMAGE_EXTENSIONS.contains(&ext))
+fn file_is_safe_to_delete(path: &Utf8File) -> bool {
+    path.extension().is_some_and(|ext| AUTO_DELETE_EXTENSIONS.contains(&ext))
 }
 
 fn create_rename_action(
     context: &RenameContext,
     common_prefix: &Utf8Path,
-    path: Utf8PathBuf,
+    file: Utf8File,
     run_id: &str,
 ) -> Result<RenameAction> {
-    let checksum = get_file_checksum(&path)?;
+    let checksum = get_file_checksum(&file)?;
 
-    let relative_path = path.strip_prefix(common_prefix).expect(
+    let relative_path = file.as_path().strip_prefix(common_prefix).expect(
         "common_prefix is based on this file too, should always have prefix.",
     );
 
@@ -198,13 +198,12 @@ fn create_rename_action(
     let target_name = format!("{path_concat}_{checksum}");
 
     let rename_action = RenameAction::new(
-        path,
+        file,
         context
             .rename_options()
             .bin_directory()
-            .as_path()
-            .join(run_id)
-            .join(target_name),
+            .join(run_id)?
+            .join_file(target_name)?,
     );
 
     trace!("Created rename action: {rename_action:?}");
@@ -214,13 +213,16 @@ fn create_rename_action(
 
 fn preview_files_to_delete(
     context: &RenameContext,
-    paths: &[Utf8PathBuf],
+    paths: &[Utf8File],
 ) -> Result<()> {
     let working_directory = current_dir_utf8()?;
 
     let items = PreviewList::new(
         paths.iter().map(|path| {
-            super::strip_path_prefix(path, working_directory.as_path())
+            super::strip_path_prefix(
+                path.as_path(),
+                working_directory.as_path(),
+            )
         }),
         context.app_options().preview_list_size(),
     )
@@ -240,19 +242,14 @@ fn move_files(
 
 fn remove_directories(
     context: &RenameContext,
-    directories: Vec<Utf8PathBuf>,
+    directories: Vec<Utf8Directory>,
 ) -> Result<Vec<Action>> {
-    let handler = ActionHandler::new(context.fs_handler(), false);
+    let handler = ActionHandler::new(context.fs_handler());
 
     directories
         .into_iter()
         .rev()
-        .map(|path| {
-            Ok(handler.apply(
-                Action::RemoveDir(path),
-                context.rename_options().move_mode(),
-            )?)
-        })
+        .map(|dir| Ok(handler.apply(Action::RemoveDir(dir.into_path_buf()))?))
         .flatten_ok()
         .collect()
 }
