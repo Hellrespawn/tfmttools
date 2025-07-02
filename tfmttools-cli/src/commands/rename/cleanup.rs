@@ -43,10 +43,10 @@ fn handle_remaining_files(
         &applied_actions
             .iter()
             .filter_map(|action| {
-                if let Action::MoveFile(rename_action)
-                | Action::CopyFile(rename_action) = action
+                if let Action::MoveFile { source, .. }
+                | Action::CopyFile { source, .. } = action
                 {
-                    Some(rename_action.source().as_path())
+                    Some(source.as_path())
                 } else {
                     None
                 }
@@ -249,8 +249,11 @@ fn remove_directories(
     directories
         .into_iter()
         .rev()
-        .map(|dir| Ok(handler.apply(Action::RemoveDir(dir.into_path_buf()))?))
-        .flatten_ok()
+        .map(|dir| {
+            let action = Action::RemoveDir(dir.into_path_buf());
+            handler.apply(&action)?;
+            Ok(action)
+        })
         .collect()
 }
 

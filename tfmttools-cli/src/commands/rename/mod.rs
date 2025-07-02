@@ -52,40 +52,36 @@ pub fn rename(context: &RenameContext) -> Result<()> {
     Ok(())
 }
 
-struct MoveFilesIter<'ah> {
-    into_iter: <Vec<Action> as IntoIterator>::IntoIter,
-    action_handler: ActionHandler<'ah>,
-}
-
-impl<'ah> MoveFilesIter<'ah> {
-    fn new(
-        into_iter: <Vec<Action> as IntoIterator>::IntoIter,
-        action_handler: ActionHandler<'ah>,
-    ) -> Self {
-        Self { into_iter, action_handler }
-    }
-}
-
-impl Iterator for MoveFilesIter<'_> {
-    type Item = Result<Vec<Action>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.into_iter
-            .next()
-            .map(|action| Ok(self.action_handler.apply(action)?))
-    }
-}
-
 fn move_files_iter(
     context: &RenameContext,
     rename_actions: Vec<RenameAction>,
 ) -> impl Iterator<Item = Result<Action>> {
-    let initial_actions = RenameAction::create_actions(rename_actions);
+    let make_dir_actions = RenameAction::get_make_dir_actions(&rename_actions);
 
-    let handler = ActionHandler::new(context.fs_handler())
-        .move_mode(context.rename_options().move_mode());
+    let make_dir_iter = make_dir_actions.into_iter().map(|action| {
+        let handler = ActionHandler::new(context.fs_handler())
+            .move_mode(context.rename_options().move_mode());
 
-    MoveFilesIter::new(initial_actions.into_iter(), handler).flatten_ok()
+        handler.apply(&action)?;
+
+        Ok(action)
+    });
+
+    let move_files_iter = rename_actions
+        .into_iter()
+        .map(|rename_action| {
+            let handler = ActionHandler::new(context.fs_handler())
+                .move_mode(context.rename_options().move_mode());
+
+            let applied_actions = handler.rename(&rename_action)?;
+
+            Ok(applied_actions)
+        })
+        .flatten_ok();
+    // let move_files_iter =
+    //     MoveFilesIter::new(rename_actions.into_iter(), handler).flatten_ok();
+
+    make_dir_iter.chain(move_files_iter)
 }
 
 fn strip_path_prefix(path: &Utf8Path, prefix: &Utf8Path) -> String {

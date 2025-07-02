@@ -86,23 +86,20 @@ impl<'tl> TemplateLoader<'tl> {
         let source = template.source();
 
         if source.trim().starts_with(COMMENT_START) {
-            let option = source.split_once(COMMENT_END).map(|(left, _)| {
+            source.split_once(COMMENT_END).map(|(left, _)| {
                 left.replace(COMMENT_START, "")
                     .replace(COMMENT_END, "")
                     .trim()
                     .to_owned()
-            });
-
-            option
+            })
         } else {
             None
         }
     }
 
     fn path_is_template(path: &Utf8Path) -> bool {
-        path.extension().is_some_and(|string| {
-            TEMPLATE_EXTENSIONS.iter().any(|ext| string == *ext)
-        })
+        path.extension()
+            .is_some_and(|string| TEMPLATE_EXTENSIONS.contains(&string))
     }
 
     fn create_environment() -> Environment<'tl> {

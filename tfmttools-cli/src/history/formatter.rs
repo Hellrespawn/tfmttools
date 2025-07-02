@@ -174,7 +174,7 @@ impl RecordSummary {
         for action in record.iter() {
             match action {
                 Action::MoveFile { .. } => summary.mv += 1,
-                Action::CopyFile(_) => summary.cp += 1,
+                Action::CopyFile { .. } => summary.cp += 1,
                 Action::RemoveFile(_) => summary.rm_file += 1,
                 Action::MakeDir(_) => summary.mk_dir += 1,
                 Action::RemoveDir(_) => summary.rm_dir += 1,

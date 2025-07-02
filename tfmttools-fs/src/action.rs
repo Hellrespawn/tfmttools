@@ -1,4 +1,4 @@
-use tfmttools_core::action::Action;
+use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
@@ -26,84 +26,81 @@ impl<'a> ActionHandler<'a> {
         matches!(self.move_mode, MoveMode::AlwaysCopy)
     }
 
-    pub fn apply(&self, action: Action) -> TFMTResult<Vec<Action>> {
-        let actions = match action {
-            Action::MoveFile(rename_action) => {
-                if self.always_copy() {
-                    self.fs_handler.copy_file(
-                        rename_action.source().as_path(),
-                        rename_action.target().as_path(),
-                    )?;
+    pub fn rename(
+        &self,
+        rename_action: &RenameAction,
+    ) -> TFMTResult<Vec<Action>> {
+        let applied_actions = if self.always_copy() {
+            self.fs_handler.copy_file(
+                rename_action.source().as_path(),
+                rename_action.target().as_path(),
+            )?;
 
-                    self.fs_handler
-                        .remove_file(rename_action.source().as_path())?;
+            self.fs_handler.remove_file(rename_action.source().as_path())?;
 
-                    let source = rename_action.source().to_owned();
+            let source = rename_action.source().to_owned();
 
-                    vec![
-                        Action::CopyFile(rename_action),
-                        Action::RemoveFile(source.into_path_buf()),
-                    ]
-                } else {
-                    let result = self.fs_handler.move_file(
-                        rename_action.source().as_path(),
-                        rename_action.target().as_path(),
-                    )?;
+            vec![
+                Action::copy_from_rename_action(rename_action),
+                Action::RemoveFile(source.into_path_buf()),
+            ]
+        } else {
+            let result = self.fs_handler.move_file(
+                rename_action.source().as_path(),
+                rename_action.target().as_path(),
+            )?;
 
-                    if let MoveFileResult::CopiedAndRemoved = result {
-                        let source = rename_action.source().to_owned();
+            if let MoveFileResult::CopiedAndRemoved = result {
+                let source = rename_action.source().to_owned();
 
-                        vec![
-                            Action::CopyFile(rename_action),
-                            Action::RemoveFile(source.into_path_buf()),
-                        ]
-                    } else {
-                        vec![Action::MoveFile(rename_action)]
-                    }
-                }
-            },
-            Action::CopyFile(rename_action) => {
-                self.fs_handler.copy_file(
-                    rename_action.source().as_path(),
-                    rename_action.target().as_path(),
-                )?;
-
-                vec![Action::CopyFile(rename_action)]
-            },
-            Action::RemoveFile(path) => {
-                vec![Action::RemoveFile(path)]
-            },
-            Action::MakeDir(path) => {
-                self.fs_handler.create_dir(&path)?;
-
-                vec![Action::MakeDir(path)]
-            },
-            Action::RemoveDir(path) => {
-                self.fs_handler.remove_dir(&path)?;
-
-                vec![Action::RemoveDir(path)]
-            },
+                vec![
+                    Action::copy_from_rename_action(rename_action),
+                    Action::RemoveFile(source.into_path_buf()),
+                ]
+            } else {
+                vec![Action::move_from_rename_action(rename_action)]
+            }
         };
 
-        Ok(actions)
+        Ok(applied_actions)
     }
 
-    pub fn undo(&self, action: &Action) -> TFMTResult<()> {
+    pub fn apply(&self, action: &Action) -> TFMTResult {
         match action {
-            Action::MoveFile(rename_action) => {
-                self.fs_handler.move_file(
-                    rename_action.target().as_path(),
-                    rename_action.source().as_path(),
-                )?;
-            },
-            Action::CopyFile(rename_action) => {
-                self.fs_handler.copy_file(
-                    rename_action.target().as_path(),
-                    rename_action.source().as_path(),
-                )?;
-
+            Action::MoveFile { source, target } => {
                 self.fs_handler
-                    .remove_file(rename_action.target().as_path())?;
+                    .move_file(source.as_path(), target.as_path())?;
+            },
+
+            Action::CopyFile { source, target } => {
+                self.fs_handler
+                    .copy_file(source.as_path(), target.as_path())?;
+            },
+            Action::RemoveFile(path) => {
+                self.fs_handler.remove_file(path.as_path())?;
+            },
+            Action::MakeDir(path) => {
+                self.fs_handler.create_dir(path)?;
+            },
+            Action::RemoveDir(path) => {
+                self.fs_handler.remove_dir(path)?;
+            },
+        }
+
+        Ok(())
+    }
+
+    pub fn undo(&self, action: &Action) -> TFMTResult {
+        match action {
+            Action::MoveFile { source, target } => {
+                self.fs_handler
+                    .move_file(target.as_path(), source.as_path())?;
+            },
+            Action::CopyFile { source, target } => {
+                self.fs_handler
+                    .copy_file(target.as_path(), source.as_path())?;
+
+                self.fs_handler.remove_file(target.as_path())?;
             },
             Action::RemoveFile(_path) => {
                 trace!(
@@ -123,20 +120,17 @@ impl<'a> ActionHandler<'a> {
 
     pub fn redo(&self, action: &Action) -> TFMTResult<()> {
         match action {
-            Action::MoveFile(rename_action) => {
-                self.fs_handler.move_file(
-                    rename_action.source().as_path(),
-                    rename_action.target().as_path(),
-                )?;
+            Action::MoveFile { source, target } => {
+                self.fs_handler
+                    .move_file(source.as_path(), target.as_path())?;
             },
-            Action::CopyFile(rename_action) => {
-                self.fs_handler.copy_file(
-                    rename_action.source().as_path(),
-                    rename_action.target().as_path(),
-                )?;
+
+            Action::CopyFile { source, target } => {
+                self.fs_handler
+                    .copy_file(source.as_path(), target.as_path())?;
             },
             Action::RemoveFile(path) => {
-                self.fs_handler.remove_file(path)?;
+                self.fs_handler.remove_file(path.as_path())?;
             },
             Action::MakeDir(path) => {
                 self.fs_handler.create_dir(path)?;

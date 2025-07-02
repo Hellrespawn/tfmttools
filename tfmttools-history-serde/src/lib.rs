@@ -175,13 +175,11 @@ where
 
             if found_records.is_empty() {
                 Err(HistoryError::MutError(format!(
-                    "Unable to find saved record with id {}",
-                    id
+                    "Unable to find saved record with id {id}"
                 )))
             } else if found_records.len() > 1 {
                 Err(HistoryError::MutError(format!(
-                    "Found multiple saved records with id {}",
-                    id
+                    "Found multiple saved records with id {id}"
                 )))
             } else {
                 record.set_state(state);
@@ -224,8 +222,7 @@ where
 
         result.map_err(|source| {
             HistoryError::SaveError(format!(
-                "Unable to serialize history: {}",
-                source
+                "Unable to serialize history: {source}"
             ))
         })
     }
@@ -234,8 +231,7 @@ where
         let mut history: SerdeHistory<A, M> = serde_json::from_slice(bytes)
             .map_err(|source| {
                 HistoryError::LoadError(format!(
-                    "Unable to deserialize history: {}",
-                    source
+                    "Unable to deserialize history: {source}"
                 ))
             })?;
 
