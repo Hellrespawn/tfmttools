@@ -137,7 +137,7 @@ impl Utf8File {
     }
 
     #[must_use]
-    pub fn components(&self) -> Vec<Utf8Component> {
+    pub fn components(&'_ self) -> Vec<Utf8Component<'_>> {
         self.0.components().collect()
     }
 

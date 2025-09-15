@@ -161,8 +161,8 @@ fn write_source_and_target(
 
 #[must_use]
 pub fn validate_rename_actions(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
     let mut errors = Vec::new();
 
     errors.extend(validate_double_separators(rename_actions));
@@ -180,8 +180,8 @@ pub fn validate_rename_actions(
 }
 
 fn validate_double_separators(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
     rename_actions
         .iter()
         .filter(|rename_action| {
@@ -195,8 +195,8 @@ fn validate_double_separators(
 }
 
 fn validate_collisions(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
     let mut map = HashMap::new();
 
     for rename_action in rename_actions {
@@ -215,8 +215,8 @@ fn validate_collisions(
 
 // Impossible to unit test, therefore not included below.
 fn validate_existing_files(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
     rename_actions
         .iter()
         .filter(|m| m.target().exists() && m.target() != m.source())
@@ -268,8 +268,8 @@ fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
 }
 
 fn validate_target_path_too_long(
-    rename_actions: &[RenameAction],
-) -> Vec<ValidationError> {
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
     rename_actions
         .iter()
         .map(|a| (a, a.target().to_string().len()))
@@ -293,7 +293,9 @@ mod test {
         assert!(validate_rename_actions(rename_actions).is_empty());
     }
 
-    fn assert_single_error(rename_actions: &[RenameAction]) -> ValidationError {
+    fn assert_single_error(
+        rename_actions: &'_ [RenameAction],
+    ) -> ValidationError<'_> {
         let mut errors = validate_rename_actions(rename_actions);
 
         assert!(errors.len() == 1);
@@ -302,9 +304,9 @@ mod test {
     }
 
     fn assert_n_errors(
-        rename_actions: &[RenameAction],
+        rename_actions: &'_ [RenameAction],
         n: usize,
-    ) -> Vec<ValidationError> {
+    ) -> Vec<ValidationError<'_>> {
         let errors = validate_rename_actions(rename_actions);
 
         let len = errors.len();

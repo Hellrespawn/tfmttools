@@ -54,10 +54,10 @@ impl<'tl> TemplateLoader<'tl> {
     }
 
     pub fn get_template(
-        &self,
+        &'_ self,
         name: &str,
         arguments: Vec<String>,
-    ) -> Option<Template> {
+    ) -> Option<Template<'_, '_>> {
         let minijinja_template: minijinja::Template<'_, '_> =
             self.environment.get_template(name).ok()?;
 
@@ -73,7 +73,7 @@ impl<'tl> TemplateLoader<'tl> {
         Some(template)
     }
 
-    pub fn get_all_templates(&self) -> Vec<Template> {
+    pub fn get_all_templates(&'_ self) -> Vec<Template<'_, '_>> {
         self.template_names
             .iter()
             .map(|name| self.get_template(name, Vec::new()).expect("Templates::template_names should not contain names of non-existent templates.")).collect()
