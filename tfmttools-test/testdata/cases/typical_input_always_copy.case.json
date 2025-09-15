@@ -88,7 +88,7 @@
       "expectations": "initial-state"
     },
     "apply": {
-      "command": "--simple --yes rename --always-copy typical_input -- output_dir/",
+      "command": "--simple --yes rename --always-copy -t typical_input -- output_dir/",
       "expectations": "apply",
       "previous-expectations": "initial-state"
     },

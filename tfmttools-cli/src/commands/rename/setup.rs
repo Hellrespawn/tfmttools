@@ -4,13 +4,14 @@ use color_eyre::eyre::eyre;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTResult;
-use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
 use tfmttools_history_core::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
 use super::RenameContext;
+use crate::options::TemplateOption;
 use crate::term::current_dir_utf8;
 use crate::ui::ProgressBar;
 
@@ -19,9 +20,85 @@ pub fn create_actions(
     history: &mut impl History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
-    let (file_or_name, arguments) =
-        get_template_name_and_arguments(context, history, load_history_result)?;
+    match context.rename_options().template_option() {
+        TemplateOption::None => {
+            create_actions_from_previous_template(
+                context,
+                history,
+                load_history_result,
+            )
+        },
+        TemplateOption::FileOrName(file_or_name) => {
+            create_actions_from_file_or_name(
+                context,
+                file_or_name,
+                context.rename_options().arguments(),
+            )
+        },
+        TemplateOption::Script(script) => {
+            create_actions_from_script(
+                context,
+                script,
+                context.rename_options().arguments(),
+            )
+        },
+    }
+}
 
+fn create_actions_from_previous_template(
+    context: &RenameContext,
+    history: &mut impl History<Action, ActionRecordMetadata>,
+    load_history_result: LoadHistoryResult,
+) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
+    if let LoadHistoryResult::Loaded = load_history_result {
+        let record = history.get_previous_record()?;
+
+        if let Some(record) = record {
+            let metadata = record.metadata();
+
+            match metadata.template() {
+                TemplateMetadata::FileOrName(file_or_name) => {
+                    let template_name = FileOrName::from(file_or_name.as_str());
+
+                    let arguments = metadata.arguments().to_owned();
+
+                    println!(
+                        "Re-using template '{template_name}' and arguments from previous rename."
+                    );
+
+                    debug!("Using data from previous rename");
+
+                    return create_actions_from_file_or_name(
+                        context,
+                        &template_name,
+                        &arguments,
+                    );
+                },
+                TemplateMetadata::Script(script) => {
+                    let arguments = metadata.arguments().to_owned();
+
+                    println!(
+                        "Re-using script\n```\n'{script}'\n```\n and arguments from previous rename."
+                    );
+
+                    debug!("Using data from previous rename");
+
+                    return create_actions_from_script(
+                        context, script, &arguments,
+                    );
+                },
+            }
+        }
+    }
+
+    Err(eyre!("No template specified and no data from previous run available."))
+}
+
+fn create_actions_from_file_or_name(
+    context: &RenameContext,
+    file_or_name: &FileOrName,
+    arguments: &[String],
+) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
     debug!("Using template: '{file_or_name}'");
     debug!("Template arguments: '{}'", arguments.join("', '"));
 
@@ -38,15 +115,54 @@ pub fn create_actions(
 
     let template_name = file_or_name.as_str();
 
-    let template = loader
-        .get_template(template_name, arguments.clone())
-        .ok_or(eyre!("Unable to find template: {}", template_name))?;
-
     let metadata = ActionRecordMetadata::new(
-        template_name.to_owned(),
-        arguments.clone(),
+        TemplateMetadata::FileOrName(template_name.to_owned()),
+        arguments.to_vec(),
         context.app_options().run_id().to_owned(),
     );
+
+    create_actions_from_loader_and_script_name(
+        context,
+        &loader,
+        template_name,
+        arguments,
+        metadata,
+    )
+}
+
+fn create_actions_from_script(
+    context: &RenameContext,
+    script: &str,
+    arguments: &[String],
+) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
+    debug!("Using script:\n```\n{script}\n```");
+    debug!("Template arguments: '{}'", arguments.join("', '"));
+    let loader = TemplateLoader::read_script(script)?;
+    let metadata = ActionRecordMetadata::new(
+        TemplateMetadata::Script(script.to_owned()),
+        arguments.to_vec(),
+        context.app_options().run_id().to_owned(),
+    );
+
+    create_actions_from_loader_and_script_name(
+        context,
+        &loader,
+        TemplateLoader::DEFAULT_SCRIPT_NAME,
+        arguments,
+        metadata,
+    )
+}
+
+fn create_actions_from_loader_and_script_name(
+    context: &RenameContext,
+    loader: &TemplateLoader,
+    template_name: &str,
+    arguments: &[String],
+    metadata: ActionRecordMetadata,
+) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
+    let template = loader
+        .get_template(template_name, arguments.to_vec())
+        .ok_or(eyre!("Unable to find template: {}", template_name))?;
 
     let paths = gather_file_paths(context);
 
@@ -60,45 +176,6 @@ pub fn create_actions(
         create_rename_actions(context, &template, &audio_files)?;
 
     Ok((rename_actions, metadata))
-}
-
-fn get_template_name_and_arguments(
-    context: &RenameContext,
-    history: &mut impl History<Action, ActionRecordMetadata>,
-    load_history_result: LoadHistoryResult,
-) -> Result<(FileOrName, Vec<String>)> {
-    if let Some(file_or_name) = context.rename_options().template() {
-        debug!("Using template and arguments from command line.");
-
-        Ok((
-            file_or_name.clone(),
-            context.rename_options().arguments().to_vec(),
-        ))
-    } else {
-        if let LoadHistoryResult::Loaded = load_history_result {
-            let record = history.get_previous_record()?;
-
-            if let Some(record) = record {
-                let metadata = record.metadata();
-
-                let template_name = FileOrName::from(metadata.template());
-
-                let arguments = metadata.arguments().to_owned();
-
-                println!(
-                    "Re-using template '{template_name}' and arguments from previous rename."
-                );
-
-                debug!("Using data from previous rename");
-
-                return Ok((template_name, arguments));
-            }
-        }
-
-        Err(eyre!(
-            "No template specified and no data from previous run available."
-        ))
-    }
 }
 
 fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {

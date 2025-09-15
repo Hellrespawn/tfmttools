@@ -106,7 +106,7 @@ pub struct RenameArgs {
     /// Directory to scan for input files. Defaults to the current directory.
     pub custom_input_directory: Option<Utf8PathBuf>,
 
-    #[arg(short = 't', long = "template-directory")]
+    #[arg(long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
     pub custom_template_directory: Option<Utf8PathBuf>,
 
@@ -118,14 +118,26 @@ pub struct RenameArgs {
     /// Set custom recursion depth for scan.
     pub recursion_depth: Option<usize>,
 
-    /// Path to or name of template.
-    pub template: Option<FileOrName>,
+    #[arg(hide = true, long)]
+    pub always_copy: bool,
+
+    #[command(flatten)]
+    pub template_args: TemplateArgs,
 
     /// Template arguments.
     pub arguments: Vec<String>,
+}
 
-    #[arg(hide = true, long)]
-    pub always_copy: bool,
+#[derive(Args, Debug)]
+#[group(required = false, multiple = false)]
+pub struct TemplateArgs {
+    #[arg(short, long)]
+    /// Path to or name of template.
+    pub template: Option<FileOrName>,
+
+    #[arg(short, long)]
+    /// Path to or name of template.
+    pub script: Option<String>,
 }
 
 #[derive(Args, Debug)]

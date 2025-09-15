@@ -19,6 +19,8 @@ pub struct TemplateLoader<'tl> {
 }
 
 impl<'tl> TemplateLoader<'tl> {
+    pub const DEFAULT_SCRIPT_NAME: &'static str = "script";
+
     pub fn read_directory(
         template_directory: &Utf8Directory,
     ) -> TFMTResult<Self> {
@@ -51,6 +53,20 @@ impl<'tl> TemplateLoader<'tl> {
         environment.add_template_owned(name.to_owned(), template)?;
 
         Ok(Self { template_names: vec![name.to_owned()], environment })
+    }
+
+    pub fn read_script(script: &str) -> TFMTResult<Self> {
+        let mut environment = Self::create_environment();
+
+        environment.add_template_owned(
+            Self::DEFAULT_SCRIPT_NAME.to_owned(),
+            script.to_owned(),
+        )?;
+
+        Ok(Self {
+            template_names: vec![Self::DEFAULT_SCRIPT_NAME.to_owned()],
+            environment,
+        })
     }
 
     pub fn get_template(

@@ -6,7 +6,7 @@ use tfmttools_core::util::{
 };
 use tfmttools_fs::FileOrName;
 
-use crate::args::{RenameArgs, TFMTArgs};
+use crate::args::{RenameArgs, TFMTArgs, TemplateArgs};
 use crate::term::{current_dir_utf8, terminal_height};
 use crate::ui::PreviewListSize;
 
@@ -135,13 +135,33 @@ impl TryFrom<&TFMTArgs> for TFMTOptions {
 }
 
 #[derive(Debug, Clone)]
+pub enum TemplateOption {
+    None,
+    FileOrName(FileOrName),
+    Script(String),
+}
+
+impl From<TemplateArgs> for TemplateOption {
+    fn from(template_args: TemplateArgs) -> Self {
+        match (template_args.template, template_args.script) {
+            (None, None) => Self::None,
+            (None, Some(script)) => Self::Script(script),
+            (Some(file_or_name), None) => Self::FileOrName(file_or_name),
+            (Some(_), Some(_)) => {
+                unreachable!("Mutual exclusion should be guaranteed by clap.")
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct RenameOptions {
     input_directory: Utf8Directory,
     template_directory: Utf8Directory,
     bin_directory: Utf8Directory,
     recursion_depth: usize,
     move_mode: MoveMode,
-    template: Option<FileOrName>,
+    template_option: TemplateOption,
     arguments: Vec<String>,
 }
 
@@ -166,8 +186,8 @@ impl RenameOptions {
         self.move_mode
     }
 
-    pub fn template(&self) -> Option<&FileOrName> {
-        self.template.as_ref()
+    pub fn template_option(&self) -> &TemplateOption {
+        &self.template_option
     }
 
     pub fn arguments(&self) -> &[String] {
@@ -216,7 +236,7 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             } else {
                 MoveMode::Auto
             },
-            template: rename_args.template,
+            template_option: rename_args.template_args.into(),
             arguments: rename_args.arguments,
         })
     }

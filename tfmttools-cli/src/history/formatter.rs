@@ -2,7 +2,9 @@ use std::fmt::Write;
 
 use color_eyre::Result;
 use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
+use tfmttools_core::history::{
+    ActionRecord, ActionRecordMetadata, TemplateMetadata,
+};
 use tfmttools_history_core::History;
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -144,12 +146,21 @@ impl HistoryFormatter {
             HistoryFormat::Verbose => {
                 let metadata_string = format!(
                     "'{}' => '{}'",
-                    record.metadata().template(),
+                    Self::format_template_name(record.metadata().template()),
                     record.metadata().arguments().join(" ")
                 );
 
                 format!("┌ {base_string}\n└── {metadata_string}")
             },
+        }
+    }
+
+    pub fn format_template_name(metadata: &TemplateMetadata) -> String {
+        match metadata {
+            TemplateMetadata::FileOrName(file_or_name) => {
+                file_or_name.to_owned()
+            },
+            TemplateMetadata::Script(_) => "script".to_owned(),
         }
     }
 }

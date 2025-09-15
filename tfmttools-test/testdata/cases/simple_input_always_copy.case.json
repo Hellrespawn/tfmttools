@@ -88,7 +88,7 @@
       "expectations": "initial-state"
     },
     "apply": {
-      "command": "--simple --yes rename --always-copy simple_input",
+      "command": "--simple --yes rename --always-copy -t simple_input",
       "expectations": "apply",
       "previous-expectations": "initial-state"
     },

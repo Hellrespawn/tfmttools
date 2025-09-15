@@ -6,8 +6,15 @@ use crate::action::Action;
 pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+
+pub enum TemplateMetadata {
+    FileOrName(String),
+    Script(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActionRecordMetadata {
-    template: String,
+    template: TemplateMetadata,
     arguments: Vec<String>,
     run_id: String,
 }
@@ -15,7 +22,7 @@ pub struct ActionRecordMetadata {
 impl ActionRecordMetadata {
     #[must_use]
     pub fn new(
-        template: String,
+        template: TemplateMetadata,
         arguments: Vec<String>,
         run_id: String,
     ) -> Self {
@@ -23,8 +30,8 @@ impl ActionRecordMetadata {
     }
 
     #[must_use]
-    pub fn template(&self) -> &str {
-        self.template.as_ref()
+    pub fn template(&self) -> &TemplateMetadata {
+        &self.template
     }
 
     #[must_use]

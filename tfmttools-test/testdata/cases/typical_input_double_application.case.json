@@ -142,12 +142,12 @@
       "expectations": "initial-state"
     },
     "apply": {
-      "command": "--simple --yes rename typical_input -- output_dir/",
+      "command": "--simple --yes rename -t typical_input -- output_dir/",
       "expectations": "apply1",
       "previous-expectations": "initial-state"
     },
     "apply2": {
-      "command": "--simple --yes rename typical_input -- output_dir2/",
+      "command": "--simple --yes rename -t typical_input -- output_dir2/",
       "expectations": "apply2",
       "previous-expectations": "apply1"
     },
