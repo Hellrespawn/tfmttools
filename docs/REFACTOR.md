@@ -93,7 +93,7 @@ Execution:
 
 Renamed to crates/test-harness
 
-### 3. Move fixture data to a top-level `tests/fixtures/` directory
+### ~~3. Move fixture data to a top-level `tests/fixtures/` directory~~
 
 Current fixture layout is under `tfmttools-test/testdata/`, which hides core
 CLI behavior behind an internal support crate.
@@ -112,7 +112,7 @@ Benefits:
 - Separates reusable Rust test helpers from static fixture assets.
 - Aligns better with how integration tests are usually discovered.
 
-### 4. Move packaging files out of the root
+### ~~4. Move packaging files out of the root~~
 
 Current root-level packaging file:
 
