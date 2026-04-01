@@ -11,14 +11,14 @@ homepage = "https://github.com/Hellrespawn/tfmttools"
 
 [workspace]
 members = [
-    "tfmttools-core",
-    "tfmttools-cli",
-    "tfmttools-fs",
-    "tfmttools-history-core",
-    "tfmttools-history-serde",
-    "tfmttools-test",
+    "crates/core",
+    "crates/cli",
+    "crates/fs",
+    "crates/history-core",
+    "crates/history-serde",
+    "crates/test-harness",
 ]
-default-members = ["tfmttools-cli"]
+default-members = ["crates/cli"]
 resolver = "3"
 
 [workspace.dependencies]

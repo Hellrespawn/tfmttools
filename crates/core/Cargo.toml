@@ -14,7 +14,7 @@ version.workspace = true
 debug = []
 
 [dependencies]
-tfmttools-history-core = { path = "../tfmttools-history-core" }
+tfmttools-history-core = { path = "../history-core" }
 camino = { workspace = true }
 convert_case = { workspace = true }
 ignore = { workspace = true }

@@ -22,10 +22,10 @@ name = "integration"
 harness = false
 
 [dependencies]
-tfmttools-core = { path = "../tfmttools-core" }
-tfmttools-fs = { path = "../tfmttools-fs" }
-tfmttools-history-core = { path = "../tfmttools-history-core" }
-tfmttools-history-serde = { path = "../tfmttools-history-serde" }
+tfmttools-core = { path = "../core" }
+tfmttools-fs = { path = "../fs" }
+tfmttools-history-core = { path = "../history-core" }
+tfmttools-history-serde = { path = "../history-serde" }
 camino = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
@@ -42,7 +42,7 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-tfmttools-test = { path = "../tfmttools-test" }
+tfmttools-test = { path = "../test-harness" }
 assert_fs = { workspace = true }
 
 [lints]

@@ -11,7 +11,7 @@ homepage.workspace = true
 version.workspace = true
 
 [dependencies]
-tfmttools-fs = { path = "../tfmttools-fs" }
+tfmttools-fs = { path = "../fs" }
 
 assert_cmd = { workspace = true }
 assert_fs = { workspace = true }

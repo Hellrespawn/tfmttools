@@ -2,7 +2,7 @@ use assert_fs::TempDir;
 use camino::Utf8PathBuf;
 use color_eyre::Result;
 
-const TEST_DATA_DIRECTORY: &str = "../tfmttools-test/testdata";
+const TEST_DATA_DIRECTORY: &str = "../../testdata";
 const TEST_CASE_DIR_NAME: &str = "cases";
 const AUDIO_DIR_NAME: &str = "audio";
 const EXTRA_DIR_NAME: &str = "extra";
