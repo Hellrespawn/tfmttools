@@ -127,7 +127,7 @@ Benefits:
 - Keeps the root focused on workspace concerns.
 - Creates room for future packaging metadata without root clutter.
 
-### 5. Expand `README.md` with a workspace map
+### ~~5. Expand `README.md` with a workspace map~~
 
 The current README is minimal and does not explain why the workspace is split
 into multiple crates.

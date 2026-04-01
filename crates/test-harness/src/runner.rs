@@ -256,7 +256,7 @@ fn verify_expectation(
         } else {
             ExpectationOutcome::ChecksumMismatch {
                 path,
-                expected: expectation.checksum().unwrap().to_string(),
+                expected: expectation.checksum().unwrap().clone(),
                 actual: checksum,
             }
         }

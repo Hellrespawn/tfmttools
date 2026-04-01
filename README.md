@@ -7,7 +7,36 @@ Use `minijinja` to rename audio files according to their tags.
 1. Ensure `cargo` and Cargo's `bin` folder are on your `PATH`.
 1. Ensure you have a version of Rust matching the MSRV described in Cargo.toml.
 1. Clone the repository.
-1. Run `cargo install --path tfmttools`.
+1. Run `cargo install --path crates/cli`.
+
+## Workspace Map
+
+`tfmt` is a CLI for renaming audio files from their tags using
+`minijinja` templates.
+
+The workspace is split by responsibility:
+
+- `crates/cli/` builds the `tfmt` binary and owns argument parsing, commands,
+  terminal interaction, and integration test wiring.
+- `crates/core/` contains the main rename logic, template rendering, and tag
+  processing.
+- `crates/fs/` applies rename plans to the filesystem and provides related file
+  handling helpers.
+- `crates/history-core/` defines history data structures and traits.
+- `crates/history-serde/` provides the serde-backed history implementation used
+  by the CLI.
+- `crates/test-harness/` contains shared test utilities used by fixture-backed
+  integration tests.
+
+Supporting directories:
+
+- `examples/` contains example templates such as
+  `examples/stef.tfmt`.
+- `tests/fixtures/cli/` contains CLI integration fixtures, including
+  `cases/`, `audio/`, `extra/`, `template/`, and `report/`.
+- `docs/` contains project notes and refactor planning.
+- `packaging/` contains packaging metadata such as the Arch Linux
+  `PKGBUILD`.
 
 ## Usage
 
