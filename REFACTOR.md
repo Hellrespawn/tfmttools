@@ -89,6 +89,10 @@ Recommendation:
 - Rename the package only if there is no external tooling or downstream usage
   that depends on the current package name.
 
+Execution:
+
+Renamed to crates/test-harness
+
 ### 3. Move fixture data to a top-level `tests/fixtures/` directory
 
 Current fixture layout is under `tfmttools-test/testdata/`, which hides core

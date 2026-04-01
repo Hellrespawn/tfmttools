@@ -66,7 +66,7 @@ fn load_data() -> Result<Vec<(String, TestCaseData)>> {
 
     let test_case_iterator = PathIterator::single_directory(&test_cases_dir);
 
-    test_case_iterator
+    let cases = test_case_iterator
         .flatten()
         .filter(|p| {
             let file_name = p.file_name().expect(
@@ -81,7 +81,15 @@ fn load_data() -> Result<Vec<(String, TestCaseData)>> {
                 TestCaseData::from_file(&path)?,
             ))
         })
-        .collect()
+        .collect::<Result<Vec<_>>>()?;
+
+    if cases.is_empty() {
+        Err(eyre!("Did not find any testcases at {}", test_cases_dir))
+    } else {
+        Ok(cases)
+    }
+
+
 }
 fn run_test_case(
     test_case_name: String,

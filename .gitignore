@@ -13,3 +13,5 @@ test-conf
 /src
 .PKGBUILD
 *.pkg.tar.*
+
+.codex
