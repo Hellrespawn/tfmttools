@@ -94,7 +94,7 @@ impl UndoRedoCommand {
 
     fn get_records(
         &self,
-        history: &mut impl History<Action, ActionRecordMetadata>,
+        history: &mut History<Action, ActionRecordMetadata>,
     ) -> Result<Vec<ActionRecord>> {
         let records = match self.mode {
             HistoryMode::Undo => history.get_n_records_to_undo(self.amount)?,
@@ -137,7 +137,7 @@ impl UndoRedoCommand {
 
     fn perform_undo_redo_actions(
         &self,
-        history: &mut impl History<Action, ActionRecordMetadata>,
+        history: &mut History<Action, ActionRecordMetadata>,
         records: Vec<ActionRecord>,
         fs_handler: &FsHandler,
     ) -> Result<()> {

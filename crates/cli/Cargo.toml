@@ -25,7 +25,6 @@ harness = false
 tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
 tfmttools-history-core = { path = "../history-core" }
-tfmttools-history-serde = { path = "../history-serde" }
 camino = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
@@ -47,4 +46,3 @@ assert_fs = { workspace = true }
 
 [lints]
 workspace = true
-

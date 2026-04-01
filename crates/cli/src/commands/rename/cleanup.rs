@@ -21,7 +21,7 @@ const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 
 pub(crate) fn clean_up(
     context: &RenameContext,
-    history: &mut impl History<Action, ActionRecordMetadata>,
+    history: &mut History<Action, ActionRecordMetadata>,
     applied_actions: Vec<Action>,
     unchanged_files: &[Utf8File],
     metadata: ActionRecordMetadata,
@@ -259,7 +259,7 @@ fn remove_directories(
 
 fn store_history(
     context: &RenameContext,
-    history: &mut impl History<Action, ActionRecordMetadata>,
+    history: &mut History<Action, ActionRecordMetadata>,
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {

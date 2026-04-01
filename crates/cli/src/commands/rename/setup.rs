@@ -17,7 +17,7 @@ use crate::ui::ProgressBar;
 
 pub fn create_actions(
     context: &RenameContext,
-    history: &mut impl History<Action, ActionRecordMetadata>,
+    history: &mut History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
     match context.rename_options().template_option() {
@@ -47,7 +47,7 @@ pub fn create_actions(
 
 fn create_actions_from_previous_template(
     context: &RenameContext,
-    history: &mut impl History<Action, ActionRecordMetadata>,
+    history: &mut History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<(Vec<RenameAction>, ActionRecordMetadata)> {
     if let LoadHistoryResult::Loaded = load_history_result {

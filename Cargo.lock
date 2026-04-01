@@ -1178,7 +1178,6 @@ dependencies = [
  "tfmttools-core",
  "tfmttools-fs",
  "tfmttools-history-core",
- "tfmttools-history-serde",
  "tfmttools-test",
  "tracing",
  "tracing-appender",
@@ -1224,19 +1223,10 @@ version = "0.23.1"
 dependencies = [
  "camino",
  "chrono",
- "serde",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "tfmttools-history-serde"
-version = "0.23.1"
-dependencies = [
- "camino",
  "fs-err",
  "serde",
  "serde_json",
- "tfmttools-history-core",
+ "thiserror 2.0.12",
  "tracing",
 ]
 

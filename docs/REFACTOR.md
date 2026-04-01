@@ -27,7 +27,6 @@ crates/
   core/
   fs/
   history-core/
-  history-serde/
   test-support/
 tests/
   fixtures/
@@ -53,7 +52,6 @@ Current root layout is dominated by:
 - `tfmttools-core/`
 - `tfmttools-fs/`
 - `tfmttools-history-core/`
-- `tfmttools-history-serde/`
 - `tfmttools-test/`
 
 Recommended directory layout:
@@ -62,7 +60,6 @@ Recommended directory layout:
 - `crates/core/`
 - `crates/fs/`
 - `crates/history-core/`
-- `crates/history-serde/`
 - `crates/test-support/`
 
 Notes:
@@ -146,26 +143,12 @@ This is cheap and removes much of the cognitive overhead of the current layout.
 These changes may be worthwhile, but they should follow layout cleanup rather
 than precede it.
 
-### 6. Reassess the `history-core` and `history-serde` split
+### ~~6. Reassess the `history-core` and `history-serde` split~~
 
-Current state:
+Execution:
 
-- `history-core` defines the abstractions and types.
-- `history-serde` provides the concrete serde-backed implementation.
-
-This split only pays for itself if multiple storage backends are expected.
-
-Recommendation:
-
-- Keep the split for now if additional history backends are plausible.
-- Merge them into a single `history` crate if serde-on-disk is the only real
-  implementation path.
-
-Decision rule:
-
-- If no second backend is planned, prefer merging.
-- If alternative persistence backends are expected, keep both crates but group
-  them under `crates/` so the relationship is clearer.
+Merged into `crates/history-core/`. The generic abstraction layer was removed
+and the serde-backed file storage now lives directly in that crate.
 
 ### 7. Simplify the CLI crate’s internal layout
 
@@ -237,8 +220,9 @@ Avoid:
 3. Move fixture assets to `tests/fixtures/cli/`.
 4. Move `PKGBUILD` under `packaging/arch/`.
 5. Update `README.md` with a workspace map.
-6. Reevaluate whether `history-core` and `history-serde` should remain separate.
+6. Merge `history-serde` into `history-core`.
 7. Tidy the CLI crate layout only if it still feels noisy after the above.
+8. Split human-facing examples from test-only assets more aggressively.
 
 ## Expected Outcome
 

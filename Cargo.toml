@@ -15,7 +15,6 @@ members = [
     "crates/cli",
     "crates/fs",
     "crates/history-core",
-    "crates/history-serde",
     "crates/test-harness",
 ]
 default-members = ["crates/cli"]
