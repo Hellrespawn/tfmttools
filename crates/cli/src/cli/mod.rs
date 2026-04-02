@@ -5,22 +5,16 @@ use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
 use color_eyre::eyre::Report;
-use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
-use tfmttools_fs::{FsHandler, PathIteratorOptions};
-use tfmttools_history::HistoryMode;
+use tfmttools_fs::FsHandler;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt, registry};
 
-use self::args::{TFMTArgs, TFMTSubcommand};
+use self::args::TFMTArgs;
 pub use self::options::{
     ConfirmMode, DisplayMode, RenameOptions, TFMTOptions, TemplateOption,
-};
-use crate::commands::{
-    RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
-    show_history,
 };
 use crate::ui::show_cursor;
 
@@ -41,7 +35,18 @@ pub fn run() -> Result<()> {
 
     let name = args.command.name();
 
-    let result = execute(args);
+
+    if args.dry_run {
+        println!("Doing dry run. No files will be modified.");
+    }
+
+    let app_options = TFMTOptions::try_from(&args)?;
+
+    let fs_handler = FsHandler::new(app_options.fs_mode());
+
+    install_restore_cursor_hooks();
+
+    let result = args.command.run(&app_options, &fs_handler);
 
     #[cfg(not(feature = "debug"))]
     if let Err(err) = result {
@@ -67,72 +72,6 @@ fn render_cli_error(err: &Report, name: &str) {
     } else {
         eprintln!("{}", command.error(ErrorKind::DisplayHelp, err.to_string()));
     }
-}
-
-fn execute(args: TFMTArgs) -> Result<()> {
-    if args.dry_run {
-        println!("Doing dry run. No files will be modified.");
-    }
-    let app_options = TFMTOptions::try_from(&args)?;
-
-    let fs_handler = FsHandler::new(app_options.fs_mode());
-
-    install_restore_cursor_hooks();
-
-    match args.command {
-        TFMTSubcommand::ClearHistory => {
-            clear_history(&app_options)?;
-        },
-        TFMTSubcommand::ListTemplates(list_templates_args) => {
-            let template_directory = list_templates_args
-                .custom_template_directory
-                .map(Utf8Directory::new)
-                .unwrap_or(Ok(app_options.config_directory().to_owned()))?;
-
-            list_templates(&template_directory)?;
-        },
-        TFMTSubcommand::Rename(rename_args) => {
-            let rename_options =
-                RenameOptions::try_from((rename_args, &app_options))?;
-
-            let path_iterator_options = PathIteratorOptions::with_depth(
-                rename_options.input_directory().as_path(),
-                rename_options.recursion_depth(),
-            );
-
-            let rename_context = RenameContext::new(
-                &fs_handler,
-                &path_iterator_options,
-                &app_options,
-                &rename_options,
-            );
-
-            rename(&rename_context)?;
-        },
-        TFMTSubcommand::Undo(undo_redo_args) => {
-            UndoRedoCommand::new(
-                matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
-                undo_redo_args.amount.unwrap_or(1),
-                HistoryMode::Undo,
-                app_options.preview_list_size(),
-            )
-            .run(&app_options, &fs_handler)?;
-        },
-        TFMTSubcommand::Redo(undo_redo_args) => {
-            UndoRedoCommand::new(
-                matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
-                undo_redo_args.amount.unwrap_or(1),
-                HistoryMode::Redo,
-                app_options.preview_list_size(),
-            )
-            .run(&app_options, &fs_handler)?;
-        },
-        TFMTSubcommand::ShowHistory => {
-            show_history(&app_options)?;
-        },
-    }
-
-    Ok(())
 }
 
 // Initialize logger. if `TFMT_LOG` is set, write the log to the current

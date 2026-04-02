@@ -1,8 +1,17 @@
 use camino::Utf8PathBuf;
 use clap::{Args, Command, CommandFactory, Parser, Subcommand};
+use color_eyre::Result;
 use tfmttools_fs::FileOrName;
+use tfmttools_fs::{FsHandler, PathIteratorOptions};
+use tfmttools_history::HistoryMode;
 use tracing::debug;
 
+use super::{ConfirmMode, RenameOptions, TFMTOptions};
+use crate::commands::{
+    RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
+    show_history,
+};
+use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 use crate::ui::PreviewListSize;
 
 #[derive(Parser, Debug)]
@@ -73,6 +82,67 @@ pub enum TFMTSubcommand {
 }
 
 impl TFMTSubcommand {
+    pub fn run(
+        self,
+        app_options: &TFMTOptions,
+        fs_handler: &FsHandler,
+    ) -> Result<()> {
+        match self {
+            TFMTSubcommand::ClearHistory => {
+                clear_history(app_options)?;
+            },
+            TFMTSubcommand::ListTemplates(list_templates_args) => {
+                let template_directory = list_templates_args
+                    .custom_template_directory
+                    .map(Utf8Directory::new)
+                    .unwrap_or(Ok(app_options.config_directory().to_owned()))?;
+
+                list_templates(&template_directory)?;
+            },
+            TFMTSubcommand::Rename(rename_args) => {
+                let rename_options =
+                    RenameOptions::try_from((rename_args, app_options))?;
+
+                let path_iterator_options = PathIteratorOptions::with_depth(
+                    rename_options.input_directory().as_path(),
+                    rename_options.recursion_depth(),
+                );
+
+                let rename_context = RenameContext::new(
+                    fs_handler,
+                    &path_iterator_options,
+                    app_options,
+                    &rename_options,
+                );
+
+                rename(&rename_context)?;
+            },
+            TFMTSubcommand::Undo(undo_redo_args) => {
+                UndoRedoCommand::new(
+                    matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
+                    undo_redo_args.amount.unwrap_or(1),
+                    HistoryMode::Undo,
+                    app_options.preview_list_size(),
+                )
+                .run(app_options, fs_handler)?;
+            },
+            TFMTSubcommand::Redo(undo_redo_args) => {
+                UndoRedoCommand::new(
+                    matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
+                    undo_redo_args.amount.unwrap_or(1),
+                    HistoryMode::Redo,
+                    app_options.preview_list_size(),
+                )
+                .run(app_options, fs_handler)?;
+            },
+            TFMTSubcommand::ShowHistory => {
+                show_history(app_options)?;
+            },
+        }
+
+        Ok(())
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
             TFMTSubcommand::ClearHistory => "clear-history",
