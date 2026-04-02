@@ -118,22 +118,10 @@ impl TFMTSubcommand {
                 rename(&rename_context)?;
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
-                UndoRedoCommand::new(
-                    matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
-                    undo_redo_args.amount.unwrap_or(1),
-                    HistoryMode::Undo,
-                    app_options.preview_list_size(),
-                )
-                .run(app_options, fs_handler)?;
+                undo_redo_args.run(HistoryMode::Undo, app_options, fs_handler)?;
             },
             TFMTSubcommand::Redo(undo_redo_args) => {
-                UndoRedoCommand::new(
-                    matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
-                    undo_redo_args.amount.unwrap_or(1),
-                    HistoryMode::Redo,
-                    app_options.preview_list_size(),
-                )
-                .run(app_options, fs_handler)?;
+                undo_redo_args.run(HistoryMode::Redo, app_options, fs_handler)?;
             },
             TFMTSubcommand::ShowHistory => {
                 show_history(app_options)?;
@@ -220,4 +208,21 @@ pub struct Seed {
 pub struct UndoRedoArgs {
     /// Amount of actions.
     pub amount: Option<usize>,
+}
+
+impl UndoRedoArgs {
+    fn run(
+        self,
+        mode: HistoryMode,
+        app_options: &TFMTOptions,
+        fs_handler: &FsHandler,
+    ) -> Result<()> {
+        UndoRedoCommand::new(
+            matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
+            self.amount.unwrap_or(1),
+            mode,
+            app_options.preview_list_size(),
+        )
+        .run(app_options, fs_handler)
+    }
 }

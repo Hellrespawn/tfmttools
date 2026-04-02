@@ -34,7 +34,7 @@ together.
 
 ## Proposed Changes
 
-### 1. Move Subcommand Dispatch Onto `TFMTSubcommand`
+### ~~1. Move Subcommand Dispatch Onto `TFMTSubcommand`~~
 
 Add a method on `TFMTSubcommand` such as:
 
@@ -55,7 +55,7 @@ Expected result:
 - `cli::run` becomes short and easier to scan.
 - Subcommand behavior is easier to find from the enum definition.
 
-### 2. Extract Undo/Redo Shared Setup
+### ~~2. Extract Undo/Redo Shared Setup~~
 
 Create a helper for the duplicated `Undo` and `Redo` branches. Options:
 
@@ -107,7 +107,7 @@ Expected result:
 - rename-specific setup lives with rename-specific types
 - future rename options can evolve without bloating the entry flow
 
-### 4. Isolate Error Rendering
+### ~~4. Isolate Error Rendering~~
 
 Extract the non-debug error printing logic from `cli::run` into a dedicated
 helper, for example:
