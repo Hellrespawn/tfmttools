@@ -135,13 +135,6 @@ impl TFMTSubcommand {
 }
 
 #[derive(Args, Debug)]
-pub struct ShowHistoryArgs {
-    #[arg(short, long, action = clap::ArgAction::Count)]
-    /// Increase output verbosity.
-    pub verbose: u8,
-}
-
-#[derive(Args, Debug)]
 pub struct ListTemplatesArgs {
     #[arg(short = 't', long = "template-directory")]
     /// Directory to read templates from. Defaults to the configuration directory.
@@ -186,13 +179,6 @@ pub struct TemplateArgs {
     #[arg(short, long)]
     /// Path to or name of template.
     pub script: Option<String>,
-}
-
-#[derive(Args, Debug)]
-pub struct Seed {
-    #[arg(short = 't', long = "template-directory")]
-    /// Directory to read templates from. Defaults to the configuration directory.
-    pub custom_template_directory: Option<Utf8PathBuf>,
 }
 
 #[derive(Args, Debug)]
