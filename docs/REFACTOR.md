@@ -1,213 +1,339 @@
-# CLI Entrypoint Simplification Plan
+# Refactor Plan
 
-## Goal
+This document proposes a staged simplification of the code and module
+structure. The focus is reducing orchestration complexity, tightening
+crate boundaries, and removing duplicated logic without changing user
+visible behavior.
 
-Simplify the CLI entry flow in `crates/cli` without changing behavior.
-The main target is `crates/cli/src/cli/mod.rs`, where command dispatch,
-command-specific setup, and user-facing error rendering are currently mixed
-together.
+## Goals
 
-## Current Problems
+- Make the rename flow readable end-to-end in one pass.
+- Move execution logic to the crates that own the behavior.
+- Reduce duplicate branching and duplicate action handling.
+- Make APIs more explicit about what mutates state and what does not.
+- Keep each step small enough to land safely with tests.
 
-- `cli::run` is responsible for too many concerns:
-  tracing setup, argument parsing, command dispatch, and non-debug error
-  formatting.
-- `execute` contains command-specific setup logic that belongs closer to each
-  command.
-- `Undo` and `Redo` are wired separately even though their setup is nearly
-  identical.
-- `Rename` setup builds several intermediate values inline, which makes the
-  dispatch path noisy.
-- `TFMTSubcommand::name()` exists only to support error rendering and currently
-  allocates a `String`.
-- Some argument definitions appear stale or disconnected from actual command
-  handling, notably `ShowHistoryArgs` and `Seed`.
+## Constraints
 
-## Refactor Principles
+- Preserve current CLI behavior and output unless a step explicitly says
+  otherwise.
+- Prefer moving code before rewriting behavior.
+- Keep integration fixtures passing after each stage.
+- Avoid broad cross-crate redesign until local simplifications have
+  reduced the surface area.
 
-- Keep `src/main.rs` minimal.
-- Keep `cli::run` focused on top-level orchestration.
-- Move command-specific setup next to the command that uses it.
-- Prefer small helper methods over a single large dispatch function.
-- Avoid changing CLI behavior, output text, or clap semantics unless explicitly
-  intended.
+## Stage 1: Low-risk cleanup
 
-## Proposed Changes
+These changes are small, local, and should be done first.
 
-### ~~1. Move Subcommand Dispatch Onto `TFMTSubcommand`~~
+### 1. Fix obviously accidental complexity
 
-Add a method on `TFMTSubcommand` such as:
+- Fix the template description parser in
+  [crates/fs/src/template.rs](/home/stef/projects/rust/tfmttools/crates/fs/src/template.rs#L98).
+  `COMMENT_END` is currently `"{#"` instead of `"#}"`.
+- Remove dead or placeholder code that obscures intent:
+  - the commented-out iterator experiment in
+    [crates/cli/src/commands/rename/mod.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/mod.rs#L81)
+  - the commented-out `.rev()` and `// Ok(remaining)` in
+    [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L165)
+  - unused interpolation modes in
+    [crates/core/src/templates/context.rs](/home/stef/projects/rust/tfmttools/crates/core/src/templates/context.rs#L12)
 
-```rust
-pub fn run(self, app_options: &TFMTOptions, fs_handler: &FsHandler) -> Result<()>
-```
+### 2. Tighten read-only APIs
 
-This method should own the `match` over subcommands. The top-level flow then
-becomes:
+- Change read-only history methods in
+  [crates/history/src/history.rs](/home/stef/projects/rust/tfmttools/crates/history/src/history.rs#L129)
+  to take `&self` instead of `&mut self`:
+  - `get_previous_record`
+  - `get_records_to_undo`
+  - `get_records_to_redo`
+  - `get_n_records_to_undo`
+  - `get_n_records_to_redo`
+  - `get_all_records_to_undo`
+  - `get_all_records_to_redo`
+  - `is_empty`
+- Keep `set_record_state`, `push`, `save`, and `remove` mutable.
 
-1. Initialize tracing.
-2. Parse args.
-3. Build shared application state.
-4. Dispatch once through `args.command.run(...)`.
+### 3. Remove local duplication in small helpers
 
-Expected result:
+- Add a shared helper for repeated confirmation checks:
+  currently duplicated in
+  [crates/cli/src/commands/rename/apply.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/apply.rs#L41)
+  and
+  [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L106).
+- Add a shared helper for previewing paths relative to cwd:
+  currently split between
+  [crates/cli/src/commands/rename/apply.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/apply.rs#L80)
+  and
+  [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L213).
 
-- `cli::run` becomes short and easier to scan.
-- Subcommand behavior is easier to find from the enum definition.
+## Stage 2: Simplify rename orchestration
 
-### ~~2. Extract Undo/Redo Shared Setup~~
+The main complexity is the rename command flow. The current structure
+already has `setup`, `apply`, and `cleanup`, but shared helpers live in
+the parent module and important decisions are spread across files.
 
-Create a helper for the duplicated `Undo` and `Redo` branches. Options:
+### 4. Introduce a `RenameSession`
 
-- `fn run_undo_redo(...) -> Result<()>`
-- `impl UndoRedoArgs { fn run(...) -> Result<()> }`
-
-Shared inputs:
-
-- `HistoryMode`
-- requested amount
-- confirmation mode
-- preview list size
-- `TFMTOptions`
-- `FsHandler`
-
-Expected result:
-
-- one path for undo/redo setup
-- less duplication in dispatch
-- fewer chances for the two commands to drift apart accidentally
-
-### ~~3. Move Rename Setup Into a Constructor~~
-
-The rename branch currently constructs:
-
-- `RenameOptions`
-- `PathIteratorOptions`
-- `RenameContext`
-
-inline in the dispatcher.
-
-Introduce a constructor such as:
+Create a type in `crates/cli/src/commands/rename/` that owns the command
+flow. Suggested shape:
 
 ```rust
-impl RenameContext<'_> {
-    pub fn try_from_args(
-        fs_handler: &FsHandler,
-        app_options: &TFMTOptions,
-        rename_args: RenameArgs,
-    ) -> Result<Self>
+pub struct RenameSession<'a> {
+    context: &'a RenameContext<'a>,
+    history: History<Action, ActionRecordMetadata>,
+    load_result: LoadHistoryResult,
 }
 ```
 
-or a helper with equivalent responsibility.
+Methods:
 
-Expected result:
+- `load(context) -> Result<Self>`
+- `plan_actions(&mut self) -> Result<RenamePlan>`
+- `preview(&self, plan: &RenamePlan) -> Result<()>`
+- `execute(&self, plan: RenamePlan) -> Result<ExecutionResult>`
+- `cleanup(&mut self, execution: ExecutionResult) -> Result<()>`
+- `save_history(&mut self, actions, metadata) -> Result<()>`
 
-- command dispatch stops knowing rename internals
-- rename-specific setup lives with rename-specific types
-- future rename options can evolve without bloating the entry flow
+Expected outcome:
 
-### ~~4. Isolate Error Rendering~~
+- [crates/cli/src/commands/rename/mod.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/mod.rs#L23)
+  becomes a short top-level entry point.
+- Shared helpers like `move_files_iter` stop living in the parent module
+  only to be called from sibling modules.
 
-Extract the non-debug error printing logic from `cli::run` into a dedicated
-helper, for example:
+### 5. Introduce a `RenamePlan`
 
-```rust
-fn render_cli_error(args: &TFMTArgs, err: &color_eyre::Report)
-```
-
-This helper should own:
-
-- building the clap `Command`
-- selecting the right subcommand help context
-- formatting the error for user-facing output
-
-Expected result:
-
-- `cli::run` reads as straight-line control flow
-- error presentation logic becomes easier to test and reason about
-
-### 5. Remove `String` Allocation From Subcommand Name Lookup
-
-If subcommand name lookup remains necessary, change:
+Bundle together the outputs of setup:
 
 ```rust
-pub fn name(&self) -> String
+pub struct RenamePlan {
+    actions: Vec<RenameAction>,
+    unchanged_files: Vec<Utf8File>,
+    metadata: ActionRecordMetadata,
+}
 ```
 
-to:
+This removes the current pattern where actions and metadata are created
+in one file, unchanged files are computed in another, and everything is
+passed around separately.
+
+### 6. Make rename execution return domain types
+
+Replace the current `RenameResult` in
+[crates/cli/src/commands/rename/mod.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/mod.rs#L17)
+with types that reflect workflow states more directly:
+
+- `RenamePlan`
+- `ExecutionResult`
+- `CleanupPlan`
+
+This reduces enum branching that currently combines planning and
+execution concerns.
+
+## Stage 3: Unify template resolution
+
+Template resolution currently has three parallel code paths in
+[crates/cli/src/commands/rename/setup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/setup.rs#L17):
+
+- reuse previous template
+- load named/file template
+- load inline script
+
+### 7. Introduce `TemplateSource`
+
+Suggested shape:
 
 ```rust
-pub fn name(&self) -> &'static str
+enum TemplateSource {
+    PreviousRun,
+    FileOrName(FileOrName),
+    Script(String),
+}
 ```
 
-If the error rendering refactor makes this helper unnecessary, remove it
-entirely.
+Methods:
 
-Expected result:
+- `resolve(&self, context, history, load_result) -> Result<ResolvedTemplate>`
+- `metadata(&self, run_id: &str, arguments: &[String]) -> ActionRecordMetadata`
 
-- less incidental work in the entry path
-- simpler API on `TFMTSubcommand`
+Where `ResolvedTemplate` contains:
 
-### 6. Audit and Remove Stale CLI Argument Types
+- a `TemplateLoader`
+- the selected template name
+- resolved arguments
+- `ActionRecordMetadata`
 
-Review these definitions in `crates/cli/src/cli/args.rs`:
+Expected simplification:
 
-- `ShowHistoryArgs`
-- `Seed`
+- `create_actions_from_previous_template`
+- `create_actions_from_file_or_name`
+- `create_actions_from_script`
 
-`ShowHistoryArgs` is especially suspicious because `ShowHistory` currently has
-no payload, while `show_history` reads verbosity from `TFMTOptions`.
+can collapse into one resolution path plus one shared action-creation
+path.
 
-Decide one of:
+### 8. Simplify `TemplateLoader`
 
-- wire the args into the actual command shape
-- or remove the unused definitions
+In [crates/fs/src/template.rs](/home/stef/projects/rust/tfmttools/crates/fs/src/template.rs#L21),
+replace the three constructors with one source-driven entry point:
 
-Expected result:
-
-- fewer misleading types in the CLI layer
-- less confusion about which options are truly supported
-
-## Suggested Implementation Order
-
-1. Extract error rendering from `cli::run`.
-2. Move subcommand dispatch onto `TFMTSubcommand`.
-3. Deduplicate undo/redo setup.
-4. Move rename setup into a constructor/helper.
-5. Remove or simplify `TFMTSubcommand::name()`.
-6. Audit and delete stale argument structs.
-
-This order keeps behavior stable while reducing risk. Each step should leave
-the codebase in a cleaner state even if the later steps are postponed.
-
-## Validation
-
-Run after each meaningful step:
-
-```bash
-cargo check -p tfmttools-cli
-cargo test --workspace
+```rust
+enum TemplateLoaderSource<'a> {
+    Directory(&'a Utf8Directory),
+    File { path: &'a Utf8Path, name: &'a str },
+    Script(&'a str),
+}
 ```
 
-Run before considering the refactor complete:
+Then implement `TemplateLoader::from_source(source)`.
 
-```bash
-cargo +nightly fmt --all
-cargo +nightly clippy --workspace --all-targets
+This keeps environment construction in one place and makes loader setup
+more uniform.
+
+## Stage 4: Move file operation orchestration to `tfmttools_fs`
+
+The CLI currently owns execution details that belong closer to the file
+operation layer.
+
+### 9. Replace `move_files_iter` with an executor type
+
+Move the logic from
+[crates/cli/src/commands/rename/mod.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/mod.rs#L55)
+into `tfmttools_fs`.
+
+Suggested shape:
+
+```rust
+pub struct ActionExecutor<'a> {
+    handler: ActionHandler<'a>,
+}
 ```
 
-Also manually verify:
+Methods:
 
-- `tfmt --help`
-- `tfmt rename --help`
-- `tfmt undo --help`
-- `tfmt redo --help`
-- one failure path to confirm error rendering still points at the right command
+- `apply_rename_actions(rename_actions) -> impl Iterator<Item = TFMTResult<Action>>`
+- `apply_actions(actions) -> TFMTResult<Vec<Action>>`
+- `remove_directories(directories) -> TFMTResult<Vec<Action>>`
 
-## Non-Goals
+Expected outcome:
 
-- changing command names or aliases
-- redesigning CLI UX
-- rewriting command implementations outside the entry flow
-- changing output text unless required by the refactor
+- [crates/cli/src/commands/rename/apply.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/apply.rs#L107)
+  becomes progress reporting plus error presentation.
+- [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L235)
+  stops reusing parent-module execution helpers.
+
+### 10. Reduce duplication inside `ActionHandler`
+
+In [crates/fs/src/action.rs](/home/stef/projects/rust/tfmttools/crates/fs/src/action.rs#L68),
+`apply`, `undo`, and `redo` each repeat a full `match Action`.
+
+Refactor target:
+
+- factor file operations into smaller internal helpers
+- centralize move/copy direction handling
+- keep `rename()` focused on translating one `RenameAction` into one or
+  more stored `Action`s
+
+This is a good follow-up after introducing an executor because it makes
+the execution layer smaller before changing internals.
+
+## Stage 5: Turn cleanup into planning
+
+Cleanup currently mixes discovery, risk classification, prompting,
+execution, and history updates in one function.
+
+### 11. Introduce `CleanupPlan`
+
+Suggested shape:
+
+```rust
+pub struct CleanupPlan {
+    files_to_bin: Vec<RenameAction>,
+    directories_to_remove: Vec<Utf8Directory>,
+    requires_confirmation: bool,
+}
+```
+
+Split current behavior in
+[crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L36)
+into:
+
+- `discover_remaining_items(...) -> Result<RemainingItems>`
+- `plan_cleanup(...) -> Result<Option<CleanupPlan>>`
+- `confirm_cleanup(...) -> Result<bool>`
+- `execute_cleanup(...) -> Result<Vec<Action>>`
+
+Expected simplification:
+
+- the duplicated “build rename actions, maybe confirm, move files” paths
+  at
+  [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L99)
+  and
+  [crates/cli/src/commands/rename/cleanup.rs](/home/stef/projects/rust/tfmttools/crates/cli/src/commands/rename/cleanup.rs#L127)
+  collapse into one execution path
+- history storage becomes a separate final step instead of being mixed
+  into cleanup logic
+
+## Stage 6: Simplify template context evaluation
+
+This is lower priority because it does not dominate the main workflow,
+but it has a few easy wins.
+
+### 12. Normalize field lookup once
+
+In [crates/core/src/templates/context.rs](/home/stef/projects/rust/tfmttools/crates/core/src/templates/context.rs#L124),
+lowercase the incoming field once and match on normalized names.
+
+This removes repetitive variants such as:
+
+- `"args" | "Args" | "ARGS" | ...`
+- `"date" | "Date" | "DATE"`
+
+### 13. Separate tag extraction from output coercion
+
+Split:
+
+- read raw tag value
+- parse numeric current/total values
+- apply safe interpolation cleanup
+- convert to `minijinja::Value`
+
+This makes the behavior easier to test in small unit tests and reduces
+the amount of branching inside `Object::get_value`.
+
+## Recommended implementation order
+
+If this is executed as actual refactor work, use this order:
+
+1. Stage 1 low-risk cleanup
+2. Stage 2 rename orchestration
+3. Stage 3 template resolution
+4. Stage 4 execution layer move to `tfmttools_fs`
+5. Stage 5 cleanup planning
+6. Stage 6 template context cleanup
+
+This order keeps behavior stable while moving the highest-complexity
+flow into clearer abstractions first.
+
+## Validation after each stage
+
+Run these after each meaningful step:
+
+- `cargo test --workspace`
+- `cargo test -p tfmttools-cli --test integration -- --nocapture`
+- `cargo +nightly clippy --workspace --all-targets`
+
+If a stage changes output formatting intentionally, update the fixture
+expectations in `tests/fixtures/cli/` in the same change.
+
+## What not to do
+
+- Do not merge `core`, `fs`, and `history` prematurely. The current
+  crate split is mostly reasonable; the problem is orchestration and
+  duplication inside the CLI command flow.
+- Do not start by rewriting the template engine interface. The loader
+  and context code can be improved later, but they are not the main
+  readability problem.
+- Do not combine behavioral changes with structural refactors. Keep
+  those separate so fixture failures stay attributable.
