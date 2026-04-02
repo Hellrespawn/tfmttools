@@ -1,296 +1,213 @@
-# Repo Refactor Plan
+# CLI Entrypoint Simplification Plan
 
-This document proposes a pragmatic cleanup of the repository structure.
-The goal is to make the workspace easier to navigate without forcing
-unnecessary crate churn.
+## Goal
 
-## Goals
+Simplify the CLI entry flow in `crates/cli` without changing behavior.
+The main target is `crates/cli/src/cli/mod.rs`, where command dispatch,
+command-specific setup, and user-facing error rendering are currently mixed
+together.
 
-- Make the top-level layout easier to scan.
-- Clarify which directories are product code, test support, fixtures, and
-  packaging.
-- Reduce naming noise from repeated `tfmttools-` directory prefixes.
-- Keep published crate/package changes proportional to the benefit.
+## Current Problems
 
-## Recommended Direction
+- `cli::run` is responsible for too many concerns:
+  tracing setup, argument parsing, command dispatch, and non-debug error
+  formatting.
+- `execute` contains command-specific setup logic that belongs closer to each
+  command.
+- `Undo` and `Redo` are wired separately even though their setup is nearly
+  identical.
+- `Rename` setup builds several intermediate values inline, which makes the
+  dispatch path noisy.
+- `TFMTSubcommand::name()` exists only to support error rendering and currently
+  allocates a `String`.
+- Some argument definitions appear stale or disconnected from actual command
+  handling, notably `ShowHistoryArgs` and `Seed`.
 
-The repo is not too large, but it looks more fragmented than it is because
-every workspace member sits at the root with a long `tfmttools-*` name. The
-highest-value improvement is to reorganize layout and naming, not to split the
-code into more crates.
+## Refactor Principles
 
-Target shape:
+- Keep `src/main.rs` minimal.
+- Keep `cli::run` focused on top-level orchestration.
+- Move command-specific setup next to the command that uses it.
+- Prefer small helper methods over a single large dispatch function.
+- Avoid changing CLI behavior, output text, or clap semantics unless explicitly
+  intended.
 
-```text
-crates/
-  cli/
-  core/
-  fs/
-  history/
-  test-support/
-tests/
-  fixtures/
-    cli/
-examples/
-docs/
-packaging/
-  arch/
+## Proposed Changes
+
+### 1. Move Subcommand Dispatch Onto `TFMTSubcommand`
+
+Add a method on `TFMTSubcommand` such as:
+
+```rust
+pub fn run(self, app_options: &TFMTOptions, fs_handler: &FsHandler) -> Result<()>
 ```
 
-This preserves the current conceptual boundaries while making the workspace
-easier to understand at a glance.
+This method should own the `match` over subcommands. The top-level flow then
+becomes:
 
-## Do Now
+1. Initialize tracing.
+2. Parse args.
+3. Build shared application state.
+4. Dispatch once through `args.command.run(...)`.
 
-These changes are low-risk and produce immediate organizational benefit.
+Expected result:
 
-### ~~1. Move workspace members under `crates/`~~
+- `cli::run` becomes short and easier to scan.
+- Subcommand behavior is easier to find from the enum definition.
 
-Current root layout is dominated by:
+### 2. Extract Undo/Redo Shared Setup
 
-- `tfmttools-cli/`
-- `tfmttools-core/`
-- `tfmttools-fs/`
-- `tfmttools-history/`
-- `tfmttools-test/`
+Create a helper for the duplicated `Undo` and `Redo` branches. Options:
 
-Recommended directory layout:
+- `fn run_undo_redo(...) -> Result<()>`
+- `impl UndoRedoArgs { fn run(...) -> Result<()> }`
 
-- `crates/cli/`
-- `crates/core/`
-- `crates/fs/`
-- `crates/history/`
-- `crates/test-support/`
+Shared inputs:
 
-Notes:
+- `HistoryMode`
+- requested amount
+- confirmation mode
+- preview list size
+- `TFMTOptions`
+- `FsHandler`
 
-- Package names in each `Cargo.toml` can stay unchanged initially.
-- Update workspace member paths in the root `Cargo.toml`.
-- This is mostly a path change, so it is disruptive to local links but low-risk
-  from a code-behavior perspective.
+Expected result:
 
-### 2. ~~Rename `tfmttools-test` to reflect its purpose~~
+- one path for undo/redo setup
+- less duplication in dispatch
+- fewer chances for the two commands to drift apart accidentally
 
-The crate currently provides shared test utilities, not the entire test suite.
-Its current name makes the repository structure less clear.
+### 3. Move Rename Setup Into a Constructor
 
-Recommended name:
+The rename branch currently constructs:
 
-- Directory: `crates/test-support/`
-- Package: either keep `tfmttools-test` for compatibility or rename to
-  `tfmttools-test-support`
+- `RenameOptions`
+- `PathIteratorOptions`
+- `RenameContext`
 
-Recommendation:
+inline in the dispatcher.
 
-- Rename the directory now.
-- Rename the package only if there is no external tooling or downstream usage
-  that depends on the current package name.
+Introduce a constructor such as:
 
-Execution:
+```rust
+impl RenameContext<'_> {
+    pub fn try_from_args(
+        fs_handler: &FsHandler,
+        app_options: &TFMTOptions,
+        rename_args: RenameArgs,
+    ) -> Result<Self>
+}
+```
 
-Renamed to crates/test-harness
+or a helper with equivalent responsibility.
 
-### ~~3. Move fixture data to a top-level `tests/fixtures/` directory~~
+Expected result:
 
-Current fixture layout is under `tfmttools-test/testdata/`, which hides core
-CLI behavior behind an internal support crate.
+- command dispatch stops knowing rename internals
+- rename-specific setup lives with rename-specific types
+- future rename options can evolve without bloating the entry flow
 
-Recommended layout:
+### 4. Isolate Error Rendering
 
-- `tests/fixtures/cli/cases/`
-- `tests/fixtures/cli/audio/`
-- `tests/fixtures/cli/extra/`
-- `tests/fixtures/cli/template/`
-- `tests/fixtures/cli/test-template.html`
+Extract the non-debug error printing logic from `cli::run` into a dedicated
+helper, for example:
 
-Benefits:
+```rust
+fn render_cli_error(args: &TFMTArgs, err: &color_eyre::Report)
+```
 
-- Makes scenario coverage visible from the repo root.
-- Separates reusable Rust test helpers from static fixture assets.
-- Aligns better with how integration tests are usually discovered.
+This helper should own:
 
-### ~~4. Move packaging files out of the root~~
+- building the clap `Command`
+- selecting the right subcommand help context
+- formatting the error for user-facing output
 
-Current root-level packaging file:
+Expected result:
 
-- `PKGBUILD`
+- `cli::run` reads as straight-line control flow
+- error presentation logic becomes easier to test and reason about
 
-Recommended layout:
+### 5. Remove `String` Allocation From Subcommand Name Lookup
 
-- `packaging/arch/PKGBUILD`
+If subcommand name lookup remains necessary, change:
 
-Benefits:
+```rust
+pub fn name(&self) -> String
+```
 
-- Keeps the root focused on workspace concerns.
-- Creates room for future packaging metadata without root clutter.
+to:
 
-### ~~5. Expand `README.md` with a workspace map~~
+```rust
+pub fn name(&self) -> &'static str
+```
 
-The current README is minimal and does not explain why the workspace is split
-into multiple crates.
+If the error rendering refactor makes this helper unnecessary, remove it
+entirely.
 
-Add a short section covering:
+Expected result:
 
-- What the `tfmt` binary does.
-- What each workspace crate is responsible for.
-- Where examples live.
-- Where integration fixtures live.
+- less incidental work in the entry path
+- simpler API on `TFMTSubcommand`
 
-This is cheap and removes much of the cognitive overhead of the current layout.
+### 6. Audit and Remove Stale CLI Argument Types
 
-## Do Later
+Review these definitions in `crates/cli/src/cli/args.rs`:
 
-These changes may be worthwhile, but they should follow layout cleanup rather
-than precede it.
+- `ShowHistoryArgs`
+- `Seed`
 
-### ~~6. Reassess the `history` and `history-serde` split~~
+`ShowHistoryArgs` is especially suspicious because `ShowHistory` currently has
+no payload, while `show_history` reads verbosity from `TFMTOptions`.
 
-Execution:
+Decide one of:
 
-Merged into `crates/history/`. The generic abstraction layer was removed
-and the serde-backed file storage now lives directly in that crate.
+- wire the args into the actual command shape
+- or remove the unused definitions
 
-### 7. Simplify the CLI crate’s internal layout
+Expected result:
 
-Current CLI sources are spread across:
+- fewer misleading types in the CLI layer
+- less confusion about which options are truly supported
 
-- `args.rs`
-- `options.rs`
-- `cli.rs`
-- `term.rs`
-- `history/`
-- `ui/`
-- `commands/`
+## Suggested Implementation Order
 
-This is not wrong, but it is slightly diffuse for the current codebase size.
+1. Extract error rendering from `cli::run`.
+2. Move subcommand dispatch onto `TFMTSubcommand`.
+3. Deduplicate undo/redo setup.
+4. Move rename setup into a constructor/helper.
+5. Remove or simplify `TFMTSubcommand::name()`.
+6. Audit and delete stale argument structs.
 
-The main issue is not file count, it is that the current split mixes three
-different concerns at the crate root:
+This order keeps behavior stable while reducing risk. Each step should leave
+the codebase in a cleaner state even if the later steps are postponed.
 
-- command-line surface definition (`args.rs`, `options.rs`)
-- application orchestration (`cli.rs`, `commands/`)
-- terminal output and interaction (`term.rs`, `ui/`, parts of `history/`)
+## Validation
 
-That makes the crate a bit harder to scan than it needs to be. A contributor
-trying to answer a simple question like “where does this command parse its
-flags?” or “where is history rendered?” has to bounce between several root
-modules before the structure becomes obvious.
+Run after each meaningful step:
 
-Possible cleanup options:
+```bash
+cargo check -p tfmttools-cli
+cargo test --workspace
+```
 
-- Merge `args.rs` and `options.rs` into a single argument-parsing area.
-- Group presentation concerns under a clearer `ui/` or `presentation/` module.
-- Keep command wiring and execution under `commands/`.
+Run before considering the refactor complete:
 
-A reasonable end state would be something like:
+```bash
+cargo +nightly fmt --all
+cargo +nightly clippy --workspace --all-targets
+```
 
-- `src/cli/`
-- `src/cli/args.rs`
-- `src/cli/options.rs`
-- `src/cli/mod.rs`
-- `src/commands/`
-- `src/ui/`
-- `src/history/`
+Also manually verify:
 
-Or, if the crate stays small, an even simpler variant:
+- `tfmt --help`
+- `tfmt rename --help`
+- `tfmt undo --help`
+- `tfmt redo --help`
+- one failure path to confirm error rendering still points at the right command
 
-- `src/args.rs`
-- `src/commands/`
-- `src/ui/`
-- `src/history/`
-- remove `cli.rs` and `term.rs` by folding them into the most obvious owners
+## Non-Goals
 
-The important part is not the exact directory names. The important part is that
-the root should communicate a small number of stable concepts:
-
-- parse input
-- execute commands
-- render output
-- manage history-specific behavior
-
-If that is obvious from `src/`, the internal layout is good enough.
-
-What not to do:
-
-- Do not create extra layers like `application/`, `domain/`, or `services/`
-  unless the CLI actually grows into those responsibilities.
-- Do not split every command into its own micro-module tree if the command
-  remains small.
-- Do not move files just to eliminate a root-level `.rs` file; the move should
-  improve discoverability, not satisfy symmetry.
-
-Signs that this refactor is justified:
-
-- new contributors regularly open the wrong module first
-- command-specific code starts leaking presentation details across modules
-- `cli.rs` becomes a generic dumping ground for setup and dispatch logic
-- `term.rs` and `ui/` begin to overlap in responsibility
-- adding a new subcommand requires touching too many unrelated files
-
-Recommendation:
-
-- Do not refactor this until there is friction in everyday development.
-- If touched, prefer small naming and grouping improvements over a full rewrite.
-- Start by choosing one seam to clarify, usually argument parsing or terminal
-  presentation, and stop once the crate reads more cleanly.
-- Treat this as a maintenance refactor, not an architecture project. It should
-  reduce navigation cost without changing behavior.
-
-### 8. Split human-facing examples from test-only assets more aggressively
-
-Right now some template/report assets sit with test data even though they are
-useful for contributors as examples.
-
-Recommendation:
-
-- Keep test-only fixtures under `tests/fixtures/`.
-- Move contributor-facing examples to `examples/` or `docs/`.
-- Keep one canonical sample report/template path referenced from the README.
-
-## Don’t Bother Yet
-
-These changes are unlikely to pay off right now.
-
-### 9. Do not add more crates just to match module names
-
-The workspace already has several crates. Additional crate extraction would add
-build, dependency, and navigation overhead without obvious benefit.
-
-Avoid:
-
-- Splitting UI into its own crate.
-- Splitting template logic into a new crate unless it is reused independently.
-- Extracting tiny abstractions into separate workspace members.
-
-### 10. Do not chase “perfect” conventional layout at the cost of churn
-
-This repository is a tool workspace, not a generic template project. The goal is
-clarity, not strict adherence to someone else’s directory scheme.
-
-Avoid:
-
-- Renaming modules solely for style.
-- Moving files that already have clear ownership unless the move improves
-  discoverability.
-- Refactoring crate boundaries before fixing the top-level structure.
-
-## Suggested Order
-
-1. Move workspace crates under `crates/`.
-2. Rename the test helper directory to `test-support`.
-3. Move fixture assets to `tests/fixtures/cli/`.
-4. Move `PKGBUILD` under `packaging/arch/`.
-5. Update `README.md` with a workspace map.
-6. Merge `history-serde` into `history`.
-7. Tidy the CLI crate layout only if it still feels noisy after the above.
-8. Split human-facing examples from test-only assets more aggressively.
-
-## Expected Outcome
-
-After the “Do Now” changes:
-
-- The root will communicate the project structure more clearly.
-- Contributors will find test scenarios faster.
-- Crate responsibilities will read as intentional rather than historical.
-- Further refactors will become easier because the repository layout will no
-  longer obscure the architecture.
+- changing command names or aliases
+- redesigning CLI UX
+- rewriting command implementations outside the entry flow
+- changing output text unless required by the refactor

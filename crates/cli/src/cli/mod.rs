@@ -4,6 +4,7 @@ pub(crate) mod options;
 use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
+use color_eyre::eyre::Report;
 use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history::HistoryMode;
@@ -44,27 +45,28 @@ pub fn run() -> Result<()> {
 
     #[cfg(not(feature = "debug"))]
     if let Err(err) = result {
-        let mut command = TFMTArgs::command();
-
-        let subcommand = command.find_subcommand_mut(name);
-
-        if let Some(subcommand) = subcommand {
-            eprintln!(
-                "{}",
-                subcommand.error(ErrorKind::DisplayHelp, err.to_string())
-            );
-        } else {
-            eprintln!(
-                "{}",
-                command.error(ErrorKind::DisplayHelp, err.to_string())
-            );
-        }
+        render_cli_error(&err, name);
     }
 
     #[cfg(feature = "debug")]
     return result;
 
     Ok(())
+}
+
+fn render_cli_error(err: &Report, name: &str) {
+    let mut command = TFMTArgs::command();
+
+    let subcommand = command.find_subcommand_mut(name);
+
+    if let Some(subcommand) = subcommand {
+        eprintln!(
+            "{}",
+            subcommand.error(ErrorKind::DisplayHelp, err.to_string())
+        );
+    } else {
+        eprintln!("{}", command.error(ErrorKind::DisplayHelp, err.to_string()));
+    }
 }
 
 fn execute(args: TFMTArgs) -> Result<()> {

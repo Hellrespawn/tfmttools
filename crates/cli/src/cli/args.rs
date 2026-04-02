@@ -73,7 +73,7 @@ pub enum TFMTSubcommand {
 }
 
 impl TFMTSubcommand {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &'static str {
         match self {
             TFMTSubcommand::ClearHistory => "clear-history",
             TFMTSubcommand::ShowHistory => "history",
@@ -82,7 +82,6 @@ impl TFMTSubcommand {
             TFMTSubcommand::Undo(..) => "undo",
             TFMTSubcommand::Redo(..) => "redo",
         }
-        .to_owned()
     }
 }
 
