@@ -24,7 +24,7 @@ harness = false
 [dependencies]
 tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
-tfmttools-history-core = { path = "../history-core" }
+tfmttools-history = { path = "../history" }
 camino = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }

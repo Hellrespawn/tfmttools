@@ -3,7 +3,7 @@ use clap::error::ErrorKind;
 use color_eyre::Result;
 use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
-use tfmttools_history_core::HistoryMode;
+use tfmttools_history::HistoryMode;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;

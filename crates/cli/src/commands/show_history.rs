@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use tfmttools_history_core::LoadHistoryResult;
+use tfmttools_history::LoadHistoryResult;
 
 use crate::history::{
     HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,

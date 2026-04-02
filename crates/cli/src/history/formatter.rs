@@ -5,7 +5,7 @@ use tfmttools_core::action::Action;
 use tfmttools_core::history::{
     ActionRecord, ActionRecordMetadata, TemplateMetadata,
 };
-use tfmttools_history_core::History;
+use tfmttools_history::History;
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 

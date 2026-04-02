@@ -9,7 +9,7 @@ use tfmttools_fs::{
     ActionHandler, PathIterator, PathIteratorOptions, get_file_checksum,
     get_longest_common_prefix,
 };
-use tfmttools_history_core::{History, HistoryError};
+use tfmttools_history::{History, HistoryError};
 use tracing::{debug, info, trace};
 
 use super::RenameContext;

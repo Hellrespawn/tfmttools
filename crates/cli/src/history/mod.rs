@@ -5,7 +5,7 @@ pub use formatter::{HistoryFormat, HistoryFormatter, HistoryPrefix};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
-use tfmttools_history_core::{History, LoadHistoryResult};
+use tfmttools_history::{History, LoadHistoryResult};
 use tracing::debug;
 
 pub fn load_history(

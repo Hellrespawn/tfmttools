@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is a Rust workspace. The CLI entry point lives in `tfmttools-cli/` and builds the `tfmt` binary from `src/main.rs`. Core rename logic is in `tfmttools-core/`, filesystem helpers are in `tfmttools-fs/`, and history support is split between `tfmttools-history-core/` and `tfmttools-history-serde/`. Shared test utilities and fixture-driven integration data live in `tfmttools-test/`. Example templates are under `examples/`; test fixtures are under `tfmttools-test/testdata/`.
+This repository is a Rust workspace. The CLI entry point lives in `tfmttools-cli/` and builds the `tfmt` binary from `src/main.rs`. Core rename logic is in `tfmttools-core/`, filesystem helpers are in `tfmttools-fs/`, and history support is in `tfmttools-history/`. Shared test utilities and fixture-driven integration data live in `tfmttools-test/`. Example templates are under `examples/`; test fixtures are under `tfmttools-test/testdata/`.
 
 ## Build, Test, and Development Commands
 Use Cargo from the workspace root.

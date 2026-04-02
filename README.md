@@ -22,7 +22,7 @@ The workspace is split by responsibility:
   processing.
 - `crates/fs/` applies rename plans to the filesystem and provides related file
   handling helpers.
-- `crates/history-core/` contains the history data model and the concrete
+- `crates/history/` contains the history data model and the concrete
   serde-backed history storage used by the CLI.
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
   integration tests.

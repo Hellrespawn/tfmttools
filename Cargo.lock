@@ -1177,7 +1177,7 @@ dependencies = [
  "textwrap",
  "tfmttools-core",
  "tfmttools-fs",
- "tfmttools-history-core",
+ "tfmttools-history",
  "tfmttools-test",
  "tracing",
  "tracing-appender",
@@ -1195,7 +1195,7 @@ dependencies = [
  "minijinja",
  "serde",
  "serde_json",
- "tfmttools-history-core",
+ "tfmttools-history",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -1218,7 +1218,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tfmttools-history-core"
+name = "tfmttools-history"
 version = "0.23.1"
 dependencies = [
  "camino",

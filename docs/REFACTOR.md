@@ -26,7 +26,7 @@ crates/
   cli/
   core/
   fs/
-  history-core/
+  history/
   test-support/
 tests/
   fixtures/
@@ -51,7 +51,7 @@ Current root layout is dominated by:
 - `tfmttools-cli/`
 - `tfmttools-core/`
 - `tfmttools-fs/`
-- `tfmttools-history-core/`
+- `tfmttools-history/`
 - `tfmttools-test/`
 
 Recommended directory layout:
@@ -59,7 +59,7 @@ Recommended directory layout:
 - `crates/cli/`
 - `crates/core/`
 - `crates/fs/`
-- `crates/history-core/`
+- `crates/history/`
 - `crates/test-support/`
 
 Notes:
@@ -143,11 +143,11 @@ This is cheap and removes much of the cognitive overhead of the current layout.
 These changes may be worthwhile, but they should follow layout cleanup rather
 than precede it.
 
-### ~~6. Reassess the `history-core` and `history-serde` split~~
+### ~~6. Reassess the `history` and `history-serde` split~~
 
 Execution:
 
-Merged into `crates/history-core/`. The generic abstraction layer was removed
+Merged into `crates/history/`. The generic abstraction layer was removed
 and the serde-backed file storage now lives directly in that crate.
 
 ### 7. Simplify the CLI crate’s internal layout
@@ -220,7 +220,7 @@ Avoid:
 3. Move fixture assets to `tests/fixtures/cli/`.
 4. Move `PKGBUILD` under `packaging/arch/`.
 5. Update `README.md` with a workspace map.
-6. Merge `history-serde` into `history-core`.
+6. Merge `history-serde` into `history`.
 7. Tidy the CLI crate layout only if it still feels noisy after the above.
 8. Split human-facing examples from test-only assets more aggressively.
 

@@ -2,7 +2,7 @@ use color_eyre::Result;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
 use tfmttools_fs::{ActionHandler, FsHandler};
-use tfmttools_history_core::{
+use tfmttools_history::{
     History, HistoryMode, LoadHistoryResult, RecordState,
 };
 

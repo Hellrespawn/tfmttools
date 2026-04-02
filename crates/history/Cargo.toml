@@ -1,5 +1,5 @@
 [package]
-name = "tfmttools-history-core"
+name = "tfmttools-history"
 
 authors.workspace = true
 edition.workspace = true

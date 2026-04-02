@@ -7,7 +7,7 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
 use tfmttools_core::templates::Template;
 use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
-use tfmttools_history_core::{History, LoadHistoryResult};
+use tfmttools_history::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
 use super::RenameContext;
