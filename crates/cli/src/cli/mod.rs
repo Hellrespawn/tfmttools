@@ -12,6 +12,7 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt, registry};
 
+pub(crate) use self::args::RenameArgs;
 use self::args::TFMTArgs;
 pub use self::options::{
     ConfirmMode, DisplayMode, RenameOptions, TFMTOptions, TemplateOption,

@@ -77,7 +77,7 @@ Expected result:
 - less duplication in dispatch
 - fewer chances for the two commands to drift apart accidentally
 
-### 3. Move Rename Setup Into a Constructor
+### ~~3. Move Rename Setup Into a Constructor~~
 
 The rename branch currently constructs:
 

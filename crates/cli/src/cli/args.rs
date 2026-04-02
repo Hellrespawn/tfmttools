@@ -2,16 +2,16 @@ use camino::Utf8PathBuf;
 use clap::{Args, Command, CommandFactory, Parser, Subcommand};
 use color_eyre::Result;
 use tfmttools_fs::FileOrName;
-use tfmttools_fs::{FsHandler, PathIteratorOptions};
+use tfmttools_fs::FsHandler;
 use tfmttools_history::HistoryMode;
 use tracing::debug;
 
-use super::{ConfirmMode, RenameOptions, TFMTOptions};
+use super::{ConfirmMode, TFMTOptions};
 use crate::commands::{
     RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
     show_history,
 };
-use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
+use tfmttools_core::util::Utf8Directory;
 use crate::ui::PreviewListSize;
 
 #[derive(Parser, Debug)]
@@ -100,20 +100,11 @@ impl TFMTSubcommand {
                 list_templates(&template_directory)?;
             },
             TFMTSubcommand::Rename(rename_args) => {
-                let rename_options =
-                    RenameOptions::try_from((rename_args, app_options))?;
-
-                let path_iterator_options = PathIteratorOptions::with_depth(
-                    rename_options.input_directory().as_path(),
-                    rename_options.recursion_depth(),
-                );
-
-                let rename_context = RenameContext::new(
+                let rename_context = RenameContext::try_from_args(
                     fs_handler,
-                    &path_iterator_options,
                     app_options,
-                    &rename_options,
-                );
+                    rename_args,
+                )?;
 
                 rename(&rename_context)?;
             },

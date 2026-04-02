@@ -186,7 +186,7 @@ fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
         "Gathered files.",
     );
 
-    let file_paths = PathIterator::new(context.path_iterator_options())
+    let file_paths = PathIterator::new(&context.path_iterator_options())
         .flatten()
         .inspect(|_| spinner.inc_total())
         .filter(|path| AudioFile::path_predicate(path))
