@@ -1,6 +1,6 @@
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 
-use crate::options::{RenameOptions, TFMTOptions};
+use crate::cli::{RenameOptions, TFMTOptions};
 
 #[derive(Debug)]
 pub struct RenameContext<'rc> {

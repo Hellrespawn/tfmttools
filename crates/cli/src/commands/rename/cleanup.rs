@@ -13,9 +13,8 @@ use tfmttools_history::{History, HistoryError};
 use tracing::{debug, info, trace};
 
 use super::RenameContext;
-use crate::options::ConfirmMode;
-use crate::term::current_dir_utf8;
-use crate::ui::{ConfirmationPrompt, PreviewList};
+use crate::cli::ConfirmMode;
+use crate::ui::{ConfirmationPrompt, PreviewList, current_dir_utf8};
 
 const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 

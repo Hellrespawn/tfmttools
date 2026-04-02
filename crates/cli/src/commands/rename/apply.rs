@@ -6,9 +6,10 @@ use tfmttools_core::util::{Utf8File, Utf8PathExt};
 use tracing::trace;
 
 use super::{RenameContext, RenameResult};
-use crate::options::ConfirmMode;
-use crate::term::current_dir_utf8;
-use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, ProgressBar};
+use crate::cli::ConfirmMode;
+use crate::ui::{
+    ConfirmationPrompt, ItemName, PreviewList, ProgressBar, current_dir_utf8,
+};
 
 pub fn apply_actions(
     context: &RenameContext,

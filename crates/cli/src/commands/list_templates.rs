@@ -4,7 +4,7 @@ use tfmttools_core::templates::Template;
 use tfmttools_core::util::Utf8Directory;
 use tfmttools_fs::TemplateLoader;
 
-use crate::term::terminal_width;
+use crate::ui::terminal_width;
 
 pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
     let loader = TemplateLoader::read_directory(template_directory)?;

@@ -164,16 +164,77 @@ Current CLI sources are spread across:
 
 This is not wrong, but it is slightly diffuse for the current codebase size.
 
+The main issue is not file count, it is that the current split mixes three
+different concerns at the crate root:
+
+- command-line surface definition (`args.rs`, `options.rs`)
+- application orchestration (`cli.rs`, `commands/`)
+- terminal output and interaction (`term.rs`, `ui/`, parts of `history/`)
+
+That makes the crate a bit harder to scan than it needs to be. A contributor
+trying to answer a simple question like “where does this command parse its
+flags?” or “where is history rendered?” has to bounce between several root
+modules before the structure becomes obvious.
+
 Possible cleanup options:
 
 - Merge `args.rs` and `options.rs` into a single argument-parsing area.
 - Group presentation concerns under a clearer `ui/` or `presentation/` module.
 - Keep command wiring and execution under `commands/`.
 
+A reasonable end state would be something like:
+
+- `src/cli/`
+- `src/cli/args.rs`
+- `src/cli/options.rs`
+- `src/cli/mod.rs`
+- `src/commands/`
+- `src/ui/`
+- `src/history/`
+
+Or, if the crate stays small, an even simpler variant:
+
+- `src/args.rs`
+- `src/commands/`
+- `src/ui/`
+- `src/history/`
+- remove `cli.rs` and `term.rs` by folding them into the most obvious owners
+
+The important part is not the exact directory names. The important part is that
+the root should communicate a small number of stable concepts:
+
+- parse input
+- execute commands
+- render output
+- manage history-specific behavior
+
+If that is obvious from `src/`, the internal layout is good enough.
+
+What not to do:
+
+- Do not create extra layers like `application/`, `domain/`, or `services/`
+  unless the CLI actually grows into those responsibilities.
+- Do not split every command into its own micro-module tree if the command
+  remains small.
+- Do not move files just to eliminate a root-level `.rs` file; the move should
+  improve discoverability, not satisfy symmetry.
+
+Signs that this refactor is justified:
+
+- new contributors regularly open the wrong module first
+- command-specific code starts leaking presentation details across modules
+- `cli.rs` becomes a generic dumping ground for setup and dispatch logic
+- `term.rs` and `ui/` begin to overlap in responsibility
+- adding a new subcommand requires touching too many unrelated files
+
 Recommendation:
 
 - Do not refactor this until there is friction in everyday development.
 - If touched, prefer small naming and grouping improvements over a full rewrite.
+- Start by choosing one seam to clarify, usually argument parsing or terminal
+  presentation, and stop once the crate reads more cleanly.
+- Treat this as a maintenance refactor, not an architecture project. It should
+  reduce navigation cost without changing behavior.
 
 ### 8. Split human-facing examples from test-only assets more aggressively
 

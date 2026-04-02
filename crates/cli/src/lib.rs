@@ -1,11 +1,7 @@
-mod args;
+pub mod cli;
 mod commands;
 mod history;
-mod options;
-mod term;
 mod ui;
-
-pub mod cli;
 
 pub const PKG_NAME: &str = "tfmttools";
 

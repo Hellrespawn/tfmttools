@@ -88,8 +88,6 @@ fn load_data() -> Result<Vec<(String, TestCaseData)>> {
     } else {
         Ok(cases)
     }
-
-
 }
 fn run_test_case(
     test_case_name: String,

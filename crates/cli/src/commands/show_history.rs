@@ -1,10 +1,10 @@
 use color_eyre::Result;
 use tfmttools_history::LoadHistoryResult;
 
+use crate::cli::TFMTOptions;
 use crate::history::{
     HistoryFormat, HistoryFormatter, HistoryPrefix, load_history,
 };
-use crate::options::TFMTOptions;
 
 pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
     let formatter = get_history_formatter(app_options.verbosity());

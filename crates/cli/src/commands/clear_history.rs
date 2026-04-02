@@ -2,8 +2,8 @@ use color_eyre::Result;
 use tfmttools_core::util::FSMode;
 use tfmttools_history::LoadHistoryResult;
 
+use crate::cli::TFMTOptions;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
-use crate::options::TFMTOptions;
 use crate::ui::ConfirmationPrompt;
 
 pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {

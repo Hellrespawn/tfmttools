@@ -6,9 +6,8 @@ use tfmttools_core::util::{
 };
 use tfmttools_fs::FileOrName;
 
-use crate::args::{RenameArgs, TFMTArgs, TemplateArgs};
-use crate::term::{current_dir_utf8, terminal_height};
-use crate::ui::PreviewListSize;
+use crate::cli::args::{RenameArgs, TFMTArgs, TemplateArgs};
+use crate::ui::{PreviewListSize, current_dir_utf8, terminal_height};
 
 const BIN_DIRECTORY_NAME: &str = "trash";
 const DEFAULT_RECURSION_DEPTH: usize = 4;
@@ -39,30 +38,37 @@ pub struct TFMTOptions {
 }
 
 impl TFMTOptions {
+    #[must_use]
     pub fn config_directory(&self) -> &Utf8Directory {
         &self.config_directory
     }
 
+    #[must_use]
     pub fn fs_mode(&self) -> FSMode {
         self.fs_mode
     }
 
+    #[must_use]
     pub fn display_mode(&self) -> DisplayMode {
         self.display_mode
     }
 
+    #[must_use]
     pub fn confirm_mode(&self) -> ConfirmMode {
         self.confirm_mode
     }
 
+    #[must_use]
     pub fn preview_list_size(&self) -> PreviewListSize {
         self.preview_list_size
     }
 
+    #[must_use]
     pub fn verbosity(&self) -> u8 {
         self.verbosity
     }
 
+    #[must_use]
     pub fn run_id(&self) -> &str {
         &self.run_id
     }
@@ -166,30 +172,37 @@ pub struct RenameOptions {
 }
 
 impl RenameOptions {
+    #[must_use]
     pub fn input_directory(&self) -> &Utf8Directory {
         &self.input_directory
     }
 
+    #[must_use]
     pub fn template_directory(&self) -> &Utf8Directory {
         &self.template_directory
     }
 
+    #[must_use]
     pub fn bin_directory(&self) -> &Utf8Directory {
         &self.bin_directory
     }
 
+    #[must_use]
     pub fn recursion_depth(&self) -> usize {
         self.recursion_depth
     }
 
+    #[must_use]
     pub fn move_mode(&self) -> MoveMode {
         self.move_mode
     }
 
+    #[must_use]
     pub fn template_option(&self) -> &TemplateOption {
         &self.template_option
     }
 
+    #[must_use]
     pub fn arguments(&self) -> &[String] {
         &self.arguments
     }

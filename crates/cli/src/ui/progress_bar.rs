@@ -1,7 +1,7 @@
 use indicatif::{ProgressBar as IndicatifProgressBar, ProgressStyle};
 
-use crate::options::DisplayMode;
-use crate::term::{hide_cursor, show_cursor};
+use crate::cli::DisplayMode;
+use crate::ui::{hide_cursor, show_cursor};
 
 pub struct ProgressBar {
     inner: Option<IndicatifProgressBar>,

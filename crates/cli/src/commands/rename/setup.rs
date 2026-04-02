@@ -11,9 +11,8 @@ use tfmttools_history::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
 use super::RenameContext;
-use crate::options::TemplateOption;
-use crate::term::current_dir_utf8;
-use crate::ui::ProgressBar;
+use crate::cli::TemplateOption;
+use crate::ui::{ProgressBar, current_dir_utf8};
 
 pub fn create_actions(
     context: &RenameContext,

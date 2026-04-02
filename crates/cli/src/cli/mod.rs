@@ -1,3 +1,6 @@
+mod args;
+pub(crate) mod options;
+
 use chrono::Local;
 use clap::error::ErrorKind;
 use color_eyre::Result;
@@ -10,18 +13,20 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt, registry};
 
-use crate::args::{TFMTArgs, TFMTSubcommand};
+use self::args::{TFMTArgs, TFMTSubcommand};
+pub use self::options::{
+    ConfirmMode, DisplayMode, RenameOptions, TFMTOptions, TemplateOption,
+};
 use crate::commands::{
     RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
     show_history,
 };
-use crate::options::{ConfirmMode, RenameOptions, TFMTOptions};
-use crate::term::show_cursor;
+use crate::ui::show_cursor;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
 /// Main entrypoint for tfmttools
-pub fn main() -> Result<()> {
+pub fn run() -> Result<()> {
     let _guard = init_tracing();
 
     info!("Initialized tracing.");
@@ -35,7 +40,7 @@ pub fn main() -> Result<()> {
 
     let name = args.command.name();
 
-    let result = run(args);
+    let result = execute(args);
 
     #[cfg(not(feature = "debug"))]
     if let Err(err) = result {
@@ -62,7 +67,7 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn run(args: TFMTArgs) -> Result<()> {
+fn execute(args: TFMTArgs) -> Result<()> {
     if args.dry_run {
         println!("Doing dry run. No files will be modified.");
     }

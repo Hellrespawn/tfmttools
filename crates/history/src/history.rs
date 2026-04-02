@@ -250,11 +250,12 @@ where
     }
 
     fn deserialize_self(bytes: &[u8], path: &Utf8Path) -> Result<Self> {
-        let mut history: Self = serde_json::from_slice(bytes).map_err(|source| {
-            HistoryError::LoadError(format!(
-                "Unable to deserialize history: {source}"
-            ))
-        })?;
+        let mut history: Self =
+            serde_json::from_slice(bytes).map_err(|source| {
+                HistoryError::LoadError(format!(
+                    "Unable to deserialize history: {source}"
+                ))
+            })?;
 
         history.path = path.to_owned();
 
