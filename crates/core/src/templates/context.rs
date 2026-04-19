@@ -51,7 +51,7 @@ impl AudioFileContext {
         value.to_owned()
     }
 
-    fn read_value(&self, key: &ItemKey) -> Option<String> {
+    fn read_value(&self, key: ItemKey) -> Option<String> {
         let tag = self
             .audio_file
             .tag()
@@ -68,7 +68,7 @@ impl AudioFileContext {
         tag
     }
 
-    fn get_value_for_item_key(&self, key: &ItemKey) -> Option<Value> {
+    fn get_value_for_item_key(&self, key: ItemKey) -> Option<Value> {
         let string = self.process_value(self.read_value(key)?);
 
         if let Ok(number) = string.parse::<usize>() {
@@ -93,7 +93,7 @@ impl AudioFileContext {
         }
     }
 
-    fn get_current(&self, key: &ItemKey) -> Option<Value> {
+    fn get_current(&self, key: ItemKey) -> Option<Value> {
         let tag = self.read_value(key)?;
 
         let (current, _) = Self::parse_number_with_optional_total(&tag)?;
@@ -101,7 +101,7 @@ impl AudioFileContext {
         Some(current.into())
     }
 
-    fn get_total(&self, key: &ItemKey) -> Option<Value> {
+    fn get_total(&self, key: ItemKey) -> Option<Value> {
         let tag = self.read_value(key)?;
 
         let total = Self::parse_number_with_optional_total(&tag)?.1?;
@@ -110,10 +110,10 @@ impl AudioFileContext {
     }
 
     fn get_date(&self) -> Option<Value> {
-        self.get_value_for_item_key(&ItemKey::RecordingDate)
-            .or_else(|| self.get_value_for_item_key(&ItemKey::Year))
+        self.get_value_for_item_key(ItemKey::RecordingDate)
+            .or_else(|| self.get_value_for_item_key(ItemKey::Year))
             .or_else(|| {
-                self.get_value_for_item_key(&ItemKey::OriginalReleaseDate)
+                self.get_value_for_item_key(ItemKey::OriginalReleaseDate)
             })
     }
 }

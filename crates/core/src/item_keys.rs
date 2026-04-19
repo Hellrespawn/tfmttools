@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use convert_case::{Case, Casing};
+use convert_case_extras::is_case;
 use lofty::tag::ItemKey;
 
 use crate::error::{TFMTError, TFMTResult};
@@ -14,9 +15,10 @@ impl ItemKeys {
         &ITEM_KEYS
     }
 
-    pub fn from_string(string: &str) -> TFMTResult<&'static ItemKey> {
+    pub fn from_string(string: &str) -> TFMTResult<ItemKey> {
         STRING_TO_ITEM_KEY_MAP
             .get(string)
+            .copied()
             .ok_or(TFMTError::UnknownTag(string.to_owned()))
     }
 }
@@ -35,21 +37,21 @@ static STRING_TO_ITEM_KEY_MAP: LazyLock<HashMap<String, ItemKey>> =
         for key in ITEM_KEYS {
             let pascal_case = format!("{key:?}");
 
-            insert_case(&pascal_case, &key, &mut map);
+            insert_case(&pascal_case, key, &mut map);
         }
 
-        insert_case("Album", &ItemKey::AlbumTitle, &mut map);
-        insert_case("Artist", &ItemKey::TrackArtist, &mut map);
-        insert_case("AlbumSort", &ItemKey::AlbumTitleSortOrder, &mut map);
-        insert_case("DiskNumber", &ItemKey::DiscNumber, &mut map);
-        insert_case("Title", &ItemKey::TrackTitle, &mut map);
+        insert_case("Album", ItemKey::AlbumTitle, &mut map);
+        insert_case("Artist", ItemKey::TrackArtist, &mut map);
+        insert_case("AlbumSort", ItemKey::AlbumTitleSortOrder, &mut map);
+        insert_case("DiskNumber", ItemKey::DiscNumber, &mut map);
+        insert_case("Title", ItemKey::TrackTitle, &mut map);
 
         map
     });
 
 fn insert_case(
     pascal_case: &str,
-    key: &ItemKey,
+    key: ItemKey,
     map: &mut HashMap<String, ItemKey>,
 ) {
     let pascal_case = match pascal_case {
@@ -58,7 +60,7 @@ fn insert_case(
     };
 
     assert!(
-        pascal_case.is_case(Case::Pascal),
+        is_case(&pascal_case, Case::Pascal),
         "Key '{pascal_case}' is not pascal case!",
     );
 
@@ -76,7 +78,7 @@ fn insert_case(
             }
         }
 
-        map.insert(new_case, key.to_owned());
+        map.insert(new_case, key);
     }
 }
 
@@ -92,7 +94,7 @@ const CASES: [Case; 9] = [
     Case::UpperFlat,
 ];
 
-const ITEM_KEYS: [ItemKey; 102] = [
+const ITEM_KEYS: [ItemKey; 100] = [
     // Titles
     ItemKey::AlbumTitle,
     ItemKey::SetSubtitle,
@@ -123,7 +125,6 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::Lyricist,
     ItemKey::MixDj,
     ItemKey::MixEngineer,
-    ItemKey::MusicianCredits,
     ItemKey::Performer,
     ItemKey::Producer,
     ItemKey::Publisher,
@@ -214,7 +215,6 @@ const ITEM_KEYS: [ItemKey; 102] = [
     ItemKey::FlagCompilation,
     ItemKey::FlagPodcast,
     // File Information
-    ItemKey::FileType,
     ItemKey::FileOwner,
     ItemKey::TaggingTime,
     ItemKey::Length,

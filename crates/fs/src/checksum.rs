@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use std::io::Read;
 
-use adler::Adler32;
+use adler2::Adler32;
 use camino::Utf8Path;
 use tfmttools_core::error::{TFMTError, TFMTResult};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};

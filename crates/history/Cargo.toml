@@ -11,7 +11,7 @@ homepage.workspace = true
 version.workspace = true
 
 [dependencies]
-camino = { workspace = true, features = ["serde", "serde1"] }
+camino = { workspace = true, features = ["serde1"] }
 chrono = { workspace = true, features = ["serde"] }
 fs-err = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
