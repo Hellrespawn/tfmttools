@@ -36,7 +36,6 @@ pub fn run() -> Result<()> {
 
     let name = args.command.name();
 
-
     if args.dry_run {
         println!("Doing dry run. No files will be modified.");
     }

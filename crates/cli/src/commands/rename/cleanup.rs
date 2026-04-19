@@ -162,7 +162,6 @@ fn get_remaining_files_and_directories(
         .collect::<Vec<_>>();
 
     let remaining = PathIterator::new(&options)
-        // .rev()
         .filter_ok(|path| !unchanged_paths.contains(path))
         .collect::<TFMTResult<Vec<_>>>()?;
 
@@ -173,8 +172,6 @@ fn get_remaining_files_and_directories(
         files.into_iter().map(Utf8File::new_unchecked).collect(),
         folders.into_iter().map(Utf8Directory::new_unchecked).collect(),
     ))
-
-    // Ok(remaining)
 }
 
 fn file_is_safe_to_delete(path: &Utf8File) -> bool {

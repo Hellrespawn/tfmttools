@@ -26,7 +26,7 @@ visible behavior.
 
 These changes are small, local, and should be done first.
 
-### 1. Fix obviously accidental complexity
+### ~~1. Fix obviously accidental complexity~~
 
 - Fix the template description parser in
   [crates/fs/src/template.rs](/home/stef/projects/rust/tfmttools/crates/fs/src/template.rs#L98).
@@ -39,7 +39,7 @@ These changes are small, local, and should be done first.
   - unused interpolation modes in
     [crates/core/src/templates/context.rs](/home/stef/projects/rust/tfmttools/crates/core/src/templates/context.rs#L12)
 
-### 2. Tighten read-only APIs
+### ~~2. Tighten read-only APIs~~
 
 - Change read-only history methods in
   [crates/history/src/history.rs](/home/stef/projects/rust/tfmttools/crates/history/src/history.rs#L129)

@@ -126,12 +126,12 @@ where
         Ok(())
     }
 
-    pub fn get_previous_record(&mut self) -> Result<Option<Record<A, M>>> {
+    pub fn get_previous_record(&self) -> Result<Option<Record<A, M>>> {
         Ok(self.records.last().cloned())
     }
 
     pub fn get_records_to_undo(
-        &mut self,
+        &self,
         amount: Option<usize>,
     ) -> Result<Vec<Record<A, M>>> {
         let iter = self
@@ -153,7 +153,7 @@ where
     }
 
     pub fn get_records_to_redo(
-        &mut self,
+        &self,
         amount: Option<usize>,
     ) -> Result<Vec<Record<A, M>>> {
         let iter = self
@@ -172,24 +172,24 @@ where
     }
 
     pub fn get_n_records_to_undo(
-        &mut self,
+        &self,
         amount: usize,
     ) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_undo(Some(amount))
     }
 
     pub fn get_n_records_to_redo(
-        &mut self,
+        &self,
         amount: usize,
     ) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_redo(Some(amount))
     }
 
-    pub fn get_all_records_to_undo(&mut self) -> Result<Vec<Record<A, M>>> {
+    pub fn get_all_records_to_undo(&self) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_undo(None)
     }
 
-    pub fn get_all_records_to_redo(&mut self) -> Result<Vec<Record<A, M>>> {
+    pub fn get_all_records_to_redo(&self) -> Result<Vec<Record<A, M>>> {
         self.get_records_to_redo(None)
     }
 
@@ -235,7 +235,8 @@ where
         Ok(())
     }
 
-    pub fn is_empty(&mut self) -> bool {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 

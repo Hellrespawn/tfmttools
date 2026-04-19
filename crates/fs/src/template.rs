@@ -97,7 +97,7 @@ impl<'tl> TemplateLoader<'tl> {
 
     fn description(template: &minijinja::Template) -> Option<String> {
         const COMMENT_START: &str = "{#";
-        const COMMENT_END: &str = "{#";
+        const COMMENT_END: &str = "#}";
 
         let source = template.source();
 

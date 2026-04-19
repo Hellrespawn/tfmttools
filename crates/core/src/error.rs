@@ -23,6 +23,9 @@ pub enum TFMTError {
     #[error("File is too big for checksum: {0}")]
     FileTooLargeError(Utf8PathBuf),
 
+    #[error("Interpolated value contains a forbidden character: '{0}'")]
+    ForbiddenCharacterError(String),
+
     // Passthrough errors
     #[error(transparent)]
     Camino(#[from] camino::FromPathBufError),

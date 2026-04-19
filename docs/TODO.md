@@ -2,9 +2,11 @@
 
 ## Backlog
 
+- [ ] Fix(?) encoding of German characters
+- [ ] Add some sort of strict interpolation of forbidden characters.
 - [ ] Separate type for rename actions and applied actions
 
-- [ ] Handle in-situ renaming of files
+- [ ] Handle in-situ renaming of files better
 
 - [ ] Do test with interactive app?
 - [ ] Some sort of transactions mechanism?
@@ -12,7 +14,6 @@
 - [ ] Add year to singles?
 - [ ] Standardize use of date/year?
 - [ ] Replace custom history format with SQLite?
-      ~~This doesn't want to work, because the current rust implementation requires getting references to Records, whereas you can't return a reference to data returned from SQLite (it's owned).~~
 
   This is now fixed
 

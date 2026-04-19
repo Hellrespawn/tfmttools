@@ -14,7 +14,6 @@ use crate::item_keys::ItemKeys;
 pub enum InterpolationMode {
     Normal,
     Safe,
-    Strict,
 }
 
 #[derive(Debug)]
@@ -29,12 +28,10 @@ impl AudioFileContext {
         Self { audio_file, arguments, mode: InterpolationMode::Safe }
     }
 
-    fn process_mode(&self, value: String) -> String {
+    fn process_value(&self, value: String) -> String {
         match self.mode {
             InterpolationMode::Normal => value,
             InterpolationMode::Safe => Self::remove_forbidden_characters(value),
-
-            InterpolationMode::Strict => unimplemented!(),
         }
     }
 
@@ -72,7 +69,7 @@ impl AudioFileContext {
     }
 
     fn get_value_for_item_key(&self, key: &ItemKey) -> Option<Value> {
-        let string = self.process_mode(self.read_value(key)?);
+        let string = self.process_value(self.read_value(key)?);
 
         if let Ok(number) = string.parse::<usize>() {
             Some(number.into())

@@ -1,8 +1,8 @@
 use camino::Utf8PathBuf;
 use clap::{Args, Command, CommandFactory, Parser, Subcommand};
 use color_eyre::Result;
-use tfmttools_fs::FileOrName;
-use tfmttools_fs::FsHandler;
+use tfmttools_core::util::Utf8Directory;
+use tfmttools_fs::{FileOrName, FsHandler};
 use tfmttools_history::HistoryMode;
 use tracing::debug;
 
@@ -11,7 +11,6 @@ use crate::commands::{
     RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
     show_history,
 };
-use tfmttools_core::util::Utf8Directory;
 use crate::ui::PreviewListSize;
 
 #[derive(Parser, Debug)]
@@ -109,10 +108,18 @@ impl TFMTSubcommand {
                 rename(&rename_context)?;
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
-                undo_redo_args.run(HistoryMode::Undo, app_options, fs_handler)?;
+                undo_redo_args.run(
+                    HistoryMode::Undo,
+                    app_options,
+                    fs_handler,
+                )?;
             },
             TFMTSubcommand::Redo(undo_redo_args) => {
-                undo_redo_args.run(HistoryMode::Redo, app_options, fs_handler)?;
+                undo_redo_args.run(
+                    HistoryMode::Redo,
+                    app_options,
+                    fs_handler,
+                )?;
             },
             TFMTSubcommand::ShowHistory => {
                 show_history(app_options)?;

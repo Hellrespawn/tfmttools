@@ -1,3 +1,7 @@
+#![warn(clippy::pedantic)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+
 mod action;
 mod checksum;
 mod file_or_name;

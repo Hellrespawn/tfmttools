@@ -20,7 +20,10 @@ impl<'rc> RenameContext<'rc> {
         Ok(Self {
             fs_handler,
             app_options,
-            rename_options: RenameOptions::try_from((rename_args, app_options))?,
+            rename_options: RenameOptions::try_from((
+                rename_args,
+                app_options,
+            ))?,
         })
     }
 

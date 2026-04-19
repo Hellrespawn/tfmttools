@@ -78,8 +78,6 @@ fn move_files_iter(
             Ok(applied_actions)
         })
         .flatten_ok();
-    // let move_files_iter =
-    //     MoveFilesIter::new(rename_actions.into_iter(), handler).flatten_ok();
 
     make_dir_iter.chain(move_files_iter)
 }
