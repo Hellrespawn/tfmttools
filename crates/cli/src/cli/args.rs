@@ -13,9 +13,9 @@ use crate::commands::{
 };
 use crate::ui::PreviewListSize;
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
 /// Holds application-wide command line arguments.
+#[derive(Parser, Debug)]
+#[command(name = "tfmt", version, about, long_about = None)]
 pub struct TFMTArgs {
     /// Sets a custom configuration directory. Defaults to '~/.tfmttools'.
     #[arg(short = 'c', long = "config-directory")]

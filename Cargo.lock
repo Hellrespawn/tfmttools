@@ -1176,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-cli"
-version = "0.23.1"
+version = "0.24.0"
 dependencies = [
  "assert_fs",
  "camino",
@@ -1201,7 +1201,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-core"
-version = "0.23.1"
+version = "0.24.0"
 dependencies = [
  "camino",
  "convert_case",
@@ -1218,7 +1218,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-fs"
-version = "0.23.1"
+version = "0.24.0"
 dependencies = [
  "adler2",
  "assert_fs",
@@ -1235,7 +1235,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-history"
-version = "0.23.1"
+version = "0.24.0"
 dependencies = [
  "camino",
  "chrono",
@@ -1248,7 +1248,7 @@ dependencies = [
 
 [[package]]
 name = "tfmttools-test"
-version = "0.23.1"
+version = "0.24.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",

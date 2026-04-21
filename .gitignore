@@ -7,6 +7,7 @@
 
 # Testing
 test-conf
+/dist
 
 # PKGBUILD
 /pkg

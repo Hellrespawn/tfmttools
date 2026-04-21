@@ -79,7 +79,12 @@ pub static FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS: LazyLock<
 pub enum ValidationError<'e> {
     DoubleSeparators(&'e RenameAction),
     Collision(Vec<&'e RenameAction>),
+    CaseInsensitiveCollision(Vec<&'e RenameAction>),
     TargetExists(&'e RenameAction),
+    ReservedName {
+        action: &'e RenameAction,
+        component: &'e str,
+    },
     ForbiddenCharacterLeadingOrTrailingPathComponent {
         action: &'e RenameAction,
         component: &'e str,
@@ -111,8 +116,28 @@ impl std::fmt::Display for ValidationError<'_> {
 
                 writeln!(f, "\ttarget: {}", actions.first().unwrap().target())?;
             },
+            ValidationError::CaseInsensitiveCollision(actions) => {
+                writeln!(
+                    f,
+                    "These files evaluate to targets that differ only by case."
+                )?;
+                for action in actions {
+                    writeln!(f, "\tsource: {}", action.source())?;
+                    writeln!(f, "\ttarget: {}", action.target())?;
+                }
+            },
             ValidationError::TargetExists(action) => {
                 writeln!(f, "The target file already exists.")?;
+                write_source_and_target(f, action)?;
+            },
+            ValidationError::ReservedName {
+                action,
+                component
+            } => {
+                writeln!(
+                    f,
+                    "The '{component}'-component in the target path is a reserved Windows device name."
+                )?;
                 write_source_and_target(f, action)?;
             },
             ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent {
@@ -167,7 +192,9 @@ pub fn validate_rename_actions(
 
     errors.extend(validate_double_separators(rename_actions));
     errors.extend(validate_collisions(rename_actions));
+    errors.extend(validate_case_insensitive_collisions(rename_actions));
     errors.extend(validate_existing_files(rename_actions));
+    errors.extend(validate_reserved_names(rename_actions));
     errors.extend(
         validate_forbidden_leading_or_trailing_characters_in_path_component(
             rename_actions,
@@ -212,15 +239,91 @@ fn validate_collisions(
         .collect()
 }
 
-// Impossible to unit test, therefore not included below.
+fn validate_case_insensitive_collisions(
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
+    let mut map = HashMap::new();
+
+    for rename_action in rename_actions {
+        map.entry(case_insensitive_path_key(rename_action.target()))
+            .or_insert_with(Vec::new)
+            .push(rename_action);
+    }
+
+    map.into_values()
+        .filter(|actions| {
+            actions.len() > 1
+                && actions
+                    .iter()
+                    .map(|action| action.target().to_string())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len()
+                    > 1
+        })
+        .map(ValidationError::CaseInsensitiveCollision)
+        .collect()
+}
+
 fn validate_existing_files(
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
+    let sources =
+        rename_actions.iter().map(RenameAction::source).collect::<Vec<_>>();
+
+    rename_actions
+        .iter()
+        .filter(|m| {
+            m.target().exists()
+                && m.target() != m.source()
+                && !sources.iter().any(|source| {
+                    case_insensitive_path_key(source)
+                        == case_insensitive_path_key(m.target())
+                })
+        })
+        .map(ValidationError::TargetExists)
+        .collect()
+}
+
+fn validate_reserved_names(
     rename_actions: &'_ [RenameAction],
 ) -> Vec<ValidationError<'_>> {
     rename_actions
         .iter()
-        .filter(|m| m.target().exists() && m.target() != m.source())
-        .map(ValidationError::TargetExists)
+        .flat_map(|action| {
+            action.target().components().filter_map(|component| {
+                if let Utf8Component::Normal(component_name) = component
+                    && is_windows_reserved_name(component_name)
+                {
+                    Some(ValidationError::ReservedName {
+                        action,
+                        component: component_name,
+                    })
+                } else {
+                    None
+                }
+            })
+        })
         .collect()
+}
+
+fn is_windows_reserved_name(component_name: &str) -> bool {
+    let stem =
+        component_name.split_once('.').map_or(component_name, |(stem, _)| stem);
+    let normalized = stem.to_ascii_uppercase();
+
+    matches!(normalized.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || is_reserved_numbered_device_name(&normalized, "COM")
+        || is_reserved_numbered_device_name(&normalized, "LPT")
+}
+
+fn is_reserved_numbered_device_name(name: &str, prefix: &str) -> bool {
+    name.strip_prefix(prefix)
+        .and_then(|suffix| suffix.parse::<u8>().ok())
+        .is_some_and(|number| (1..=9).contains(&number))
+}
+
+fn case_insensitive_path_key(path: impl std::fmt::Display) -> String {
+    path.to_string().to_lowercase()
 }
 
 fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
@@ -406,6 +509,49 @@ mod test {
 
         let error = assert_single_error(&colliding);
         assert!(matches!(error, ValidationError::Collision(..)));
+    }
+
+    #[test]
+    fn test_validate_case_insensitive_collision() {
+        let colliding = [
+            RenameAction::new(
+                Utf8File::new("input/a.mp3").unwrap(),
+                Utf8File::new("music/Track.mp3").unwrap(),
+            ),
+            RenameAction::new(
+                Utf8File::new("input/b.mp3").unwrap(),
+                Utf8File::new("music/track.mp3").unwrap(),
+            ),
+        ];
+
+        let error = assert_single_error(&colliding);
+        assert!(matches!(error, ValidationError::CaseInsensitiveCollision(..)));
+    }
+
+    #[test]
+    fn test_validate_reserved_windows_names() {
+        let reserved = [
+            RenameAction::new(
+                Utf8File::new("input/a.mp3").unwrap(),
+                Utf8File::new("music/CON.mp3").unwrap(),
+            ),
+            RenameAction::new(
+                Utf8File::new("input/b.mp3").unwrap(),
+                Utf8File::new("music/NUL/track.mp3").unwrap(),
+            ),
+            RenameAction::new(
+                Utf8File::new("input/c.mp3").unwrap(),
+                Utf8File::new("music/lpt1.flac").unwrap(),
+            ),
+        ];
+
+        let errors = assert_n_errors(&reserved, 3);
+
+        assert!(
+            errors
+                .into_iter()
+                .all(|e| matches!(e, ValidationError::ReservedName { .. }))
+        );
     }
 
     #[test]

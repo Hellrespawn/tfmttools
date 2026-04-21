@@ -2,21 +2,24 @@
 
 ## Backlog
 
+- [ ] Extract rename cycle detection / case sensitive file name handling to separate files/structs.
 - [ ] Fix(?) encoding of German characters
 - [ ] Add some sort of strict interpolation of forbidden characters.
 - [ ] Separate type for rename actions and applied actions
-
 - [ ] Handle in-situ renaming of files better
-
 - [ ] Do test with interactive app?
 - [ ] Some sort of transactions mechanism?
 - [ ] Fix/warn tag with leading/trailing whitespace?
 - [ ] Add year to singles?
 - [ ] Standardize use of date/year?
+- [ ] Add shell completions to release archives?
+- [ ] Add man pages to release archives?
+- [ ] Evaluate Windows long-path mode support.
+- [ ] Test Windows behavior on network shares.
+- [ ] Test Unicode normalization behavior across supported platforms.
+- [ ] Add targeted coverage for cross-volume moves.
+- [ ] Separate build scripts for Windows?
 - [ ] Replace custom history format with SQLite?
-
-  This is now fixed
-
 - [ ] i18n?
 
 ## In progress
