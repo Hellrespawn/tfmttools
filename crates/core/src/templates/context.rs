@@ -10,29 +10,18 @@ use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
 
 #[derive(Debug)]
-#[allow(dead_code)]
-pub enum InterpolationMode {
-    Normal,
-    Safe,
-}
-
-#[derive(Debug)]
 pub struct AudioFileContext {
     audio_file: AudioFile,
     arguments: Vec<String>,
-    mode: InterpolationMode,
 }
 
 impl AudioFileContext {
     pub fn safe(audio_file: AudioFile, arguments: Vec<String>) -> Self {
-        Self { audio_file, arguments, mode: InterpolationMode::Safe }
+        Self { audio_file, arguments }
     }
 
-    fn process_value(&self, value: String) -> String {
-        match self.mode {
-            InterpolationMode::Normal => value,
-            InterpolationMode::Safe => Self::remove_forbidden_characters(value),
-        }
+    fn safe_interpolation_value(value: String) -> String {
+        Self::remove_forbidden_characters(value)
     }
 
     fn remove_forbidden_characters(value: String) -> String {
@@ -51,7 +40,7 @@ impl AudioFileContext {
         value.to_owned()
     }
 
-    fn read_value(&self, key: ItemKey) -> Option<String> {
+    fn read_raw_tag_value(&self, key: ItemKey) -> Option<String> {
         let tag = self
             .audio_file
             .tag()
@@ -68,14 +57,20 @@ impl AudioFileContext {
         tag
     }
 
-    fn get_value_for_item_key(&self, key: ItemKey) -> Option<Value> {
-        let string = self.process_value(self.read_value(key)?);
+    fn read_safe_tag_value(&self, key: ItemKey) -> Option<String> {
+        self.read_raw_tag_value(key).map(Self::safe_interpolation_value)
+    }
 
+    fn coerce_output_value(string: String) -> Value {
         if let Ok(number) = string.parse::<usize>() {
-            Some(number.into())
+            number.into()
         } else {
-            Some(string.into())
+            string.into()
         }
+    }
+
+    fn get_value_for_item_key(&self, key: ItemKey) -> Option<Value> {
+        Some(Self::coerce_output_value(self.read_safe_tag_value(key)?))
     }
 
     fn parse_number_with_optional_total(
@@ -94,7 +89,7 @@ impl AudioFileContext {
     }
 
     fn get_current(&self, key: ItemKey) -> Option<Value> {
-        let tag = self.read_value(key)?;
+        let tag = self.read_raw_tag_value(key)?;
 
         let (current, _) = Self::parse_number_with_optional_total(&tag)?;
 
@@ -102,7 +97,7 @@ impl AudioFileContext {
     }
 
     fn get_total(&self, key: ItemKey) -> Option<Value> {
-        let tag = self.read_value(key)?;
+        let tag = self.read_raw_tag_value(key)?;
 
         let total = Self::parse_number_with_optional_total(&tag)?.1?;
 
@@ -121,13 +116,13 @@ impl AudioFileContext {
 impl Object for AudioFileContext {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let field = key.as_str()?;
+        let normalized_field = field.to_lowercase();
 
-        match field {
-            "args" | "Args" | "ARGS" | "arguments" | "Arguments"
-            | "ARGUMENTS" => Some(self.arguments.clone().into()),
-            "date" | "Date" | "DATE" => self.get_date(),
+        match normalized_field.as_str() {
+            "args" | "arguments" => Some(self.arguments.clone().into()),
+            "date" => self.get_date(),
             _ => {
-                let key = ItemKeys::from_string(field).ok()?;
+                let key = ItemKeys::from_string(&normalized_field).ok()?;
 
                 match key {
                     ItemKey::DiscTotal

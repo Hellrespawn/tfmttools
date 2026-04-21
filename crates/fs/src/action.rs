@@ -1,6 +1,6 @@
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
-use tfmttools_core::util::{MoveMode, Utf8PathExt};
+use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
 use tracing::trace;
 
 use crate::fs::{FsHandler, MoveFileResult};
@@ -66,28 +66,7 @@ impl<'a> ActionHandler<'a> {
     }
 
     pub fn apply(&self, action: &Action) -> TFMTResult {
-        match action {
-            Action::MoveFile { source, target } => {
-                self.fs_handler
-                    .move_file(source.as_path(), target.as_path())?;
-            },
-
-            Action::CopyFile { source, target } => {
-                self.fs_handler
-                    .copy_file(source.as_path(), target.as_path())?;
-            },
-            Action::RemoveFile(path) => {
-                self.fs_handler.remove_file(path.as_path())?;
-            },
-            Action::MakeDir(path) => {
-                self.fs_handler.create_dir(path)?;
-            },
-            Action::RemoveDir(path) => {
-                self.fs_handler.remove_dir(path)?;
-            },
-        }
-
-        Ok(())
+        self.apply_forward(action)
     }
 
     pub fn undo(&self, action: &Action) -> TFMTResult {
@@ -96,6 +75,7 @@ impl<'a> ActionHandler<'a> {
                 self.fs_handler
                     .move_file(target.as_path(), source.as_path())?;
             },
+
             Action::CopyFile { source, target } => {
                 self.fs_handler
                     .copy_file(target.as_path(), source.as_path())?;
@@ -119,6 +99,10 @@ impl<'a> ActionHandler<'a> {
     }
 
     pub fn redo(&self, action: &Action) -> TFMTResult<()> {
+        self.apply_forward(action)
+    }
+
+    fn apply_forward(&self, action: &Action) -> TFMTResult {
         match action {
             Action::MoveFile { source, target } => {
                 self.fs_handler
@@ -141,5 +125,72 @@ impl<'a> ActionHandler<'a> {
         }
 
         Ok(())
+    }
+}
+
+pub struct ActionExecutor<'a> {
+    handler: ActionHandler<'a>,
+}
+
+impl<'a> ActionExecutor<'a> {
+    #[must_use]
+    pub fn new(fs_handler: &'a FsHandler) -> Self {
+        Self { handler: ActionHandler::new(fs_handler) }
+    }
+
+    #[must_use]
+    pub fn move_mode(mut self, move_mode: MoveMode) -> Self {
+        self.handler = self.handler.move_mode(move_mode);
+        self
+    }
+
+    pub fn apply_rename_actions(
+        &self,
+        rename_actions: Vec<RenameAction>,
+    ) -> impl Iterator<Item = TFMTResult<Action>> + '_ {
+        let make_dir_actions =
+            RenameAction::get_make_dir_actions(&rename_actions);
+
+        let make_dir_iter = make_dir_actions.into_iter().map(|action| {
+            self.handler.apply(&action)?;
+
+            Ok(action)
+        });
+
+        let move_files_iter =
+            rename_actions.into_iter().flat_map(|rename_action| {
+                match self.handler.rename(&rename_action) {
+                    Ok(actions) => actions.into_iter().map(Ok).collect(),
+                    Err(err) => vec![Err(err)],
+                }
+            });
+
+        make_dir_iter.chain(move_files_iter)
+    }
+
+    pub fn apply_actions(
+        &self,
+        actions: impl IntoIterator<Item = Action>,
+    ) -> TFMTResult<Vec<Action>> {
+        actions
+            .into_iter()
+            .map(|action| {
+                self.handler.apply(&action)?;
+
+                Ok(action)
+            })
+            .collect()
+    }
+
+    pub fn remove_directories(
+        &self,
+        directories: Vec<Utf8Directory>,
+    ) -> TFMTResult<Vec<Action>> {
+        self.apply_actions(
+            directories
+                .into_iter()
+                .rev()
+                .map(|dir| Action::RemoveDir(dir.into_path_buf())),
+        )
     }
 }

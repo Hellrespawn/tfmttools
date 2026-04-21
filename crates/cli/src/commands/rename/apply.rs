@@ -3,27 +3,27 @@ use color_eyre::eyre::eyre;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction, validate_rename_actions};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
+use tfmttools_fs::ActionExecutor;
 use tracing::trace;
 
-use super::{RenameContext, RenameResult};
-use crate::cli::ConfirmMode;
-use crate::ui::{
-    ConfirmationPrompt, ItemName, PreviewList, ProgressBar, current_dir_utf8,
-};
+use super::{ExecutionResult, RenameContext, RenamePlan};
+use crate::ui::{ItemName, PreviewList, ProgressBar, current_dir_utf8};
 
-pub fn apply_actions(
+pub fn preview(context: &RenameContext, plan: &RenamePlan) -> Result<()> {
+    validate_rename_action_errors(&plan.actions)?;
+    preview_rename_actions(context, &plan.actions, &plan.unchanged_files)
+}
+
+pub fn execute(
     context: &RenameContext,
-    rename_actions: Vec<RenameAction>,
-) -> Result<RenameResult> {
-    let (rename_actions, unchanged_files) =
-        RenameAction::separate_unchanged_destinations(rename_actions);
-
+    plan: RenamePlan,
+) -> Result<ExecutionResult> {
     // Can't apply compiler attribute to macro invocation directly.
     #[allow(unstable_name_collisions)]
     {
         trace!(
             "Unchanged paths:\n{}",
-            unchanged_files
+            plan.unchanged_files
                 .iter()
                 .map(Utf8File::to_string)
                 .intersperse("\n".to_owned())
@@ -31,23 +31,19 @@ pub fn apply_actions(
         );
     }
 
-    if rename_actions.is_empty() {
-        Ok(RenameResult::NothingToRename(unchanged_files))
+    if plan.actions.is_empty() {
+        Ok(ExecutionResult::NothingToRename(plan.unchanged_files))
     } else {
-        validate_rename_action_errors(&rename_actions)?;
-
-        preview_rename_actions(context, &rename_actions, &unchanged_files)?;
-
-        let confirmation = matches!(
-            context.app_options().confirm_mode(),
-            ConfirmMode::NoConfirm
-        ) || ConfirmationPrompt::new("Move files?")
-            .prompt()?;
+        let confirmation = super::shared::confirm(context, "Move files?")?;
 
         if confirmation {
-            match move_files(context, rename_actions) {
-                Ok(applied_actions) => {
-                    Ok(RenameResult::Ok { applied_actions, unchanged_files })
+            match move_files(context, plan.actions) {
+                Ok(actions) => {
+                    Ok(ExecutionResult::Applied {
+                        actions,
+                        unchanged_files: plan.unchanged_files,
+                        metadata: plan.metadata,
+                    })
                 },
                 Err((err, applied_actions)) => {
                     let _ = handle_error_during_move(applied_actions);
@@ -55,7 +51,7 @@ pub fn apply_actions(
                 },
             }
         } else {
-            Ok(RenameResult::Aborted)
+            Ok(ExecutionResult::Aborted)
         }
     }
 }
@@ -85,7 +81,7 @@ fn preview_rename_actions(
     let working_directory = current_dir_utf8()?;
 
     let iter = rename_actions.iter().map(|rename_action| {
-        super::strip_path_prefix(
+        super::shared::strip_path_prefix(
             rename_action.target().as_path(),
             working_directory.as_path(),
         )
@@ -118,15 +114,18 @@ fn move_files(
 
     let mut applied_actions = Vec::new();
 
-    let iter =
-        super::move_files_iter(context, rename_actions).inspect(|result| {
-            if let Ok(action) = result {
-                if action.is_rename_action() {
-                    bar.inc_found();
+    let executor = ActionExecutor::new(context.fs_handler())
+        .move_mode(context.rename_options().move_mode());
 
-                    #[cfg(feature = "debug")]
-                    crate::debug::delay();
-                }
+    let iter =
+        executor.apply_rename_actions(rename_actions).inspect(|result| {
+            if let Ok(action) = result
+                && action.is_rename_action()
+            {
+                bar.inc_found();
+
+                #[cfg(feature = "debug")]
+                crate::debug::delay();
             }
         });
 
@@ -135,7 +134,7 @@ fn move_files(
             Ok(applied_action) => applied_actions.push(applied_action),
             Err(err) => {
                 bar.finish();
-                return Err((err, applied_actions));
+                return Err((err.into(), applied_actions));
             },
         }
     }
