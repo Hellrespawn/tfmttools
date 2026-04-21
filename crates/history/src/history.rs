@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace};
 
-use crate::{HistoryError, Record, RecordState, Result};
+use crate::{HistoryError, HistoryMode, Record, RecordState, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -134,41 +134,14 @@ where
         &self,
         amount: Option<usize>,
     ) -> Result<Vec<Record<A, M>>> {
-        let iter = self
-            .records
-            .iter()
-            .rev()
-            .filter(|r| {
-                matches!(r.state(), RecordState::Applied | RecordState::Redone)
-            })
-            .cloned();
-
-        let actions = if let Some(amount) = amount {
-            iter.take(amount).collect()
-        } else {
-            iter.collect()
-        };
-
-        Ok(actions)
+        Ok(self.collect_records(HistoryMode::Undo, amount))
     }
 
     pub fn get_records_to_redo(
         &self,
         amount: Option<usize>,
     ) -> Result<Vec<Record<A, M>>> {
-        let iter = self
-            .records
-            .iter()
-            .filter(|r| matches!(r.state(), RecordState::Undone))
-            .cloned();
-
-        let actions = if let Some(amount) = amount {
-            iter.take(amount).collect()
-        } else {
-            iter.collect()
-        };
-
-        Ok(actions)
+        Ok(self.collect_records(HistoryMode::Redo, amount))
     }
 
     pub fn get_n_records_to_undo(
@@ -193,31 +166,59 @@ where
         self.get_records_to_redo(None)
     }
 
+    fn collect_records(
+        &self,
+        mode: HistoryMode,
+        amount: Option<usize>,
+    ) -> Vec<Record<A, M>> {
+        let records: Box<dyn Iterator<Item = &Record<A, M>> + '_> = match mode {
+            HistoryMode::Undo => {
+                Box::new(self.records.iter().rev().filter(|r| {
+                    matches!(
+                        r.state(),
+                        RecordState::Applied | RecordState::Redone
+                    )
+                }))
+            },
+            HistoryMode::Redo => {
+                Box::new(
+                    self.records
+                        .iter()
+                        .filter(|r| matches!(r.state(), RecordState::Undone)),
+                )
+            },
+        };
+
+        match amount {
+            Some(amount) => records.take(amount).cloned().collect(),
+            None => records.cloned().collect(),
+        }
+    }
+
     pub fn set_record_state(
         &mut self,
         mut record: Record<A, M>,
         state: RecordState,
     ) -> Result<Record<A, M>> {
         if let Some(id) = record.id() {
-            let found_records = self
+            let mut found_records = self
                 .records
                 .iter_mut()
-                .filter(|r| r.id().is_some_and(|r_id| r_id == id))
-                .collect::<Vec<_>>();
+                .filter(|r| r.id().is_some_and(|r_id| r_id == id));
 
-            if found_records.is_empty() {
-                Err(HistoryError::MutError(format!(
+            let Some(found_record) = found_records.next() else {
+                return Err(HistoryError::MutError(format!(
                     "Unable to find saved record with id {id}"
-                )))
-            } else if found_records.len() > 1 {
+                )));
+            };
+
+            if found_records.next().is_some() {
                 Err(HistoryError::MutError(format!(
                     "Found multiple saved records with id {id}"
                 )))
             } else {
                 record.set_state(state);
-                for found_record in found_records {
-                    found_record.set_state(state);
-                }
+                found_record.set_state(state);
 
                 Ok(record)
             }

@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::path::Path;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -156,29 +157,13 @@ impl FsHandler {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
-            let result = fs_err::remove_dir(path);
-
-            if let Err(io_error) = result {
-                if let Some(error_code) = io_error.raw_os_error() {
-                    #[cfg(windows)]
-                    // https://docs.microsoft.com/en-us/windows/win32/debug/system-error-codes--0-499-
-                    // 145: Directory not empty
-                    let expected_code = 145;
-
-                    // https://nuetzlich.net/errno.html
-                    // 39: Directory not empty
-                    #[cfg(unix)]
-                    let expected_code = 39;
-
-                    if error_code == expected_code {
-                        return Ok(RemoveDirResult::NotEmpty);
-                    }
-
-                    return Err(io_error.into());
-                }
+            match fs_err::remove_dir(path) {
+                Ok(()) => Ok(RemoveDirResult::Removed),
+                Err(err) if err.kind() == ErrorKind::DirectoryNotEmpty => {
+                    Ok(RemoveDirResult::NotEmpty)
+                },
+                Err(err) => Err(err.into()),
             }
-
-            Ok(RemoveDirResult::Removed)
         }
     }
 
@@ -216,24 +201,16 @@ impl FsHandler {
 }
 
 #[must_use]
-pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
-    if paths.is_empty() {
-        None
-    } else if paths.len() == 1 {
-        Some(
-            paths[0]
-                .parent()
-                .expect("File should always have parent.")
-                .to_owned(),
-        )
-    } else {
-        let mut iter = paths.iter();
+pub fn get_longest_common_prefix<'a>(
+    paths: impl IntoIterator<Item = &'a Utf8Path>,
+) -> Option<Utf8PathBuf> {
+    let mut iter = paths.into_iter();
+    let first = iter.next()?;
 
-        // We have already returned if no files were found, so this unwrap
-        // should be safe.
-        let mut common_prefix = iter.next().unwrap().to_path_buf();
+    if let Some(second) = iter.next() {
+        let mut common_prefix = first.to_path_buf();
 
-        for path in iter {
+        for path in std::iter::once(second).chain(iter) {
             let mut new_common_prefix = Utf8PathBuf::new();
 
             for (left, right) in
@@ -249,44 +226,36 @@ pub fn get_longest_common_prefix(paths: &[&Utf8Path]) -> Option<Utf8PathBuf> {
         }
 
         Some(common_prefix)
+    } else {
+        Some(
+            first.parent().expect("File should always have parent.").to_owned(),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::ErrorKind;
+
     use assert_fs::TempDir;
     use color_eyre::Result;
 
     #[test]
-    fn test_remove_dir_error_codes() -> Result<()> {
+    fn test_remove_dir_reports_not_empty() -> Result<()> {
         let tempdir = TempDir::new()?;
 
         let test_folder = tempdir.path().join("test_folder");
         let test_file = test_folder.join("test.file");
 
-        #[cfg(windows)]
-        let expected_code = 145;
-
-        #[cfg(unix)]
-        let expected_code = 39;
-
         fs_err::create_dir(&test_folder)?;
         fs_err::write(test_file, "")?;
 
         if let Err(err) = fs_err::remove_dir(test_folder) {
-            if let Some(error_code) =
-                std::io::Error::last_os_error().raw_os_error()
-            {
-                assert_eq!(
-                    error_code, expected_code,
-                    "Expected code {expected_code}, got {error_code}",
-                );
-                Ok(())
-            } else {
-                panic!("Received unexpected error:\n{err}");
-            }
+            assert_eq!(err.kind(), ErrorKind::DirectoryNotEmpty);
         } else {
-            Ok(())
+            panic!("Expected remove_dir to fail for a non-empty directory.");
         }
+
+        Ok(())
     }
 }

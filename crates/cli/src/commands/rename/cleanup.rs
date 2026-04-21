@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use camino::Utf8Path;
 use color_eyre::Result;
 use itertools::Itertools;
@@ -23,18 +25,7 @@ pub(crate) fn handle_remaining_files(
     unchanged_files: &[Utf8File],
 ) -> Result<Vec<Action>> {
     let common_prefix = get_longest_common_prefix(
-        &applied_actions
-            .iter()
-            .filter_map(|action| {
-                if let Action::MoveFile { source, .. }
-                | Action::CopyFile { source, .. } = action
-                {
-                    Some(source.as_path())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>(),
+        applied_actions.iter().filter_map(Action::source),
     );
 
     if let Some(common_prefix) = common_prefix {
@@ -70,31 +61,8 @@ pub(crate) fn handle_remaining_files(
         let cleanup_plan = plan_cleanup(remaining_items);
 
         if let Some(cleanup_plan) = cleanup_plan {
-            if cleanup_plan.requires_confirmation {
-                info!("Has files that are not safe to delete.");
-
-                println!(
-                    "Found {} remaining files.",
-                    cleanup_plan.files_to_delete.len()
-                );
-
-                preview_files_to_delete(
-                    context,
-                    &cleanup_plan.files_to_delete,
-                )?;
-
-                if !confirm_cleanup(context)? {
-                    println!("Skipping clean-up.");
-                    return Ok(applied_actions);
-                }
-            } else if !cleanup_plan.files_to_delete.is_empty() {
-                info!("Has only files that are safe to delete.");
-
-                println!("Deleted the following files:");
-                preview_files_to_delete(
-                    context,
-                    &cleanup_plan.files_to_delete,
-                )?;
+            if !prepare_cleanup(context, &cleanup_plan)? {
+                return Ok(applied_actions);
             }
 
             let confirmed_delete = cleanup_plan.requires_confirmation
@@ -146,7 +114,7 @@ fn discover_remaining_items(
     let unchanged_paths = unchanged_files
         .iter()
         .map(|f| f.to_owned().into_path_buf())
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
 
     let remaining = PathIterator::new(&options)
         .filter_ok(|path| !unchanged_paths.contains(path))
@@ -183,6 +151,34 @@ fn plan_cleanup(remaining_items: RemainingItems) -> Option<CleanupPlan> {
 
 fn file_is_safe_to_delete(path: &Utf8File) -> bool {
     path.extension().is_some_and(|ext| AUTO_DELETE_EXTENSIONS.contains(&ext))
+}
+
+fn prepare_cleanup(
+    context: &RenameContext,
+    cleanup_plan: &CleanupPlan,
+) -> Result<bool> {
+    if cleanup_plan.requires_confirmation {
+        info!("Has files that are not safe to delete.");
+
+        println!(
+            "Found {} remaining files.",
+            cleanup_plan.files_to_delete.len()
+        );
+
+        preview_files_to_delete(context, &cleanup_plan.files_to_delete)?;
+
+        if !confirm_cleanup(context)? {
+            println!("Skipping clean-up.");
+            return Ok(false);
+        }
+    } else if !cleanup_plan.files_to_delete.is_empty() {
+        info!("Has only files that are safe to delete.");
+
+        println!("Deleted the following files:");
+        preview_files_to_delete(context, &cleanup_plan.files_to_delete)?;
+    }
+
+    Ok(true)
 }
 
 fn create_rename_action(
@@ -309,18 +305,19 @@ pub(crate) fn store_history(
     } else {
         history.push(actions, metadata)?;
 
-        let result = history.save();
-
-        if matches!(result, Err(HistoryError::SaveErrorWithBackup { .. })) {
-            eprintln!("{}", result.unwrap_err());
-            Ok(())
-        } else {
-            result?;
-            println!(
-                "Saved run #{} to history.",
-                context.app_options().run_id()
-            );
-            Ok(())
+        match history.save() {
+            Err(err @ HistoryError::SaveErrorWithBackup { .. }) => {
+                eprintln!("{err}");
+            },
+            result => {
+                result?;
+                println!(
+                    "Saved run #{} to history.",
+                    context.app_options().run_id()
+                );
+            },
         }
+
+        Ok(())
     }
 }

@@ -19,7 +19,7 @@ pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
         let formatter =
             HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
 
-        println!("{}", formatter.format_history(&mut history)?);
+        println!("{}", formatter.format_history(&history)?);
 
         let confirmation =
             ConfirmationPrompt::new("Remove history file?").prompt()?;

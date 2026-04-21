@@ -5,7 +5,7 @@ use camino::Utf8Component;
 
 use crate::MAX_PATH_LENGTH;
 use crate::action::RenameAction;
-use crate::util::{Utf8File, Utf8PathExt};
+use crate::util::Utf8PathExt;
 
 pub struct ForbiddenCharacter<'f> {
     char: &'f str,
@@ -182,13 +182,12 @@ pub fn validate_rename_actions(
 fn validate_double_separators(
     rename_actions: &'_ [RenameAction],
 ) -> Vec<ValidationError<'_>> {
+    let double_separator = std::path::MAIN_SEPARATOR_STR.repeat(2);
+
     rename_actions
         .iter()
         .filter(|rename_action| {
-            rename_action
-                .target()
-                .to_string()
-                .contains(&std::path::MAIN_SEPARATOR_STR.repeat(2))
+            rename_action.target().to_string().contains(&double_separator)
         })
         .map(ValidationError::DoubleSeparators)
         .collect()
@@ -207,10 +206,10 @@ fn validate_collisions(
             .push(rename_action);
     }
 
-    let collisions: HashMap<&Utf8File, Vec<&RenameAction>> =
-        map.into_iter().filter(|(_, v)| v.len() > 1).collect();
-
-    collisions.into_values().map(ValidationError::Collision).collect()
+    map.into_values()
+        .filter(|actions| actions.len() > 1)
+        .map(ValidationError::Collision)
+        .collect()
 }
 
 // Impossible to unit test, therefore not included below.
@@ -243,17 +242,28 @@ fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
     rename_actions
         .iter()
         .flat_map(|action| {
-            action.target().components().into_iter().filter_map(|component| {
+            action.target().components().filter_map(|component| {
                 if let Utf8Component::Normal(component_name) = component {
+                    let leading = matching_characters(
+                        &forbidden_leading_characters,
+                        component_name,
+                        |component_name, character| {
+                            component_name.starts_with(character)
+                        },
+                    );
+                    let trailing = matching_characters(
+                        &forbidden_trailing_characters,
+                        component_name,
+                        |component_name, character| {
+                            component_name.ends_with(character)
+                        },
+                    );
 
-                    let leading = forbidden_leading_characters.iter().any(|c| component_name.starts_with(c));
-                    let trailing = forbidden_trailing_characters.iter().any(|c| component_name.ends_with(c));
-
-                    if leading || trailing {
+                    if !leading.is_empty() || !trailing.is_empty() {
                         Some(ValidationError::ForbiddenCharacterLeadingOrTrailingPathComponent  {
                             action,
-                            forbidden_leading_characters: if leading { Some(forbidden_leading_characters.clone()) } else { None},
-                            forbidden_trailing_characters: if trailing { Some(forbidden_trailing_characters.clone()) } else { None},
+                            forbidden_leading_characters: if leading.is_empty() { None } else { Some(leading) },
+                            forbidden_trailing_characters: if trailing.is_empty() { None } else { Some(trailing) },
                             component: component_name,
                         })
                     } else {
@@ -264,6 +274,18 @@ fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(
                 }
             })
         })
+        .collect()
+}
+
+fn matching_characters<'a>(
+    forbidden_characters: &[&'a str],
+    component_name: &str,
+    matches: impl Fn(&str, &str) -> bool,
+) -> Vec<&'a str> {
+    forbidden_characters
+        .iter()
+        .copied()
+        .filter(|character| matches(component_name, character))
         .collect()
 }
 
@@ -288,6 +310,7 @@ fn validate_target_path_too_long(
 mod test {
 
     use super::*;
+    use crate::util::Utf8File;
 
     fn assert_valid(rename_actions: &[RenameAction]) {
         assert!(validate_rename_actions(rename_actions).is_empty());

@@ -54,7 +54,7 @@ impl UndoRedoCommand {
                 Ok(())
             },
             LoadHistoryResult::Loaded => {
-                let records = self.get_records(&mut history)?;
+                let records = self.get_records(&history)?;
 
                 let amount = self.amount;
                 let actual = records.len();
@@ -92,14 +92,12 @@ impl UndoRedoCommand {
 
     fn get_records(
         &self,
-        history: &mut History<Action, ActionRecordMetadata>,
+        history: &History<Action, ActionRecordMetadata>,
     ) -> Result<Vec<ActionRecord>> {
-        let records = match self.mode {
+        Ok(match self.mode {
             HistoryMode::Undo => history.get_n_records_to_undo(self.amount)?,
             HistoryMode::Redo => history.get_n_records_to_redo(self.amount)?,
-        };
-
-        Ok(records)
+        })
     }
 
     fn confirm_undo_redo(&self, records: &[ActionRecord]) -> Result<bool> {
@@ -148,16 +146,17 @@ impl UndoRedoCommand {
                 self.formatter.format_record(&record)
             );
 
-            let actions: Vec<&Action> = match self.mode {
-                HistoryMode::Undo => record.iter().rev().collect(),
-                HistoryMode::Redo => record.iter().collect(),
-            };
-
-            for action in actions {
-                match self.mode {
-                    HistoryMode::Undo => action_handler.undo(action)?,
-                    HistoryMode::Redo => action_handler.redo(action)?,
-                }
+            match self.mode {
+                HistoryMode::Undo => {
+                    for action in record.iter().rev() {
+                        action_handler.undo(action)?;
+                    }
+                },
+                HistoryMode::Redo => {
+                    for action in record.iter() {
+                        action_handler.redo(action)?;
+                    }
+                },
             }
 
             match self.mode {

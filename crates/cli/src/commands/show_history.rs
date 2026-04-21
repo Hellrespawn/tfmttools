@@ -9,12 +9,12 @@ use crate::history::{
 pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
     let formatter = get_history_formatter(app_options.verbosity());
 
-    let (mut history, load_history_result) =
+    let (history, load_history_result) =
         load_history(&app_options.history_file_path()?)?;
 
     match load_history_result {
         LoadHistoryResult::Loaded => {
-            println!("{}", formatter.format_history(&mut history)?);
+            println!("{}", formatter.format_history(&history)?);
         },
         LoadHistoryResult::New => {
             println!("There is no history.");

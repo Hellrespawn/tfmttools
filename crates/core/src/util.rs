@@ -136,9 +136,10 @@ impl Utf8File {
         Utf8Directory::new(path).expect("Utf8File::parent should directory.")
     }
 
-    #[must_use]
-    pub fn components(&'_ self) -> Vec<Utf8Component<'_>> {
-        self.0.components().collect()
+    pub fn components(
+        &'_ self,
+    ) -> impl Iterator<Item = Utf8Component<'_>> + '_ {
+        self.0.components()
     }
 
     #[must_use]

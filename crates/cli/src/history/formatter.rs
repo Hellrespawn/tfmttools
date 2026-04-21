@@ -58,7 +58,7 @@ impl HistoryFormatter {
 
     pub fn format_history(
         &self,
-        history: &mut History<Action, ActionRecordMetadata>,
+        history: &History<Action, ActionRecordMetadata>,
     ) -> Result<String> {
         let undo = history.get_all_records_to_undo()?;
 
@@ -98,37 +98,54 @@ impl HistoryFormatter {
             None
         } else {
             let string = records
-            .iter()
-            .enumerate()
-            .map(|(i, record)| {
-                if let Some(prefix) = &self.prefix {
-                    let formatted_prefix = prefix.format(i, records.len());
-
-                    let formatted_record = self.format_record(record);
-
-                    let mut iter = formatted_record.lines();
-
-                    let mut string =
-                        format!("{formatted_prefix}{}", iter.next().unwrap());
-
-                    for line in iter {
-                        write!(
-                            string,
-                            "\n{}{}",
-                            " ".repeat(formatted_prefix.len()),
-                            line
-                        ).expect("Using write! to append to String should never fail.");
-                    }
-
-                    string
-                } else {
-                    self.format_record(record)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+                .iter()
+                .enumerate()
+                .map(|(i, record)| {
+                    self.format_record_entry(record, i, records.len())
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
             Some(string)
         }
+    }
+
+    fn format_record_entry(
+        &self,
+        record: &ActionRecord,
+        index: usize,
+        total: usize,
+    ) -> String {
+        if let Some(prefix) = &self.prefix {
+            self.format_record_with_prefix(record, prefix, index, total)
+        } else {
+            self.format_record(record)
+        }
+    }
+
+    fn format_record_with_prefix(
+        &self,
+        record: &ActionRecord,
+        prefix: &HistoryPrefix,
+        index: usize,
+        total: usize,
+    ) -> String {
+        let formatted_prefix = prefix.format(index, total);
+        let formatted_record = self.format_record(record);
+
+        let mut lines = formatted_record.lines();
+        let mut string = format!(
+            "{formatted_prefix}{}",
+            lines
+                .next()
+                .expect("format_record should not return an empty string")
+        );
+
+        for line in lines {
+            write!(string, "\n{}{}", " ".repeat(formatted_prefix.len()), line)
+                .expect("Using write! to append to String should never fail.");
+        }
+
+        string
     }
 
     pub fn format_record(&self, record: &ActionRecord) -> String {
@@ -200,56 +217,40 @@ impl std::fmt::Display for RecordSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut strings = Vec::new();
 
-        match self.mk_dir.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                strings.push("1 directory created".to_string());
-            },
-            std::cmp::Ordering::Greater => {
-                strings.push(format!("{} directories created", self.mk_dir));
-            },
-        }
-
-        match self.mv.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                strings.push("1 file moved".to_string());
-            },
-            std::cmp::Ordering::Greater => {
-                strings.push(format!("{} files moved", self.mv));
-            },
-        }
-
-        match self.cp.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                strings.push("1 file copied".to_string());
-            },
-            std::cmp::Ordering::Greater => {
-                strings.push(format!("{} files copied", self.cp));
-            },
-        }
-
-        match self.rm_file.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                strings.push("1 file removed".to_string());
-            },
-            std::cmp::Ordering::Greater => {
-                strings.push(format!("{} files removed", self.rm_file));
-            },
-        }
-
-        match self.rm_dir.cmp(&1) {
-            std::cmp::Ordering::Less => (),
-            std::cmp::Ordering::Equal => {
-                strings.push("1 directory removed".to_string());
-            },
-            std::cmp::Ordering::Greater => {
-                strings.push(format!("{} directories removed", self.rm_dir));
-            },
-        }
+        push_summary_part(
+            &mut strings,
+            self.mk_dir,
+            "directory created",
+            "directories created",
+        );
+        push_summary_part(&mut strings, self.mv, "file moved", "files moved");
+        push_summary_part(&mut strings, self.cp, "file copied", "files copied");
+        push_summary_part(
+            &mut strings,
+            self.rm_file,
+            "file removed",
+            "files removed",
+        );
+        push_summary_part(
+            &mut strings,
+            self.rm_dir,
+            "directory removed",
+            "directories removed",
+        );
 
         write!(f, "{}", strings.join(", "))
+    }
+}
+
+fn push_summary_part(
+    strings: &mut Vec<String>,
+    amount: usize,
+    singular: &str,
+    plural: &str,
+) {
+    match amount {
+        0 => (),
+        1 => strings.push(format!("1 {singular}")),
+        amount => strings.push(format!("{amount} {plural}")),
     }
 }

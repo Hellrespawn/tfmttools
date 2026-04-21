@@ -20,7 +20,7 @@ pub fn load_history(
             "Loaded history:\n{}",
             HistoryFormatter::new()
                 .with_format(HistoryFormat::Verbose)
-                .format_history(&mut history)?
+                .format_history(&history)?
         );
     }
 
