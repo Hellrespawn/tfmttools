@@ -1,9 +1,13 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
+mod case_insensitive_path;
 mod rename_action;
 mod validation;
 
+pub use case_insensitive_path::{
+    CaseInsensitivePathKey, CaseInsensitivePathSet,
+};
 pub use rename_action::RenameAction;
 pub use validation::{FORBIDDEN_CHARACTERS, validate_rename_actions};
 

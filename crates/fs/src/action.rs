@@ -1,12 +1,15 @@
-use std::collections::HashSet;
-
-use camino::Utf8PathBuf;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::error::TFMTResult;
-use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8File, Utf8PathExt};
+use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
 use tracing::trace;
 
 use crate::fs::{FsHandler, MoveFileResult};
+
+mod rename_cycles;
+mod rename_planner;
+mod rename_staging;
+
+use rename_planner::RenamePlanner;
 
 enum PlannedAction {
     Action(Action),
@@ -179,24 +182,7 @@ impl<'a> ActionExecutor<'a> {
     fn plan_rename_actions(
         rename_actions: Vec<RenameAction>,
     ) -> Vec<PlannedAction> {
-        let make_dir_actions =
-            RenameAction::get_make_dir_actions(&rename_actions);
-
-        let make_dir_actions = make_dir_actions
-            .into_iter()
-            .map(PlannedAction::Action)
-            .collect::<Vec<_>>();
-
-        let move_actions = if needs_temporary_staging(&rename_actions) {
-            plan_staged_rename_actions(rename_actions)
-        } else {
-            rename_actions
-                .into_iter()
-                .map(PlannedAction::Rename)
-                .collect::<Vec<_>>()
-        };
-
-        make_dir_actions.into_iter().chain(move_actions).collect()
+        RenamePlanner::new(rename_actions).plan()
     }
 
     pub fn apply_actions(
@@ -224,89 +210,6 @@ impl<'a> ActionExecutor<'a> {
                 .map(|dir| Action::RemoveDir(dir.into_path_buf())),
         )
     }
-}
-
-fn needs_temporary_staging(rename_actions: &[RenameAction]) -> bool {
-    let source_keys = rename_actions
-        .iter()
-        .map(|action| case_insensitive_path_key(action.source()))
-        .collect::<HashSet<_>>();
-
-    rename_actions.iter().any(|action| {
-        source_keys.contains(&case_insensitive_path_key(action.target()))
-    })
-}
-
-fn plan_staged_rename_actions(
-    rename_actions: Vec<RenameAction>,
-) -> Vec<PlannedAction> {
-    let mut reserved_paths = rename_actions
-        .iter()
-        .flat_map(|action| {
-            [
-                case_insensitive_path_key(action.source()),
-                case_insensitive_path_key(action.target()),
-            ]
-        })
-        .collect::<HashSet<_>>();
-
-    let staged_actions = rename_actions
-        .into_iter()
-        .enumerate()
-        .map(|(index, action)| {
-            let temporary_path =
-                temporary_path_for(action.source(), index, &mut reserved_paths);
-
-            (action, temporary_path)
-        })
-        .collect::<Vec<_>>();
-
-    let stage_sources = staged_actions
-        .iter()
-        .map(|(action, temporary_path)| {
-            PlannedAction::Action(Action::MoveFile {
-                source: action.source().to_owned().into_path_buf(),
-                target: temporary_path.clone(),
-            })
-        })
-        .collect::<Vec<_>>();
-
-    let move_to_targets =
-        staged_actions.into_iter().map(|(action, temporary_path)| {
-            PlannedAction::Action(Action::MoveFile {
-                source: temporary_path,
-                target: action.target().to_owned().into_path_buf(),
-            })
-        });
-
-    stage_sources.into_iter().chain(move_to_targets).collect()
-}
-
-fn temporary_path_for(
-    source: &Utf8File,
-    index: usize,
-    reserved_paths: &mut HashSet<String>,
-) -> Utf8PathBuf {
-    let parent = source.parent();
-    let process_id = std::process::id();
-
-    for attempt in 0.. {
-        let candidate = parent
-            .as_path()
-            .join(format!(".tfmt-{process_id}-{index}-{attempt}"));
-        let candidate_key = case_insensitive_path_key(&candidate);
-
-        if !candidate.exists() && !reserved_paths.contains(&candidate_key) {
-            reserved_paths.insert(candidate_key);
-            return candidate;
-        }
-    }
-
-    unreachable!("unbounded temporary path generation should return");
-}
-
-fn case_insensitive_path_key(path: impl std::fmt::Display) -> String {
-    path.to_string().to_lowercase()
 }
 
 #[cfg(test)]

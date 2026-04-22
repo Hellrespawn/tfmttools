@@ -32,8 +32,15 @@ pub(crate) fn handle_remaining_files(
     if let Some(common_prefix) = common_prefix {
         debug!("Common prefix of renamed files: {}", common_prefix);
 
-        let remaining_items =
-            discover_remaining_items(session, &common_prefix, unchanged_files)?;
+        let protected_paths = protected_cleanup_paths(
+            applied_actions.as_slice(),
+            unchanged_files,
+        );
+        let remaining_items = discover_remaining_items(
+            session,
+            &common_prefix,
+            &protected_paths,
+        )?;
 
         // Can't apply compiler attribute to macro invocation directly.
         #[allow(unstable_name_collisions)]
@@ -105,20 +112,15 @@ struct RemainingItems {
 fn discover_remaining_items(
     session: &RenameSession,
     common_prefix: &Utf8Path,
-    unchanged_files: &[Utf8File],
+    protected_paths: &HashSet<camino::Utf8PathBuf>,
 ) -> Result<RemainingItems> {
     let options = PathIteratorOptions::with_depth(
         common_prefix,
         session.rename_options().recursion_depth(),
     );
 
-    let unchanged_paths = unchanged_files
-        .iter()
-        .map(|f| f.to_owned().into_path_buf())
-        .collect::<HashSet<_>>();
-
     let remaining = PathIterator::new(&options)
-        .filter_ok(|path| !unchanged_paths.contains(path))
+        .filter_ok(|path| !protected_paths.contains(path))
         .collect::<TFMTResult<Vec<_>>>()?;
 
     let (files, folders): (Vec<_>, Vec<_>) =
@@ -131,6 +133,22 @@ fn discover_remaining_items(
             .map(Utf8Directory::new_unchecked)
             .collect(),
     })
+}
+
+fn protected_cleanup_paths(
+    applied_actions: &[Action],
+    unchanged_files: &[Utf8File],
+) -> HashSet<camino::Utf8PathBuf> {
+    unchanged_files
+        .iter()
+        .map(|f| f.to_owned().into_path_buf())
+        .chain(
+            applied_actions
+                .iter()
+                .filter(|action| action.is_rename_action())
+                .map(|action| action.target().to_owned()),
+        )
+        .collect()
 }
 
 fn plan_cleanup(remaining_items: RemainingItems) -> Option<CleanupPlan> {

@@ -1,0 +1,39 @@
+{
+  "description": "Swapping two filenames stages moves through temporary paths, keeps the final targets out of cleanup, and preserves undo/redo.",
+  "expectations": {
+    "initial-state": [
+      {
+        "path": "input/Nightwish - Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" }
+    ],
+    "apply": [
+      {
+        "path": "input/Nightwish - Elvenpath (Live).mp3",
+        "checksum": "820F92DA"
+      },
+      {
+        "path": "input/Nightwish - Nemo.mp3",
+        "checksum": "781AABD2"
+      }
+    ]
+  },
+  "tests": {
+    "initial": {
+      "expectations": "initial-state"
+    },
+    "apply": {
+      "command": "--simple --yes rename -t staged_swap",
+      "expectations": "apply"
+    },
+    "undo": {
+      "command": "--simple --yes undo",
+      "expectations": "initial-state"
+    },
+    "redo": {
+      "command": "--simple --yes redo",
+      "expectations": "apply"
+    }
+  }
+}

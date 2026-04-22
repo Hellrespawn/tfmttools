@@ -1,0 +1,7 @@
+{%- if artist == "Nightwish" and title == "Nemo" -%}
+input/Nightwish - Elvenpath (Live)
+{%- elif artist == "Nightwish" and title == "Elvenpath (Live)" -%}
+input/Nightwish - Nemo
+{%- else -%}
+{{ artist }}/{{ title }}
+{%- endif -%}

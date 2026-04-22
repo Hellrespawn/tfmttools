@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use camino::Utf8Component;
 
 use crate::MAX_PATH_LENGTH;
-use crate::action::RenameAction;
+use crate::action::{CaseInsensitivePathKey, RenameAction};
 use crate::util::Utf8PathExt;
 
 pub struct ForbiddenCharacter<'f> {
@@ -245,7 +245,7 @@ fn validate_case_insensitive_collisions(
     let mut map = HashMap::new();
 
     for rename_action in rename_actions {
-        map.entry(case_insensitive_path_key(rename_action.target()))
+        map.entry(CaseInsensitivePathKey::new(rename_action.target()))
             .or_insert_with(Vec::new)
             .push(rename_action);
     }
@@ -276,8 +276,8 @@ fn validate_existing_files(
             m.target().exists()
                 && m.target() != m.source()
                 && !sources.iter().any(|source| {
-                    case_insensitive_path_key(source)
-                        == case_insensitive_path_key(m.target())
+                    CaseInsensitivePathKey::new(source)
+                        == CaseInsensitivePathKey::new(m.target())
                 })
         })
         .map(ValidationError::TargetExists)
@@ -320,10 +320,6 @@ fn is_reserved_numbered_device_name(name: &str, prefix: &str) -> bool {
     name.strip_prefix(prefix)
         .and_then(|suffix| suffix.parse::<u8>().ok())
         .is_some_and(|number| (1..=9).contains(&number))
-}
-
-fn case_insensitive_path_key(path: impl std::fmt::Display) -> String {
-    path.to_string().to_lowercase()
 }
 
 fn validate_forbidden_leading_or_trailing_characters_in_path_component<'a>(

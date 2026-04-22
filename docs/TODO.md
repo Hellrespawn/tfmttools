@@ -5,8 +5,6 @@
 - [ ] Extract rename cycle detection / case sensitive file name handling to separate files/structs.
 - [ ] Fix(?) encoding of German characters
 - [ ] Add some sort of strict interpolation of forbidden characters.
-- [ ] Separate type for rename actions and applied actions
-- [ ] Handle in-situ renaming of files better
 - [ ] Do test with interactive app?
 - [ ] Some sort of transactions mechanism?
 - [ ] Fix/warn tag with leading/trailing whitespace?
