@@ -40,7 +40,7 @@ fn main() -> ExitCode {
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
         "test-cli" => run_cargo(&["test", "-p", "tfmttools-cli"]),
         "test-integration" => run_cargo(TEST_INTEGRATION_ARGS),
-        "lint" => run_steps(&[FMT_ARGS, CLIPPY_ARGS]),
+        "lint" => run_steps(&[CLIPPY_ARGS, FMT_ARGS]),
         "help" | "--help" | "-h" => {
             print!("{HELP}");
             ExitCode::SUCCESS

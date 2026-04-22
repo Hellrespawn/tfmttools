@@ -5,7 +5,7 @@ use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
 use super::PlannedAction;
 use super::handler::ActionHandler;
 use super::rename_planner::RenamePlanner;
-use crate::fs::FsHandler;
+use crate::fs_handler::FsHandler;
 
 pub struct ActionExecutor<'a> {
     handler: ActionHandler<'a>,

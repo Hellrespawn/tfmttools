@@ -3,7 +3,7 @@ use tfmttools_core::error::TFMTResult;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
-use crate::fs::{FsHandler, MoveFileResult};
+use crate::fs_handler::{FsHandler, MoveFileResult};
 
 pub struct ActionHandler<'a> {
     fs_handler: &'a FsHandler,
@@ -50,16 +50,7 @@ impl<'a> ActionHandler<'a> {
                 rename_action.target().as_path(),
             )?;
 
-            if let MoveFileResult::CopiedAndRemoved = result {
-                let source = rename_action.source().to_owned();
-
-                vec![
-                    Action::copy_from_rename_action(rename_action),
-                    Action::RemoveFile(source.into_path_buf()),
-                ]
-            } else {
-                vec![Action::move_from_rename_action(rename_action)]
-            }
+            actions_from_move_result(rename_action, result)
         };
 
         Ok(applied_actions)
@@ -123,6 +114,90 @@ impl<'a> ActionHandler<'a> {
                 self.fs_handler.remove_dir(path)?;
             },
         }
+
+        Ok(())
+    }
+}
+
+fn actions_from_move_result(
+    rename_action: &RenameAction,
+    result: MoveFileResult,
+) -> Vec<Action> {
+    if let MoveFileResult::CopiedAndRemoved = result {
+        let source = rename_action.source().to_owned();
+
+        vec![
+            Action::copy_from_rename_action(rename_action),
+            Action::RemoveFile(source.into_path_buf()),
+        ]
+    } else {
+        vec![Action::move_from_rename_action(rename_action)]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use camino::Utf8PathBuf;
+    use color_eyre::Result;
+    use tfmttools_core::action::{Action, RenameAction};
+    use tfmttools_core::util::Utf8File;
+
+    use super::*;
+
+    fn rename_action(
+        source: &str,
+        target: &str,
+    ) -> Result<(RenameAction, Utf8PathBuf, Utf8PathBuf)> {
+        let source = Utf8PathBuf::from(source);
+        let target = Utf8PathBuf::from(target);
+        let action =
+            RenameAction::new(Utf8File::new(&source)?, Utf8File::new(&target)?);
+
+        Ok((action, source, target))
+    }
+
+    #[test]
+    fn copied_and_removed_move_records_copy_and_remove_actions() -> Result<()> {
+        let (rename_action, source, target) =
+            rename_action("source.mp3", "target.mp3")?;
+
+        let actions = actions_from_move_result(
+            &rename_action,
+            MoveFileResult::CopiedAndRemoved,
+        );
+
+        assert_eq!(actions.len(), 2);
+        assert!(matches!(
+            &actions[0],
+            Action::CopyFile {
+                source: copy_source,
+                target: copy_target,
+            } if copy_source == &source && copy_target == &target
+        ));
+        assert!(matches!(
+            &actions[1],
+            Action::RemoveFile(remove_source) if remove_source == &source
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn moved_result_records_move_action() -> Result<()> {
+        let (rename_action, source, target) =
+            rename_action("source.mp3", "target.mp3")?;
+
+        let actions =
+            actions_from_move_result(&rename_action, MoveFileResult::Moved);
+
+        assert_eq!(actions.len(), 1);
+        assert!(matches!(
+            &actions[0],
+            Action::MoveFile {
+                source: move_source,
+                target: move_target,
+            } if move_source == &source && move_target == &target
+        ));
 
         Ok(())
     }

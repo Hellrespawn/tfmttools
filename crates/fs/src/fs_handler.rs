@@ -9,29 +9,33 @@ use tracing::trace;
 use crate::PathIterator;
 use crate::path_iterator::PathIteratorOptions;
 
+#[derive(Copy, Clone)]
 pub enum MoveFileResult {
     Moved,
     CopiedAndRemoved,
     DryRun,
 }
 
+#[derive(Copy, Clone)]
 pub enum CopyFileResult {
     Copied,
     DryRun,
 }
 
+#[derive(Copy, Clone)]
 pub enum RemoveFileResult {
     Removed,
     DryRun,
 }
 
+#[derive(Copy, Clone)]
 pub enum CreateDirResult {
     Created,
     Exists,
     DryRun,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum RemoveDirResult {
     Removed,
     NotEmpty,
@@ -79,36 +83,8 @@ impl FsHandler {
             Ok(MoveFileResult::DryRun)
         } else {
             // std::fs::rename does not work across filesystem boundaries.
-            // Check for the appropriate error and copies + deletes instead.
-            // Error codes are correct on Windows 10 20H2 and Arch
-            // Linux.
-            // UPSTREAM Use ErrorKind::CrossesDevices when it enters stable
-
-            #[cfg(windows)]
-            const EXPECTED_ERROR_CODE: i32 = 17;
-
-            #[cfg(unix)]
-            const EXPECTED_ERROR_CODE: i32 = 18;
-
             if let Err(err) = std::fs::rename(source, target) {
-                // HACK Unable to capture raw_os_error with fs_err, use
-                // std::fs::rename instead.
-                let is_expected_error =
-                    err.raw_os_error().is_some_and(|code| {
-                        code > 0 && code == EXPECTED_ERROR_CODE
-                    });
-
-                if is_expected_error {
-                    fs_err::copy(source, target)?;
-                    fs_err::remove_file(source)?;
-                    Ok(MoveFileResult::CopiedAndRemoved)
-                } else {
-                    Err(TFMTError::UnexpectedMoveError(
-                        source.to_owned(),
-                        target.to_owned(),
-                        err.to_string(),
-                    ))
-                }
+                handle_move_error(source, target, &err)
             } else {
                 Ok(MoveFileResult::Moved)
             }
@@ -200,6 +176,24 @@ impl FsHandler {
     }
 }
 
+fn handle_move_error(
+    source: &Utf8Path,
+    target: &Utf8Path,
+    err: &std::io::Error,
+) -> TFMTResult<MoveFileResult> {
+    if err.kind() == ErrorKind::CrossesDevices {
+        fs_err::copy(source, target)?;
+        fs_err::remove_file(source)?;
+        Ok(MoveFileResult::CopiedAndRemoved)
+    } else {
+        Err(TFMTError::UnexpectedMoveError(
+            source.to_owned(),
+            target.to_owned(),
+            err.to_string(),
+        ))
+    }
+}
+
 #[must_use]
 pub fn get_longest_common_prefix<'a>(
     paths: impl IntoIterator<Item = &'a Utf8Path>,
@@ -238,7 +232,53 @@ mod tests {
     use std::io::ErrorKind;
 
     use assert_fs::TempDir;
+    use camino::Utf8PathBuf;
     use color_eyre::Result;
+    use tfmttools_core::error::TFMTError;
+
+    use super::*;
+
+    fn temp_path(temp_dir: &TempDir, name: &str) -> Result<Utf8PathBuf> {
+        Ok(Utf8PathBuf::try_from(temp_dir.path().join(name))?)
+    }
+
+    #[test]
+    fn move_error_crosses_devices_copies_and_removes_source() -> Result<()> {
+        let tempdir = TempDir::new()?;
+        let source = temp_path(&tempdir, "source.mp3")?;
+        let target = temp_path(&tempdir, "target.mp3")?;
+        fs_err::write(&source, "source contents")?;
+
+        let result = handle_move_error(
+            &source,
+            &target,
+            &std::io::Error::from(ErrorKind::CrossesDevices),
+        )?;
+
+        assert!(matches!(result, MoveFileResult::CopiedAndRemoved));
+        assert!(!source.exists());
+        assert_eq!(fs_err::read_to_string(target)?, "source contents");
+
+        Ok(())
+    }
+
+    #[test]
+    fn move_error_other_kind_is_unexpected_move_error() -> Result<()> {
+        let tempdir = TempDir::new()?;
+        let source = temp_path(&tempdir, "source.mp3")?;
+        let target = temp_path(&tempdir, "target.mp3")?;
+
+        let result = handle_move_error(
+            &source,
+            &target,
+            &std::io::Error::from(ErrorKind::PermissionDenied),
+        );
+
+        assert!(matches!(result, Err(TFMTError::UnexpectedMoveError(_, _, _))));
+        assert!(!target.exists());
+
+        Ok(())
+    }
 
     #[test]
     fn test_remove_dir_reports_not_empty() -> Result<()> {
