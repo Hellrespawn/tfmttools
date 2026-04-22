@@ -6,6 +6,6 @@ mod undo_redo;
 
 pub use clear_history::clear_history;
 pub use list_templates::list_templates;
-pub use rename::{RenameContext, rename};
+pub use rename::rename;
 pub use show_history::show_history;
-pub use undo_redo::UndoRedoCommand;
+pub use undo_redo::undo_redo;

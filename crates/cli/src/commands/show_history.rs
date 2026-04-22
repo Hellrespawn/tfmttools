@@ -7,7 +7,13 @@ use crate::history::{
 };
 
 pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
-    let formatter = get_history_formatter(app_options.verbosity());
+    let formatter =
+        HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
+    let formatter = if app_options.verbosity() > 0 {
+        formatter.with_format(HistoryFormat::Verbose)
+    } else {
+        formatter
+    };
 
     let (history, load_history_result) =
         load_history(&app_options.history_file_path()?)?;
@@ -22,15 +28,4 @@ pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn get_history_formatter(verbosity: u8) -> HistoryFormatter {
-    let formatter =
-        HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
-
-    if verbosity > 0 {
-        formatter.with_format(HistoryFormat::Verbose)
-    } else {
-        formatter
-    }
 }

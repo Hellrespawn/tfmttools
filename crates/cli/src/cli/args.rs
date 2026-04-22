@@ -6,10 +6,9 @@ use tfmttools_fs::{FileOrName, FsHandler};
 use tfmttools_history::HistoryMode;
 use tracing::debug;
 
-use super::{ConfirmMode, TFMTOptions};
+use super::TFMTOptions;
 use crate::commands::{
-    RenameContext, UndoRedoCommand, clear_history, list_templates, rename,
-    show_history,
+    clear_history, list_templates, rename, show_history, undo_redo,
 };
 use crate::ui::PreviewListSize;
 
@@ -99,24 +98,20 @@ impl TFMTSubcommand {
                 list_templates(&template_directory)?;
             },
             TFMTSubcommand::Rename(rename_args) => {
-                let rename_context = RenameContext::try_from_args(
-                    fs_handler,
-                    app_options,
-                    rename_args,
-                )?;
-
-                rename(&rename_context)?;
+                rename(fs_handler, app_options, rename_args)?;
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
-                undo_redo_args.run(
+                undo_redo(
                     HistoryMode::Undo,
+                    undo_redo_args.amount.unwrap_or(1),
                     app_options,
                     fs_handler,
                 )?;
             },
             TFMTSubcommand::Redo(undo_redo_args) => {
-                undo_redo_args.run(
+                undo_redo(
                     HistoryMode::Redo,
+                    undo_redo_args.amount.unwrap_or(1),
                     app_options,
                     fs_handler,
                 )?;
@@ -192,21 +187,4 @@ pub struct TemplateArgs {
 pub struct UndoRedoArgs {
     /// Amount of actions.
     pub amount: Option<usize>,
-}
-
-impl UndoRedoArgs {
-    fn run(
-        self,
-        mode: HistoryMode,
-        app_options: &TFMTOptions,
-        fs_handler: &FsHandler,
-    ) -> Result<()> {
-        UndoRedoCommand::new(
-            matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm),
-            self.amount.unwrap_or(1),
-            mode,
-            app_options.preview_list_size(),
-        )
-        .run(app_options, fs_handler)
-    }
 }

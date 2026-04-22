@@ -1,12 +1,12 @@
 use camino::Utf8Path;
 use color_eyre::Result;
 
-use super::RenameContext;
+use super::RenameSession;
 use crate::cli::ConfirmMode;
 use crate::ui::ConfirmationPrompt;
 
-pub fn confirm(context: &RenameContext, prompt: &str) -> Result<bool> {
-    Ok(matches!(context.app_options().confirm_mode(), ConfirmMode::NoConfirm)
+pub fn confirm(session: &RenameSession, prompt: &str) -> Result<bool> {
+    Ok(matches!(session.app_options().confirm_mode(), ConfirmMode::NoConfirm)
         || ConfirmationPrompt::new(prompt).prompt()?)
 }
 

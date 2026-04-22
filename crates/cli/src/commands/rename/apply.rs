@@ -6,16 +6,16 @@ use tfmttools_core::util::{Utf8File, Utf8PathExt};
 use tfmttools_fs::ActionExecutor;
 use tracing::trace;
 
-use super::{RenameExecutionResult, RenameContext, RenamePlan};
+use super::{RenameExecutionResult, RenamePlan, RenameSession};
 use crate::ui::{ItemName, PreviewList, ProgressBar, current_dir_utf8};
 
-pub fn preview(context: &RenameContext, plan: &RenamePlan) -> Result<()> {
+pub fn preview(session: &RenameSession, plan: &RenamePlan) -> Result<()> {
     validate_rename_action_errors(&plan.actions)?;
-    preview_rename_actions(context, &plan.actions, &plan.unchanged_files)
+    preview_rename_actions(session, &plan.actions, &plan.unchanged_files)
 }
 
 pub fn execute(
-    context: &RenameContext,
+    session: &RenameSession,
     plan: RenamePlan,
 ) -> Result<RenameExecutionResult> {
     // Can't apply compiler attribute to macro invocation directly.
@@ -34,10 +34,10 @@ pub fn execute(
     if plan.actions.is_empty() {
         Ok(RenameExecutionResult::NothingToRename(plan.unchanged_files))
     } else {
-        let confirmation = super::shared::confirm(context, "Move files?")?;
+        let confirmation = super::shared::confirm(session, "Move files?")?;
 
         if confirmation {
-            match move_files(context, plan.actions) {
+            match move_files(session, plan.actions) {
                 Ok(actions) => {
                     Ok(RenameExecutionResult::Applied {
                         actions,
@@ -74,7 +74,7 @@ fn validate_rename_action_errors(
 }
 
 fn preview_rename_actions(
-    context: &RenameContext,
+    session: &RenameSession,
     rename_actions: &[RenameAction],
     unchanged_files: &[Utf8File],
 ) -> Result<()> {
@@ -88,7 +88,7 @@ fn preview_rename_actions(
     });
 
     let preview_list =
-        PreviewList::new(iter, context.app_options().preview_list_size())
+        PreviewList::new(iter, session.app_options().preview_list_size())
             .with_item_name(ItemName::simple("destination"));
 
     if !unchanged_files.is_empty() {
@@ -101,11 +101,11 @@ fn preview_rename_actions(
 }
 
 fn move_files(
-    context: &RenameContext,
+    session: &RenameSession,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>, (color_eyre::Report, Vec<Action>)> {
     let bar = ProgressBar::bar(
-        context.app_options().display_mode(),
+        session.app_options().display_mode(),
         "Moving files:",
         "Moved files.",
         rename_actions.len() as u64,
@@ -114,8 +114,8 @@ fn move_files(
 
     let mut applied_actions = Vec::new();
 
-    let executor = ActionExecutor::new(context.fs_handler())
-        .move_mode(context.rename_options().move_mode());
+    let executor = ActionExecutor::new(session.fs_handler())
+        .move_mode(session.rename_options().move_mode());
 
     let iter =
         executor.apply_rename_actions(rename_actions).inspect(|result| {

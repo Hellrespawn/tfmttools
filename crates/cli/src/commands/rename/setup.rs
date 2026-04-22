@@ -10,17 +10,17 @@ use tfmttools_fs::{FileOrName, PathIterator, TemplateLoader};
 use tfmttools_history::{History, LoadHistoryResult};
 use tracing::{debug, trace};
 
-use super::{RenameContext, RenamePlan};
+use super::{RenamePlan, RenameSession};
 use crate::cli::TemplateOption;
 use crate::ui::{ProgressBar, current_dir_utf8};
 
 pub fn create_plan(
-    context: &RenameContext,
+    session: &RenameSession,
     history: &History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<RenamePlan> {
-    let resolved = resolve_template(context, history, load_history_result)?;
-    let actions = create_actions_from_template(context, &resolved)?;
+    let resolved = resolve_template(session, history, load_history_result)?;
+    let actions = create_actions_from_template(session, &resolved)?;
     let (actions, unchanged_files) =
         RenameAction::separate_unchanged_destinations(actions);
 
@@ -35,33 +35,33 @@ struct ResolvedTemplate {
 }
 
 fn resolve_template(
-    context: &RenameContext,
+    session: &RenameSession,
     history: &History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<ResolvedTemplate> {
-    match context.rename_options().template_option() {
+    match session.rename_options().template_option() {
         TemplateOption::None => {
-            resolve_previous_template(context, history, load_history_result)
+            resolve_previous_template(session, history, load_history_result)
         },
         TemplateOption::FileOrName(file_or_name) => {
             resolve_file_or_name(
-                context,
+                session,
                 file_or_name,
-                context.rename_options().arguments(),
+                session.rename_options().arguments(),
             )
         },
         TemplateOption::Script(script) => {
             resolve_script(
-                context,
+                session,
                 script,
-                context.rename_options().arguments(),
+                session.rename_options().arguments(),
             )
         },
     }
 }
 
 fn resolve_previous_template(
-    context: &RenameContext,
+    session: &RenameSession,
     history: &History<Action, ActionRecordMetadata>,
     load_history_result: LoadHistoryResult,
 ) -> Result<ResolvedTemplate> {
@@ -81,14 +81,14 @@ fn resolve_previous_template(
                     "Re-using template '{template_name}' and arguments from previous rename."
                 );
 
-                resolve_file_or_name(context, &template_name, &arguments)
+                resolve_file_or_name(session, &template_name, &arguments)
             },
             TemplateMetadata::Script(script) => {
                 println!(
                     "Re-using script\n```\n'{script}'\n```\n and arguments from previous rename."
                 );
 
-                resolve_script(context, script, &arguments)
+                resolve_script(session, script, &arguments)
             },
         };
     }
@@ -97,7 +97,7 @@ fn resolve_previous_template(
 }
 
 fn resolve_file_or_name(
-    context: &RenameContext,
+    session: &RenameSession,
     file_or_name: &FileOrName,
     arguments: &[String],
 ) -> Result<ResolvedTemplate> {
@@ -110,7 +110,7 @@ fn resolve_file_or_name(
         },
         FileOrName::Name(_) => {
             TemplateLoader::read_directory(
-                context.rename_options().template_directory(),
+                session.rename_options().template_directory(),
             )
         },
     }?;
@@ -119,7 +119,7 @@ fn resolve_file_or_name(
     let arguments = arguments.to_vec();
     let metadata = create_metadata(
         &TemplateMetadata::FileOrName(template_name.clone()),
-        context.app_options().run_id(),
+        session.app_options().run_id(),
         &arguments,
     );
 
@@ -127,7 +127,7 @@ fn resolve_file_or_name(
 }
 
 fn resolve_script(
-    context: &RenameContext,
+    session: &RenameSession,
     script: &str,
     arguments: &[String],
 ) -> Result<ResolvedTemplate> {
@@ -138,7 +138,7 @@ fn resolve_script(
     let arguments = arguments.to_vec();
     let metadata = create_metadata(
         &TemplateMetadata::Script(script.to_owned()),
-        context.app_options().run_id(),
+        session.app_options().run_id(),
         &arguments,
     );
 
@@ -163,7 +163,7 @@ fn create_metadata(
 }
 
 fn create_actions_from_template(
-    context: &RenameContext,
+    session: &RenameSession,
     resolved: &ResolvedTemplate,
 ) -> Result<Vec<RenameAction>> {
     let template = resolved
@@ -171,30 +171,30 @@ fn create_actions_from_template(
         .get_template(&resolved.template_name, resolved.arguments.clone())
         .ok_or(eyre!("Unable to find template: {}", resolved.template_name))?;
 
-    let paths = gather_file_paths(context);
+    let paths = gather_file_paths(session);
 
     debug!("Read {} files.", paths.len());
 
-    let audio_files = read_files(context, paths)?;
+    let audio_files = read_files(session, paths)?;
 
     debug!("Found {} audio files.", audio_files.len());
 
     let rename_actions =
-        create_rename_actions(context, &template, &audio_files)?;
+        create_rename_actions(session, &template, &audio_files)?;
 
     Ok(rename_actions)
 }
 
-fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
+fn gather_file_paths(session: &RenameSession) -> Vec<Utf8PathBuf> {
     let spinner = ProgressBar::spinner(
-        context.app_options().display_mode(),
+        session.app_options().display_mode(),
         "audio",
         "total files",
         "Gathering files...",
         "Gathered files.",
     );
 
-    let file_paths = PathIterator::new(&context.path_iterator_options())
+    let file_paths = PathIterator::new(&session.path_iterator_options())
         .flatten()
         .inspect(|_| spinner.inc_total())
         .filter(|path| AudioFile::path_predicate(path))
@@ -212,11 +212,11 @@ fn gather_file_paths(context: &RenameContext) -> Vec<Utf8PathBuf> {
 }
 
 fn read_files(
-    context: &RenameContext,
+    session: &RenameSession,
     file_paths: Vec<Utf8PathBuf>,
 ) -> Result<Vec<AudioFile>> {
     let bar = ProgressBar::bar(
-        context.app_options().display_mode(),
+        session.app_options().display_mode(),
         "Reading files...",
         "Read files.",
         file_paths.len() as u64,
@@ -246,14 +246,14 @@ fn read_files(
 }
 
 fn create_rename_actions(
-    context: &RenameContext,
+    session: &RenameSession,
     template: &Template,
     files: &[AudioFile],
 ) -> Result<Vec<RenameAction>> {
     let cwd = current_dir_utf8()?;
 
     let bar = ProgressBar::bar(
-        context.app_options().display_mode(),
+        session.app_options().display_mode(),
         "Determining output paths:",
         "Determined output paths.",
         files.len() as u64,

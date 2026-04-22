@@ -4,173 +4,166 @@ use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
 use tfmttools_fs::{ActionHandler, FsHandler};
 use tfmttools_history::{History, HistoryMode, LoadHistoryResult, RecordState};
 
-use crate::cli::TFMTOptions;
+use crate::cli::{ConfirmMode, TFMTOptions};
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, PreviewListSize};
 
-#[derive(Debug)]
-pub struct UndoRedoCommand {
-    yes: bool,
-
-    amount: usize,
+pub fn undo_redo(
     mode: HistoryMode,
-    formatter: HistoryFormatter,
-    preview_list_size: PreviewListSize,
-}
+    amount: usize,
+    app_options: &TFMTOptions,
+    fs_handler: &FsHandler,
+) -> Result<()> {
+    let verb = match mode {
+        HistoryMode::Undo => "undo",
+        HistoryMode::Redo => "redo",
+    };
 
-impl UndoRedoCommand {
-    pub fn new(
-        yes: bool,
-        amount: usize,
-        mode: HistoryMode,
-        preview_list_size: PreviewListSize,
-    ) -> Self {
-        Self {
-            yes,
-            amount,
-            mode,
-            preview_list_size,
-            formatter: HistoryFormatter::new()
-                .with_prefix(HistoryPrefix::Ordered(')')),
-        }
-    }
+    let (mut history, load_history_result) =
+        load_history(&app_options.history_file_path()?)?;
 
-    pub fn run(
-        &self,
-        app_options: &TFMTOptions,
-        fs_handler: &FsHandler,
-    ) -> Result<()> {
-        let verb = match self.mode {
-            HistoryMode::Undo => "undo",
-            HistoryMode::Redo => "redo",
-        };
+    match load_history_result {
+        LoadHistoryResult::New => {
+            eprintln!("There is no history to {verb}.");
+            Ok(())
+        },
+        LoadHistoryResult::Loaded => {
+            let records = get_records(&history, mode, amount)?;
 
-        let (mut history, load_history_result) =
-            load_history(&app_options.history_file_path()?)?;
+            let actual = records.len();
 
-        match load_history_result {
-            LoadHistoryResult::New => {
-                eprintln!("There is no history to {verb}.");
-                Ok(())
-            },
-            LoadHistoryResult::Loaded => {
-                let records = self.get_records(&history)?;
-
-                let amount = self.amount;
-                let actual = records.len();
-
-                if records.is_empty() {
-                    println!("There are no runs to {verb}.");
-                } else {
-                    if actual < amount {
-                        println!(
-                            "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
-                            verb = self.mode.verb()
-                        );
-                    }
-
-                    let confirmation =
-                        self.yes || self.confirm_undo_redo(&records)?;
-
-                    if confirmation {
-                        self.perform_undo_redo_actions(
-                            &mut history,
-                            records,
-                            fs_handler,
-                        )?;
-
-                        history.save()?;
-                    } else {
-                        println!("Aborting!");
-                    }
+            if records.is_empty() {
+                println!("There are no runs to {verb}.");
+            } else {
+                if actual < amount {
+                    println!(
+                        "Tried to {verb} {amount} runs, but only {actual} can be {verb}ne.",
+                        verb = mode.verb()
+                    );
                 }
 
-                Ok(())
-            },
-        }
+                let formatter = HistoryFormatter::new()
+                    .with_prefix(HistoryPrefix::Ordered(')'));
+                let confirmation = matches!(
+                    app_options.confirm_mode(),
+                    ConfirmMode::NoConfirm
+                ) || confirm_undo_redo(
+                    &records,
+                    mode,
+                    &formatter,
+                    app_options.preview_list_size(),
+                )?;
+
+                if confirmation {
+                    perform_undo_redo_actions(
+                        &mut history,
+                        records,
+                        fs_handler,
+                        mode,
+                        &formatter,
+                    )?;
+
+                    history.save()?;
+                } else {
+                    println!("Aborting!");
+                }
+            }
+
+            Ok(())
+        },
     }
+}
 
-    fn get_records(
-        &self,
-        history: &History<Action, ActionRecordMetadata>,
-    ) -> Result<Vec<ActionRecord>> {
-        Ok(match self.mode {
-            HistoryMode::Undo => history.get_n_records_to_undo(self.amount)?,
-            HistoryMode::Redo => history.get_n_records_to_redo(self.amount)?,
-        })
-    }
+fn get_records(
+    history: &History<Action, ActionRecordMetadata>,
+    mode: HistoryMode,
+    amount: usize,
+) -> Result<Vec<ActionRecord>> {
+    Ok(match mode {
+        HistoryMode::Undo => history.get_n_records_to_undo(amount)?,
+        HistoryMode::Redo => history.get_n_records_to_redo(amount)?,
+    })
+}
 
-    fn confirm_undo_redo(&self, records: &[ActionRecord]) -> Result<bool> {
-        self.preview_undo_redo(records)?;
+fn confirm_undo_redo(
+    records: &[ActionRecord],
+    mode: HistoryMode,
+    formatter: &HistoryFormatter,
+    preview_list_size: PreviewListSize,
+) -> Result<bool> {
+    preview_undo_redo(records, formatter, preview_list_size)?;
 
-        let item_name = ItemName::simple("record");
+    let item_name = ItemName::simple("record");
 
-        let amount = records.len();
+    let amount = records.len();
 
-        let prompt_message = format!(
-            "{} {} {}?",
-            self.mode.verb_capitalized(),
-            amount,
-            item_name.by_amount(amount)
+    let prompt_message = format!(
+        "{} {} {}?",
+        mode.verb_capitalized(),
+        amount,
+        item_name.by_amount(amount)
+    );
+
+    let confirmation_prompt = ConfirmationPrompt::new(&prompt_message);
+
+    confirmation_prompt.prompt()
+}
+
+fn preview_undo_redo(
+    records: &[ActionRecord],
+    formatter: &HistoryFormatter,
+    preview_list_size: PreviewListSize,
+) -> Result<()> {
+    let iter = records.iter().map(|record| formatter.format_record(record));
+
+    let preview_list = PreviewList::new(iter, preview_list_size)
+        .with_item_name(ItemName::simple("record"));
+
+    preview_list.print()?;
+
+    Ok(())
+}
+
+fn perform_undo_redo_actions(
+    history: &mut History<Action, ActionRecordMetadata>,
+    records: Vec<ActionRecord>,
+    fs_handler: &FsHandler,
+    mode: HistoryMode,
+    formatter: &HistoryFormatter,
+) -> Result<()> {
+    let action_handler = ActionHandler::new(fs_handler);
+
+    for record in records {
+        println!(
+            "{}ing {}...",
+            mode.verb_capitalized(),
+            formatter.format_record(&record)
         );
 
-        let confirmation_prompt = ConfirmationPrompt::new(&prompt_message);
-
-        confirmation_prompt.prompt()
-    }
-
-    fn preview_undo_redo(&self, records: &[ActionRecord]) -> Result<()> {
-        let iter =
-            records.iter().map(|record| self.formatter.format_record(record));
-
-        let preview_list = PreviewList::new(iter, self.preview_list_size)
-            .with_item_name(ItemName::simple("record"));
-
-        preview_list.print()?;
-
-        Ok(())
-    }
-
-    fn perform_undo_redo_actions(
-        &self,
-        history: &mut History<Action, ActionRecordMetadata>,
-        records: Vec<ActionRecord>,
-        fs_handler: &FsHandler,
-    ) -> Result<()> {
-        let action_handler = ActionHandler::new(fs_handler);
-
-        for record in records {
-            println!(
-                "{}ing {}...",
-                self.mode.verb_capitalized(),
-                self.formatter.format_record(&record)
-            );
-
-            match self.mode {
-                HistoryMode::Undo => {
-                    for action in record.iter().rev() {
-                        action_handler.undo(action)?;
-                    }
-                },
-                HistoryMode::Redo => {
-                    for action in record.iter() {
-                        action_handler.redo(action)?;
-                    }
-                },
-            }
-
-            match self.mode {
-                HistoryMode::Undo => {
-                    history.set_record_state(record, RecordState::Undone)?;
-                },
-                HistoryMode::Redo => {
-                    history.set_record_state(record, RecordState::Redone)?;
-                },
-            }
-
-            println!("Done.");
+        match mode {
+            HistoryMode::Undo => {
+                for action in record.iter().rev() {
+                    action_handler.undo(action)?;
+                }
+            },
+            HistoryMode::Redo => {
+                for action in record.iter() {
+                    action_handler.redo(action)?;
+                }
+            },
         }
 
-        Ok(())
+        match mode {
+            HistoryMode::Undo => {
+                history.set_record_state(record, RecordState::Undone)?;
+            },
+            HistoryMode::Redo => {
+                history.set_record_state(record, RecordState::Redone)?;
+            },
+        }
+
+        println!("Done.");
     }
+
+    Ok(())
 }

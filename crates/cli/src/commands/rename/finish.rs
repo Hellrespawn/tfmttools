@@ -14,13 +14,14 @@ use tfmttools_fs::{
 use tfmttools_history::{History, HistoryError};
 use tracing::{debug, info, trace};
 
-use super::RenameContext;
+use super::RenameSession;
+use crate::cli::TFMTOptions;
 use crate::ui::{PreviewList, current_dir_utf8};
 
 const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 
 pub(crate) fn handle_remaining_files(
-    context: &RenameContext,
+    session: &RenameSession,
     mut applied_actions: Vec<Action>,
     unchanged_files: &[Utf8File],
 ) -> Result<Vec<Action>> {
@@ -32,7 +33,7 @@ pub(crate) fn handle_remaining_files(
         debug!("Common prefix of renamed files: {}", common_prefix);
 
         let remaining_items =
-            discover_remaining_items(context, &common_prefix, unchanged_files)?;
+            discover_remaining_items(session, &common_prefix, unchanged_files)?;
 
         // Can't apply compiler attribute to macro invocation directly.
         #[allow(unstable_name_collisions)]
@@ -61,7 +62,7 @@ pub(crate) fn handle_remaining_files(
         let cleanup_plan = plan_cleanup(remaining_items);
 
         if let Some(cleanup_plan) = cleanup_plan {
-            if !prepare_cleanup(context, &cleanup_plan)? {
+            if !prepare_cleanup(session, &cleanup_plan)? {
                 return Ok(applied_actions);
             }
 
@@ -70,7 +71,7 @@ pub(crate) fn handle_remaining_files(
             let removed_directories =
                 !cleanup_plan.directories_to_remove.is_empty();
             let cleanup_actions =
-                execute_cleanup(context, &common_prefix, cleanup_plan)?;
+                execute_cleanup(session, &common_prefix, cleanup_plan)?;
 
             if confirmed_delete {
                 println!("Deleted.");
@@ -102,13 +103,13 @@ struct RemainingItems {
 }
 
 fn discover_remaining_items(
-    context: &RenameContext,
+    session: &RenameSession,
     common_prefix: &Utf8Path,
     unchanged_files: &[Utf8File],
 ) -> Result<RemainingItems> {
     let options = PathIteratorOptions::with_depth(
         common_prefix,
-        context.rename_options().recursion_depth(),
+        session.rename_options().recursion_depth(),
     );
 
     let unchanged_paths = unchanged_files
@@ -154,7 +155,7 @@ fn file_is_safe_to_delete(path: &Utf8File) -> bool {
 }
 
 fn prepare_cleanup(
-    context: &RenameContext,
+    session: &RenameSession,
     cleanup_plan: &CleanupPlan,
 ) -> Result<bool> {
     if cleanup_plan.requires_confirmation {
@@ -165,9 +166,9 @@ fn prepare_cleanup(
             cleanup_plan.files_to_delete.len()
         );
 
-        preview_files_to_delete(context, &cleanup_plan.files_to_delete)?;
+        preview_files_to_delete(session, &cleanup_plan.files_to_delete)?;
 
-        if !confirm_cleanup(context)? {
+        if !confirm_cleanup(session)? {
             println!("Skipping clean-up.");
             return Ok(false);
         }
@@ -175,14 +176,14 @@ fn prepare_cleanup(
         info!("Has only files that are safe to delete.");
 
         println!("Deleted the following files:");
-        preview_files_to_delete(context, &cleanup_plan.files_to_delete)?;
+        preview_files_to_delete(session, &cleanup_plan.files_to_delete)?;
     }
 
     Ok(true)
 }
 
 fn create_rename_action(
-    context: &RenameContext,
+    session: &RenameSession,
     common_prefix: &Utf8Path,
     file: Utf8File,
     run_id: &str,
@@ -198,7 +199,7 @@ fn create_rename_action(
 
     let rename_action = RenameAction::new(
         file,
-        context
+        session
             .rename_options()
             .bin_directory()
             .join(run_id)?
@@ -211,7 +212,7 @@ fn create_rename_action(
 }
 
 fn preview_files_to_delete(
-    context: &RenameContext,
+    session: &RenameSession,
     files: &[Utf8File],
 ) -> Result<()> {
     let working_directory = current_dir_utf8()?;
@@ -223,7 +224,7 @@ fn preview_files_to_delete(
                 working_directory.as_path(),
             )
         }),
-        context.app_options().preview_list_size(),
+        session.app_options().preview_list_size(),
     )
     .into_string()?;
 
@@ -232,24 +233,24 @@ fn preview_files_to_delete(
     Ok(())
 }
 
-fn confirm_cleanup(context: &RenameContext) -> Result<bool> {
-    super::shared::confirm(context, "Delete these remaining files?")
+fn confirm_cleanup(session: &RenameSession) -> Result<bool> {
+    super::shared::confirm(session, "Delete these remaining files?")
 }
 
 fn execute_cleanup(
-    context: &RenameContext,
+    session: &RenameSession,
     common_prefix: &Utf8Path,
     cleanup_plan: CleanupPlan,
 ) -> Result<Vec<Action>> {
     let rename_actions = create_rename_actions(
-        context,
+        session,
         common_prefix,
         cleanup_plan.files_to_delete,
     )?;
-    let mut actions = move_files(context, rename_actions)?;
+    let mut actions = move_files(session, rename_actions)?;
 
     actions.extend(remove_directories(
-        context,
+        session,
         cleanup_plan.directories_to_remove,
     )?);
 
@@ -257,7 +258,7 @@ fn execute_cleanup(
 }
 
 fn create_rename_actions(
-    context: &RenameContext,
+    session: &RenameSession,
     common_prefix: &Utf8Path,
     files: Vec<Utf8File>,
 ) -> Result<Vec<RenameAction>> {
@@ -265,21 +266,21 @@ fn create_rename_actions(
         .into_iter()
         .map(|file| {
             create_rename_action(
-                context,
+                session,
                 common_prefix,
                 file,
-                context.app_options().run_id(),
+                session.app_options().run_id(),
             )
         })
         .collect()
 }
 
 fn move_files(
-    context: &RenameContext,
+    session: &RenameSession,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
-    let executor = ActionExecutor::new(context.fs_handler())
-        .move_mode(context.rename_options().move_mode());
+    let executor = ActionExecutor::new(session.fs_handler())
+        .move_mode(session.rename_options().move_mode());
 
     Ok(executor
         .apply_rename_actions(rename_actions)
@@ -287,20 +288,20 @@ fn move_files(
 }
 
 fn remove_directories(
-    context: &RenameContext,
+    session: &RenameSession,
     directories: Vec<Utf8Directory>,
 ) -> Result<Vec<Action>> {
-    Ok(ActionExecutor::new(context.fs_handler())
+    Ok(ActionExecutor::new(session.fs_handler())
         .remove_directories(directories)?)
 }
 
 pub(crate) fn store_history(
-    context: &RenameContext,
+    app_options: &TFMTOptions,
     history: &mut History<Action, ActionRecordMetadata>,
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {
-    if matches!(context.app_options().fs_mode(), FSMode::DryRun) {
+    if matches!(app_options.fs_mode(), FSMode::DryRun) {
         Ok(())
     } else {
         history.push(actions, metadata)?;
@@ -311,10 +312,7 @@ pub(crate) fn store_history(
             },
             result => {
                 result?;
-                println!(
-                    "Saved run #{} to history.",
-                    context.app_options().run_id()
-                );
+                println!("Saved run #{} to history.", app_options.run_id());
             },
         }
 

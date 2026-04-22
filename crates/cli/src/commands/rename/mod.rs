@@ -1,16 +1,17 @@
 mod apply;
 mod finish;
-mod context;
 mod session;
 mod setup;
 mod shared;
 
 use color_eyre::Result;
-pub use context::RenameContext;
-use session::RenameSession;
+pub(crate) use session::RenameSession;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::Utf8File;
+use tfmttools_fs::FsHandler;
+
+use crate::cli::{RenameArgs, TFMTOptions};
 
 pub(crate) struct RenamePlan {
     actions: Vec<RenameAction>,
@@ -28,6 +29,10 @@ pub(crate) enum RenameExecutionResult {
     Aborted,
 }
 
-pub fn rename(context: &RenameContext) -> Result<()> {
-    RenameSession::load(context)?.run()
+pub fn rename(
+    fs_handler: &FsHandler,
+    app_options: &TFMTOptions,
+    rename_args: RenameArgs,
+) -> Result<()> {
+    RenameSession::from_args(fs_handler, app_options, rename_args)?.run()
 }
