@@ -1,8 +1,10 @@
 mod apply;
+mod discovery;
 mod finish;
+mod planning;
 mod session;
-mod setup;
 mod shared;
+mod template_resolution;
 
 use color_eyre::Result;
 pub(crate) use session::RenameSession;

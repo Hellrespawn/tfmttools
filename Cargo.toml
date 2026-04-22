@@ -16,6 +16,7 @@ members = [
     "crates/fs",
     "crates/history",
     "crates/test-harness",
+    "xtask",
 ]
 default-members = ["crates/cli"]
 resolver = "3"

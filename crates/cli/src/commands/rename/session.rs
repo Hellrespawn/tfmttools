@@ -6,7 +6,7 @@ use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tfmttools_history::{History, LoadHistoryResult};
 use tracing::info;
 
-use super::{RenameExecutionResult, apply, finish, setup};
+use super::{RenameExecutionResult, apply, finish, planning};
 use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
 use crate::history::load_history;
 
@@ -59,7 +59,8 @@ impl<'a> RenameSession<'a> {
     }
 
     pub fn run(mut self) -> Result<()> {
-        let plan = setup::create_plan(&self, &self.history, self.load_result)?;
+        let plan =
+            planning::create_plan(&self, &self.history, self.load_result)?;
 
         if !plan.actions.is_empty() {
             apply::preview(&self, &plan)?;

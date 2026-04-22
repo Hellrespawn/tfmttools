@@ -11,6 +11,19 @@ Workspace-level integration fixtures and sample report assets live under
 `tests/fixtures/cli/`. Example templates are under `examples/`, and
 notes or design work live under `docs/`.
 
+## Task Map
+
+- CLI flags and option conversion:
+  `crates/cli/src/cli/args.rs`, `crates/cli/src/cli/options.rs`.
+- Rename command flow: `crates/cli/src/commands/rename/`.
+- Rename action model: `crates/core/src/action/rename_action.rs`.
+- Rename validation: `crates/core/src/action/validation.rs`.
+- Filesystem application and staging:
+  `crates/fs/src/action.rs`, `crates/fs/src/action/`.
+- History model and persistence: `crates/history/src/`.
+- CLI integration fixtures:
+  `crates/test-harness/src/`, `tests/fixtures/cli/cases/`.
+
 ## Build, Test, and Development Commands
 
 Use Cargo from the workspace root.
@@ -18,11 +31,21 @@ Use Cargo from the workspace root.
 - `cargo build` builds the default workspace member, `tfmttools-cli`.
 - `cargo build --workspace` builds every crate.
 - `cargo run -- --help` runs the CLI locally.
-- `cargo test --workspace` runs unit and integration tests across the workspace.
-- `cargo test -p tfmttools-cli --test integration -- --nocapture` runs the fixture-backed CLI integration suite.
+- `cargo xtask check` runs `cargo check --workspace`.
+- `cargo xtask test` runs unit and integration tests across the workspace.
+- `cargo xtask test-integration` runs the fixture-backed CLI integration suite.
 - `cargo +nightly fmt --all` applies the workspace formatting rules.
-- `cargo +nightly clippy --workspace --all-targets` checks the shared lint configuration.
-- `cargo test -p tfmttools-cli` is the quickest way to exercise the CLI crate, including its custom integration harness.
+- `cargo xtask lint` runs the format check and shared clippy configuration.
+- `cargo xtask test-cli` is the quickest way to exercise the CLI crate, including its custom integration harness.
+
+## Fast Verification
+
+- Core-only changes: `cargo xtask test-core`.
+- Filesystem action/planning changes: `cargo xtask test-fs`.
+- CLI changes: `cargo xtask test-cli`.
+- CLI fixture harness changes: `cargo xtask test-integration`.
+- Final broad check: `cargo xtask test`.
+- Lint and format gate: `cargo xtask lint`.
 
 ## Coding Style & Naming Conventions
 
@@ -31,7 +54,7 @@ imports, and reordered imports/items. Keep modules focused and use
 snake_case for files, modules, and functions. Use PascalCase for types
 and traits. Prefer small, explicit helper functions over dense inline
 logic. When adding CLI behavior, keep argument parsing in
-`crates/cli/src/args.rs` or `crates/cli/src/commands/`.
+`crates/cli/src/cli/args.rs` or `crates/cli/src/commands/`.
 
 ## Testing Guidelines
 
@@ -46,6 +69,16 @@ run `cargo test --workspace` and `cargo +nightly clippy --workspace
 actionable: fix reported issues, or document why a finding is being left
 in place, before opening a PR.
 
+## Low-Value Files
+
+Avoid reading generated or bulky fixture assets unless they are directly
+relevant to the task.
+
+- `tests/fixtures/cli/report/` is generated report output.
+- `tests/fixtures/cli/mvp.css` is only relevant for report styling.
+- Binary audio fixtures and images are test assets unless the task
+  explicitly concerns their contents.
+
 ## Commit & Pull Request Guidelines
 
 Recent commits use short, imperative subjects such as `Add option to specify template on command line` and `Handle new lints`. Keep commit titles concise, capitalized, and behavior-focused. PRs should explain the user-visible change, call out affected crates, and mention any added fixtures or template changes. Include command output when relevant, especially for test or lint fixes.
@@ -55,5 +88,4 @@ Recent commits use short, imperative subjects such as `Add option to specify tem
 The workspace MSRV is Rust 1.85.0 (`edition = "2024"`). If you touch
 templates or reports, check `examples/` and
 `tests/fixtures/cli/test-template.html` so sample output and test
-reporting stay aligned. The workspace metadata also watches that fixture
-template for tooling integrations.
+reporting stay aligned.

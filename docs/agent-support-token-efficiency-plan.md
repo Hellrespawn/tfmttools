@@ -180,36 +180,24 @@ Include:
 
 ## Phase 5: Tooling Convenience
 
-Consider adding a `justfile` or equivalent script wrapper.
+Implemented with the Cargo `xtask` pattern to avoid adding another developer
+tool dependency.
 
-Suggested commands:
+Commands:
 
-```just
-check:
-    cargo check --workspace
-
-test:
-    cargo test --workspace
-
-test-core:
-    cargo test -p tfmttools-core
-
-test-fs:
-    cargo test -p tfmttools-fs
-
-test-cli:
-    cargo test -p tfmttools-cli
-
-test-integration:
-    cargo test -p tfmttools-cli --test integration -- --nocapture
-
-lint:
-    cargo +nightly fmt --all --check
-    cargo +nightly clippy --workspace --all-targets
+```sh
+cargo xtask check
+cargo xtask test
+cargo xtask test-core
+cargo xtask test-fs
+cargo xtask test-cli
+cargo xtask test-integration
+cargo xtask lint
 ```
 
-Only add this if the project wants another developer dependency. Otherwise,
-keep the command list in `AGENTS.md`.
+The `xtask/` crate is a workspace member, but `default-members` still points at
+`crates/cli` so plain `cargo build` keeps its existing behavior. The
+`.cargo/config.toml` alias maps `cargo xtask` to `cargo run -p xtask --`.
 
 ## Phase 6: Optional Code Structure Improvements
 

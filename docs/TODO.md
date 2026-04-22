@@ -2,7 +2,6 @@
 
 ## Backlog
 
-- [ ] Extract rename cycle detection / case sensitive file name handling to separate files/structs.
 - [ ] Fix(?) encoding of German characters
 - [ ] Add some sort of strict interpolation of forbidden characters.
 - [ ] Do test with interactive app?
@@ -19,6 +18,7 @@
 - [ ] Separate build scripts for Windows?
 - [ ] Replace custom history format with SQLite?
 - [ ] i18n?
+- [ ] Refactor the test harness report to output JSON, have a static HTML-page to render that JSON?
 
 ## In progress
 
