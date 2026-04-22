@@ -6,7 +6,7 @@ use tfmttools_core::util::{Utf8File, Utf8PathExt};
 use tfmttools_fs::ActionExecutor;
 use tracing::trace;
 
-use super::{ExecutionResult, RenameContext, RenamePlan};
+use super::{RenameExecutionResult, RenameContext, RenamePlan};
 use crate::ui::{ItemName, PreviewList, ProgressBar, current_dir_utf8};
 
 pub fn preview(context: &RenameContext, plan: &RenamePlan) -> Result<()> {
@@ -17,7 +17,7 @@ pub fn preview(context: &RenameContext, plan: &RenamePlan) -> Result<()> {
 pub fn execute(
     context: &RenameContext,
     plan: RenamePlan,
-) -> Result<ExecutionResult> {
+) -> Result<RenameExecutionResult> {
     // Can't apply compiler attribute to macro invocation directly.
     #[allow(unstable_name_collisions)]
     {
@@ -32,14 +32,14 @@ pub fn execute(
     }
 
     if plan.actions.is_empty() {
-        Ok(ExecutionResult::NothingToRename(plan.unchanged_files))
+        Ok(RenameExecutionResult::NothingToRename(plan.unchanged_files))
     } else {
         let confirmation = super::shared::confirm(context, "Move files?")?;
 
         if confirmation {
             match move_files(context, plan.actions) {
                 Ok(actions) => {
-                    Ok(ExecutionResult::Applied {
+                    Ok(RenameExecutionResult::Applied {
                         actions,
                         unchanged_files: plan.unchanged_files,
                         metadata: plan.metadata,
@@ -51,7 +51,7 @@ pub fn execute(
                 },
             }
         } else {
-            Ok(ExecutionResult::Aborted)
+            Ok(RenameExecutionResult::Aborted)
         }
     }
 }

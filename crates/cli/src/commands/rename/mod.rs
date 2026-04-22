@@ -1,5 +1,5 @@
 mod apply;
-mod cleanup;
+mod finish;
 mod context;
 mod session;
 mod setup;
@@ -18,7 +18,7 @@ pub(crate) struct RenamePlan {
     metadata: ActionRecordMetadata,
 }
 
-pub(crate) enum ExecutionResult {
+pub(crate) enum RenameExecutionResult {
     Applied {
         actions: Vec<Action>,
         unchanged_files: Vec<Utf8File>,
