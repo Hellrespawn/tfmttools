@@ -1,5 +1,6 @@
 use std::process::Command;
 
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use color_eyre::eyre::{OptionExt, eyre};
 
@@ -8,6 +9,7 @@ use crate::runtime::ContainerRuntime;
 pub const DEFAULT_IMAGE: &str = "tfmttools-test-container:local";
 
 const CONTAINERFILE: &str = "tests/container/Containerfile";
+const BUILD_CONTEXT: &str = ".";
 
 #[derive(Debug, Clone)]
 pub struct ImageConfig {
@@ -29,16 +31,20 @@ impl ImageConfig {
 pub fn ensure_image(
     runtime: &ContainerRuntime,
     config: &ImageConfig,
-) -> Result<ImageBuild> {
-    if config.skip_build {
-        return Ok(ImageBuild::Skipped);
-    }
+) -> Result<ImageInfo> {
+    let build = if config.skip_build {
+        ImageBuild::Skipped
+    } else if !config.rebuild && image_exists(runtime, &config.image)? {
+        ImageBuild::AlreadyPresent
+    } else {
+        build_image(runtime, &config.image)?
+    };
 
-    if !config.rebuild && image_exists(runtime, &config.image)? {
-        return Ok(ImageBuild::AlreadyPresent);
-    }
-
-    build_image(runtime, &config.image)
+    Ok(ImageInfo {
+        build,
+        id: image_id(runtime, &config.image)?,
+        source: ImageSource::default(),
+    })
 }
 
 fn image_exists(runtime: &ContainerRuntime, image: &str) -> Result<bool> {
@@ -51,7 +57,8 @@ fn image_exists(runtime: &ContainerRuntime, image: &str) -> Result<bool> {
 
 fn build_image(runtime: &ContainerRuntime, image: &str) -> Result<ImageBuild> {
     let output = Command::new(runtime.command())
-        .args(["build", "-f", CONTAINERFILE, "-t", image, "."])
+        .args(["build", "-f", CONTAINERFILE, "-t", image, BUILD_CONTEXT])
+        .current_dir(workspace_root())
         .output()?;
 
     if output.status.success() {
@@ -62,6 +69,49 @@ fn build_image(runtime: &ContainerRuntime, image: &str) -> Result<ImageBuild> {
             "failed to build container image {image} with {}: {stderr}",
             runtime.command()
         ))
+    }
+}
+
+fn workspace_root() -> Utf8PathBuf {
+    Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn image_id(runtime: &ContainerRuntime, image: &str) -> Result<Option<String>> {
+    let output = Command::new(runtime.command())
+        .args(["image", "inspect", "--format", "{{.Id}}", image])
+        .output()?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let id = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    Ok((!id.is_empty()).then_some(id))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageInfo {
+    pub build: ImageBuild,
+    pub id: Option<String>,
+    pub source: ImageSource,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageSource {
+    pub build_context: String,
+    pub containerfile: String,
+    pub builder_base: String,
+    pub runtime_base: String,
+}
+
+impl Default for ImageSource {
+    fn default() -> Self {
+        Self {
+            build_context: BUILD_CONTEXT.to_owned(),
+            containerfile: CONTAINERFILE.to_owned(),
+            builder_base: "rust:1.89-bookworm".to_owned(),
+            runtime_base: "debian:bookworm-slim".to_owned(),
+        }
     }
 }
 

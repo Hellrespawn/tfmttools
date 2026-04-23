@@ -1,0 +1,4 @@
+target/
+.git/
+tests/fixtures/cli/report/
+tests/fixtures/container/report/

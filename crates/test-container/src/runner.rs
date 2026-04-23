@@ -4,7 +4,9 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use color_eyre::Result;
-use tfmttools_test_harness::{CaseOutcome, ContainerRunDetails, Status};
+use tfmttools_test_harness::{
+    CaseOutcome, ContainerImageSource, ContainerRunDetails, Status,
+};
 
 use crate::case::run_case;
 use crate::image::{
@@ -83,7 +85,13 @@ fn run_suite() -> Result<SuiteOutcome> {
     };
 
     let image_config = ImageConfig::from_env()?;
-    let image_build = ensure_image(&runtime, &image_config)?;
+    let image_info = ensure_image(&runtime, &image_config)?;
+    let image_source = ContainerImageSource::new(
+        image_info.source.build_context,
+        image_info.source.containerfile,
+        image_info.source.builder_base,
+        image_info.source.runtime_base,
+    );
     let mut cases = Vec::new();
 
     for case in discover_cases() {
@@ -95,7 +103,9 @@ fn run_suite() -> Result<SuiteOutcome> {
         details: ContainerRunDetails::new(
             runtime.command().to_owned(),
             image_config.image,
-            image_build.as_str().to_owned(),
+            image_info.build.as_str().to_owned(),
+            image_info.id,
+            image_source,
             timeout_seconds,
             preserve,
         ),

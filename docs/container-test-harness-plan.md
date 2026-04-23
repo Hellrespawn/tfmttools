@@ -239,7 +239,7 @@ crates/test-container/src/
     tfmt-container-verify.rs
 ```
 
-### 3. Container Image
+### ~~3. Container Image~~
 
 - Add `tests/container/Containerfile`.
 - Use the local workspace checkout as the build context so uncommitted

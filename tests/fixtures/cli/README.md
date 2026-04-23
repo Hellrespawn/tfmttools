@@ -115,3 +115,21 @@ Run the fixture-backed suite with:
 ```sh
 cargo test -p tfmttools-cli --test integration -- --nocapture
 ```
+
+## Audio-file explanation
+
+All audio-files are of silence, with tags copied to them for testing.
+
+### Justification
+
+- "Amon Amarth - Under Siege": Uses disc-number
+- "Damjan Mravunac - Welcome To Heaven.ogg": Non-MP3 file
+- "Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3": Bug with periods in tag values
+- "MASTER BOOT RECORD - Dune.mp3": Has no album or year
+- "MASTER BOOT RECORD - MYTH.NFO.mp3": Complex album name, many forbidden characters.
+- "MASTER BOOT RECORD - RAMDRIVE.SYS.mp3": Checking folder structure with same artist
+- "MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3": Complex song and album name, many forbidden characters
+- "Nightwish - Elvenpath (Live).mp3": Random initial pick
+- "Nightwish - Nemo.mp3": Random initial pick
+- "Nightwish - While Your Lips Are Still Red.mp3": Random initial pick
+

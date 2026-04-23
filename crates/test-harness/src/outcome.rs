@@ -168,6 +168,8 @@ pub struct ContainerRunDetails {
     runtime: Option<String>,
     image: Option<String>,
     image_build: Option<String>,
+    image_id: Option<String>,
+    image_source: Option<ContainerImageSource>,
     command_timeout_seconds: u64,
     preserve: bool,
     setup_error: Option<String>,
@@ -179,6 +181,8 @@ impl ContainerRunDetails {
         runtime: String,
         image: String,
         image_build: String,
+        image_id: Option<String>,
+        image_source: ContainerImageSource,
         command_timeout_seconds: u64,
         preserve: bool,
     ) -> Self {
@@ -186,6 +190,8 @@ impl ContainerRunDetails {
             runtime: Some(runtime),
             image: Some(image),
             image_build: Some(image_build),
+            image_id,
+            image_source: Some(image_source),
             command_timeout_seconds,
             preserve,
             setup_error: None,
@@ -206,6 +212,25 @@ impl ContainerRunDetails {
 
     pub fn failed_setup(error: impl Into<String>) -> Self {
         Self { setup_error: Some(error.into()), ..Self::default() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContainerImageSource {
+    build_context: String,
+    containerfile: String,
+    builder_base: String,
+    runtime_base: String,
+}
+
+impl ContainerImageSource {
+    pub fn new(
+        build_context: String,
+        containerfile: String,
+        builder_base: String,
+        runtime_base: String,
+    ) -> Self {
+        Self { build_context, containerfile, builder_base, runtime_base }
     }
 }
 
