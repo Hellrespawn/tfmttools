@@ -16,6 +16,7 @@ members = [
     "crates/fs",
     "crates/history",
     "crates/test-cli",
+    "crates/test-container",
     "crates/test-harness",
     "xtask",
 ]

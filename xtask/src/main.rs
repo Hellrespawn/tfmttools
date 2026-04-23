@@ -6,11 +6,15 @@ Usage: cargo xtask <task>
 
 Tasks:
     check             cargo check --workspace
-    test              cargo test --workspace
+    test              cargo test --workspace --exclude tfmttools-cli
+                      cargo test -p tfmttools-cli --bin tfmt
+                      cargo test -p tfmttools-cli --test integration -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
-    test-cli          cargo test -p tfmttools-cli
+    test-cli          cargo test -p tfmttools-cli --bin tfmt
+                      cargo test -p tfmttools-cli --test integration -- --nocapture
     test-integration  cargo test -p tfmttools-cli --test integration -- --nocapture
+    test-container    TFMT_CONTAINER_REQUIRED=1 cargo test -p tfmttools-cli --test container -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
 ";
@@ -23,6 +27,19 @@ const TEST_INTEGRATION_ARGS: &[&str] = &[
     "--",
     "--nocapture",
 ];
+const TEST_CONTAINER_ARGS: &[&str] = &[
+    "test",
+    "-p",
+    "tfmttools-cli",
+    "--test",
+    "container",
+    "--",
+    "--nocapture",
+];
+const TEST_WORKSPACE_ARGS: &[&str] =
+    &["test", "--workspace", "--exclude", "tfmttools-cli"];
+const TEST_CLI_BIN_ARGS: &[&str] =
+    &["test", "-p", "tfmttools-cli", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];
@@ -35,11 +52,23 @@ fn main() -> ExitCode {
 
     match task.as_str() {
         "check" => run_cargo(&["check", "--workspace"]),
-        "test" => run_cargo(&["test", "--workspace"]),
+        "test" => {
+            run_steps(&[
+                TEST_WORKSPACE_ARGS,
+                TEST_CLI_BIN_ARGS,
+                TEST_INTEGRATION_ARGS,
+            ])
+        },
         "test-core" => run_cargo(&["test", "-p", "tfmttools-core"]),
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
-        "test-cli" => run_cargo(&["test", "-p", "tfmttools-cli"]),
+        "test-cli" => run_steps(&[TEST_CLI_BIN_ARGS, TEST_INTEGRATION_ARGS]),
         "test-integration" => run_cargo(TEST_INTEGRATION_ARGS),
+        "test-container" => {
+            run_cargo_with_env(TEST_CONTAINER_ARGS, &[(
+                "TFMT_CONTAINER_REQUIRED",
+                "1",
+            )])
+        },
         "lint" => run_steps(&[CLIPPY_ARGS, FMT_ARGS]),
         "help" | "--help" | "-h" => {
             print!("{HELP}");
@@ -65,7 +94,18 @@ fn run_steps(steps: &[&[&str]]) -> ExitCode {
 }
 
 fn run_cargo(args: &[&str]) -> ExitCode {
-    let status = Command::new("cargo").args(args).status();
+    run_cargo_with_env(args, &[])
+}
+
+fn run_cargo_with_env(args: &[&str], env: &[(&str, &str)]) -> ExitCode {
+    let mut command = Command::new("cargo");
+    command.args(args);
+
+    for (name, value) in env {
+        command.env(name, value);
+    }
+
+    let status = command.status();
 
     match status {
         Ok(status) if status.success() => ExitCode::SUCCESS,

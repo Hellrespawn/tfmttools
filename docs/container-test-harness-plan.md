@@ -168,7 +168,7 @@ crates/test-cli/src/
 The shared crate should contain lower-level utilities and common data
 structures only. Host and container schemas should stay separate.
 
-### 2. Container Harness Skeleton
+### ~~2. Container Harness Skeleton~~
 
 - Add `crates/test-container` with package name
   `tfmttools-test-container`.

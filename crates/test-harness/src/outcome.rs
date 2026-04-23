@@ -79,6 +79,12 @@ impl ReportEnvelope {
     pub fn status(&self) -> Status {
         self.status
     }
+
+    #[must_use]
+    pub fn with_status(mut self, status: Status) -> Self {
+        self.status = status;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -151,10 +157,57 @@ impl ReportSummary {
 #[serde(rename_all = "snake_case")]
 pub enum RunnerDetails {
     Cli(CliRunDetails),
+    Container(ContainerRunDetails),
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct CliRunDetails {}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ContainerRunDetails {
+    runtime: Option<String>,
+    image: Option<String>,
+    image_build: Option<String>,
+    command_timeout_seconds: u64,
+    preserve: bool,
+    setup_error: Option<String>,
+    skip_reason: Option<String>,
+}
+
+impl ContainerRunDetails {
+    pub fn new(
+        runtime: String,
+        image: String,
+        image_build: String,
+        command_timeout_seconds: u64,
+        preserve: bool,
+    ) -> Self {
+        Self {
+            runtime: Some(runtime),
+            image: Some(image),
+            image_build: Some(image_build),
+            command_timeout_seconds,
+            preserve,
+            setup_error: None,
+            skip_reason: None,
+        }
+    }
+
+    pub fn skipped(
+        command_timeout_seconds: u64,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            command_timeout_seconds,
+            skip_reason: Some(reason.into()),
+            ..Self::default()
+        }
+    }
+
+    pub fn failed_setup(error: impl Into<String>) -> Self {
+        Self { setup_error: Some(error.into()), ..Self::default() }
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CaseOutcome {

@@ -21,6 +21,10 @@ debug = []
 name = "integration"
 harness = false
 
+[[test]]
+name = "container"
+harness = false
+
 [dependencies]
 tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
@@ -42,6 +46,7 @@ tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 tfmttools-test-cli = { path = "../test-cli" }
+tfmttools-test-container = { path = "../test-container" }
 assert_fs = { workspace = true }
 
 [lints]

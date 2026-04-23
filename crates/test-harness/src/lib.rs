@@ -12,7 +12,8 @@ pub use context::{FixtureDirs, copy_files};
 pub use data::{Expectation, ExpectationOption, TestCaseData, TestData};
 pub use outcome::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome,
-    ExpectationOutcome, ExpectationsOutcome, ReportEnvelope, ReportFilters,
-    ReportSummary, Runner, RunnerDetails, Status, StepOutcome,
+    ContainerRunDetails, ExpectationOutcome, ExpectationsOutcome,
+    ReportEnvelope, ReportFilters, ReportSummary, Runner, RunnerDetails,
+    Status, StepOutcome,
 };
 pub use report::{REPORT_HTML_FILE_NAME, REPORT_JSON_FILE_NAME, write_report};
