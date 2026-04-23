@@ -1,3 +1,60 @@
 {
-  "description": "Runs with source and target on separate named volumes"
+  "description": "Runs with source and target on separate named volumes",
+  "mounts": {
+    "source": {
+      "kind": "volume",
+      "container-path": "/mnt/source"
+    },
+    "target": {
+      "kind": "volume",
+      "container-path": "/mnt/target",
+      "driver": "local",
+      "driver-opts": {
+        "type": "tmpfs",
+        "device": "tmpfs"
+      }
+    },
+    "config": {
+      "kind": "volume",
+      "container-path": "/work/config"
+    }
+  },
+  "workdir": "/work",
+  "input": {
+    "mount": "source",
+    "path": "input"
+  },
+  "setup": [
+    {
+      "op": "copy-fixture-dir",
+      "from": "audio",
+      "to": {
+        "mount": "source",
+        "path": "input"
+      }
+    },
+    {
+      "op": "copy-fixture-dir",
+      "from": "extra",
+      "to": {
+        "mount": "source",
+        "path": "input/extra"
+      }
+    },
+    {
+      "op": "copy-fixture-dir",
+      "from": "template",
+      "to": {
+        "mount": "config",
+        "path": ""
+      }
+    }
+  ],
+  "preconditions": [
+    {
+      "kind": "different-devices",
+      "left": "source",
+      "right": "target"
+    }
+  ]
 }

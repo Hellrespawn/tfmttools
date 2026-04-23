@@ -191,12 +191,15 @@ pub struct CliRunDetails {}
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ContainerRunDetails {
     runtime: Option<String>,
+    runtime_version_output: Option<String>,
     image: Option<String>,
     image_build: Option<String>,
     image_id: Option<String>,
     image_source: Option<ContainerImageSource>,
     command_timeout_seconds: u64,
     preserve: bool,
+    volume_names: Vec<String>,
+    cleanup_commands: Vec<String>,
     setup_error: Option<String>,
     skip_reason: Option<String>,
 }
@@ -204,21 +207,27 @@ pub struct ContainerRunDetails {
 impl ContainerRunDetails {
     pub fn new(
         runtime: String,
+        runtime_version_output: String,
         image: String,
         image_build: String,
         image_id: Option<String>,
         image_source: ContainerImageSource,
         command_timeout_seconds: u64,
         preserve: bool,
+        volume_names: Vec<String>,
+        cleanup_commands: Vec<String>,
     ) -> Self {
         Self {
             runtime: Some(runtime),
+            runtime_version_output: Some(runtime_version_output),
             image: Some(image),
             image_build: Some(image_build),
             image_id,
             image_source: Some(image_source),
             command_timeout_seconds,
             preserve,
+            volume_names,
+            cleanup_commands,
             setup_error: None,
             skip_reason: None,
         }
@@ -359,6 +368,32 @@ impl StepOutcome {
         }
     }
 
+    pub fn failed(name: String, reason: impl Into<String>) -> Self {
+        Self {
+            name,
+            status: Status::Failed,
+            skip_reason: Some(reason.into()),
+            duration_ms: 0,
+            command_outcome: None,
+            expectations_outcome: None,
+        }
+    }
+
+    pub fn timed_out(
+        name: String,
+        duration_ms: u128,
+        command_outcome: Option<CommandOutcome>,
+    ) -> Self {
+        Self {
+            name,
+            status: Status::TimedOut,
+            skip_reason: None,
+            duration_ms,
+            command_outcome,
+            expectations_outcome: None,
+        }
+    }
+
     pub fn passed(&self) -> bool {
         self.status == Status::Passed
     }
@@ -385,6 +420,20 @@ impl CommandOutcome {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
         Self { arguments, status, exit_code, stdout, stderr }
+    }
+
+    pub fn timed_out(
+        arguments: Vec<String>,
+        stdout: impl Into<String>,
+        stderr: impl Into<String>,
+    ) -> Self {
+        Self {
+            arguments,
+            status: Status::TimedOut,
+            exit_code: None,
+            stdout: stdout.into(),
+            stderr: stderr.into(),
+        }
     }
 
     pub fn passed(&self) -> bool {

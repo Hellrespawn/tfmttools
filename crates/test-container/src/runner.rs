@@ -3,13 +3,14 @@ use std::error::Error;
 use std::process::ExitCode;
 use std::time::Instant;
 
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use libtest_mimic::Arguments;
 use tfmttools_test_harness::{
     CaseOutcome, ContainerImageSource, ContainerRunDetails, Status,
 };
 
-use crate::case::run_case;
+use crate::case::{CaseRunContext, run_case};
 use crate::image::{
     ImageConfig, ensure_image, required_env_flag, required_env_u64,
 };
@@ -93,25 +94,48 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
 
     let image_config = ImageConfig::from_env()?;
     let image_info = ensure_image(&runtime, &image_config)?;
+    let runtime_version_output = runtime.version_output()?;
     let image_source = ContainerImageSource::new(
         image_info.source.build_context,
         image_info.source.containerfile,
         image_info.source.builder_base,
         image_info.source.runtime_base,
     );
-    let cases =
-        discover_cases(args)?.into_iter().map(|case| run_case(&case)).collect();
+    let run_id = build_run_id(&timestamp());
+    let workspace_root = workspace_root();
+    let case_context = CaseRunContext {
+        runtime: &runtime,
+        image: &image_config.image,
+        timeout_seconds,
+        preserve,
+        run_id: &run_id,
+        workspace_root: &workspace_root,
+    };
+    let mut volume_names = Vec::new();
+    let mut cleanup_commands = Vec::new();
+    let cases = discover_cases(args)?
+        .into_iter()
+        .map(|case| {
+            let executed = run_case(&case, &case_context);
+            volume_names.extend(executed.volume_names);
+            cleanup_commands.extend(executed.cleanup_commands);
+            executed.outcome
+        })
+        .collect::<Vec<CaseOutcome>>();
 
     Ok(SuiteOutcome {
         cases,
         details: ContainerRunDetails::new(
             runtime.command().to_owned(),
+            runtime_version_output,
             image_config.image,
             image_info.build.as_str().to_owned(),
             image_info.id,
             image_source,
             timeout_seconds,
             preserve,
+            volume_names,
+            cleanup_commands,
         ),
         exit_code: ExitCode::SUCCESS,
         status: None,
@@ -123,4 +147,22 @@ struct SuiteOutcome {
     details: ContainerRunDetails,
     exit_code: ExitCode,
     status: Option<Status>,
+}
+
+fn build_run_id(started_at: &str) -> String {
+    started_at
+        .chars()
+        .filter_map(|char| {
+            if char.is_ascii_alphanumeric() {
+                Some(char.to_ascii_lowercase())
+            } else {
+                None
+            }
+        })
+        .take(24)
+        .collect()
+}
+
+fn workspace_root() -> Utf8PathBuf {
+    Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }

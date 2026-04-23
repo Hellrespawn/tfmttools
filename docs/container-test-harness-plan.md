@@ -301,7 +301,7 @@ tests/fixtures/container/
   matching later only if real usage shows that case-ID filtering is too
   narrow.
 
-### 5. First Real Scenario
+### 5. ~~First Real Scenario~~
 
 Start with cross-filesystem rename fallback.
 
