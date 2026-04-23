@@ -41,7 +41,7 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-tfmttools-test = { path = "../test-harness" }
+tfmttools-test-cli = { path = "../test-cli" }
 assert_fs = { workspace = true }
 
 [lints]

@@ -1,20 +1,19 @@
 # Test Harness Crate Guidance
 
-This crate owns the fixture-backed CLI integration harness used by
-`crates/cli/tests/integration.rs`.
+This crate owns shared fixture parsing and report utilities for test harness
+crates.
 
 ## Task Map
 
 - Case schema readers and expectation data: `src/data.rs`.
-- Fixture directory and temporary work directory setup: `src/context.rs`.
-- Case discovery, command execution, expectation checks, and report
-  generation: `src/runner.rs`.
-- Serialized command, expectation, and case outcomes: `src/outcome.rs`.
-- Report template: `../../tests/fixtures/cli/test-template.html`.
+- Fixture directory helpers: `src/context.rs`.
+- Shared serialized command, expectation, and report outcomes:
+  `src/outcome.rs`.
+- Static report viewer and writer: `src/report.rs`, `assets/report/`.
 - Fixture authoring guide: `../../tests/fixtures/cli/README.md`.
 
 ## Verification
 
-- Harness or fixture behavior changes:
+- Shared harness or fixture behavior changes:
   `cargo test -p tfmttools-cli --test integration -- --nocapture`.
-- Crate-local compile check: `cargo test -p tfmttools-test`.
+- Crate-local compile check: `cargo test -p tfmttools-test-harness`.

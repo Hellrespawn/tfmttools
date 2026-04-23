@@ -17,4 +17,3 @@
 - Separate build scripts for Windows?
 - Replace custom history format with SQLite?
 - i18n?
-- Refactor the test harness report to output JSON, have a static HTML-page to render that JSON?

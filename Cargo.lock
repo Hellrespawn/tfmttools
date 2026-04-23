@@ -1193,7 +1193,7 @@ dependencies = [
  "tfmttools-core",
  "tfmttools-fs",
  "tfmttools-history",
- "tfmttools-test",
+ "tfmttools-test-cli",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -1247,20 +1247,31 @@ dependencies = [
 ]
 
 [[package]]
-name = "tfmttools-test"
+name = "tfmttools-test-cli"
 version = "0.24.0"
 dependencies = [
  "assert_cmd",
  "assert_fs",
  "camino",
+ "chrono",
+ "color-eyre",
+ "fs-err",
+ "libtest-mimic",
+ "tfmttools-fs",
+ "tfmttools-test-harness",
+]
+
+[[package]]
+name = "tfmttools-test-harness"
+version = "0.24.0"
+dependencies = [
+ "camino",
+ "chrono",
  "color-eyre",
  "fs-err",
  "indexmap",
- "libtest-mimic",
- "minijinja",
  "serde",
  "serde_json",
- "tfmttools-fs",
 ]
 
 [[package]]

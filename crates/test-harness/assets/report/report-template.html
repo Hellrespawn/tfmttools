@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>tfmt test report</title>
+    <style>
+{{REPORT_CSS}}
+    </style>
+</head>
+<body>
+    <main id="app"></main>
+    <script type="module">
+const vendorModuleSource = {{REPORT_VENDOR_MODULE_JSON}};
+const viewerModuleSource = {{REPORT_VIEWER_MODULE_JSON}};
+const vendorUrl = URL.createObjectURL(
+    new Blob([vendorModuleSource], { type: "text/javascript" }),
+);
+const viewerUrl = URL.createObjectURL(
+    new Blob(
+        [`globalThis.__tfmtReportVendorUrl = ${JSON.stringify(vendorUrl)};\n`, viewerModuleSource],
+        { type: "text/javascript" },
+    ),
+);
+await import(viewerUrl);
+    </script>
+</body>
+</html>

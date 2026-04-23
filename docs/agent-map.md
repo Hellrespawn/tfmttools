@@ -75,14 +75,14 @@ Compact map for finding the right code quickly. Prefer crate-local
 ## Fixture Integration Flow
 
 1. `crates/cli/tests/integration.rs` calls
-   `tfmttools_test::test_runner`.
-2. `crates/test-harness/src/runner.rs` discovers
+   `tfmttools_test_cli::test_runner`.
+2. `crates/test-cli/src/runner.rs` discovers
    `tests/fixtures/cli/cases/*.case.json` through
    `crates/fs/src/path_iterator.rs`.
 3. `crates/test-harness/src/data.rs` reads the case schema:
    `description`, named `expectations`, ordered `tests`, commands, and
    previous-expectation checks.
-4. `crates/test-harness/src/context.rs` creates a fresh temporary work
+4. `crates/test-cli/src/case.rs` creates a fresh temporary work
    directory per case and maps fixture sources under
    `tests/fixtures/cli/`.
 5. Before each case, `runner.rs` copies `template/*` to `config/`,
@@ -94,8 +94,8 @@ Compact map for finding the right code quickly. Prefer crate-local
    `previous-expectations` unless an entry has
    `options: ["no-previous"]`.
 8. Failing work directories are preserved. After the run,
-   `runner.rs` renders `tests/fixtures/cli/report/test-report.html`
-   from `tests/fixtures/cli/test-template.html`.
+   `runner.rs` writes `tests/fixtures/cli/report/report.json` and copies
+   the shared static viewer to `tests/fixtures/cli/report/report.html`.
 
 ## Change Recipes
 

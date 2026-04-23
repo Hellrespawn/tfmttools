@@ -8,8 +8,7 @@ These fixtures drive the `tfmttools-cli` integration test harness.
 - `template/`: templates copied into each test config directory.
 - `audio/`: audio files copied into each test input directory.
 - `extra/`: non-audio files copied into `input/extra/`.
-- `test-template.html`: report template used after the harness run.
-- `report/`: generated report output.
+- `report/`: generated `report.html` and `report.json` output.
 
 ## Case File Schema
 
@@ -92,8 +91,10 @@ stops a case after the first failing step. Failing work directories are
 preserved for inspection; passing work directories are temporary.
 
 After the integration run, the harness generates
-`tests/fixtures/cli/report/test-report.html` from `test-template.html`.
-The `report/` directory is generated output.
+`tests/fixtures/cli/report/report.html` and
+`tests/fixtures/cli/report/report.json`. The HTML viewer is owned by the
+harness crate and loads the adjacent JSON report. The `report/` directory is
+generated output.
 
 ## Adding A Case
 

@@ -25,7 +25,7 @@ fallback behavior.
 
 ## Milestones
 
-### 1. Refactor Existing Harness
+### ~~1. Refactor Existing Harness~~
 
 Create clearer crate boundaries before adding container behavior.
 

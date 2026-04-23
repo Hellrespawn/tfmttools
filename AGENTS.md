@@ -75,7 +75,6 @@ Avoid reading generated or bulky fixture assets unless they are directly
 relevant to the task.
 
 - `tests/fixtures/cli/report/` is generated report output.
-- `tests/fixtures/cli/mvp.css` is only relevant for report styling.
 - Binary audio fixtures and images are test assets unless the task
   explicitly concerns their contents.
 
@@ -86,6 +85,6 @@ Recent commits use short, imperative subjects such as `Add option to specify tem
 ## Contributor Notes
 
 The workspace MSRV is Rust 1.85.0 (`edition = "2024"`). If you touch
-templates or reports, check `examples/` and
-`tests/fixtures/cli/test-template.html` so sample output and test
-reporting stay aligned.
+templates or reports, check `examples/`, fixture report expectations, and
+the shared report viewer assets under `crates/test-harness/assets/report/`
+so sample output and test reporting stay aligned.

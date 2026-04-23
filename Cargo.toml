@@ -15,6 +15,7 @@ members = [
     "crates/cli",
     "crates/fs",
     "crates/history",
+    "crates/test-cli",
     "crates/test-harness",
     "xtask",
 ]
@@ -60,9 +61,6 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 strip = true    # Automatically strip symbols from the binary.
 lto = true
 opt-level = "z" # Optimize for size.
-
-[workspace.metadata.bacon]
-watch = ["tfmttools-test/testdata/test-template.html"]
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
