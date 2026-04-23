@@ -94,8 +94,8 @@ Compact map for finding the right code quickly. Prefer crate-local
    `previous-expectations` unless an entry has
    `options: ["no-previous"]`.
 8. Failing work directories are preserved. After the run,
-   `runner.rs` writes `tests/fixtures/cli/report/report.json` and copies
-   the shared static viewer to `tests/fixtures/cli/report/report.html`.
+   `runner.rs` writes runner-specific timestamped report files under
+   `tests/reports/`.
 
 ## Change Recipes
 

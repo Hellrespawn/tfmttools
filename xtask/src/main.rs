@@ -17,6 +17,7 @@ Tasks:
     test-container    TFMT_CONTAINER_REQUIRED=1 cargo test -p tfmttools-cli --test container -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
+    serve-reports     python -m http.server (from tests/reports/, passes through arguments)
 ";
 const TEST_INTEGRATION_ARGS: &[&str] = &[
     "test",
@@ -45,10 +46,12 @@ const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];
 
 fn main() -> ExitCode {
-    let Some(task) = env::args().nth(1) else {
+    let mut args = env::args().skip(1);
+    let Some(task) = args.next() else {
         print!("{HELP}");
         return ExitCode::SUCCESS;
     };
+    let trailing_args = args.collect::<Vec<_>>();
 
     match task.as_str() {
         "check" => run_cargo(&["check", "--workspace"]),
@@ -70,6 +73,7 @@ fn main() -> ExitCode {
             )])
         },
         "lint" => run_steps(&[CLIPPY_ARGS, FMT_ARGS]),
+        "serve-reports" => run_reports_server(&trailing_args),
         "help" | "--help" | "-h" => {
             print!("{HELP}");
             ExitCode::SUCCESS
@@ -105,21 +109,38 @@ fn run_cargo_with_env(args: &[&str], env: &[(&str, &str)]) -> ExitCode {
         command.env(name, value);
     }
 
+    for (name, value) in env {
+        command.env(name, value);
+    }
+
+    run_command(command, "cargo")
+}
+
+fn run_reports_server(args: &[String]) -> ExitCode {
+    let mut command = Command::new("python");
+    command.args(["-m", "http.server"]);
+    command.args(args);
+    command.current_dir("tests/reports");
+
+    run_command(command, "python")
+}
+
+fn run_command(mut command: Command, program_name: &str) -> ExitCode {
     let status = command.status();
 
     match status {
         Ok(status) if status.success() => ExitCode::SUCCESS,
         Ok(status) => {
             if let Some(code) = status.code() {
-                eprintln!("cargo exited with status code {code}");
+                eprintln!("{program_name} exited with status code {code}");
             } else {
-                eprintln!("cargo was terminated by a signal");
+                eprintln!("{program_name} was terminated by a signal");
             }
 
             ExitCode::FAILURE
         },
         Err(error) => {
-            eprintln!("failed to run cargo: {error}");
+            eprintln!("failed to run {program_name}: {error}");
             ExitCode::FAILURE
         },
     }

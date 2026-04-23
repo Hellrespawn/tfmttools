@@ -8,7 +8,7 @@ These fixtures drive the `tfmttools-cli` integration test harness.
 - `template/`: templates copied into each test config directory.
 - `audio/`: audio files copied into each test input directory.
 - `extra/`: non-audio files copied into `input/extra/`.
-- `report/`: generated `report.html` and `report.json` output.
+- Reports are generated under `tests/reports/`.
 
 ## Case File Schema
 
@@ -90,11 +90,11 @@ Test steps run in the order written in the JSON object. The harness
 stops a case after the first failing step. Failing work directories are
 preserved for inspection; passing work directories are temporary.
 
-After the integration run, the harness generates
-`tests/fixtures/cli/report/report.html` and
-`tests/fixtures/cli/report/report.json`. The HTML viewer is owned by the
-harness crate and loads the adjacent JSON report. The `report/` directory is
-generated output.
+After the integration run, the harness generates runner-specific
+timestamped report files under `tests/reports/`, for example
+`cli-2026-04-23T14-03-44.123Z.html` and
+`cli-2026-04-23T14-03-44.123Z.json`. The HTML viewer is owned by the
+harness crate and loads its adjacent JSON report.
 
 ## Adding A Case
 
@@ -132,4 +132,3 @@ All audio-files are of silence, with tags copied to them for testing.
 - "Nightwish - Elvenpath (Live).mp3": Random initial pick
 - "Nightwish - Nemo.mp3": Random initial pick
 - "Nightwish - While Your Lips Are Still Red.mp3": Random initial pick
-

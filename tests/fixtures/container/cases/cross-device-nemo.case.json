@@ -1,0 +1,4 @@
+{
+  "description": "Rename across source and target volumes falls back to copy/remove",
+  "scenario": "cross-device-volumes"
+}

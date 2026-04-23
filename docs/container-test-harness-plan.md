@@ -268,7 +268,7 @@ crates/test-container/src/
   containers.
 - Create a non-root app user with UID/GID `1000:1000`.
 
-### 4. Container Fixture Tree
+### ~~4. Container Fixture Tree~~
 
 Use a separate self-contained fixture tree:
 

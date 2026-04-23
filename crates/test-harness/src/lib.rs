@@ -16,4 +16,4 @@ pub use outcome::{
     ExpectationsOutcome, ReportEnvelope, ReportFilters, ReportSummary, Runner,
     RunnerDetails, Status, StepOutcome,
 };
-pub use report::{REPORT_HTML_FILE_NAME, REPORT_JSON_FILE_NAME, write_report};
+pub use report::write_report;

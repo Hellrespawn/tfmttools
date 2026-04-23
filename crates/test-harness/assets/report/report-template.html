@@ -13,6 +13,7 @@
     <script type="module">
 const vendorModuleSource = {{REPORT_VENDOR_MODULE_JSON}};
 const viewerModuleSource = {{REPORT_VIEWER_MODULE_JSON}};
+globalThis.__tfmtReportJsonFileName = {{REPORT_JSON_FILE_NAME_JSON}};
 const vendorUrl = URL.createObjectURL(
     new Blob([vendorModuleSource], { type: "text/javascript" }),
 );

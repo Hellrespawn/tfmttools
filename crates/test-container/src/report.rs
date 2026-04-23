@@ -1,27 +1,25 @@
 use std::collections::BTreeMap;
 use std::env;
 
-use camino::Utf8PathBuf;
 use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
 use tfmttools_test_harness::{
-    CaseOutcome, ContainerRunDetails, ReportEnvelope, ReportFilters, Runner,
-    RunnerDetails, Status, write_report,
+    CaseOutcome, ContainerRunDetails, FixtureDirs, ReportEnvelope,
+    ReportFilters, Runner, RunnerDetails, Status, write_report,
 };
-
-pub const REPORT_ROOT: &str = "../../tests/fixtures/container";
 
 pub struct ReportInput {
     pub started_at: String,
     pub duration_ms: u128,
     pub argv: Vec<String>,
+    pub filters: ReportFilters,
     pub cases: Vec<CaseOutcome>,
     pub details: ContainerRunDetails,
     pub status: Option<Status>,
 }
 
 pub fn write_container_report(input: ReportInput) -> Result<()> {
-    let report_dir = Utf8PathBuf::from(REPORT_ROOT).join("report");
+    let report_dir = FixtureDirs::reports_dir();
     fs_err::create_dir_all(&report_dir)?;
     let canonical_report_dir = report_dir.canonicalize_utf8().ok();
     let mut report = ReportEnvelope::new(
@@ -30,17 +28,17 @@ pub fn write_container_report(input: ReportInput) -> Result<()> {
         timestamp(),
         input.duration_ms,
         input.argv,
-        ReportFilters::default(),
+        input.filters,
         harness_environment(),
         canonical_report_dir,
         input.cases,
-        RunnerDetails::Container(input.details),
+        RunnerDetails::Container(Box::new(input.details)),
     );
     if let Some(status) = input.status {
         report = report.with_status(status);
     }
 
-    write_report(&report_dir, &report)
+    write_report(&report_dir, report)
 }
 
 pub fn harness_environment() -> BTreeMap<String, String> {

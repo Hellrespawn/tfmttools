@@ -69,7 +69,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         Arc::into_inner(mutex).expect("Arc dropped").into_inner()?;
     test_outcomes.sort_by(|left, right| left.name().cmp(right.name()));
 
-    let report_dir = fixture_dirs.report_output_dir();
+    let report_dir = FixtureDirs::reports_dir();
     fs_err::create_dir_all(&report_dir)?;
     let canonical_report_dir = report_dir.canonicalize_utf8().ok();
     let report = ReportEnvelope::new(
@@ -85,7 +85,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         RunnerDetails::Cli(CliRunDetails::default()),
     );
 
-    write_report(&report_dir, &report)?;
+    write_report(&report_dir, report)?;
 
     Ok(exit_code)
 }

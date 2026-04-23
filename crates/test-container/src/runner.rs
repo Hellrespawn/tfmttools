@@ -4,6 +4,7 @@ use std::process::ExitCode;
 use std::time::Instant;
 
 use color_eyre::Result;
+use libtest_mimic::Arguments;
 use tfmttools_test_harness::{
     CaseOutcome, ContainerImageSource, ContainerRunDetails, Status,
 };
@@ -23,8 +24,9 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let run_started = Instant::now();
     let started_at = timestamp();
     let argv = env::args().collect::<Vec<_>>();
+    let test_args = Arguments::from_args();
 
-    let outcome = run_suite();
+    let outcome = run_suite(&test_args);
     let (cases, details, exit_code, status) = match outcome {
         Ok(SuiteOutcome { cases, details, exit_code, status }) => {
             (cases, details, exit_code, status)
@@ -39,6 +41,11 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         started_at,
         duration_ms: run_started.elapsed().as_millis(),
         argv,
+        filters: tfmttools_test_harness::ReportFilters::new(
+            test_args.filter.clone(),
+            test_args.skip.clone(),
+            test_args.exact,
+        ),
         cases,
         details,
         status,
@@ -47,7 +54,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     Ok(exit_code)
 }
 
-fn run_suite() -> Result<SuiteOutcome> {
+fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
     let required = required_env_flag("TFMT_CONTAINER_REQUIRED")?;
     let preserve = required_env_flag("TFMT_CONTAINER_PRESERVE")?;
     let timeout_seconds = required_env_u64(
@@ -92,11 +99,8 @@ fn run_suite() -> Result<SuiteOutcome> {
         image_info.source.builder_base,
         image_info.source.runtime_base,
     );
-    let mut cases = Vec::new();
-
-    for case in discover_cases() {
-        cases.push(run_case(&case));
-    }
+    let cases =
+        discover_cases(args)?.into_iter().map(|case| run_case(&case)).collect();
 
     Ok(SuiteOutcome {
         cases,

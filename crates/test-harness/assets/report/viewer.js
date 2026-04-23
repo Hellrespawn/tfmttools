@@ -487,9 +487,13 @@ function Report({ report }) {
 }
 
 async function main() {
-    const response = await fetch("report.json", { cache: "no-store" });
+    const reportJsonFileName =
+        globalThis.__tfmtReportJsonFileName ?? "report.json";
+    const response = await fetch(reportJsonFileName, { cache: "no-store" });
     if (!response.ok) {
-        throw new Error(`failed to load report.json: ${response.status}`);
+        throw new Error(
+            `failed to load ${reportJsonFileName}: ${response.status}`,
+        );
     }
 
     const report = await response.json();

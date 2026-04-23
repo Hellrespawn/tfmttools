@@ -2,10 +2,12 @@ use camino::Utf8PathBuf;
 use color_eyre::Result;
 
 const TEST_CASE_DIR_NAME: &str = "cases";
+const SCENARIO_DIR_NAME: &str = "scenarios";
 const AUDIO_DIR_NAME: &str = "audio";
 const EXTRA_DIR_NAME: &str = "extra";
 const TEMPLATE_DIR_NAME: &str = "template";
-const TEST_REPORT_DIR: &str = "report";
+const TEST_TEMPLATE_FILE_NAME: &str = "test-template.html";
+const REPORTS_ROOT: &str = "../../tests/reports";
 
 pub struct FixtureDirs {
     root: Utf8PathBuf,
@@ -28,12 +30,20 @@ impl FixtureDirs {
         Self::new("../../tests/fixtures/cli")
     }
 
+    pub fn container() -> Self {
+        Self::new("../../tests/fixtures/container")
+    }
+
     pub fn case_dir(&self) -> Utf8PathBuf {
         self.root.join(TEST_CASE_DIR_NAME)
     }
 
     pub fn audio_dir(&self) -> Utf8PathBuf {
         self.root.join(AUDIO_DIR_NAME)
+    }
+
+    pub fn scenario_dir(&self) -> Utf8PathBuf {
+        self.root.join(SCENARIO_DIR_NAME)
     }
 
     pub fn extra_dir(&self) -> Utf8PathBuf {
@@ -44,8 +54,12 @@ impl FixtureDirs {
         self.root.join(TEMPLATE_DIR_NAME)
     }
 
-    pub fn report_output_dir(&self) -> Utf8PathBuf {
-        self.root.join(TEST_REPORT_DIR)
+    pub fn reports_dir() -> Utf8PathBuf {
+        Utf8PathBuf::from(REPORTS_ROOT)
+    }
+
+    pub fn test_template_path(&self) -> Utf8PathBuf {
+        self.root.join(TEST_TEMPLATE_FILE_NAME)
     }
 }
 

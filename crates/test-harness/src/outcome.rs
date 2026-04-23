@@ -80,9 +80,23 @@ impl ReportEnvelope {
         self.status
     }
 
+    pub fn runner(&self) -> Runner {
+        self.runner
+    }
+
+    pub fn started_at(&self) -> &str {
+        &self.started_at
+    }
+
     #[must_use]
     pub fn with_status(mut self, status: Status) -> Self {
         self.status = status;
+        self
+    }
+
+    #[must_use]
+    pub fn with_artifacts(mut self, artifacts: ReportArtifacts) -> Self {
+        self.artifacts = artifacts;
         self
     }
 }
@@ -106,12 +120,23 @@ pub struct ReportArtifacts {
     report_json: String,
 }
 
+impl ReportArtifacts {
+    pub fn new(report_html: String, report_json: String) -> Self {
+        Self { report_html, report_json }
+    }
+
+    pub fn report_html(&self) -> &str {
+        &self.report_html
+    }
+
+    pub fn report_json(&self) -> &str {
+        &self.report_json
+    }
+}
+
 impl Default for ReportArtifacts {
     fn default() -> Self {
-        Self {
-            report_html: "report.html".to_owned(),
-            report_json: "report.json".to_owned(),
-        }
+        Self::new("report.html".to_owned(), "report.json".to_owned())
     }
 }
 
@@ -157,7 +182,7 @@ impl ReportSummary {
 #[serde(rename_all = "snake_case")]
 pub enum RunnerDetails {
     Cli(CliRunDetails),
-    Container(ContainerRunDetails),
+    Container(Box<ContainerRunDetails>),
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
