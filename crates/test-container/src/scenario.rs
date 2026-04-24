@@ -161,8 +161,27 @@ impl ScenarioMount {
         self.driver.as_deref()
     }
 
-    pub fn driver_opts(&self) -> &BTreeMap<String, String> {
-        &self.driver_opts
+    pub fn resolved_driver_opts(
+        &self,
+        volume_name: &str,
+    ) -> BTreeMap<String, String> {
+        self.driver_opts
+            .iter()
+            .map(|(key, value)| {
+                (key.clone(), value.replace("{volume-name}", volume_name))
+            })
+            .collect()
+    }
+
+    pub fn host_bind_dir(&self, volume_name: &str) -> Option<Utf8PathBuf> {
+        let device = self.resolved_driver_opts(volume_name).remove("device")?;
+        let mount_type = self.driver_opts.get("type")?;
+        let options = self.driver_opts.get("o")?;
+
+        (self.driver.as_deref() == Some("local")
+            && mount_type == "none"
+            && options.split(',').any(|option| option == "bind"))
+        .then_some(Utf8PathBuf::from(device))
     }
 }
 

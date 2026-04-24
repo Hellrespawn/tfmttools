@@ -68,6 +68,10 @@ impl ContainerRuntime {
         name: &str,
         mount: &ScenarioMount,
     ) -> Result<()> {
+        if let Some(host_bind_dir) = mount.host_bind_dir(name) {
+            fs_err::create_dir_all(host_bind_dir)?;
+        }
+
         let mut args = vec!["volume".to_owned(), "create".to_owned()];
 
         if let Some(driver) = mount.driver() {
@@ -75,7 +79,7 @@ impl ContainerRuntime {
             args.push(driver.to_owned());
         }
 
-        for (key, value) in mount.driver_opts() {
+        for (key, value) in mount.resolved_driver_opts(name) {
             args.push("--opt".to_owned());
             args.push(format!("{key}={value}"));
         }

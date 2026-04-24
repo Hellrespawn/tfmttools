@@ -10,8 +10,9 @@
       "container-path": "/mnt/target",
       "driver": "local",
       "driver-opts": {
-        "type": "tmpfs",
-        "device": "tmpfs"
+        "type": "none",
+        "o": "bind",
+        "device": "/tmp/tfmttools-container-volumes/{volume-name}"
       }
     },
     "config": {

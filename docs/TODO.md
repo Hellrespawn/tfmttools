@@ -2,6 +2,7 @@
 
 ## Backlog
 
+- Make the use of `tfmt`, `tfmttools` and `tfmttools-cli` consistent
 - Fix(?) encoding of German characters
 - Add some sort of strict interpolation of forbidden characters.
 - Do test with interactive app?

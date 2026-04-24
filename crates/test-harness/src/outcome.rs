@@ -410,12 +410,20 @@ pub struct CommandOutcome {
 
 impl CommandOutcome {
     pub fn new(arguments: Vec<String>, output: &Output) -> Self {
-        let status = if output.status.success() {
+        Self::with_expected_exit_code(arguments, output, 0)
+    }
+
+    pub fn with_expected_exit_code(
+        arguments: Vec<String>,
+        output: &Output,
+        expected_exit_code: i32,
+    ) -> Self {
+        let exit_code = output.status.code();
+        let status = if exit_code == Some(expected_exit_code) {
             Status::Passed
         } else {
             Status::Failed
         };
-        let exit_code = output.status.code();
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
@@ -472,6 +480,7 @@ impl ExpectationsOutcome {
 pub enum ExpectationOutcome {
     Ok(Utf8PathBuf),
     NotPresent(Utf8PathBuf),
+    UnexpectedPresent(Utf8PathBuf),
     ChecksumMismatch { path: Utf8PathBuf, expected: String, actual: String },
 }
 

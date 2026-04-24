@@ -95,6 +95,15 @@ function expectationDetails(outcome) {
         };
     }
 
+    if (kind === "unexpected_present") {
+        return {
+            status: "failed",
+            label: "Unexpected file",
+            path: value,
+            detail: null,
+        };
+    }
+
     if (kind === "ok") {
         return {
             status: "passed",

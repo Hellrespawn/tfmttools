@@ -122,6 +122,11 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
             executed.outcome
         })
         .collect::<Vec<CaseOutcome>>();
+    let exit_code = if cases.iter().all(CaseOutcome::passed) {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    };
 
     Ok(SuiteOutcome {
         cases,
@@ -137,7 +142,7 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
             volume_names,
             cleanup_commands,
         ),
-        exit_code: ExitCode::SUCCESS,
+        exit_code,
         status: None,
     })
 }

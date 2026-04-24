@@ -11,6 +11,9 @@ homepage.workspace = true
 version.workspace = true
 
 [dependencies]
+tfmttools-core = { path = "../core" }
+tfmttools-fs = { path = "../fs" }
+tfmttools-history = { path = "../history" }
 tfmttools-test-harness = { path = "../test-harness" }
 
 camino = { workspace = true }

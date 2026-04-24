@@ -4,7 +4,7 @@
 
 mod case;
 mod image;
-mod protocol;
+pub mod protocol;
 mod report;
 mod runner;
 mod runtime;

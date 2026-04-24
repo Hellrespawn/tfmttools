@@ -241,6 +241,11 @@ where
         self.records.is_empty()
     }
 
+    #[must_use]
+    pub fn records(&self) -> &[Record<A, M>] {
+        &self.records
+    }
+
     fn serialize_self(&self) -> Result<Vec<u8>> {
         let result = serde_json::to_vec_pretty(self);
 

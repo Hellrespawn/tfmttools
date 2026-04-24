@@ -1,4 +1,75 @@
 {
   "description": "Rename across source and target volumes falls back to copy/remove",
-  "scenario": "cross-device-volumes"
+  "scenario": "cross-device-volumes",
+  "expectations": {
+    "initial-state": [
+      {
+        "mount": "source",
+        "path": "input/Nightwish - Nemo.mp3",
+        "checksum": "820F92DA"
+      },
+      {
+        "mount": "target",
+        "path": "Nightwish/Nemo.mp3",
+        "exists": false
+      }
+    ],
+    "applied": [
+      {
+        "mount": "source",
+        "path": "input/Nightwish - Nemo.mp3",
+        "exists": false
+      },
+      {
+        "mount": "target",
+        "path": "Nightwish/Nemo.mp3",
+        "checksum": "820F92DA"
+      }
+    ]
+  },
+  "history": {
+    "copy-remove-applied": {
+      "mount": "config",
+      "path": "tfmttools.hist",
+      "record": 0,
+      "contains-actions": ["CopyFile", "RemoveFile"],
+      "does-not-contain-actions": ["MoveFile"]
+    }
+  },
+  "steps": [
+    {
+      "name": "initial",
+      "expectations": "initial-state"
+    },
+    {
+      "name": "apply",
+      "command": [
+        "--simple",
+        "--yes",
+        "rename",
+        "--input-directory",
+        "/mnt/source/input",
+        "-t",
+        "cross_device"
+      ],
+      "exit-code": 0,
+      "before": "initial-state",
+      "expectations": "applied",
+      "history": "copy-remove-applied"
+    },
+    {
+      "name": "undo",
+      "command": ["--simple", "--yes", "undo"],
+      "exit-code": 0,
+      "before": "applied",
+      "expectations": "initial-state"
+    },
+    {
+      "name": "redo",
+      "command": ["--simple", "--yes", "redo"],
+      "exit-code": 0,
+      "before": "initial-state",
+      "expectations": "applied"
+    }
+  ]
 }

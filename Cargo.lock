@@ -1273,6 +1273,9 @@ dependencies = [
  "libtest-mimic",
  "serde",
  "serde_json",
+ "tfmttools-core",
+ "tfmttools-fs",
+ "tfmttools-history",
  "tfmttools-test-harness",
 ]
 
