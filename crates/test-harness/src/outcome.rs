@@ -36,6 +36,8 @@ pub struct ReportEnvelope {
     report_dir: Option<Utf8PathBuf>,
     artifacts: ReportArtifacts,
     summary: ReportSummary,
+    run_failure: Option<RunFailure>,
+    source_metadata: SourceMetadata,
     cases: Vec<CaseOutcome>,
     runner_details: RunnerDetails,
 }
@@ -52,10 +54,14 @@ impl ReportEnvelope {
         environment: BTreeMap<String, String>,
         report_dir: Option<Utf8PathBuf>,
         cases: Vec<CaseOutcome>,
+        run_failure: Option<RunFailure>,
+        source_metadata: SourceMetadata,
         runner_details: RunnerDetails,
     ) -> Self {
         let summary = ReportSummary::from_cases(&cases);
-        let status = summary.status();
+        let status = run_failure
+            .as_ref()
+            .map_or_else(|| summary.status(), |_| Status::Failed);
         let artifacts = ReportArtifacts::default();
 
         Self {
@@ -71,6 +77,8 @@ impl ReportEnvelope {
             report_dir,
             artifacts,
             summary,
+            run_failure,
+            source_metadata,
             cases,
             runner_details,
         }
@@ -140,6 +148,34 @@ impl Default for ReportArtifacts {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct RunFailure {
+    reason: String,
+}
+
+impl RunFailure {
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self { reason: reason.into() }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SourceMetadata {
+    git_head: Option<String>,
+    git_dirty: Option<bool>,
+    git_diff_stat: Option<String>,
+}
+
+impl SourceMetadata {
+    pub fn new(
+        git_head: Option<String>,
+        git_dirty: Option<bool>,
+        git_diff_stat: Option<String>,
+    ) -> Self {
+        Self { git_head, git_dirty, git_diff_stat }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ReportSummary {
     total: usize,
@@ -200,8 +236,9 @@ pub struct ContainerRunDetails {
     preserve: bool,
     volume_names: Vec<String>,
     cleanup_commands: Vec<String>,
-    setup_error: Option<String>,
     skip_reason: Option<String>,
+    build_stdout: Option<String>,
+    build_stderr: Option<String>,
 }
 
 impl ContainerRunDetails {
@@ -216,6 +253,8 @@ impl ContainerRunDetails {
         preserve: bool,
         volume_names: Vec<String>,
         cleanup_commands: Vec<String>,
+        build_stdout: Option<String>,
+        build_stderr: Option<String>,
     ) -> Self {
         Self {
             runtime: Some(runtime),
@@ -228,8 +267,9 @@ impl ContainerRunDetails {
             preserve,
             volume_names,
             cleanup_commands,
-            setup_error: None,
             skip_reason: None,
+            build_stdout,
+            build_stderr,
         }
     }
 
@@ -242,10 +282,6 @@ impl ContainerRunDetails {
             skip_reason: Some(reason.into()),
             ..Self::default()
         }
-    }
-
-    pub fn failed_setup(error: impl Into<String>) -> Self {
-        Self { setup_error: Some(error.into()), ..Self::default() }
     }
 }
 
@@ -270,12 +306,12 @@ impl ContainerImageSource {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CaseOutcome {
-    name: String,
-    description: String,
-    status: Status,
-    duration_ms: u128,
-    steps: Vec<StepOutcome>,
-    cli: Option<CliCaseDetails>,
+    pub name: String,
+    pub description: String,
+    pub status: Status,
+    pub duration_ms: u128,
+    pub steps: Vec<StepOutcome>,
+    pub cli: Option<CliCaseDetails>,
 }
 
 impl CaseOutcome {
@@ -324,12 +360,13 @@ impl CliCaseDetails {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct StepOutcome {
-    name: String,
-    status: Status,
-    skip_reason: Option<String>,
-    duration_ms: u128,
-    command_outcome: Option<CommandOutcome>,
-    expectations_outcome: Option<ExpectationsOutcome>,
+    pub name: String,
+    pub status: Status,
+    pub skip_reason: Option<String>,
+    pub duration_ms: u128,
+    pub command_outcome: Option<CommandOutcome>,
+    pub expectations_outcome: Option<ExpectationsOutcome>,
+    pub container: Option<ContainerStepDetails>,
 }
 
 impl StepOutcome {
@@ -354,6 +391,7 @@ impl StepOutcome {
             duration_ms,
             command_outcome,
             expectations_outcome: Some(expectations_outcome),
+            container: None,
         }
     }
 
@@ -365,6 +403,7 @@ impl StepOutcome {
             duration_ms: 0,
             command_outcome: None,
             expectations_outcome: None,
+            container: None,
         }
     }
 
@@ -376,6 +415,7 @@ impl StepOutcome {
             duration_ms: 0,
             command_outcome: None,
             expectations_outcome: None,
+            container: None,
         }
     }
 
@@ -391,21 +431,32 @@ impl StepOutcome {
             duration_ms,
             command_outcome,
             expectations_outcome: None,
+            container: None,
         }
     }
 
     pub fn passed(&self) -> bool {
         self.status == Status::Passed
     }
+
+    #[must_use]
+    pub fn with_container_details(
+        mut self,
+        container: ContainerStepDetails,
+    ) -> Self {
+        self.container = Some(container);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CommandOutcome {
-    arguments: Vec<String>,
-    status: Status,
-    exit_code: Option<i32>,
-    stdout: String,
-    stderr: String,
+    pub arguments: Vec<String>,
+    pub status: Status,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: Option<u128>,
 }
 
 impl CommandOutcome {
@@ -427,7 +478,14 @@ impl CommandOutcome {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-        Self { arguments, status, exit_code, stdout, stderr }
+        Self {
+            arguments,
+            status,
+            exit_code,
+            stdout,
+            stderr,
+            duration_ms: None,
+        }
     }
 
     pub fn timed_out(
@@ -441,11 +499,18 @@ impl CommandOutcome {
             exit_code: None,
             stdout: stdout.into(),
             stderr: stderr.into(),
+            duration_ms: None,
         }
     }
 
     pub fn passed(&self) -> bool {
         self.status == Status::Passed
+    }
+
+    #[must_use]
+    pub fn with_duration_ms(mut self, duration_ms: u128) -> Self {
+        self.duration_ms = Some(duration_ms);
+        self
     }
 }
 
@@ -482,10 +547,79 @@ pub enum ExpectationOutcome {
     NotPresent(Utf8PathBuf),
     UnexpectedPresent(Utf8PathBuf),
     ChecksumMismatch { path: Utf8PathBuf, expected: String, actual: String },
+    VerificationFailure {
+        code: String,
+        path: Option<Utf8PathBuf>,
+        message: String,
+    },
 }
 
 impl ExpectationOutcome {
     pub fn passed(&self) -> bool {
         matches!(self, ExpectationOutcome::Ok(..))
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ContainerStepDetails {
+    verify_request_artifact: Option<String>,
+    verify_response_artifact: Option<String>,
+    diagnostics_artifact: Option<String>,
+    commands_artifact: Option<String>,
+    exported_artifacts: Vec<String>,
+    setup_created_paths: Vec<String>,
+}
+
+impl ContainerStepDetails {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn with_verify_request_artifact(
+        mut self,
+        path: impl Into<String>,
+    ) -> Self {
+        self.verify_request_artifact = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_verify_response_artifact(
+        mut self,
+        path: impl Into<String>,
+    ) -> Self {
+        self.verify_response_artifact = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_diagnostics_artifact(
+        mut self,
+        path: impl Into<String>,
+    ) -> Self {
+        self.diagnostics_artifact = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_commands_artifact(
+        mut self,
+        path: impl Into<String>,
+    ) -> Self {
+        self.commands_artifact = Some(path.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_exported_artifacts(mut self, paths: Vec<String>) -> Self {
+        self.exported_artifacts = paths;
+        self
+    }
+
+    #[must_use]
+    pub fn with_setup_created_paths(mut self, paths: Vec<String>) -> Self {
+        self.setup_created_paths = paths;
+        self
     }
 }

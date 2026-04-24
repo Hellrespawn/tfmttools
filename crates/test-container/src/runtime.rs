@@ -116,10 +116,24 @@ impl ContainerRuntime {
         }
     }
 
-    pub fn run_with_timeout<I, S>(
+    pub fn run_container_with_timeout<I, S>(
+        &self,
+        args: I,
+        container_name: &str,
+        timeout_seconds: u64,
+    ) -> Result<RuntimeCommandResult>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
+        self.run_with_timeout_inner(args, timeout_seconds, Some(container_name))
+    }
+
+    fn run_with_timeout_inner<I, S>(
         &self,
         args: I,
         timeout_seconds: u64,
+        container_name: Option<&str>,
     ) -> Result<RuntimeCommandResult>
     where
         I: IntoIterator<Item = S>,
@@ -151,7 +165,11 @@ impl ContainerRuntime {
             }
 
             if started.elapsed() >= timeout {
-                child.kill()?;
+                if let Some(container_name) = container_name {
+                    let _ = self.stop_container(container_name, 2);
+                    let _ = self.remove_container(container_name);
+                }
+                let _ = child.kill();
                 let output = child.wait_with_output()?;
                 return Ok(RuntimeCommandResult {
                     arguments: args,
@@ -162,6 +180,35 @@ impl ContainerRuntime {
             }
 
             thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    pub fn remove_container(&self, name: &str) -> Result<()> {
+        let args = ["rm", "-f", name];
+        let output = Command::new(self.command()).args(args).output()?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(command_error(
+                self.command(),
+                &args.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                &output,
+            ))
+        }
+    }
+
+    fn stop_container(&self, name: &str, grace_seconds: u64) -> Result<()> {
+        let args = vec![
+            "stop".to_owned(),
+            "-t".to_owned(),
+            grace_seconds.to_string(),
+            name.to_owned(),
+        ];
+        let output = Command::new(self.command()).args(&args).output()?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(command_error(self.command(), &args, &output))
         }
     }
 }

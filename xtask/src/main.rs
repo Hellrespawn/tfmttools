@@ -14,7 +14,7 @@ Tasks:
     test-cli          cargo test -p tfmttools-cli --bin tfmt
                       cargo test -p tfmttools-cli --test integration -- --nocapture
     test-integration  cargo test -p tfmttools-cli --test integration -- --nocapture
-    test-container    TFMT_CONTAINER_REQUIRED=1 cargo test -p tfmttools-cli --test container -- --nocapture
+    test-container    cargo test -p tfmttools-cli --test container -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
     serve-reports     python -m http.server (from tests/reports/, passes through arguments)
@@ -65,12 +65,11 @@ fn main() -> ExitCode {
         "test-core" => run_cargo(&["test", "-p", "tfmttools-core"]),
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
         "test-cli" => run_steps(&[TEST_CLI_BIN_ARGS, TEST_INTEGRATION_ARGS]),
-        "test-integration" => run_cargo(TEST_INTEGRATION_ARGS),
+        "test-integration" => {
+            run_cargo(&test_args_with_trailing(TEST_INTEGRATION_ARGS, &trailing_args))
+        },
         "test-container" => {
-            run_cargo_with_env(TEST_CONTAINER_ARGS, &[(
-                "TFMT_CONTAINER_REQUIRED",
-                "1",
-            )])
+            run_cargo(&test_args_with_trailing(TEST_CONTAINER_ARGS, &trailing_args))
         },
         "lint" => run_steps(&[CLIPPY_ARGS, FMT_ARGS]),
         "serve-reports" => run_reports_server(&trailing_args),
@@ -99,6 +98,30 @@ fn run_steps(steps: &[&[&str]]) -> ExitCode {
 
 fn run_cargo(args: &[&str]) -> ExitCode {
     run_cargo_with_env(args, &[])
+}
+
+fn test_args_with_trailing<'a>(
+    base: &'a [&'a str],
+    trailing_args: &'a [String],
+) -> Vec<&'a str> {
+    let mut split_index = base.len();
+    for (index, value) in base.iter().enumerate() {
+        if *value == "--" {
+            split_index = index;
+            break;
+        }
+    }
+
+    let mut args = base[..split_index].to_vec();
+    if !trailing_args.is_empty() {
+        args.extend(trailing_args.iter().map(String::as_str));
+    }
+    if split_index < base.len() {
+        args.push("--");
+        args.extend(base[(split_index + 1)..].iter().copied());
+    }
+
+    args
 }
 
 fn run_cargo_with_env(args: &[&str], env: &[(&str, &str)]) -> ExitCode {

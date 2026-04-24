@@ -113,6 +113,17 @@ function expectationDetails(outcome) {
         };
     }
 
+    if (kind === "verification_failure") {
+        return {
+            status: "failed",
+            label: value.code ?? "Verification failure",
+            path: value.path ?? "",
+            detail: value.message
+                ? html`<p><code>${value.message}</code></p>`
+                : null,
+        };
+    }
+
     return {
         status: "failed",
         label: statusText(kind),
@@ -254,6 +265,64 @@ function CommandOutcome({ command }) {
     `;
 }
 
+function ArtifactList({ container }) {
+    if (!container) return null;
+
+    const items = [
+        ["Verify request", container.verify_request_artifact],
+        ["Verify response", container.verify_response_artifact],
+        ["Diagnostics", container.diagnostics_artifact],
+        ["Commands", container.commands_artifact],
+    ].filter(([, value]) => Boolean(value));
+    const exported = container.exported_artifacts ?? [];
+    const setupCreated = container.setup_created_paths ?? [];
+
+    if (!items.length && !exported.length && !setupCreated.length) return null;
+
+    return html`
+        <section class="command-detail">
+            <div class="command-bar">
+                <span class="detail-label">Artifacts</span>
+            </div>
+            ${items.length
+                ? html`
+                      <ul>
+                          ${items.map(
+                              ([label, value]) => html`
+                                  <li><strong>${label}:</strong> <code>${value}</code></li>
+                              `,
+                          )}
+                      </ul>
+                  `
+                : null}
+            ${exported.length
+                ? html`
+                      <div>
+                          <strong>Exported volumes</strong>
+                          <ul>
+                              ${exported.map(
+                                  value => html`<li><code>${value}</code></li>`,
+                              )}
+                          </ul>
+                      </div>
+                  `
+                : null}
+            ${setupCreated.length
+                ? html`
+                      <div>
+                          <strong>Setup created paths</strong>
+                          <ul>
+                              ${setupCreated.map(
+                                  value => html`<li><code>${value}</code></li>`,
+                              )}
+                          </ul>
+                      </div>
+                  `
+                : null}
+        </section>
+    `;
+}
+
 function RemainingFiles({ files }) {
     if (!files?.length) return null;
 
@@ -376,6 +445,7 @@ function Step({ step }) {
                 <${ExpectationsOutcome}
                     expectations=${step.expectations_outcome}
                 />
+                <${ArtifactList} container=${step.container} />
             </div>
         </details>
     `;
@@ -456,6 +526,8 @@ function RunMeta({ report }) {
 }
 
 function Report({ report }) {
+    const runFailure = report.run_failure?.reason;
+
     return html`
         <header class=${`run-header ${report.status}`}>
             <div class="run-title">
@@ -486,6 +558,14 @@ function Report({ report }) {
                     status="timed_out"
                 />
             </div>
+            ${runFailure
+                ? html`
+                      <p class="failure-summary failed">
+                          <strong>Run failure</strong>
+                          <span>${runFailure}</span>
+                      </p>
+                  `
+                : null}
         </header>
         <section class="cases" aria-label="Test cases">
             ${report.cases.map(
@@ -506,6 +586,11 @@ async function main() {
     }
 
     const report = await response.json();
+    if (report.schema_version !== 1) {
+        throw new Error(
+            `unsupported report schema version ${report.schema_version}`,
+        );
+    }
     render(html`<${Report} report=${report} />`, document.querySelector("#app"));
 }
 

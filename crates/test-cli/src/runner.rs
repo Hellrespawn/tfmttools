@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
+use std::process::Command as StdCommand;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -15,7 +16,8 @@ use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
     ExpectationOutcome, ExpectationsOutcome, FixtureDirs, ReportEnvelope,
-    ReportFilters, Runner, RunnerDetails, StepOutcome, write_report,
+    ReportFilters, RunFailure, Runner, RunnerDetails, SourceMetadata,
+    StepOutcome, write_report,
 };
 
 use crate::case::{TestContext, populate_files};
@@ -69,7 +71,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         Arc::into_inner(mutex).expect("Arc dropped").into_inner()?;
     test_outcomes.sort_by(|left, right| left.name().cmp(right.name()));
 
-    let report_dir = FixtureDirs::reports_dir();
+    let report_dir = FixtureDirs::reports_dir().join("cli");
     fs_err::create_dir_all(&report_dir)?;
     let canonical_report_dir = report_dir.canonicalize_utf8().ok();
     let report = ReportEnvelope::new(
@@ -82,6 +84,8 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         harness_environment(),
         canonical_report_dir,
         test_outcomes,
+        None::<RunFailure>,
+        source_metadata(),
         RunnerDetails::Cli(CliRunDetails::default()),
     );
 
@@ -328,4 +332,34 @@ fn harness_environment() -> BTreeMap<String, String> {
 
 fn timestamp() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+fn source_metadata() -> SourceMetadata {
+    SourceMetadata::new(
+        git_output(&["rev-parse", "HEAD"]),
+        git_dirty(),
+        git_output(&["diff", "--stat"]),
+    )
+}
+
+fn git_dirty() -> Option<bool> {
+    let output = StdCommand::new("git")
+        .args(["status", "--short"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    Some(!String::from_utf8_lossy(&output.stdout).trim().is_empty())
+}
+
+fn git_output(args: &[&str]) -> Option<String> {
+    let output = StdCommand::new("git").args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    (!stdout.is_empty()).then_some(stdout)
 }

@@ -8,8 +8,8 @@ use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_fs::get_path_checksum;
 use tfmttools_history::History;
 use tfmttools_test_container::protocol::{
-    ActionName, FilesystemExpectation, HistoryExpectation, VerifyOutcome,
-    VerifyRequest, VerifyResponse,
+    ActionName, FilesystemExpectation, HistoryExpectation, VerifyCode,
+    VerifyOutcome, VerifyRequest, VerifyResponse,
 };
 
 fn main() -> ExitCode {
@@ -22,9 +22,12 @@ fn main() -> ExitCode {
         },
         Err(error) => {
             print_response(&VerifyResponse {
-                outcomes: vec![VerifyOutcome::Error {
-                    message: error.to_string(),
-                }],
+                mount_aliases: BTreeMap::new(),
+                outcomes: vec![VerifyOutcome::failure(
+                    VerifyCode::VerifierError,
+                    None,
+                    error.to_string(),
+                )],
             });
             ExitCode::FAILURE
         },
@@ -49,7 +52,7 @@ fn run() -> color_eyre::Result<VerifyResponse> {
             .extend(verify_history_expectation(&request.mounts, expectation));
     }
 
-    Ok(VerifyResponse { outcomes })
+    Ok(VerifyResponse { mount_aliases: request.mounts, outcomes })
 }
 
 fn verify_filesystem_expectation(
@@ -58,43 +61,69 @@ fn verify_filesystem_expectation(
 ) -> VerifyOutcome {
     let Ok(path) = resolve_path(mounts, &expectation.mount, &expectation.path)
     else {
-        return VerifyOutcome::Error {
-            message: format!("unknown verifier mount {:?}", expectation.mount),
-        };
+        return VerifyOutcome::failure(
+            VerifyCode::MountUnknown,
+            None,
+            format!("unknown verifier mount {:?}", expectation.mount),
+        );
     };
 
     if !expectation.exists {
         return if path.exists() {
-            VerifyOutcome::UnexpectedPresent { path }
+            let mut outcome = VerifyOutcome::failure(
+                VerifyCode::PathUnexpected,
+                Some(path),
+                "path exists but was expected to be absent",
+            );
+            outcome.exists = Some(true);
+            outcome
         } else {
-            VerifyOutcome::Ok { path }
+            let mut outcome = VerifyOutcome::ok(path, "path is absent as expected");
+            outcome.exists = Some(false);
+            outcome
         };
     }
 
     if !path.exists() {
-        return VerifyOutcome::NotPresent { path };
+        let mut outcome = VerifyOutcome::failure(
+            VerifyCode::PathMissing,
+            Some(path),
+            "path is missing",
+        );
+        outcome.exists = Some(false);
+        return outcome;
     }
 
     if let Some(expected) = &expectation.checksum {
         match get_path_checksum(&path) {
             Ok(actual) if actual.eq_ignore_ascii_case(expected) => {
-                VerifyOutcome::Ok { path }
+                let mut outcome =
+                    VerifyOutcome::ok(path, "checksum matched expected value");
+                outcome.expected_checksum = Some(expected.to_ascii_uppercase());
+                outcome.actual_checksum = Some(actual);
+                outcome
             },
             Ok(actual) => {
-                VerifyOutcome::ChecksumMismatch {
-                    path,
-                    expected: expected.to_ascii_uppercase(),
-                    actual,
-                }
+                let mut outcome = VerifyOutcome::failure(
+                    VerifyCode::ChecksumMismatch,
+                    Some(path),
+                    "checksum mismatch",
+                );
+                outcome.expected_checksum =
+                    Some(expected.to_ascii_uppercase());
+                outcome.actual_checksum = Some(actual);
+                outcome
             },
-            Err(error) => {
-                VerifyOutcome::Error {
-                    message: format!("failed to checksum {path}: {error}"),
-                }
-            },
+            Err(error) => VerifyOutcome::failure(
+                VerifyCode::VerifierError,
+                Some(path),
+                format!("failed to checksum path: {error}"),
+            ),
         }
     } else {
-        VerifyOutcome::Ok { path }
+        let mut outcome = VerifyOutcome::ok(path, "path exists");
+        outcome.exists = Some(true);
+        outcome
     }
 }
 
@@ -104,30 +133,33 @@ fn verify_history_expectation(
 ) -> Vec<VerifyOutcome> {
     let Ok(path) = resolve_path(mounts, &expectation.mount, &expectation.path)
     else {
-        return vec![VerifyOutcome::Error {
-            message: format!("unknown verifier mount {:?}", expectation.mount),
-        }];
+        return vec![VerifyOutcome::failure(
+            VerifyCode::MountUnknown,
+            None,
+            format!("unknown verifier mount {:?}", expectation.mount),
+        )];
     };
 
     let mut history =
         History::<Action, ActionRecordMetadata>::new(path.clone());
     if let Err(error) = history.load() {
-        return vec![VerifyOutcome::HistoryRecordMissing {
-            path,
-            record: expectation.record,
-            message: error.to_string(),
-        }];
+        let mut outcome = VerifyOutcome::failure(
+            VerifyCode::HistoryLoadFailed,
+            Some(path),
+            format!("failed to load history: {error}"),
+        );
+        outcome.history_record = Some(expectation.record);
+        return vec![outcome];
     }
 
     let Some(record) = history.records().get(expectation.record) else {
-        return vec![VerifyOutcome::HistoryRecordMissing {
-            path,
-            record: expectation.record,
-            message: format!(
-                "history contains {} records",
-                history.records().len()
-            ),
-        }];
+        let mut outcome = VerifyOutcome::failure(
+            VerifyCode::HistoryRecordMissing,
+            Some(path),
+            format!("history contains {} records", history.records().len()),
+        );
+        outcome.history_record = Some(expectation.record);
+        return vec![outcome];
     };
 
     let actual = record.iter().map(action_name).collect::<Vec<_>>();
@@ -135,27 +167,47 @@ fn verify_history_expectation(
 
     for expected in &expectation.contains_actions {
         if actual.contains(expected) {
-            outcomes.push(VerifyOutcome::Ok { path: path.clone() });
+            let mut outcome = VerifyOutcome::ok(
+                path.clone(),
+                format!("history record contains action {expected:?}"),
+            );
+            outcome.history_record = Some(expectation.record);
+            outcome.action = Some(*expected);
+            outcome.actual_actions = actual.clone();
+            outcomes.push(outcome);
         } else {
-            outcomes.push(VerifyOutcome::HistoryActionMissing {
-                path: path.clone(),
-                record: expectation.record,
-                action: *expected,
-                actual: actual.clone(),
-            });
+            let mut outcome = VerifyOutcome::failure(
+                VerifyCode::HistoryActionMissing,
+                Some(path.clone()),
+                format!("history record is missing action {expected:?}"),
+            );
+            outcome.history_record = Some(expectation.record);
+            outcome.action = Some(*expected);
+            outcome.actual_actions = actual.clone();
+            outcomes.push(outcome);
         }
     }
 
     for unexpected in &expectation.does_not_contain_actions {
         if actual.contains(unexpected) {
-            outcomes.push(VerifyOutcome::HistoryActionUnexpected {
-                path: path.clone(),
-                record: expectation.record,
-                action: *unexpected,
-                actual: actual.clone(),
-            });
+            let mut outcome = VerifyOutcome::failure(
+                VerifyCode::HistoryActionUnexpected,
+                Some(path.clone()),
+                format!("history record unexpectedly contains action {unexpected:?}"),
+            );
+            outcome.history_record = Some(expectation.record);
+            outcome.action = Some(*unexpected);
+            outcome.actual_actions = actual.clone();
+            outcomes.push(outcome);
         } else {
-            outcomes.push(VerifyOutcome::Ok { path: path.clone() });
+            let mut outcome = VerifyOutcome::ok(
+                path.clone(),
+                format!("history record does not contain action {unexpected:?}"),
+            );
+            outcome.history_record = Some(expectation.record);
+            outcome.action = Some(*unexpected);
+            outcome.actual_actions = actual.clone();
+            outcomes.push(outcome);
         }
     }
 

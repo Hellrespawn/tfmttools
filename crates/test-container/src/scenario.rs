@@ -101,6 +101,9 @@ impl ContainerScenario {
 
         for operation in &self.setup {
             match operation {
+                SetupOperation::Mkdir { path } => {
+                    validate_path_ref(self.id(), "setup.mkdir.path", &self.mounts, path)?;
+                },
                 SetupOperation::CopyFixtureDir { from, to } => {
                     fixture_source_dir(from)?;
                     validate_path_ref(
@@ -211,6 +214,7 @@ impl ScenarioPathRef {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "op", rename_all = "kebab-case")]
 pub enum SetupOperation {
+    Mkdir { path: ScenarioPathRef },
     CopyFixtureDir { from: String, to: ScenarioPathRef },
 }
 

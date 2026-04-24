@@ -3,7 +3,7 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
 use crate::outcome::ReportArtifacts;
-use crate::{ReportEnvelope, Runner};
+use crate::ReportEnvelope;
 
 const REPORT_TEMPLATE: &str =
     include_str!("../assets/report/report-template.html");
@@ -72,35 +72,6 @@ fn assert_placeholder(template: &str, placeholder: &str) -> Result<()> {
 }
 
 fn report_artifacts(report: &ReportEnvelope) -> ReportArtifacts {
-    let stem = format!(
-        "{}-{}",
-        runner_name(report.runner()),
-        sanitize_started_at(report.started_at())
-    );
-
-    ReportArtifacts::new(format!("{stem}.html"), format!("{stem}.json"))
-}
-
-fn runner_name(runner: Runner) -> &'static str {
-    match runner {
-        Runner::Cli => "cli",
-        Runner::Container => "container",
-    }
-}
-
-fn sanitize_started_at(started_at: &str) -> String {
-    started_at
-        .chars()
-        .map(|char| {
-            match char {
-                ':' => '-',
-                c if c.is_ascii_alphanumeric()
-                    || matches!(c, '-' | '_' | '.') =>
-                {
-                    c
-                },
-                _ => '_',
-            }
-        })
-        .collect()
+    let _ = report;
+    ReportArtifacts::default()
 }

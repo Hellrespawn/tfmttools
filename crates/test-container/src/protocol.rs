@@ -38,53 +38,87 @@ pub enum ActionName {
     RemoveDir,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerifyStatus {
+    Passed,
+    Failed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerifyCode {
+    FilesystemOk,
+    PathMissing,
+    PathUnexpected,
+    ChecksumMismatch,
+    HistoryRecordMissing,
+    HistoryActionMissing,
+    HistoryActionUnexpected,
+    MountUnknown,
+    HistoryLoadFailed,
+    VerifierError,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyResponse {
+    pub mount_aliases: BTreeMap<String, String>,
     pub outcomes: Vec<VerifyOutcome>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "kind")]
-pub enum VerifyOutcome {
-    Ok {
-        path: Utf8PathBuf,
-    },
-    NotPresent {
-        path: Utf8PathBuf,
-    },
-    UnexpectedPresent {
-        path: Utf8PathBuf,
-    },
-    ChecksumMismatch {
-        path: Utf8PathBuf,
-        expected: String,
-        actual: String,
-    },
-    HistoryRecordMissing {
-        path: Utf8PathBuf,
-        record: usize,
-        message: String,
-    },
-    HistoryActionMissing {
-        path: Utf8PathBuf,
-        record: usize,
-        action: ActionName,
-        actual: Vec<ActionName>,
-    },
-    HistoryActionUnexpected {
-        path: Utf8PathBuf,
-        record: usize,
-        action: ActionName,
-        actual: Vec<ActionName>,
-    },
-    Error {
-        message: String,
-    },
+pub struct VerifyOutcome {
+    pub status: VerifyStatus,
+    pub code: VerifyCode,
+    pub path: Option<Utf8PathBuf>,
+    pub message: String,
+    pub exists: Option<bool>,
+    pub expected_checksum: Option<String>,
+    pub actual_checksum: Option<String>,
+    pub history_record: Option<usize>,
+    pub action: Option<ActionName>,
+    pub actual_actions: Vec<ActionName>,
 }
 
 impl VerifyOutcome {
     #[must_use]
+    pub fn ok(path: Utf8PathBuf, message: impl Into<String>) -> Self {
+        Self {
+            status: VerifyStatus::Passed,
+            code: VerifyCode::FilesystemOk,
+            path: Some(path),
+            message: message.into(),
+            exists: Some(true),
+            expected_checksum: None,
+            actual_checksum: None,
+            history_record: None,
+            action: None,
+            actual_actions: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn failure(
+        code: VerifyCode,
+        path: Option<Utf8PathBuf>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            status: VerifyStatus::Failed,
+            code,
+            path,
+            message: message.into(),
+            exists: None,
+            expected_checksum: None,
+            actual_checksum: None,
+            history_record: None,
+            action: None,
+            actual_actions: Vec::new(),
+        }
+    }
+
+    #[must_use]
     pub fn passed(&self) -> bool {
-        matches!(self, Self::Ok { .. })
+        self.status == VerifyStatus::Passed
     }
 }

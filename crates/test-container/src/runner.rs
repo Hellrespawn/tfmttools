@@ -7,12 +7,14 @@ use camino::Utf8PathBuf;
 use color_eyre::Result;
 use libtest_mimic::Arguments;
 use tfmttools_test_harness::{
-    CaseOutcome, ContainerImageSource, ContainerRunDetails, Status,
+    CaseOutcome, ContainerImageSource, ContainerRunDetails, RunFailure,
+    Status,
 };
 
 use crate::case::{CaseRunContext, run_case};
 use crate::image::{
-    ImageConfig, ensure_image, required_env_flag, required_env_u64,
+    ImageConfig, ImageBuildFailure, ensure_image, required_env_flag,
+    required_env_u64,
 };
 use crate::protocol::DEFAULT_COMMAND_TIMEOUT_SECONDS;
 use crate::report::{ReportInput, timestamp, write_container_report};
@@ -28,13 +30,23 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
     let test_args = Arguments::from_args();
 
     let outcome = run_suite(&test_args);
-    let (cases, details, exit_code, status) = match outcome {
-        Ok(SuiteOutcome { cases, details, exit_code, status }) => {
-            (cases, details, exit_code, status)
-        },
+    let (cases, details, exit_code, status, run_failure) = match outcome {
+        Ok(SuiteOutcome {
+            cases,
+            details,
+            exit_code,
+            status,
+            run_failure,
+        }) => (cases, details, exit_code, status, run_failure),
         Err(error) => {
-            let details = ContainerRunDetails::failed_setup(error.to_string());
-            (Vec::new(), details, ExitCode::FAILURE, Some(Status::Failed))
+            let run_failure = RunFailure::new(error.to_string());
+            (
+                Vec::new(),
+                ContainerRunDetails::default(),
+                ExitCode::FAILURE,
+                Some(Status::Failed),
+                Some(run_failure),
+            )
         },
     };
 
@@ -50,6 +62,7 @@ pub fn test_runner() -> Result<ExitCode, Box<dyn Error>> {
         cases,
         details,
         status,
+        run_failure,
     })?;
 
     Ok(exit_code)
@@ -62,21 +75,6 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
         "TFMT_CONTAINER_TIMEOUT_SECONDS",
         DEFAULT_COMMAND_TIMEOUT_SECONDS,
     )?;
-    let runtime_configured = env::var_os("TFMT_CONTAINER_RUNTIME").is_some();
-
-    if !required && !runtime_configured {
-        let details = ContainerRunDetails::skipped(
-            timeout_seconds,
-            "set TFMT_CONTAINER_REQUIRED=1 or use cargo xtask test-container",
-        );
-
-        return Ok(SuiteOutcome {
-            cases: Vec::new(),
-            details,
-            exit_code: ExitCode::SUCCESS,
-            status: None,
-        });
-    }
 
     let Some(runtime) = ContainerRuntime::detect(required)? else {
         let details = ContainerRunDetails::skipped(
@@ -89,11 +87,43 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
             details,
             exit_code: ExitCode::SUCCESS,
             status: None,
+            run_failure: None,
         });
     };
 
     let image_config = ImageConfig::from_env()?;
-    let image_info = ensure_image(&runtime, &image_config)?;
+    let image_info = match ensure_image(&runtime, &image_config) {
+        Ok(image_info) => image_info,
+        Err(ImageBuildFailure { reason, stdout, stderr }) => {
+            let details = ContainerRunDetails::new(
+                runtime.command().to_owned(),
+                runtime.version_output().unwrap_or_default(),
+                image_config.image.clone(),
+                "failed".to_owned(),
+                None,
+                ContainerImageSource::new(
+                    ".".to_owned(),
+                    "tests/container/Containerfile".to_owned(),
+                    "rust:1.89-bookworm".to_owned(),
+                    "debian:bookworm-slim".to_owned(),
+                ),
+                timeout_seconds,
+                preserve,
+                Vec::new(),
+                Vec::new(),
+                stdout,
+                stderr,
+            );
+
+            return Ok(SuiteOutcome {
+                cases: Vec::new(),
+                details,
+                exit_code: ExitCode::FAILURE,
+                status: Some(Status::Failed),
+                run_failure: Some(RunFailure::new(reason)),
+            });
+        },
+    };
     let runtime_version_output = runtime.version_output()?;
     let image_source = ContainerImageSource::new(
         image_info.source.build_context,
@@ -141,9 +171,12 @@ fn run_suite(args: &Arguments) -> Result<SuiteOutcome> {
             preserve,
             volume_names,
             cleanup_commands,
+            None,
+            None,
         ),
         exit_code,
         status: None,
+        run_failure: None,
     })
 }
 
@@ -152,6 +185,7 @@ struct SuiteOutcome {
     details: ContainerRunDetails,
     exit_code: ExitCode,
     status: Option<Status>,
+    run_failure: Option<RunFailure>,
 }
 
 fn build_run_id(started_at: &str) -> String {

@@ -31,10 +31,18 @@ impl ImageConfig {
 pub fn ensure_image(
     runtime: &ContainerRuntime,
     config: &ImageConfig,
-) -> Result<ImageInfo> {
+) -> std::result::Result<ImageInfo, ImageBuildFailure> {
     let build = if config.skip_build {
         ImageBuild::Skipped
-    } else if !config.rebuild && image_exists(runtime, &config.image)? {
+    } else if !config.rebuild
+        && image_exists(runtime, &config.image).map_err(|error| {
+            ImageBuildFailure::new(
+                format!("failed to inspect container image {}: {error}", config.image),
+                None,
+                None,
+            )
+        })?
+    {
         ImageBuild::AlreadyPresent
     } else {
         build_image(runtime, &config.image)?
@@ -42,7 +50,13 @@ pub fn ensure_image(
 
     Ok(ImageInfo {
         build,
-        id: image_id(runtime, &config.image)?,
+        id: image_id(runtime, &config.image).map_err(|error| {
+            ImageBuildFailure::new(
+                format!("failed to inspect image id for {}: {error}", config.image),
+                None,
+                None,
+            )
+        })?,
         source: ImageSource::default(),
     })
 }
@@ -55,19 +69,31 @@ fn image_exists(runtime: &ContainerRuntime, image: &str) -> Result<bool> {
     Ok(output.status.success())
 }
 
-fn build_image(runtime: &ContainerRuntime, image: &str) -> Result<ImageBuild> {
+fn build_image(
+    runtime: &ContainerRuntime,
+    image: &str,
+) -> std::result::Result<ImageBuild, ImageBuildFailure> {
     let output = Command::new(runtime.command())
         .args(["build", "-f", CONTAINERFILE, "-t", image, BUILD_CONTEXT])
         .current_dir(workspace_root())
-        .output()?;
+        .output()
+        .map_err(|error| {
+            ImageBuildFailure::new(
+                format!("failed to run {} build for {image}: {error}", runtime.command()),
+                None,
+                None,
+            )
+        })?;
 
     if output.status.success() {
         Ok(ImageBuild::Built)
     } else {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-        Err(eyre!(
-            "failed to build container image {image} with {}: {stderr}",
-            runtime.command()
+        Err(ImageBuildFailure::new(
+            format!("failed to build container image {image} with {}", runtime.command()),
+            (!stdout.is_empty()).then_some(stdout),
+            (!stderr.is_empty()).then_some(stderr),
         ))
     }
 }
@@ -94,6 +120,23 @@ pub struct ImageInfo {
     pub build: ImageBuild,
     pub id: Option<String>,
     pub source: ImageSource,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImageBuildFailure {
+    pub reason: String,
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+}
+
+impl ImageBuildFailure {
+    fn new(
+        reason: impl Into<String>,
+        stdout: Option<String>,
+        stderr: Option<String>,
+    ) -> Self {
+        Self { reason: reason.into(), stdout, stderr }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
