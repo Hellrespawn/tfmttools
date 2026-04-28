@@ -265,64 +265,6 @@ function CommandOutcome({ command }) {
     `;
 }
 
-function ArtifactList({ container }) {
-    if (!container) return null;
-
-    const items = [
-        ["Verify request", container.verify_request_artifact],
-        ["Verify response", container.verify_response_artifact],
-        ["Diagnostics", container.diagnostics_artifact],
-        ["Commands", container.commands_artifact],
-    ].filter(([, value]) => Boolean(value));
-    const exported = container.exported_artifacts ?? [];
-    const setupCreated = container.setup_created_paths ?? [];
-
-    if (!items.length && !exported.length && !setupCreated.length) return null;
-
-    return html`
-        <section class="command-detail">
-            <div class="command-bar">
-                <span class="detail-label">Artifacts</span>
-            </div>
-            ${items.length
-                ? html`
-                      <ul>
-                          ${items.map(
-                              ([label, value]) => html`
-                                  <li><strong>${label}:</strong> <code>${value}</code></li>
-                              `,
-                          )}
-                      </ul>
-                  `
-                : null}
-            ${exported.length
-                ? html`
-                      <div>
-                          <strong>Exported volumes</strong>
-                          <ul>
-                              ${exported.map(
-                                  value => html`<li><code>${value}</code></li>`,
-                              )}
-                          </ul>
-                      </div>
-                  `
-                : null}
-            ${setupCreated.length
-                ? html`
-                      <div>
-                          <strong>Setup created paths</strong>
-                          <ul>
-                              ${setupCreated.map(
-                                  value => html`<li><code>${value}</code></li>`,
-                              )}
-                          </ul>
-                      </div>
-                  `
-                : null}
-        </section>
-    `;
-}
-
 function RemainingFiles({ files }) {
     if (!files?.length) return null;
 
@@ -445,7 +387,6 @@ function Step({ step }) {
                 <${ExpectationsOutcome}
                     expectations=${step.expectations_outcome}
                 />
-                <${ArtifactList} container=${step.container} />
             </div>
         </details>
     `;

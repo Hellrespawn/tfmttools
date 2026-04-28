@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
-use std::process::Command as StdCommand;
-use std::process::ExitCode;
+use std::process::{Command as StdCommand, ExitCode};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -343,10 +342,8 @@ fn source_metadata() -> SourceMetadata {
 }
 
 fn git_dirty() -> Option<bool> {
-    let output = StdCommand::new("git")
-        .args(["status", "--short"])
-        .output()
-        .ok()?;
+    let output =
+        StdCommand::new("git").args(["status", "--short"]).output().ok()?;
     if !output.status.success() {
         return None;
     }

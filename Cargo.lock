@@ -1194,7 +1194,6 @@ dependencies = [
  "tfmttools-fs",
  "tfmttools-history",
  "tfmttools-test-cli",
- "tfmttools-test-container",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -1259,23 +1258,6 @@ dependencies = [
  "fs-err",
  "libtest-mimic",
  "tfmttools-fs",
- "tfmttools-test-harness",
-]
-
-[[package]]
-name = "tfmttools-test-container"
-version = "0.24.0"
-dependencies = [
- "camino",
- "chrono",
- "color-eyre",
- "fs-err",
- "libtest-mimic",
- "serde",
- "serde_json",
- "tfmttools-core",
- "tfmttools-fs",
- "tfmttools-history",
  "tfmttools-test-harness",
 ]
 

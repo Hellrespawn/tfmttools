@@ -2,8 +2,8 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 
-use crate::outcome::ReportArtifacts;
 use crate::ReportEnvelope;
+use crate::outcome::ReportArtifacts;
 
 const REPORT_TEMPLATE: &str =
     include_str!("../assets/report/report-template.html");

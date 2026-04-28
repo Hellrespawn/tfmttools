@@ -14,33 +14,15 @@ Tasks:
     test-cli          cargo test -p tfmt --bin tfmt
                       cargo test -p tfmt --test integration -- --nocapture
     test-integration  cargo test -p tfmt --test integration -- --nocapture
-    test-container    cargo test -p tfmt --test container -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
     serve-reports     python -m http.server (from tests/reports/, passes through arguments)
 ";
-const TEST_INTEGRATION_ARGS: &[&str] = &[
-    "test",
-    "-p",
-    "tfmt",
-    "--test",
-    "integration",
-    "--",
-    "--nocapture",
-];
-const TEST_CONTAINER_ARGS: &[&str] = &[
-    "test",
-    "-p",
-    "tfmt",
-    "--test",
-    "container",
-    "--",
-    "--nocapture",
-];
+const TEST_INTEGRATION_ARGS: &[&str] =
+    &["test", "-p", "tfmt", "--test", "integration", "--", "--nocapture"];
 const TEST_WORKSPACE_ARGS: &[&str] =
     &["test", "--workspace", "--exclude", "tfmt"];
-const TEST_CLI_BIN_ARGS: &[&str] =
-    &["test", "-p", "tfmt", "--bin", "tfmt"];
+const TEST_CLI_BIN_ARGS: &[&str] = &["test", "-p", "tfmt", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];
@@ -66,10 +48,10 @@ fn main() -> ExitCode {
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
         "test-cli" => run_steps(&[TEST_CLI_BIN_ARGS, TEST_INTEGRATION_ARGS]),
         "test-integration" => {
-            run_cargo(&test_args_with_trailing(TEST_INTEGRATION_ARGS, &trailing_args))
-        },
-        "test-container" => {
-            run_cargo(&test_args_with_trailing(TEST_CONTAINER_ARGS, &trailing_args))
+            run_cargo(&test_args_with_trailing(
+                TEST_INTEGRATION_ARGS,
+                &trailing_args,
+            ))
         },
         "lint" => run_steps(&[CLIPPY_ARGS, FMT_ARGS]),
         "serve-reports" => run_reports_server(&trailing_args),

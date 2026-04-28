@@ -19,7 +19,6 @@ pub enum Status {
 #[serde(rename_all = "snake_case")]
 pub enum Runner {
     Cli,
-    Container,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -160,6 +159,7 @@ impl RunFailure {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[allow(clippy::struct_field_names)]
 pub struct SourceMetadata {
     git_head: Option<String>,
     git_dirty: Option<bool>,
@@ -218,91 +218,10 @@ impl ReportSummary {
 #[serde(rename_all = "snake_case")]
 pub enum RunnerDetails {
     Cli(CliRunDetails),
-    Container(Box<ContainerRunDetails>),
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct CliRunDetails {}
-
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct ContainerRunDetails {
-    runtime: Option<String>,
-    runtime_version_output: Option<String>,
-    image: Option<String>,
-    image_build: Option<String>,
-    image_id: Option<String>,
-    image_source: Option<ContainerImageSource>,
-    command_timeout_seconds: u64,
-    preserve: bool,
-    volume_names: Vec<String>,
-    cleanup_commands: Vec<String>,
-    skip_reason: Option<String>,
-    build_stdout: Option<String>,
-    build_stderr: Option<String>,
-}
-
-impl ContainerRunDetails {
-    pub fn new(
-        runtime: String,
-        runtime_version_output: String,
-        image: String,
-        image_build: String,
-        image_id: Option<String>,
-        image_source: ContainerImageSource,
-        command_timeout_seconds: u64,
-        preserve: bool,
-        volume_names: Vec<String>,
-        cleanup_commands: Vec<String>,
-        build_stdout: Option<String>,
-        build_stderr: Option<String>,
-    ) -> Self {
-        Self {
-            runtime: Some(runtime),
-            runtime_version_output: Some(runtime_version_output),
-            image: Some(image),
-            image_build: Some(image_build),
-            image_id,
-            image_source: Some(image_source),
-            command_timeout_seconds,
-            preserve,
-            volume_names,
-            cleanup_commands,
-            skip_reason: None,
-            build_stdout,
-            build_stderr,
-        }
-    }
-
-    pub fn skipped(
-        command_timeout_seconds: u64,
-        reason: impl Into<String>,
-    ) -> Self {
-        Self {
-            command_timeout_seconds,
-            skip_reason: Some(reason.into()),
-            ..Self::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ContainerImageSource {
-    build_context: String,
-    containerfile: String,
-    builder_base: String,
-    runtime_base: String,
-}
-
-impl ContainerImageSource {
-    pub fn new(
-        build_context: String,
-        containerfile: String,
-        builder_base: String,
-        runtime_base: String,
-    ) -> Self {
-        Self { build_context, containerfile, builder_base, runtime_base }
-    }
-}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CaseOutcome {
@@ -366,7 +285,6 @@ pub struct StepOutcome {
     pub duration_ms: u128,
     pub command_outcome: Option<CommandOutcome>,
     pub expectations_outcome: Option<ExpectationsOutcome>,
-    pub container: Option<ContainerStepDetails>,
 }
 
 impl StepOutcome {
@@ -391,7 +309,6 @@ impl StepOutcome {
             duration_ms,
             command_outcome,
             expectations_outcome: Some(expectations_outcome),
-            container: None,
         }
     }
 
@@ -403,7 +320,6 @@ impl StepOutcome {
             duration_ms: 0,
             command_outcome: None,
             expectations_outcome: None,
-            container: None,
         }
     }
 
@@ -415,7 +331,6 @@ impl StepOutcome {
             duration_ms: 0,
             command_outcome: None,
             expectations_outcome: None,
-            container: None,
         }
     }
 
@@ -431,21 +346,11 @@ impl StepOutcome {
             duration_ms,
             command_outcome,
             expectations_outcome: None,
-            container: None,
         }
     }
 
     pub fn passed(&self) -> bool {
         self.status == Status::Passed
-    }
-
-    #[must_use]
-    pub fn with_container_details(
-        mut self,
-        container: ContainerStepDetails,
-    ) -> Self {
-        self.container = Some(container);
-        self
     }
 }
 
@@ -478,14 +383,7 @@ impl CommandOutcome {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-        Self {
-            arguments,
-            status,
-            exit_code,
-            stdout,
-            stderr,
-            duration_ms: None,
-        }
+        Self { arguments, status, exit_code, stdout, stderr, duration_ms: None }
     }
 
     pub fn timed_out(
@@ -546,7 +444,11 @@ pub enum ExpectationOutcome {
     Ok(Utf8PathBuf),
     NotPresent(Utf8PathBuf),
     UnexpectedPresent(Utf8PathBuf),
-    ChecksumMismatch { path: Utf8PathBuf, expected: String, actual: String },
+    ChecksumMismatch {
+        path: Utf8PathBuf,
+        expected: String,
+        actual: String,
+    },
     VerificationFailure {
         code: String,
         path: Option<Utf8PathBuf>,
@@ -557,69 +459,5 @@ pub enum ExpectationOutcome {
 impl ExpectationOutcome {
     pub fn passed(&self) -> bool {
         matches!(self, ExpectationOutcome::Ok(..))
-    }
-}
-
-#[derive(Debug, Clone, Default, Serialize)]
-pub struct ContainerStepDetails {
-    verify_request_artifact: Option<String>,
-    verify_response_artifact: Option<String>,
-    diagnostics_artifact: Option<String>,
-    commands_artifact: Option<String>,
-    exported_artifacts: Vec<String>,
-    setup_created_paths: Vec<String>,
-}
-
-impl ContainerStepDetails {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[must_use]
-    pub fn with_verify_request_artifact(
-        mut self,
-        path: impl Into<String>,
-    ) -> Self {
-        self.verify_request_artifact = Some(path.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_verify_response_artifact(
-        mut self,
-        path: impl Into<String>,
-    ) -> Self {
-        self.verify_response_artifact = Some(path.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_diagnostics_artifact(
-        mut self,
-        path: impl Into<String>,
-    ) -> Self {
-        self.diagnostics_artifact = Some(path.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_commands_artifact(
-        mut self,
-        path: impl Into<String>,
-    ) -> Self {
-        self.commands_artifact = Some(path.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_exported_artifacts(mut self, paths: Vec<String>) -> Self {
-        self.exported_artifacts = paths;
-        self
-    }
-
-    #[must_use]
-    pub fn with_setup_created_paths(mut self, paths: Vec<String>) -> Self {
-        self.setup_created_paths = paths;
-        self
     }
 }

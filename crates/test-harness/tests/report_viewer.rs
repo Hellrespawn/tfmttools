@@ -46,10 +46,8 @@ fn writes_static_report_viewer_with_json_loader() {
 }
 
 fn temp_report_dir() -> Utf8PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "tfmttools-test-harness-{}",
-        std::process::id()
-    ));
+    let dir = std::env::temp_dir()
+        .join(format!("tfmttools-test-harness-{}", std::process::id()));
     let dir = Utf8PathBuf::from_path_buf(dir).expect("utf8 temp dir");
     if dir.exists() {
         fs_err::remove_dir_all(&dir).unwrap();
