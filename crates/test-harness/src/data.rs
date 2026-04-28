@@ -45,6 +45,8 @@ pub struct Expectation {
     path: Utf8PathBuf,
     checksum: Option<String>,
     #[serde(default)]
+    tags: IndexMap<String, String>,
+    #[serde(default)]
     options: Vec<ExpectationOption>,
 }
 
@@ -71,12 +73,18 @@ impl Expectation {
     pub fn checksum(&self) -> Option<&String> {
         self.checksum.as_ref()
     }
+
+    pub fn tags(&self) -> &IndexMap<String, String> {
+        &self.tags
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TestData {
     command: Option<String>,
+    #[serde(default, alias = "expected-exit-code")]
+    expected_exit_code: Option<i32>,
     expectations: Option<String>,
     #[serde(alias = "previous-expectations")]
     previous_expectations: Option<String>,
@@ -85,6 +93,10 @@ pub struct TestData {
 impl TestData {
     pub fn command(&self) -> Option<&String> {
         self.command.as_ref()
+    }
+
+    pub fn expected_exit_code(&self) -> i32 {
+        self.expected_exit_code.unwrap_or(0)
     }
 
     pub fn expectations(&self) -> Option<&String> {

@@ -8,7 +8,7 @@ use tracing::debug;
 
 use super::TFMTOptions;
 use crate::commands::{
-    clear_history, list_templates, rename, show_history, undo_redo,
+    clear_history, list_templates, rename, show_history, undo_redo, validate,
 };
 use crate::ui::PreviewListSize;
 
@@ -72,6 +72,9 @@ pub enum TFMTSubcommand {
     /// Use a template to rename audio files according to their tags.
     Rename(RenameArgs),
 
+    /// Validate audio files and their tags.
+    Validate(ValidateArgs),
+
     /// Undo actions.
     Undo(UndoRedoArgs),
 
@@ -99,6 +102,9 @@ impl TFMTSubcommand {
             },
             TFMTSubcommand::Rename(rename_args) => {
                 rename(fs_handler, app_options, rename_args)?;
+            },
+            TFMTSubcommand::Validate(validate_args) => {
+                validate(fs_handler, app_options, validate_args)?;
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
                 undo_redo(
@@ -130,6 +136,7 @@ impl TFMTSubcommand {
             TFMTSubcommand::ShowHistory => "history",
             TFMTSubcommand::ListTemplates(..) => "list-templates",
             TFMTSubcommand::Rename(..) => "rename",
+            TFMTSubcommand::Validate(..) => "validate",
             TFMTSubcommand::Undo(..) => "undo",
             TFMTSubcommand::Redo(..) => "redo",
         }
@@ -169,6 +176,57 @@ pub struct RenameArgs {
 
     /// Template arguments.
     pub arguments: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+pub struct ValidateArgs {
+    #[command(flatten)]
+    pub common_args: ValidateCommonArgs,
+
+    #[command(subcommand)]
+    pub command: Option<ValidateSubcommand>,
+}
+
+#[derive(Args, Debug)]
+pub struct ValidateCommonArgs {
+    #[arg(short = 'i', long = "input-directory")]
+    /// Directory to scan for input files. Defaults to the current directory.
+    pub custom_input_directory: Option<Utf8PathBuf>,
+
+    #[arg(short, long)]
+    /// Set custom recursion depth for scan.
+    pub recursion_depth: Option<usize>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ValidateSubcommand {
+    /// Check audio files and their tags.
+    Check,
+
+    /// Fix audio files and their tags.
+    Fix(ValidateFixArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct ValidateFixArgs {
+    #[command(subcommand)]
+    pub command: ValidateFixSubcommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ValidateFixSubcommand {
+    /// Fix text decoded as the wrong encoding.
+    Encoding(FixEncodingArgs),
+
+    /// Replace forbidden characters in tag values.
+    Characters,
+}
+
+#[derive(Args, Debug)]
+pub struct FixEncodingArgs {
+    #[arg(long, default_value = "ISO-8859-1")]
+    /// Source encoding to translate from. Defaults to ISO-8859-1.
+    pub encoding: String,
 }
 
 #[derive(Args, Debug)]

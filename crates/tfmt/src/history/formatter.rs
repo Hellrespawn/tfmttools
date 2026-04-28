@@ -178,6 +178,7 @@ impl HistoryFormatter {
                 file_or_name.to_owned()
             },
             TemplateMetadata::Script(_) => "script".to_owned(),
+            TemplateMetadata::Validation(command) => command.to_owned(),
         }
     }
 }
@@ -189,6 +190,7 @@ pub struct RecordSummary {
     rm_file: usize,
     mk_dir: usize,
     rm_dir: usize,
+    tag: usize,
     run_id: String,
 }
 
@@ -206,6 +208,7 @@ impl RecordSummary {
                 Action::RemoveFile(_) => summary.rm_file += 1,
                 Action::MakeDir(_) => summary.mk_dir += 1,
                 Action::RemoveDir(_) => summary.rm_dir += 1,
+                Action::EditTagValues { .. } => summary.tag += 1,
             }
         }
 
@@ -237,6 +240,7 @@ impl std::fmt::Display for RecordSummary {
             "directory removed",
             "directories removed",
         );
+        push_summary_part(&mut strings, self.tag, "tag edited", "tags edited");
 
         write!(f, "{}", strings.join(", "))
     }

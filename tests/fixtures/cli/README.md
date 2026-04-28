@@ -23,7 +23,11 @@ Each case has this top-level shape:
   "description": "Single apply, undo and redo of simple_input.tfmt",
   "expectations": {
     "initial-state": [
-      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" }
+      {
+        "path": "input/Nightwish - Nemo.mp3",
+        "checksum": "820F92DA",
+        "tags": { "TrackTitle": "Nemo" }
+      }
     ],
     "apply": [
       { "path": "Nightwish/Nemo.mp3", "checksum": "820F92DA" }
@@ -49,6 +53,9 @@ Each case has this top-level shape:
 Expectation entries use paths relative to the temporary work directory.
 If `checksum` is present, it must match the file checksum calculated by
 the harness. If `checksum` is omitted, only file presence is checked.
+If `tags` is present, each key/value pair must match the audio file's
+primary tag. Tag keys use the same names accepted by templates, such as
+`TrackTitle`, `AlbumTitle`, or `Artist`.
 
 Use `options: ["no-previous"]` on an expectation entry when a later
 `previous-expectations` check should allow that path to remain:
@@ -60,6 +67,7 @@ Use `options: ["no-previous"]` on an expectation entry when a later
 Test steps support these fields:
 
 - `command`: CLI command appended after harness-provided global options.
+- `expected-exit-code`: expected command exit code. Defaults to `0`.
 - `expectations`: expectation set that should exist after the step.
 - `previous-expectations`: expectation set whose paths should no longer
   exist unless individual entries use `options: ["no-previous"]`.
@@ -125,6 +133,7 @@ All audio-files are of silence, with tags copied to them for testing.
 - "Amon Amarth - Under Siege": Uses disc-number
 - "Damjan Mravunac - Welcome To Heaven.ogg": Non-MP3 file
 - "Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3": Bug with periods in tag values
+- "Lindemann - Ich Weiß Es Nicht.mp3": Encoding issues with "ß"
 - "MASTER BOOT RECORD - Dune.mp3": Has no album or year
 - "MASTER BOOT RECORD - MYTH.NFO.mp3": Complex album name, many forbidden characters.
 - "MASTER BOOT RECORD - RAMDRIVE.SYS.mp3": Checking folder structure with same artist

@@ -35,6 +35,7 @@ fastrand = { workspace = true }
 dirs = { workspace = true }
 itertools = { workspace = true }
 indicatif = { workspace = true }
+lofty = { workspace = true }
 textwrap = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }

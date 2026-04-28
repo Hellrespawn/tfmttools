@@ -15,4 +15,8 @@ test-conf
 .PKGBUILD
 *.pkg.tar.*
 
+# Python
+
+__pycache__
+
 .codex

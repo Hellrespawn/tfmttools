@@ -6,7 +6,9 @@ use tfmttools_core::util::{
 };
 use tfmttools_fs::FileOrName;
 
-use crate::cli::args::{RenameArgs, TFMTArgs, TemplateArgs};
+use crate::cli::args::{
+    RenameArgs, TFMTArgs, TemplateArgs, ValidateCommonArgs,
+};
 use crate::ui::{PreviewListSize, current_dir_utf8, terminal_height};
 
 const BIN_DIRECTORY_NAME: &str = "trash";
@@ -171,6 +173,24 @@ pub struct RenameOptions {
     arguments: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ValidateOptions {
+    input_directory: Utf8Directory,
+    recursion_depth: usize,
+}
+
+impl ValidateOptions {
+    #[must_use]
+    pub fn input_directory(&self) -> &Utf8Directory {
+        &self.input_directory
+    }
+
+    #[must_use]
+    pub fn recursion_depth(&self) -> usize {
+        self.recursion_depth
+    }
+}
+
 impl RenameOptions {
     #[must_use]
     pub fn input_directory(&self) -> &Utf8Directory {
@@ -205,6 +225,25 @@ impl RenameOptions {
     #[must_use]
     pub fn arguments(&self) -> &[String] {
         &self.arguments
+    }
+}
+
+impl TryFrom<ValidateCommonArgs> for ValidateOptions {
+    type Error = color_eyre::Report;
+
+    fn try_from(validate_args: ValidateCommonArgs) -> Result<Self> {
+        Ok(Self {
+            input_directory: if let Some(input_directory) =
+                validate_args.custom_input_directory
+            {
+                Utf8Directory::new(input_directory)?
+            } else {
+                current_dir_utf8()?
+            },
+            recursion_depth: validate_args
+                .recursion_depth
+                .unwrap_or(DEFAULT_RECURSION_DEPTH),
+        })
     }
 }
 

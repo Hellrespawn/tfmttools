@@ -72,6 +72,9 @@ fn resolve_previous_template(
 
                 resolve_script(session, script, &arguments)
             },
+            TemplateMetadata::Validation(_) => {
+                Err(eyre!("No previous rename run found."))
+            },
         };
     }
 

@@ -1,0 +1,49 @@
+{
+  "description": "Validate fix characters replaces forbidden characters in MASTER BOOT RECORD tag values",
+  "expectations": {
+    "initial-state": [
+      {
+        "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
+        "tags": { "AlbumTitle": "C:\\>COPY *.* A: /V" }
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "tags": {
+          "TrackTitle": "SET MIDI=SYNTH:1 MAP:G MODE:1",
+          "AlbumTitle": "C:\\>EDIT AUTOEXEC.BAT"
+        }
+      }
+    ],
+    "fixed": [
+      {
+        "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
+        "tags": { "AlbumTitle": "C-COPY . A -V" }
+      },
+      {
+        "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
+        "tags": {
+          "TrackTitle": "SET MIDI=SYNTH1 MAPG MODE1",
+          "AlbumTitle": "C-EDIT AUTOEXEC.BAT"
+        }
+      }
+    ]
+  },
+  "tests": {
+    "initial": {
+      "expectations": "initial-state"
+    },
+    "check-fails": {
+      "command": "--simple validate -i input check",
+      "expected-exit-code": 1,
+      "expectations": "initial-state"
+    },
+    "fix-characters": {
+      "command": "--simple --yes validate -i input fix characters",
+      "expectations": "fixed"
+    },
+    "check-passes": {
+      "command": "--simple validate -i input check",
+      "expectations": "fixed"
+    }
+  }
+}

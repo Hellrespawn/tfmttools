@@ -20,6 +20,53 @@ pub enum Action {
     RemoveFile(Utf8PathBuf),
     MakeDir(Utf8PathBuf),
     RemoveDir(Utf8PathBuf),
+    EditTagValues { path: Utf8PathBuf, changes: Vec<TagValueChange> },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum TagValueKind {
+    Text,
+    Locator,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TagValueChange {
+    key: String,
+    kind: TagValueKind,
+    old_value: String,
+    new_value: String,
+}
+
+impl TagValueChange {
+    #[must_use]
+    pub fn new(
+        key: String,
+        kind: TagValueKind,
+        old_value: String,
+        new_value: String,
+    ) -> Self {
+        Self { key, kind, old_value, new_value }
+    }
+
+    #[must_use]
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    #[must_use]
+    pub fn kind(&self) -> &TagValueKind {
+        &self.kind
+    }
+
+    #[must_use]
+    pub fn old_value(&self) -> &str {
+        &self.old_value
+    }
+
+    #[must_use]
+    pub fn new_value(&self) -> &str {
+        &self.new_value
+    }
 }
 
 impl Action {
@@ -51,7 +98,8 @@ impl Action {
             | Action::MoveFile { source, .. } => Some(source.as_path()),
             Action::RemoveFile(_)
             | Action::MakeDir(_)
-            | Action::RemoveDir(_) => None,
+            | Action::RemoveDir(_)
+            | Action::EditTagValues { .. } => None,
         }
     }
 
@@ -62,7 +110,8 @@ impl Action {
             | Action::MoveFile { target, .. } => target.as_path(),
             Action::RemoveFile(path)
             | Action::MakeDir(path)
-            | Action::RemoveDir(path) => path,
+            | Action::RemoveDir(path)
+            | Action::EditTagValues { path, .. } => path,
         }
     }
 }

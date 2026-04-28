@@ -3,9 +3,11 @@ mod list_templates;
 mod rename;
 mod show_history;
 mod undo_redo;
+mod validate;
 
 pub use clear_history::clear_history;
 pub use list_templates::list_templates;
 pub use rename::rename;
 pub use show_history::show_history;
 pub use undo_redo::undo_redo;
+pub use validate::validate;

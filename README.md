@@ -146,15 +146,3 @@ tfmt clear-history
 Windows support targets normal NTFS usage. Long-path mode, network shares,
 unusual Unicode normalization, and cross-volume edge cases are not full
 compatibility promises for this release.
-
-<!--
-## Miscellaneous
-
-Don't remember what this was about, probably related to the file in question:
-
-> Handle UTF-16 odd length error manually?
->
-> Check:
->
-> .\The Witcher\2016 - The Witcher 3 Wild Hunt - Blood and Wine\09 - Percival Schuttenbach - The Musty Scent of Fresh Pâté.mp3
--->

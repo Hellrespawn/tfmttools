@@ -10,6 +10,7 @@ pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 pub enum TemplateMetadata {
     FileOrName(String),
     Script(String),
+    Validation(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

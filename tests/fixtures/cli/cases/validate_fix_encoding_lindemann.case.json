@@ -1,0 +1,34 @@
+{
+  "description": "Validate fix encoding updates Lindemann tag values and records undoable history",
+  "expectations": {
+    "initial-state": [
+      {
+        "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
+        "tags": { "TrackTitle": "Ich Weiß Es Nicht" }
+      }
+    ],
+    "fixed": [
+      {
+        "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
+        "tags": { "TrackTitle": "Ich Wei\uFFFD Es Nicht" }
+      }
+    ]
+  },
+  "tests": {
+    "initial": {
+      "expectations": "initial-state"
+    },
+    "fix-encoding": {
+      "command": "--simple --yes validate -i input fix encoding",
+      "expectations": "fixed"
+    },
+    "undo": {
+      "command": "--simple --yes undo",
+      "expectations": "initial-state"
+    },
+    "redo": {
+      "command": "--simple --yes redo",
+      "expectations": "fixed"
+    }
+  }
+}

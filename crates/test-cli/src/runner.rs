@@ -11,6 +11,8 @@ use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
+use lofty::file::TaggedFileExt;
+use tfmttools_core::item_keys::ItemKeys;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
@@ -225,7 +227,9 @@ fn run_test_step(
 
     let command_outcome = test_data
         .command()
-        .map(|command| run_command(context, command))
+        .map(|command| {
+            run_command(context, command, test_data.expected_exit_code())
+        })
         .transpose()?;
 
     let expectations_outcome = verify_expectations(
@@ -242,7 +246,11 @@ fn run_test_step(
     ))
 }
 
-fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
+fn run_command(
+    context: &TestContext,
+    command: &str,
+    expected_exit_code: i32,
+) -> Result<CommandOutcome> {
     let mut cmd = Command::cargo_bin("tfmt").unwrap();
     cmd.current_dir(context.work_dir_path());
 
@@ -259,7 +267,11 @@ fn run_command(context: &TestContext, command: &str) -> Result<CommandOutcome> {
     let arguments =
         cmd.get_args().map(|arg| arg.to_string_lossy().to_string()).collect();
 
-    Ok(CommandOutcome::new(arguments, &output))
+    Ok(CommandOutcome::with_expected_exit_code(
+        arguments,
+        &output,
+        expected_exit_code,
+    ))
 }
 
 fn verify_expectations(
@@ -302,21 +314,80 @@ fn verify_expectation(
 ) -> ExpectationOutcome {
     let path = prefix.join(expectation.path());
 
-    if path.exists() {
-        let checksum = get_path_checksum(&path).expect("");
-
-        if expectation.verify_checksum(&checksum) {
-            ExpectationOutcome::Ok(path)
-        } else {
-            ExpectationOutcome::ChecksumMismatch {
-                path,
-                expected: expectation.checksum().unwrap().clone(),
-                actual: checksum,
-            }
-        }
-    } else {
-        ExpectationOutcome::NotPresent(path)
+    if !path.exists() {
+        return ExpectationOutcome::NotPresent(path);
     }
+
+    let checksum = get_path_checksum(&path).expect("");
+
+    if !expectation.verify_checksum(&checksum) {
+        return ExpectationOutcome::ChecksumMismatch {
+            path,
+            expected: expectation.checksum().unwrap().clone(),
+            actual: checksum,
+        };
+    }
+
+    if let Some(failure) = verify_tag_expectations(expectation, &path) {
+        return failure;
+    }
+
+    ExpectationOutcome::Ok(path)
+}
+
+fn verify_tag_expectations(
+    expectation: &Expectation,
+    path: &Utf8Path,
+) -> Option<ExpectationOutcome> {
+    if expectation.tags().is_empty() {
+        return None;
+    }
+
+    let tagged_file = match lofty::read_from_path(path) {
+        Ok(tagged_file) => tagged_file,
+        Err(err) => {
+            return Some(ExpectationOutcome::VerificationFailure {
+                code: "tag-read-failed".to_owned(),
+                path: Some(path.to_owned()),
+                message: err.to_string(),
+            });
+        },
+    };
+    let Some(tag) = tagged_file.primary_tag() else {
+        return Some(ExpectationOutcome::VerificationFailure {
+            code: "tag-missing".to_owned(),
+            path: Some(path.to_owned()),
+            message: "audio file has no primary tag".to_owned(),
+        });
+    };
+
+    for (key, expected) in expectation.tags() {
+        let item_key = match ItemKeys::from_string(key) {
+            Ok(item_key) => item_key,
+            Err(err) => {
+                return Some(ExpectationOutcome::VerificationFailure {
+                    code: "unknown-tag-key".to_owned(),
+                    path: Some(path.to_owned()),
+                    message: err.to_string(),
+                });
+            },
+        };
+        let actual = tag
+            .get_string(item_key)
+            .map_or_else(String::new, ToOwned::to_owned);
+
+        if actual != *expected {
+            return Some(ExpectationOutcome::VerificationFailure {
+                code: "tag-value-mismatch".to_owned(),
+                path: Some(path.to_owned()),
+                message: format!(
+                    "{key}: expected '{expected}', got '{actual}'"
+                ),
+            });
+        }
+    }
+
+    None
 }
 
 fn harness_environment() -> BTreeMap<String, String> {

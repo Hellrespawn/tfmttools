@@ -1,5 +1,11 @@
-use tfmttools_core::action::{Action, RenameAction};
+use lofty::config::WriteOptions;
+use lofty::file::{AudioFile as LoftyAudioFile, TaggedFileExt};
+use lofty::tag::{ItemKey, ItemValue, TagItem};
+use tfmttools_core::action::{
+    Action, RenameAction, TagValueChange, TagValueKind,
+};
 use tfmttools_core::error::TFMTResult;
+use tfmttools_core::item_keys::ItemKeys;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
@@ -84,6 +90,9 @@ impl<'a> ActionHandler<'a> {
             Action::RemoveDir(path) => {
                 self.fs_handler.create_dir(path)?;
             },
+            Action::EditTagValues { path, changes } => {
+                apply_tag_changes(path, changes, TagChangeDirection::Backward)?;
+            },
         }
 
         Ok(())
@@ -113,10 +122,100 @@ impl<'a> ActionHandler<'a> {
             Action::RemoveDir(path) => {
                 self.fs_handler.remove_dir(path)?;
             },
+            Action::EditTagValues { path, changes } => {
+                apply_tag_changes(path, changes, TagChangeDirection::Forward)?;
+            },
         }
 
         Ok(())
     }
+}
+
+#[derive(Clone, Copy)]
+enum TagChangeDirection {
+    Forward,
+    Backward,
+}
+
+fn apply_tag_changes(
+    path: &camino::Utf8Path,
+    changes: &[TagValueChange],
+    direction: TagChangeDirection,
+) -> TFMTResult {
+    let mut tagged_file = lofty::read_from_path(path).map_err(|err| {
+        tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err)
+    })?;
+    let tag = tagged_file.primary_tag_mut().ok_or_else(|| {
+        tfmttools_core::error::TFMTError::NoPrimaryTag(path.to_owned())
+    })?;
+
+    for change in changes {
+        apply_tag_change(tag, change, direction)?;
+    }
+
+    tagged_file.save_to_path(path, WriteOptions::default()).map_err(|err| {
+        tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err)
+    })?;
+
+    Ok(())
+}
+
+fn apply_tag_change(
+    tag: &mut lofty::tag::Tag,
+    change: &TagValueChange,
+    direction: TagChangeDirection,
+) -> TFMTResult {
+    let key = ItemKeys::from_string(change.key())?;
+    let (from, to) = match direction {
+        TagChangeDirection::Forward => (change.old_value(), change.new_value()),
+        TagChangeDirection::Backward => {
+            (change.new_value(), change.old_value())
+        },
+    };
+    let mut replacements = tag
+        .take_filter(key, |item| {
+            tag_item_matches(item, key, change.kind(), from)
+        })
+        .map(|item| replacement_item(&item, change.kind(), to.to_owned()))
+        .collect::<Vec<_>>();
+
+    for item in replacements.drain(..) {
+        tag.push(item);
+    }
+
+    Ok(())
+}
+
+fn tag_item_matches(
+    item: &TagItem,
+    key: ItemKey,
+    kind: &TagValueKind,
+    value: &str,
+) -> bool {
+    item.key() == key && item_value(item, kind) == Some(value)
+}
+
+fn item_value<'a>(item: &'a TagItem, kind: &TagValueKind) -> Option<&'a str> {
+    match kind {
+        TagValueKind::Text => item.value().text(),
+        TagValueKind::Locator => item.value().locator(),
+    }
+}
+
+fn replacement_item(
+    item: &TagItem,
+    kind: &TagValueKind,
+    value: String,
+) -> TagItem {
+    let mut replacement = TagItem::new(item.key(), match kind {
+        TagValueKind::Text => ItemValue::Text(value),
+        TagValueKind::Locator => ItemValue::Locator(value),
+    });
+
+    replacement.set_description(item.description().to_owned());
+    replacement.set_lang(*item.lang());
+
+    replacement
 }
 
 fn actions_from_move_result(
