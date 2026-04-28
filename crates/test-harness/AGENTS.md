@@ -15,5 +15,5 @@ crates.
 ## Verification
 
 - Shared harness or fixture behavior changes:
-  `cargo test -p tfmttools-cli --test integration -- --nocapture`.
+  `cargo test -p tfmt --test integration -- --nocapture`.
 - Crate-local compile check: `cargo test -p tfmttools-test-harness`.

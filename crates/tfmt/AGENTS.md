@@ -17,7 +17,7 @@ dispatches through `src/commands/`.
 
 ## Verification
 
-- CLI-only changes: `cargo test -p tfmttools-cli`.
+- CLI-only changes: `cargo test -p tfmt`.
 - Fixture harness changes:
-  `cargo test -p tfmttools-cli --test integration -- --nocapture`.
+  `cargo test -p tfmt --test integration -- --nocapture`.
 - Broader workspace confidence: `cargo test --workspace`.

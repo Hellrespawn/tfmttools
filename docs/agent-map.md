@@ -23,7 +23,7 @@ Compact map for finding the right code quickly. Prefer crate-local
 ## Rename Flow
 
 1. `tfmt` starts in `crates/cli/src/main.rs` and calls
-   `tfmttools_cli::cli::run`.
+   `tfmt::cli::run`.
 2. `crates/cli/src/cli/mod.rs` initializes tracing, parses
    `TFMTArgs`, converts them to `TFMTOptions`, creates `FsHandler`, and
    dispatches the selected subcommand.

@@ -3,7 +3,7 @@ FROM rust:1.89-bookworm AS builder
 WORKDIR /workspace
 COPY . .
 
-RUN cargo build --package tfmttools-cli --bin tfmt \
+RUN cargo build --package tfmt --bin tfmt \
     && cargo build \
         --package tfmttools-test-container \
         --bin tfmt-container-verify

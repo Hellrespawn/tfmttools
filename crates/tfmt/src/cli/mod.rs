@@ -21,7 +21,7 @@ use crate::ui::show_cursor;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
-/// Main entrypoint for tfmttools
+/// Main entrypoint for tfmt
 pub fn run() -> Result<()> {
     let _guard = init_tracing();
 

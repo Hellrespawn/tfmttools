@@ -1,4 +1,4 @@
-# tfmttools
+# tfmt
 
 Use `minijinja` to rename audio files according to their tags.
 

@@ -1,5 +1,5 @@
 [package]
-name = "tfmttools-cli"
+name = "tfmt"
 
 authors.workspace = true
 edition.workspace = true

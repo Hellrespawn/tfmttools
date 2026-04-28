@@ -28,7 +28,7 @@ notes or design work live under `docs/`.
 
 Use Cargo from the workspace root.
 
-- `cargo build` builds the default workspace member, `tfmttools-cli`.
+- `cargo build` builds the default workspace member, `tfmt`.
 - `cargo build --workspace` builds every crate.
 - `cargo run -- --help` runs the CLI locally.
 - `cargo xtask check` runs `cargo check --workspace`.

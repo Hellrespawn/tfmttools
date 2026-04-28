@@ -6,15 +6,15 @@ Usage: cargo xtask <task>
 
 Tasks:
     check             cargo check --workspace
-    test              cargo test --workspace --exclude tfmttools-cli
-                      cargo test -p tfmttools-cli --bin tfmt
-                      cargo test -p tfmttools-cli --test integration -- --nocapture
+    test              cargo test --workspace --exclude tfmt
+                      cargo test -p tfmt --bin tfmt
+                      cargo test -p tfmt --test integration -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
-    test-cli          cargo test -p tfmttools-cli --bin tfmt
-                      cargo test -p tfmttools-cli --test integration -- --nocapture
-    test-integration  cargo test -p tfmttools-cli --test integration -- --nocapture
-    test-container    cargo test -p tfmttools-cli --test container -- --nocapture
+    test-cli          cargo test -p tfmt --bin tfmt
+                      cargo test -p tfmt --test integration -- --nocapture
+    test-integration  cargo test -p tfmt --test integration -- --nocapture
+    test-container    cargo test -p tfmt --test container -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
     serve-reports     python -m http.server (from tests/reports/, passes through arguments)
@@ -22,7 +22,7 @@ Tasks:
 const TEST_INTEGRATION_ARGS: &[&str] = &[
     "test",
     "-p",
-    "tfmttools-cli",
+    "tfmt",
     "--test",
     "integration",
     "--",
@@ -31,16 +31,16 @@ const TEST_INTEGRATION_ARGS: &[&str] = &[
 const TEST_CONTAINER_ARGS: &[&str] = &[
     "test",
     "-p",
-    "tfmttools-cli",
+    "tfmt",
     "--test",
     "container",
     "--",
     "--nocapture",
 ];
 const TEST_WORKSPACE_ARGS: &[&str] =
-    &["test", "--workspace", "--exclude", "tfmttools-cli"];
+    &["test", "--workspace", "--exclude", "tfmt"];
 const TEST_CLI_BIN_ARGS: &[&str] =
-    &["test", "-p", "tfmttools-cli", "--bin", "tfmt"];
+    &["test", "-p", "tfmt", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];

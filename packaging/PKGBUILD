@@ -6,7 +6,7 @@ function _meta() {
 
 prgname=tfmt
 
-pkgname=tfmttools
+pkgname=tfmt
 pkgver=$(_meta "version")
 pkgrel=1
 pkgdesc=$(_meta "description")

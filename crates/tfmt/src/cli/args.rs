@@ -16,7 +16,7 @@ use crate::ui::PreviewListSize;
 #[derive(Parser, Debug)]
 #[command(name = "tfmt", version, about, long_about = None)]
 pub struct TFMTArgs {
-    /// Sets a custom configuration directory. Defaults to '~/.tfmttools'.
+    /// Sets a custom configuration directory. Defaults to '~/.tfmt'.
     #[arg(short = 'c', long = "config-directory")]
     pub custom_config_directory: Option<Utf8PathBuf>,
 

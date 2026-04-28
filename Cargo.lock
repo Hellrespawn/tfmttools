@@ -1175,7 +1175,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tfmttools-cli"
+name = "tfmt"
 version = "0.24.0"
 dependencies = [
  "assert_fs",

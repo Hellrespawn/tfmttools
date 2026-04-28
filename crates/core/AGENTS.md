@@ -19,4 +19,4 @@ with other crates, and UTF-8 path helpers.
 
 - Core-only changes: `cargo test -p tfmttools-core`.
 - If validation affects CLI behavior, also run
-  `cargo test -p tfmttools-cli`.
+  `cargo test -p tfmt`.

@@ -434,7 +434,7 @@ strings:
   "history": {
     "copy-remove-applied": {
       "mount": "config",
-      "path": "tfmttools-cli.hist",
+      "path": "tfmt.hist",
       "record": 0,
       "contains-actions": ["CopyFile", "RemoveFile"],
       "does-not-contain-actions": ["MoveFile"]

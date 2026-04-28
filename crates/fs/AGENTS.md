@@ -18,4 +18,4 @@ direct filesystem operations, and rename staging/planning.
 
 - Filesystem action/planning changes: `cargo test -p tfmttools-fs`.
 - If behavior is user-visible through the CLI, also run
-  `cargo test -p tfmttools-cli`.
+  `cargo test -p tfmt`.

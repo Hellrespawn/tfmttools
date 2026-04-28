@@ -1,6 +1,6 @@
 # CLI Fixture Harness
 
-These fixtures drive the `tfmttools-cli` integration test harness.
+These fixtures drive the `tfmt` integration test harness.
 
 ## Directory Roles
 
@@ -113,7 +113,7 @@ harness crate and loads its adjacent JSON report.
 Run the fixture-backed suite with:
 
 ```sh
-cargo test -p tfmttools-cli --test integration -- --nocapture
+cargo test -p tfmt --test integration -- --nocapture
 ```
 
 ## Audio-file explanation
