@@ -24,7 +24,7 @@ tfmt --version
 1. Ensure you have a version of Rust matching the MSRV described in
    `Cargo.toml`.
 1. Clone the repository.
-1. Run `cargo install --path crates/cli`.
+1. Run `cargo install --path crates/tfmt`.
 1. Run `tfmt --version`.
 
 ## Workspace Map
@@ -34,7 +34,7 @@ tfmt --version
 
 The workspace is split by responsibility:
 
-- `crates/cli/` builds the `tfmt` binary and owns argument parsing, commands,
+- `crates/tfmt/` builds the `tfmt` binary and owns argument parsing, commands,
   terminal interaction, and integration test wiring.
 - `crates/core/` contains the main rename logic, template rendering, and tag
   processing.

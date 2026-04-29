@@ -10,5 +10,9 @@ repository.workspace = true
 homepage.workspace = true
 version.workspace = true
 
+[dependencies]
+tfmt = { path = "../crates/tfmt" }
+clap_complete = { workspace = true }
+
 [lints]
 workspace = true

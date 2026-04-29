@@ -1,11 +1,17 @@
 use std::env;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+
+use clap_complete::generate_to;
+use clap_complete::shells::{Bash, PowerShell, Zsh};
 
 const HELP: &str = "\
 Usage: cargo xtask <task>
 
 Tasks:
     check             cargo check --workspace
+    completions       Generate shell completions into target/completions
+    completions DIR   Generate shell completions into DIR
     test              cargo test --workspace --exclude tfmt
                       cargo test -p tfmt --bin tfmt
                       cargo test -p tfmt --test integration -- --nocapture
@@ -37,6 +43,7 @@ fn main() -> ExitCode {
 
     match task.as_str() {
         "check" => run_cargo(&["check", "--workspace"]),
+        "completions" => generate_completions(&trailing_args),
         "test" => {
             run_steps(&[
                 TEST_WORKSPACE_ARGS,
@@ -128,6 +135,43 @@ fn run_reports_server(args: &[String]) -> ExitCode {
     command.current_dir("tests/reports");
 
     run_command(command, "python")
+}
+
+fn generate_completions(args: &[String]) -> ExitCode {
+    if args.len() > 1 {
+        eprintln!("completions accepts at most one output directory");
+        return ExitCode::FAILURE;
+    }
+
+    let out_dir = args
+        .first()
+        .map_or_else(|| PathBuf::from("target/completions"), PathBuf::from);
+
+    match generate_completion_files(&out_dir) {
+        Ok(files) => {
+            for file in files {
+                println!("generated {}", file.display());
+            }
+
+            ExitCode::SUCCESS
+        },
+        Err(error) => {
+            eprintln!("failed to generate completions: {error}");
+            ExitCode::FAILURE
+        },
+    }
+}
+
+fn generate_completion_files(out_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
+    std::fs::create_dir_all(out_dir)?;
+
+    let mut command = tfmt::cli::command();
+
+    Ok(vec![
+        generate_to(Bash, &mut command, "tfmt", out_dir)?,
+        generate_to(Zsh, &mut command, "tfmt", out_dir)?,
+        generate_to(PowerShell, &mut command, "tfmt", out_dir)?,
+    ])
 }
 
 fn run_command(mut command: Command, program_name: &str) -> ExitCode {

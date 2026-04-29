@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 This repository is a Rust workspace. The CLI entry point lives in
-`crates/cli/` and builds the `tfmt` binary from `src/main.rs`. Core
+`crates/tfmt/` and builds the `tfmt` binary from `src/main.rs`. Core
 rename logic is in `crates/core/`, filesystem helpers are in
 `crates/fs/`, and history support is in `crates/history/`. Shared test
 utilities for the integration harness live in `crates/test-harness/`.
@@ -14,8 +14,8 @@ notes or design work live under `docs/`.
 ## Task Map
 
 - CLI flags and option conversion:
-  `crates/cli/src/cli/args.rs`, `crates/cli/src/cli/options.rs`.
-- Rename command flow: `crates/cli/src/commands/rename/`.
+  `crates/tfmt/src/cli/args.rs`, `crates/tfmt/src/cli/options.rs`.
+- Rename command flow: `crates/tfmt/src/commands/rename/`.
 - Rename action model: `crates/core/src/action/rename_action.rs`.
 - Rename validation: `crates/core/src/action/validation.rs`.
 - Filesystem application and staging:
@@ -54,7 +54,7 @@ imports, and reordered imports/items. Keep modules focused and use
 snake_case for files, modules, and functions. Use PascalCase for types
 and traits. Prefer small, explicit helper functions over dense inline
 logic. When adding CLI behavior, keep argument parsing in
-`crates/cli/src/cli/args.rs` or `crates/cli/src/commands/`.
+`crates/tfmt/src/cli/args.rs` or `crates/tfmt/src/commands/`.
 
 ## Testing Guidelines
 

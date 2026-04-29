@@ -5,7 +5,7 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 ## Workspace
 
-- `crates/cli/`: builds the `tfmt` binary, parses CLI flags, dispatches
+- `crates/tfmt/`: builds the `tfmt` binary, parses CLI flags, dispatches
   commands, owns terminal UI, and coordinates rename/undo/history flows.
 - `crates/core/`: owns pure data and rules: rename actions, validation,
   templates, audio metadata, item keys, history metadata, and UTF-8 path
@@ -16,24 +16,24 @@ Compact map for finding the right code quickly. Prefer crate-local
 - `crates/history/`: owns JSON history persistence, record state, record
   selection for undo/redo, and save/load error handling.
 - `crates/test-harness/`: owns the fixture-backed CLI integration test
-  runner used by `crates/cli/tests/integration.rs`.
+  runner used by `crates/tfmt/tests/integration.rs`.
 - `xtask/`: owns repository task shortcuts exposed through
   `cargo xtask`.
 
 ## Rename Flow
 
-1. `tfmt` starts in `crates/cli/src/main.rs` and calls
+1. `tfmt` starts in `crates/tfmt/src/main.rs` and calls
    `tfmt::cli::run`.
-2. `crates/cli/src/cli/mod.rs` initializes tracing, parses
+2. `crates/tfmt/src/cli/mod.rs` initializes tracing, parses
    `TFMTArgs`, converts them to `TFMTOptions`, creates `FsHandler`, and
    dispatches the selected subcommand.
-3. `crates/cli/src/cli/args.rs` defines global flags and the `rename`
-   subcommand; `crates/cli/src/cli/options.rs` normalizes those args into
+3. `crates/tfmt/src/cli/args.rs` defines global flags and the `rename`
+   subcommand; `crates/tfmt/src/cli/options.rs` normalizes those args into
    `TFMTOptions` and `RenameOptions`.
-4. `crates/cli/src/commands/rename/session.rs` creates a
+4. `crates/tfmt/src/commands/rename/session.rs` creates a
    `RenameSession`, converts rename args, loads history, and coordinates
    setup, apply, and finish.
-5. `crates/cli/src/commands/rename/setup.rs` resolves the template from
+5. `crates/tfmt/src/commands/rename/setup.rs` resolves the template from
    the command line or previous history. It uses
    `crates/fs/src/template.rs` to load template files or scripts.
 6. `setup.rs` gathers paths with `crates/fs/src/path_iterator.rs`,
@@ -42,7 +42,7 @@ Compact map for finding the right code quickly. Prefer crate-local
 7. Audio tags are rendered through `crates/core/src/templates/` to build
    `RenameAction` values from
    `crates/core/src/action/rename_action.rs`.
-8. `crates/cli/src/commands/rename/apply.rs` separates unchanged
+8. `crates/tfmt/src/commands/rename/apply.rs` separates unchanged
    destinations, validates rename actions with
    `crates/core/src/action/validation.rs`, and prints the preview.
 9. If confirmed, `apply.rs` sends actions to
@@ -50,7 +50,7 @@ Compact map for finding the right code quickly. Prefer crate-local
    creation, detects cycles in `crates/fs/src/action/rename_cycles.rs`,
    and stages conflicting renames with
    `crates/fs/src/action/rename_staging.rs`.
-10. `crates/cli/src/commands/rename/finish.rs` handles remaining files,
+10. `crates/tfmt/src/commands/rename/finish.rs` handles remaining files,
     optional cleanup, empty-directory removal, and history storage.
 11. History records are saved through `crates/history/src/history.rs`;
     CLI-facing record metadata types live in
@@ -58,14 +58,14 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 ## Undo/Redo Flow
 
-1. `undo` and `redo` are parsed in `crates/cli/src/cli/args.rs` and
+1. `undo` and `redo` are parsed in `crates/tfmt/src/cli/args.rs` and
    dispatched from `TFMTSubcommand::run`.
-2. `crates/cli/src/commands/undo_redo.rs` loads history from the
+2. `crates/tfmt/src/commands/undo_redo.rs` loads history from the
    configured history file.
 3. Record selection happens in `crates/history/src/history.rs` with
    `get_n_records_to_undo` or `get_n_records_to_redo`.
 4. The CLI previews selected records with
-   `crates/cli/src/history/formatter.rs` and asks for confirmation unless
+   `crates/tfmt/src/history/formatter.rs` and asks for confirmation unless
    confirmation is disabled.
 5. `ActionHandler` in `crates/fs/src/action.rs` applies undo actions in
    reverse record order and redo actions in forward record order.
@@ -74,7 +74,7 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 ## Fixture Integration Flow
 
-1. `crates/cli/tests/integration.rs` calls
+1. `crates/tfmt/tests/integration.rs` calls
    `tfmttools_test_cli::test_runner`.
 2. `crates/test-cli/src/runner.rs` discovers
    `tests/fixtures/cli/cases/*.case.json` through
@@ -101,10 +101,10 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 ### Add A CLI Flag
 
-1. Add the flag to `crates/cli/src/cli/args.rs`.
-2. Convert it in `crates/cli/src/cli/options.rs` if it affects shared
+1. Add the flag to `crates/tfmt/src/cli/args.rs`.
+2. Convert it in `crates/tfmt/src/cli/options.rs` if it affects shared
    options or rename options.
-3. Use the normalized option in `crates/cli/src/commands/`.
+3. Use the normalized option in `crates/tfmt/src/commands/`.
 4. Verify with `cargo xtask test-cli`; add a fixture case when the
    behavior is command-visible.
 
@@ -114,7 +114,7 @@ Compact map for finding the right code quickly. Prefer crate-local
 2. Make sure `validate_rename_actions` includes the new rule in the
    intended order.
 3. If the user-facing error changes, check the CLI path through
-   `crates/cli/src/commands/rename/apply.rs`.
+   `crates/tfmt/src/commands/rename/apply.rs`.
 4. Verify with `cargo xtask test-core`; run `cargo xtask test-cli` when
    CLI behavior is affected.
 
@@ -140,9 +140,9 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 ### Change History Formatting
 
-1. Update CLI formatting in `crates/cli/src/history/formatter.rs`.
-2. Check callers in `crates/cli/src/commands/show_history.rs` and
-   `crates/cli/src/commands/undo_redo.rs`.
+1. Update CLI formatting in `crates/tfmt/src/history/formatter.rs`.
+2. Check callers in `crates/tfmt/src/commands/show_history.rs` and
+   `crates/tfmt/src/commands/undo_redo.rs`.
 3. If record data or state changes, update
    `crates/history/src/record.rs` and `crates/history/src/history.rs`.
 4. Verify with `cargo xtask test-cli`.

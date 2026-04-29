@@ -1,4 +1,5 @@
 mod args;
+mod args_definition;
 pub(crate) mod options;
 
 use chrono::Local;
@@ -61,6 +62,11 @@ pub fn run() -> Result<()> {
     return result;
 
     Ok(())
+}
+
+#[must_use]
+pub fn command() -> clap::Command {
+    TFMTArgs::command()
 }
 
 fn render_cli_error(err: &Report, name: &str) {
