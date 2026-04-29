@@ -1,7 +1,9 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use lofty::tag::TagItem;
+use lofty::TextEncoding;
+use lofty::id3::v2::{Frame, Id3v2Tag};
+use lofty::tag::{ItemKey, Tag, TagItem, TagType};
 use tfmttools_core::action::{
     Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
 };
@@ -66,10 +68,14 @@ fn fix_characters(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
 ) -> Result<()> {
-    let actions = create_fix_actions(app_options, file_paths, |value| {
+    let actions = create_fix_actions(app_options, file_paths, |_, _, value| {
         let fixed = safe_interpolation_value(value);
 
-        (fixed != value).then_some(FieldFix { new_value: fixed })
+        (fixed != value).then_some(FieldFix {
+            new_value: fixed,
+            old_encoding: None,
+            new_encoding: None,
+        })
     });
 
     apply_and_store_fix(
@@ -86,10 +92,12 @@ fn fix_encoding(
     file_paths: Vec<Utf8PathBuf>,
     args: &FixEncodingArgs,
 ) -> Result<()> {
-    let encoding = SourceEncoding::parse(&args.encoding)?;
-    let actions = create_fix_actions(app_options, file_paths, |value| {
-        fix_encoding_value(value, encoding)
-    });
+    let target_encoding = TargetEncoding::parse(&args.encoding)?;
+    let actions =
+        create_fix_actions(app_options, file_paths, |tag, item, value| {
+            let source_encoding = lofty_id3v2_text_encoding(tag, item.key())?;
+            fix_encoding_value(value, source_encoding, target_encoding)
+        });
     let problems = actions
         .iter()
         .flat_map(|action| {
@@ -98,9 +106,12 @@ fn fix_encoding(
                     changes
                         .iter()
                         .flat_map(|change| {
-                            encoding_problems(change.old_value())
-                                .into_iter()
-                                .map(move |problem| (path, change, problem))
+                            encoding_problems_for(
+                                change.new_value(),
+                                target_encoding,
+                            )
+                            .into_iter()
+                            .map(move |problem| (path, change, problem))
                         })
                         .collect::<Vec<_>>()
                 },
@@ -132,7 +143,7 @@ fn fix_encoding(
 fn create_fix_actions(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    fix_value: impl Fn(&str) -> Option<FieldFix>,
+    fix_value: impl Fn(&Tag, &TagItem, &str) -> Option<FieldFix>,
 ) -> Vec<Action> {
     let bar = ProgressBar::bar(
         app_options.display_mode(),
@@ -150,7 +161,9 @@ fn create_fix_actions(
             let changes = audio_file
                 .tag()
                 .items()
-                .filter_map(|item| tag_value_change(item, &fix_value))
+                .filter_map(|item| {
+                    tag_value_change(audio_file.tag(), item, &fix_value)
+                })
                 .collect::<Vec<_>>();
 
             if !changes.is_empty() {
@@ -165,18 +178,22 @@ fn create_fix_actions(
 }
 
 fn tag_value_change(
+    tag: &Tag,
     item: &TagItem,
-    fix_value: &impl Fn(&str) -> Option<FieldFix>,
+    fix_value: &impl Fn(&Tag, &TagItem, &str) -> Option<FieldFix>,
 ) -> Option<TagValueChange> {
     let (kind, value) = tag_item_value(item)?;
-    let fixed = fix_value(value)?;
+    let fixed = fix_value(tag, item, value)?;
 
-    Some(TagValueChange::new(
-        format!("{:?}", item.key()),
-        kind,
-        value.to_owned(),
-        fixed.new_value,
-    ))
+    Some(
+        TagValueChange::new(
+            format!("{:?}", item.key()),
+            kind,
+            value.to_owned(),
+            fixed.new_value,
+        )
+        .with_encoding(fixed.old_encoding, fixed.new_encoding),
+    )
 }
 
 fn tag_item_value(item: &TagItem) -> Option<(TagValueKind, &str)> {
@@ -377,68 +394,126 @@ fn forbidden_characters_in(value: &str) -> Vec<&'static str> {
     forbidden_characters
 }
 
-#[derive(Debug, Clone, Copy)]
-enum SourceEncoding {
-    Iso88591,
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum TargetEncoding {
+    Latin1,
+    Utf16,
+    Utf16Be,
+    Utf8,
 }
 
-impl SourceEncoding {
+impl TargetEncoding {
     fn parse(encoding: &str) -> Result<Self> {
         match encoding.to_ascii_lowercase().as_str() {
-            "iso-8859-1" | "iso8859-1" | "latin1" | "latin-1" => {
-                Ok(Self::Iso88591)
+            "latin1" | "latin-1" | "iso-8859-1" | "iso8859-1" => {
+                Ok(Self::Latin1)
             },
+            "utf-16" | "utf16" => Ok(Self::Utf16),
+            "utf-16be" | "utf16be" => Ok(Self::Utf16Be),
+            "utf-8" | "utf8" => Ok(Self::Utf8),
             _ => Err(eyre!("Unsupported encoding: {encoding}")),
+        }
+    }
+
+    fn text_encoding(self) -> TextEncoding {
+        match self {
+            Self::Latin1 => TextEncoding::Latin1,
+            Self::Utf16 => TextEncoding::UTF16,
+            Self::Utf16Be => TextEncoding::UTF16BE,
+            Self::Utf8 => TextEncoding::UTF8,
         }
     }
 }
 
 fn fix_encoding_value(
     value: &str,
-    encoding: SourceEncoding,
+    source_encoding: TextEncoding,
+    target_encoding: TargetEncoding,
 ) -> Option<FieldFix> {
-    let bytes = encode_source_bytes(value, encoding);
-    let new_value = match String::from_utf8(bytes.clone()) {
-        Ok(value) => value,
-        Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
+    let target_text_encoding = target_encoding.text_encoding();
+    let new_value = if source_encoding == TextEncoding::Latin1 {
+        let bytes = encode_latin1_source_bytes(value);
+        match String::from_utf8(bytes.clone()) {
+            Ok(value) => value,
+            Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
+        }
+    } else {
+        value.to_owned()
     };
+    let new_encoding = (source_encoding != target_text_encoding)
+        .then(|| text_encoding_name(target_text_encoding).to_owned());
 
-    (new_value != value).then_some(FieldFix { new_value })
+    (new_value != value || new_encoding.is_some()).then_some(FieldFix {
+        new_value,
+        old_encoding: Some(text_encoding_name(source_encoding).to_owned()),
+        new_encoding,
+    })
 }
 
-fn encode_source_bytes(value: &str, encoding: SourceEncoding) -> Vec<u8> {
-    match encoding {
-        SourceEncoding::Iso88591 => {
-            value
-                .chars()
-                .map(|character| {
-                    u8::try_from(u32::from(character)).unwrap_or(b'?')
-                })
-                .collect()
-        },
+fn encode_latin1_source_bytes(value: &str) -> Vec<u8> {
+    value
+        .chars()
+        .map(|character| u8::try_from(u32::from(character)).unwrap_or(b'?'))
+        .collect()
+}
+
+fn encoding_problems_for(
+    value: &str,
+    target_encoding: TargetEncoding,
+) -> Vec<String> {
+    if !matches!(target_encoding, TargetEncoding::Latin1) {
+        return Vec::new();
     }
-}
 
-fn encoding_problems(value: &str) -> Vec<String> {
-    let mut problems = value
+    value
         .chars()
         .filter(|character| u32::from(*character) > 0xff)
         .map(|character| {
             format!("'{character}' cannot be represented in ISO-8859-1")
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+}
 
-    let bytes = encode_source_bytes(value, SourceEncoding::Iso88591);
-    if let Err(err) = String::from_utf8(bytes) {
-        problems.push(format!("invalid UTF-8 byte sequence: {err}"));
+fn lofty_id3v2_text_encoding(
+    tag: &Tag,
+    item_key: ItemKey,
+) -> Option<TextEncoding> {
+    let id = item_key.map_key(TagType::Id3v2)?;
+    let id3v2_tag = Id3v2Tag::from(tag.clone());
+
+    id3v2_tag.into_iter().find_map(|frame| {
+        match frame {
+            Frame::Text(frame) if frame.id().as_str() == id => {
+                Some(frame.encoding)
+            },
+            Frame::UserText(frame)
+                if frame.description.as_ref() == id
+                    || ItemKey::from_key(
+                        TagType::Id3v2,
+                        &frame.description,
+                    ) == Some(item_key) =>
+            {
+                Some(frame.encoding)
+            },
+            _ => None,
+        }
+    })
+}
+
+fn text_encoding_name(encoding: TextEncoding) -> &'static str {
+    match encoding {
+        TextEncoding::Latin1 => "Latin1",
+        TextEncoding::UTF16 => "UTF16",
+        TextEncoding::UTF16BE => "UTF16BE",
+        TextEncoding::UTF8 => "UTF8",
     }
-
-    problems
 }
 
 #[derive(Debug)]
 struct FieldFix {
     new_value: String,
+    old_encoding: Option<String>,
+    new_encoding: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -501,8 +576,10 @@ struct TagValueError {
 
 #[cfg(test)]
 mod tests {
+    use lofty::TextEncoding;
+
     use super::{
-        SourceEncoding, encoding_problems, fix_encoding_value,
+        TargetEncoding, encoding_problems_for, fix_encoding_value,
         forbidden_characters_in, safe_interpolation_value,
     };
 
@@ -518,14 +595,49 @@ mod tests {
 
     #[test]
     fn fixes_latin1_mojibake_when_lossless() {
-        let fix =
-            fix_encoding_value("FranÃ§ois", SourceEncoding::Iso88591).unwrap();
+        let fix = fix_encoding_value(
+            "FranÃ§ois",
+            TextEncoding::Latin1,
+            TargetEncoding::Utf16,
+        )
+        .unwrap();
 
         assert_eq!(fix.new_value, "François");
+        assert_eq!(fix.old_encoding.as_deref(), Some("Latin1"));
+        assert_eq!(fix.new_encoding.as_deref(), Some("UTF16"));
+    }
+
+    #[test]
+    fn keeps_value_when_changing_target_encoding() {
+        let fix = fix_encoding_value(
+            "Ich Weiß Es Nicht",
+            TextEncoding::UTF8,
+            TargetEncoding::Utf16,
+        )
+        .unwrap();
+
+        assert_eq!(fix.new_value, "Ich Weiß Es Nicht");
+        assert_eq!(fix.old_encoding.as_deref(), Some("UTF8"));
+        assert_eq!(fix.new_encoding.as_deref(), Some("UTF16"));
+    }
+
+    #[test]
+    fn skips_value_that_already_matches_target_encoding() {
+        assert!(
+            fix_encoding_value(
+                "Ich Weiß Es Nicht",
+                TextEncoding::UTF16,
+                TargetEncoding::Utf16,
+            )
+            .is_none()
+        );
     }
 
     #[test]
     fn reports_lossy_encoding_problems() {
-        assert!(!encoding_problems("Beyoncé").is_empty());
+        assert!(
+            !encoding_problems_for("Бейонсе", TargetEncoding::Latin1)
+                .is_empty()
+        );
     }
 }

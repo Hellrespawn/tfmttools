@@ -11,7 +11,10 @@ use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use libtest_mimic::{Arguments, Trial};
+use lofty::TextEncoding;
 use lofty::file::TaggedFileExt;
+use lofty::id3::v2::{Frame, Id3v2Tag};
+use lofty::tag::{ItemKey, Tag, TagType};
 use tfmttools_core::item_keys::ItemKeys;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
@@ -340,7 +343,7 @@ fn verify_tag_expectations(
     expectation: &Expectation,
     path: &Utf8Path,
 ) -> std::result::Result<Vec<ExpectationVerification>, ExpectationOutcome> {
-    if expectation.tags().is_empty() {
+    if expectation.tags().is_empty() && expectation.tag_encodings().is_empty() {
         return Ok(Vec::new());
     }
 
@@ -365,16 +368,7 @@ fn verify_tag_expectations(
     let mut verifications = Vec::new();
 
     for (key, expected) in expectation.tags() {
-        let item_key = match ItemKeys::from_string(key) {
-            Ok(item_key) => item_key,
-            Err(err) => {
-                return Err(ExpectationOutcome::VerificationFailure {
-                    code: "unknown-tag-key".to_owned(),
-                    path: Some(path.to_owned()),
-                    message: err.to_string(),
-                });
-            },
-        };
+        let item_key = item_key_from_expectation(key, path)?;
         let actual = tag
             .get_string(item_key)
             .map_or_else(String::new, ToOwned::to_owned);
@@ -395,7 +389,137 @@ fn verify_tag_expectations(
         });
     }
 
+    for (key, expected) in expectation.tag_encodings() {
+        let item_key = item_key_from_expectation(key, path)?;
+        let actual = tag_encoding(path, tag, item_key).unwrap_or_default();
+
+        if actual != *expected {
+            return Err(ExpectationOutcome::TagEncodingMismatch {
+                path: path.to_owned(),
+                key: key.clone(),
+                expected: expected.clone(),
+                actual,
+            });
+        }
+
+        verifications.push(ExpectationVerification::TagEncoding {
+            key: key.clone(),
+            expected: expected.clone(),
+            actual,
+        });
+    }
+
     Ok(verifications)
+}
+
+fn item_key_from_expectation(
+    key: &str,
+    path: &Utf8Path,
+) -> std::result::Result<ItemKey, ExpectationOutcome> {
+    ItemKeys::from_string(key).map_err(|err| {
+        ExpectationOutcome::VerificationFailure {
+            code: "unknown-tag-key".to_owned(),
+            path: Some(path.to_owned()),
+            message: err.to_string(),
+        }
+    })
+}
+
+fn tag_encoding(
+    path: &Utf8Path,
+    tag: &Tag,
+    item_key: ItemKey,
+) -> Option<String> {
+    let id = item_key.map_key(TagType::Id3v2)?;
+    if let Some(encoding) = raw_id3v2_text_encoding(path, id) {
+        return Some(encoding);
+    }
+
+    let id3v2_tag = Id3v2Tag::from(tag.clone());
+
+    id3v2_tag.into_iter().find_map(|frame| {
+        match frame {
+            Frame::Text(frame) if frame.id().as_str() == id => {
+                Some(text_encoding_name(frame.encoding).to_owned())
+            },
+            Frame::UserText(frame)
+                if frame.description.as_ref() == id
+                    || ItemKey::from_key(
+                        TagType::Id3v2,
+                        &frame.description,
+                    ) == Some(item_key) =>
+            {
+                Some(text_encoding_name(frame.encoding).to_owned())
+            },
+            _ => None,
+        }
+    })
+}
+
+fn raw_id3v2_text_encoding(path: &Utf8Path, id: &str) -> Option<String> {
+    let bytes = fs_err::read(path).ok()?;
+    if bytes.len() < 10 || &bytes[0..3] != b"ID3" {
+        return None;
+    }
+
+    let version = bytes[3];
+    let tag_size = synchsafe_u32(&bytes[6..10])? as usize;
+    let mut offset = 10;
+    let end = bytes.len().min(10 + tag_size);
+
+    while offset + 10 <= end {
+        let frame_id = std::str::from_utf8(&bytes[offset..offset + 4]).ok()?;
+        if frame_id.chars().all(|character| character == '\0') {
+            return None;
+        }
+
+        let frame_size = match version {
+            4 => synchsafe_u32(&bytes[offset + 4..offset + 8])? as usize,
+            3 => {
+                u32::from_be_bytes(
+                    bytes[offset + 4..offset + 8].try_into().ok()?,
+                ) as usize
+            },
+            _ => return None,
+        };
+        let content_offset = offset + 10;
+        let next_offset = content_offset.checked_add(frame_size)?;
+
+        if frame_id == id && content_offset < end {
+            let encoding = TextEncoding::from_u8(bytes[content_offset])?;
+            return Some(text_encoding_name(encoding).to_owned());
+        }
+
+        if next_offset <= offset || next_offset > end {
+            return None;
+        }
+        offset = next_offset;
+    }
+
+    None
+}
+
+fn synchsafe_u32(bytes: &[u8]) -> Option<u32> {
+    let bytes: [u8; 4] = bytes.try_into().ok()?;
+    if bytes.iter().any(|byte| byte & 0x80 != 0) {
+        return None;
+    }
+
+    Some(
+        (u32::from(bytes[0]) << 21)
+            | (u32::from(bytes[1]) << 14)
+            | (u32::from(bytes[2]) << 7)
+            | u32::from(bytes[3]),
+    )
+}
+
+fn text_encoding_name(encoding: TextEncoding) -> &'static str {
+    match encoding {
+        TextEncoding::Latin1 => "Latin1",
+        TextEncoding::UTF16 => "UTF16",
+        TextEncoding::UTF16BE => "UTF16BE",
+        TextEncoding::UTF8 => "UTF8",
+    }
 }
 
 fn harness_environment() -> BTreeMap<String, String> {

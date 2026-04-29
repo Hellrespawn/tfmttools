@@ -89,11 +89,18 @@ fn writes_tag_expectation_verifications_to_report_json() {
                 )),
                 ExpectationsOutcome::new(None, vec![ExpectationOutcome::Ok {
                     path: audio_path,
-                    verifications: vec![ExpectationVerification::TagValue {
-                        key: "TrackTitle".to_owned(),
-                        expected: "Nemo".to_owned(),
-                        actual: "Nemo".to_owned(),
-                    }],
+                    verifications: vec![
+                        ExpectationVerification::TagValue {
+                            key: "TrackTitle".to_owned(),
+                            expected: "Nemo".to_owned(),
+                            actual: "Nemo".to_owned(),
+                        },
+                        ExpectationVerification::TagEncoding {
+                            key: "TrackTitle".to_owned(),
+                            expected: "UTF16".to_owned(),
+                            actual: "UTF16".to_owned(),
+                        },
+                    ],
                 }]),
             )],
             Some(CliCaseDetails::new(Utf8PathBuf::from("/tmp"))),
@@ -105,17 +112,27 @@ fn writes_tag_expectation_verifications_to_report_json() {
 
     write_report(&report_dir, report).expect("report should write");
 
+    let report_html_path = report_dir.join("cli-2026-04-24T12-00-00.000Z.html");
     let report_json_path = report_dir.join("cli-2026-04-24T12-00-00.000Z.json");
+    let report_html = fs_err::read_to_string(report_html_path).unwrap();
     let report_json = fs_err::read_to_string(report_json_path).unwrap();
     let report_json: Value = serde_json::from_str(&report_json).unwrap();
     let step = &report_json["cases"][0]["steps"][0];
     let tag_value = &step["expectations_outcome"]["outcomes"][0]["ok"]["verifications"]
         [0]["tag_value"];
+    let tag_encoding = &step["expectations_outcome"]["outcomes"][0]["ok"]["verifications"]
+        [1]["tag_encoding"];
 
     assert_eq!(step["command_outcome"]["expected_exit_code"], 0);
     assert_eq!(tag_value["key"], "TrackTitle");
     assert_eq!(tag_value["expected"], "Nemo");
     assert_eq!(tag_value["actual"], "Nemo");
+    assert_eq!(tag_encoding["key"], "TrackTitle");
+    assert_eq!(tag_encoding["expected"], "UTF16");
+    assert_eq!(tag_encoding["actual"], "UTF16");
+    assert!(report_html.contains("Expected encoding"));
+    assert!(report_html.contains("Actual encoding"));
+    assert!(report_html.contains("tag_encoding_mismatch"));
 }
 
 #[cfg(unix)]

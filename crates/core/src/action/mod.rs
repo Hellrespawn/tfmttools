@@ -35,6 +35,10 @@ pub struct TagValueChange {
     kind: TagValueKind,
     old_value: String,
     new_value: String,
+    #[serde(default)]
+    old_encoding: Option<String>,
+    #[serde(default)]
+    new_encoding: Option<String>,
 }
 
 impl TagValueChange {
@@ -45,7 +49,25 @@ impl TagValueChange {
         old_value: String,
         new_value: String,
     ) -> Self {
-        Self { key, kind, old_value, new_value }
+        Self {
+            key,
+            kind,
+            old_value,
+            new_value,
+            old_encoding: None,
+            new_encoding: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_encoding(
+        mut self,
+        old_encoding: Option<String>,
+        new_encoding: Option<String>,
+    ) -> Self {
+        self.old_encoding = old_encoding;
+        self.new_encoding = new_encoding;
+        self
     }
 
     #[must_use]
@@ -66,6 +88,16 @@ impl TagValueChange {
     #[must_use]
     pub fn new_value(&self) -> &str {
         &self.new_value
+    }
+
+    #[must_use]
+    pub fn old_encoding(&self) -> Option<&str> {
+        self.old_encoding.as_deref()
+    }
+
+    #[must_use]
+    pub fn new_encoding(&self) -> Option<&str> {
+        self.new_encoding.as_deref()
     }
 }
 

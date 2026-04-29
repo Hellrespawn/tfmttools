@@ -224,8 +224,8 @@ pub enum ValidateFixSubcommand {
 
 #[derive(Args, Debug)]
 pub struct FixEncodingArgs {
-    #[arg(long, default_value = "ISO-8859-1")]
-    /// Source encoding to translate from. Defaults to ISO-8859-1.
+    #[arg(long, default_value = "UTF-16")]
+    /// Target encoding to write. Defaults to UTF-16.
     pub encoding: String,
 }
 

@@ -146,6 +146,28 @@ function expectationDetails(outcome) {
         };
     }
 
+    if (kind === "tag_encoding_mismatch") {
+        return {
+            status: "failed",
+            label: "Tag encoding mismatch",
+            path: value.path,
+            detail: html`<dl class="tag-verification failed">
+                <div>
+                    <dt>Tag</dt>
+                    <dd><code>${value.key}</code></dd>
+                </div>
+                <div>
+                    <dt>Expected encoding</dt>
+                    <dd><code>${value.expected}</code></dd>
+                </div>
+                <div>
+                    <dt>Actual encoding</dt>
+                    <dd><code>${value.actual}</code></dd>
+                </div>
+            </dl>`,
+        };
+    }
+
     if (kind === "verification_failure") {
         return {
             status: "failed",
@@ -171,6 +193,18 @@ function verificationDetails(verification) {
     if (kind === "tag_value") {
         return {
             label: value.key,
+            expectedLabel: "Expected",
+            actualLabel: "Actual",
+            expected: value.expected,
+            actual: value.actual,
+        };
+    }
+
+    if (kind === "tag_encoding") {
+        return {
+            label: value.key,
+            expectedLabel: "Expected encoding",
+            actualLabel: "Actual encoding",
             expected: value.expected,
             actual: value.actual,
         };
@@ -196,11 +230,11 @@ function Verifications({ verifications }) {
                             <dd><code>${detail.label}</code></dd>
                         </div>
                         <div>
-                            <dt>Expected</dt>
+                            <dt>${detail.expectedLabel}</dt>
                             <dd><code>${detail.expected}</code></dd>
                         </div>
                         <div>
-                            <dt>Actual</dt>
+                            <dt>${detail.actualLabel}</dt>
                             <dd><code>${detail.actual}</code></dd>
                         </div>
                     </dl>

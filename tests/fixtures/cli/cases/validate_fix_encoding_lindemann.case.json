@@ -4,13 +4,15 @@
     "initial-state": [
       {
         "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
-        "tags": { "TrackTitle": "Ich Weiß Es Nicht" }
+        "tags": { "TrackTitle": "Ich Weiß Es Nicht" },
+        "tag-encodings": { "TrackTitle": "UTF8" }
       }
     ],
     "fixed": [
       {
         "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
-        "tags": { "TrackTitle": "Ich Wei\uFFFD Es Nicht" }
+        "tags": { "TrackTitle": "Ich Weiß Es Nicht" },
+        "tag-encodings": { "TrackTitle": "UTF16" }
       }
     ]
   },

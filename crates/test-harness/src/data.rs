@@ -46,6 +46,8 @@ pub struct Expectation {
     checksum: Option<String>,
     #[serde(default)]
     tags: IndexMap<String, String>,
+    #[serde(default, alias = "tag-encodings")]
+    tag_encodings: IndexMap<String, String>,
     #[serde(default)]
     options: Vec<ExpectationOption>,
 }
@@ -76,6 +78,10 @@ impl Expectation {
 
     pub fn tags(&self) -> &IndexMap<String, String> {
         &self.tags
+    }
+
+    pub fn tag_encodings(&self) -> &IndexMap<String, String> {
+        &self.tag_encodings
     }
 }
 

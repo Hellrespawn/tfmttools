@@ -26,7 +26,8 @@ Each case has this top-level shape:
       {
         "path": "input/Nightwish - Nemo.mp3",
         "checksum": "820F92DA",
-        "tags": { "TrackTitle": "Nemo" }
+        "tags": { "TrackTitle": "Nemo" },
+        "tag-encodings": { "TrackTitle": "UTF8" }
       }
     ],
     "apply": [
@@ -56,6 +57,10 @@ the harness. If `checksum` is omitted, only file presence is checked.
 If `tags` is present, each key/value pair must match the audio file's
 primary tag. Tag keys use the same names accepted by templates, such as
 `TrackTitle`, `AlbumTitle`, or `Artist`.
+If `tag-encodings` is present, each key/encoding pair must match the
+text encoding reported for that tag. Currently this is supported for
+ID3v2 text frames and uses Lofty's encoding variant names, such as
+`Latin1`, `UTF8`, or `UTF16`.
 
 Use `options: ["no-previous"]` on an expectation entry when a later
 `previous-expectations` check should allow that path to remain:

@@ -468,6 +468,12 @@ pub enum ExpectationOutcome {
         expected: String,
         actual: String,
     },
+    TagEncodingMismatch {
+        path: Utf8PathBuf,
+        key: String,
+        expected: String,
+        actual: String,
+    },
     VerificationFailure {
         code: String,
         path: Option<Utf8PathBuf>,
@@ -485,4 +491,5 @@ impl ExpectationOutcome {
 #[serde(rename_all = "snake_case")]
 pub enum ExpectationVerification {
     TagValue { key: String, expected: String, actual: String },
+    TagEncoding { key: String, expected: String, actual: String },
 }

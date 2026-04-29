@@ -1,6 +1,8 @@
+use lofty::TextEncoding;
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile as LoftyAudioFile, TaggedFileExt};
-use lofty::tag::{ItemKey, ItemValue, TagItem};
+use lofty::id3::v2::{Frame, Id3v2Tag};
+use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{
     Action, RenameAction, TagValueChange, TagValueKind,
 };
@@ -152,10 +154,18 @@ fn apply_tag_changes(
     for change in changes {
         apply_tag_change(tag, change, direction)?;
     }
+    let id3v2_tag_with_encoding_changes =
+        tag_with_encoding_changes(tag, changes, direction)?;
 
     tagged_file.save_to_path(path, WriteOptions::default()).map_err(|err| {
         tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err)
     })?;
+
+    if let Some(id3v2_tag) = id3v2_tag_with_encoding_changes {
+        id3v2_tag.save_to_path(path, WriteOptions::default()).map_err(
+            |err| tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err),
+        )?;
+    }
 
     Ok(())
 }
@@ -184,6 +194,77 @@ fn apply_tag_change(
     }
 
     Ok(())
+}
+
+fn tag_with_encoding_changes(
+    tag: &lofty::tag::Tag,
+    changes: &[TagValueChange],
+    direction: TagChangeDirection,
+) -> TFMTResult<Option<Id3v2Tag>> {
+    if tag.tag_type() != TagType::Id3v2 {
+        return Ok(None);
+    }
+
+    let mut id3v2_tag = Id3v2Tag::from(tag.clone());
+    let mut changed = false;
+
+    for change in changes {
+        let Some(encoding) = (match direction {
+            TagChangeDirection::Forward => change.new_encoding(),
+            TagChangeDirection::Backward => change.old_encoding(),
+        }) else {
+            continue;
+        };
+        let Some(encoding) = text_encoding_from_name(encoding) else {
+            continue;
+        };
+        let key = ItemKeys::from_string(change.key())?;
+        let Some(id) = key.map_key(TagType::Id3v2) else {
+            continue;
+        };
+
+        let frames = id3v2_tag
+            .into_iter()
+            .map(|frame| {
+                match frame {
+                    Frame::Text(mut frame) if frame.id().as_str() == id => {
+                        frame.encoding = encoding;
+                        changed = true;
+                        Frame::Text(frame)
+                    },
+                    Frame::UserText(mut frame)
+                        if frame.description.as_ref() == id
+                            || ItemKey::from_key(
+                                TagType::Id3v2,
+                                &frame.description,
+                            ) == Some(key) =>
+                    {
+                        frame.encoding = encoding;
+                        changed = true;
+                        Frame::UserText(frame)
+                    },
+                    frame => frame,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        id3v2_tag = Id3v2Tag::default();
+        for frame in frames {
+            id3v2_tag.insert(frame);
+        }
+    }
+
+    Ok(changed.then_some(id3v2_tag))
+}
+
+fn text_encoding_from_name(encoding: &str) -> Option<TextEncoding> {
+    match encoding {
+        "Latin1" => Some(TextEncoding::Latin1),
+        "UTF16" => Some(TextEncoding::UTF16),
+        "UTF16BE" => Some(TextEncoding::UTF16BE),
+        "UTF8" => Some(TextEncoding::UTF8),
+        _ => None,
+    }
 }
 
 fn tag_item_matches(
