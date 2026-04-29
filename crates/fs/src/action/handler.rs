@@ -206,7 +206,7 @@ fn tag_with_encoding_changes(
     }
 
     let mut id3v2_tag = Id3v2Tag::from(tag.clone());
-    let mut changed = false;
+    let mut encoding_changed = false;
 
     for change in changes {
         let Some(encoding) = (match direction {
@@ -229,7 +229,7 @@ fn tag_with_encoding_changes(
                 match frame {
                     Frame::Text(mut frame) if frame.id().as_str() == id => {
                         frame.encoding = encoding;
-                        changed = true;
+                        encoding_changed = true;
                         Frame::Text(frame)
                     },
                     Frame::UserText(mut frame)
@@ -240,7 +240,7 @@ fn tag_with_encoding_changes(
                             ) == Some(key) =>
                     {
                         frame.encoding = encoding;
-                        changed = true;
+                        encoding_changed = true;
                         Frame::UserText(frame)
                     },
                     frame => frame,
@@ -254,7 +254,7 @@ fn tag_with_encoding_changes(
         }
     }
 
-    Ok(changed.then_some(id3v2_tag))
+    Ok(encoding_changed.then_some(id3v2_tag))
 }
 
 fn text_encoding_from_name(encoding: &str) -> Option<TextEncoding> {

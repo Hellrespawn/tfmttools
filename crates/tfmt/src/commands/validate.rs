@@ -18,7 +18,7 @@ use tfmttools_history::{History, HistoryError};
 use tracing::{debug, trace};
 
 use crate::cli::{
-    ConfirmMode, FixEncodingArgs, TFMTOptions, ValidateArgs,
+    ConfirmMode, FixId3EncodingArgs, TFMTOptions, ValidateArgs,
     ValidateFixSubcommand, ValidateOptions, ValidateSubcommand,
 };
 use crate::history::load_history;
@@ -42,8 +42,8 @@ pub fn validate(
         },
         ValidateSubcommand::Fix(fix_args) => {
             match fix_args.command {
-                ValidateFixSubcommand::Encoding(args) => {
-                    fix_encoding(fs_handler, app_options, file_paths, &args)
+                ValidateFixSubcommand::Id3Encoding(args) => {
+                    fix_id3_encoding(fs_handler, app_options, file_paths, &args)
                 },
                 ValidateFixSubcommand::Characters => {
                     fix_characters(fs_handler, app_options, file_paths)
@@ -86,13 +86,17 @@ fn fix_characters(
     )
 }
 
-fn fix_encoding(
+fn fix_id3_encoding(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    args: &FixEncodingArgs,
+    args: &FixId3EncodingArgs,
 ) -> Result<()> {
     let target_encoding = TargetEncoding::parse(&args.encoding)?;
+    let file_paths = file_paths
+        .into_iter()
+        .filter(|path| path.extension() == Some("mp3"))
+        .collect::<Vec<_>>();
     let actions =
         create_fix_actions(app_options, file_paths, |tag, item, value| {
             let source_encoding = lofty_id3v2_text_encoding(tag, item.key())?;
@@ -136,7 +140,7 @@ fn fix_encoding(
         fs_handler,
         app_options,
         actions,
-        "validate fix encoding",
+        "validate fix id3-encoding",
     )
 }
 

@@ -215,17 +215,18 @@ pub struct ValidateFixArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum ValidateFixSubcommand {
-    /// Fix text decoded as the wrong encoding.
-    Encoding(FixEncodingArgs),
+    /// Fix ID3 text decoded as the wrong encoding in MP3 files.
+    #[command(name = "id3-encoding")]
+    Id3Encoding(FixId3EncodingArgs),
 
     /// Replace forbidden characters in tag values.
     Characters,
 }
 
 #[derive(Args, Debug)]
-pub struct FixEncodingArgs {
+pub struct FixId3EncodingArgs {
     #[arg(long, default_value = "UTF-16")]
-    /// Target encoding to write. Defaults to UTF-16.
+    /// Target ID3 text encoding to write. Defaults to UTF-16.
     pub encoding: String,
 }
 

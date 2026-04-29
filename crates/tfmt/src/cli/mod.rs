@@ -14,7 +14,7 @@ use tracing_subscriber::{EnvFilter, fmt, registry};
 
 use self::args::TFMTArgs;
 pub(crate) use self::args::{
-    FixEncodingArgs, RenameArgs, ValidateArgs, ValidateFixSubcommand,
+    FixId3EncodingArgs, RenameArgs, ValidateArgs, ValidateFixSubcommand,
     ValidateSubcommand,
 };
 pub use self::options::{

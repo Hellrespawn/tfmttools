@@ -37,6 +37,10 @@
         "path": "input/Nightwish - While Your Lips Are Still Red.mp3",
         "checksum": "DCBC7996"
       },
+      {
+        "path": "input/Van Pletzen - Benaaihilism.m4a",
+        "checksum": "166D0587"
+      },
       { "path": "input/extra/cover.jpg" },
       { "path": "input/extra/description.txt" }
     ],
@@ -84,6 +88,10 @@
       {
         "path": "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
         "checksum": "DCBC7996"
+      },
+      {
+        "path": "output_dir/Van Pletzen/Benaaihilism/101 - Van Pletzen - Benaaihilism.m4a",
+        "checksum": "166D0587"
       },
       { "path": "config/trash/run_id/extra_cover.jpg_166003A3" },
       {

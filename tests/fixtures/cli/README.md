@@ -146,3 +146,4 @@ All audio-files are of silence, with tags copied to them for testing.
 - "Nightwish - Elvenpath (Live).mp3": Random initial pick
 - "Nightwish - Nemo.mp3": Random initial pick
 - "Nightwish - While Your Lips Are Still Red.mp3": Random initial pick
+- "Van Pletzen - Benaaihilism.m4a": M4A file

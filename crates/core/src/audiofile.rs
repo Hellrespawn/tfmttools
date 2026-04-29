@@ -21,7 +21,7 @@ impl std::fmt::Debug for AudioFile {
 }
 
 impl AudioFile {
-    pub const SUPPORTED_EXTENSIONS: [&'static str; 2] = ["mp3", "ogg"];
+    pub const SUPPORTED_EXTENSIONS: [&'static str; 3] = ["mp3", "ogg", "m4a"];
 
     pub fn new(path: Utf8PathBuf) -> TFMTResult<AudioFile> {
         let file = Utf8File::new(&path)?;

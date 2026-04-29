@@ -2,6 +2,7 @@
 
 ## Backlog
 
+- Detect file type based on mime type?
 - Somehow handle UTF16/etc. strings in cases
 - Fix(?) encoding of German characters
 - Add some sort of strict interpolation of forbidden characters.

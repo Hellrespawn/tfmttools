@@ -1,5 +1,5 @@
 {
-  "description": "Validate fix encoding updates Lindemann tag values and records undoable history",
+  "description": "Validate fix id3-encoding updates Lindemann MP3 tag values and records undoable history",
   "expectations": {
     "initial-state": [
       {
@@ -20,8 +20,8 @@
     "initial": {
       "expectations": "initial-state"
     },
-    "fix-encoding": {
-      "command": "--simple --yes validate -i input fix encoding",
+    "fix-id3-encoding": {
+      "command": "--simple --yes validate -i input fix id3-encoding",
       "expectations": "fixed"
     },
     "undo": {
