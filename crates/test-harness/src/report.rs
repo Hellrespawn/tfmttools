@@ -72,6 +72,30 @@ fn assert_placeholder(template: &str, placeholder: &str) -> Result<()> {
 }
 
 fn report_artifacts(report: &ReportEnvelope) -> ReportArtifacts {
-    let _ = report;
-    ReportArtifacts::default()
+    let prefix = match report.runner() {
+        crate::outcome::Runner::Cli => "cli",
+    };
+    let timestamp = report.started_at();
+    let timestamp = filename_safe_timestamp(timestamp);
+
+    ReportArtifacts::new(
+        format!("{prefix}-{timestamp}.html"),
+        format!("{prefix}-{timestamp}.json"),
+    )
+}
+
+fn filename_safe_timestamp(timestamp: &str) -> String {
+    let timestamp = timestamp
+        .chars()
+        .map(|character| {
+            match character {
+                'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' => {
+                    character
+                },
+                _ => '-',
+            }
+        })
+        .collect::<String>();
+
+    if timestamp.is_empty() { "unknown".to_owned() } else { timestamp }
 }

@@ -66,6 +66,26 @@ function skipReasonText(reason) {
 function expectationDetails(outcome) {
     const [kind, value] = Object.entries(outcome)[0] ?? ["unknown", ""];
 
+    if (kind === "ok") {
+        if (typeof value === "string") {
+            return {
+                status: "passed",
+                label: "Found",
+                path: value,
+                detail: null,
+            };
+        }
+
+        return {
+            status: "passed",
+            label: "Found",
+            path: value.path,
+            detail: html`<${Verifications}
+                verifications=${value.verifications}
+            />`,
+        };
+    }
+
     if (kind === "checksum_mismatch") {
         return {
             status: "failed",
@@ -104,12 +124,25 @@ function expectationDetails(outcome) {
         };
     }
 
-    if (kind === "ok") {
+    if (kind === "tag_value_mismatch") {
         return {
-            status: "passed",
-            label: "Found",
-            path: value,
-            detail: null,
+            status: "failed",
+            label: "Tag mismatch",
+            path: value.path,
+            detail: html`<dl class="tag-verification failed">
+                <div>
+                    <dt>Tag</dt>
+                    <dd><code>${value.key}</code></dd>
+                </div>
+                <div>
+                    <dt>Expected</dt>
+                    <dd><code>${value.expected}</code></dd>
+                </div>
+                <div>
+                    <dt>Actual</dt>
+                    <dd><code>${value.actual}</code></dd>
+                </div>
+            </dl>`,
         };
     }
 
@@ -130,6 +163,51 @@ function expectationDetails(outcome) {
         path: String(value),
         detail: null,
     };
+}
+
+function verificationDetails(verification) {
+    const [kind, value] = Object.entries(verification)[0] ?? ["unknown", ""];
+
+    if (kind === "tag_value") {
+        return {
+            label: value.key,
+            expected: value.expected,
+            actual: value.actual,
+        };
+    }
+
+    return null;
+}
+
+function Verifications({ verifications }) {
+    const details = (verifications ?? [])
+        .map(verificationDetails)
+        .filter(Boolean);
+
+    if (details.length === 0) return null;
+
+    return html`
+        <div class="tag-verifications">
+            ${details.map(
+                detail => html`
+                    <dl class="tag-verification passed">
+                        <div>
+                            <dt>Tag</dt>
+                            <dd><code>${detail.label}</code></dd>
+                        </div>
+                        <div>
+                            <dt>Expected</dt>
+                            <dd><code>${detail.expected}</code></dd>
+                        </div>
+                        <div>
+                            <dt>Actual</dt>
+                            <dd><code>${detail.actual}</code></dd>
+                        </div>
+                    </dl>
+                `,
+            )}
+        </div>
+    `;
 }
 
 function expectationFailureSummary(expectations) {
@@ -167,11 +245,17 @@ function commandFailureSummary(command) {
     if (!command || command.status === "passed") return null;
 
     const exit = command.exit_code == null ? "signal" : command.exit_code;
+    const expected =
+        command.expected_exit_code == null
+            ? ""
+            : `, expected ${command.expected_exit_code}`;
     const stderr = firstLine(command.stderr);
 
     return {
         label: "Command failed",
-        message: stderr ? `exit ${exit}: ${stderr}` : `exit ${exit}`,
+        message: stderr
+            ? `exit ${exit}${expected}: ${stderr}`
+            : `exit ${exit}${expected}`,
     };
 }
 
@@ -229,10 +313,18 @@ function SummaryItem({ label, value, status }) {
 function ExitCode({ command }) {
     const isSignal = command.exit_code == null;
     const value = isSignal ? "signal" : command.exit_code;
+    const expected = command.expected_exit_code;
+    const title =
+        expected == null
+            ? "Process exit code"
+            : `Process exit code, expected ${expected}`;
 
     return html`
-        <span class=${`exit-code ${command.status}`} title="Process exit code">
-            exit ${value}
+        <span class=${`exit-code ${command.status}`} title=${title}>
+            <span>exit ${value}</span>
+            ${expected == null
+                ? null
+                : html`<span class="expected-exit">expected ${expected}</span>`}
         </span>
     `;
 }

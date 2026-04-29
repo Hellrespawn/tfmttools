@@ -16,9 +16,9 @@ use tfmttools_core::item_keys::ItemKeys;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
-    ExpectationOutcome, ExpectationsOutcome, FixtureDirs, ReportEnvelope,
-    ReportFilters, RunFailure, Runner, RunnerDetails, SourceMetadata,
-    StepOutcome, write_report,
+    ExpectationOutcome, ExpectationVerification, ExpectationsOutcome,
+    FixtureDirs, ReportEnvelope, ReportFilters, RunFailure, Runner,
+    RunnerDetails, SourceMetadata, StepOutcome, write_report,
 };
 
 use crate::case::{TestContext, populate_files};
@@ -328,25 +328,26 @@ fn verify_expectation(
         };
     }
 
-    if let Some(failure) = verify_tag_expectations(expectation, &path) {
-        return failure;
-    }
+    let verifications = match verify_tag_expectations(expectation, &path) {
+        Ok(verifications) => verifications,
+        Err(failure) => return failure,
+    };
 
-    ExpectationOutcome::Ok(path)
+    ExpectationOutcome::Ok { path, verifications }
 }
 
 fn verify_tag_expectations(
     expectation: &Expectation,
     path: &Utf8Path,
-) -> Option<ExpectationOutcome> {
+) -> std::result::Result<Vec<ExpectationVerification>, ExpectationOutcome> {
     if expectation.tags().is_empty() {
-        return None;
+        return Ok(Vec::new());
     }
 
     let tagged_file = match lofty::read_from_path(path) {
         Ok(tagged_file) => tagged_file,
         Err(err) => {
-            return Some(ExpectationOutcome::VerificationFailure {
+            return Err(ExpectationOutcome::VerificationFailure {
                 code: "tag-read-failed".to_owned(),
                 path: Some(path.to_owned()),
                 message: err.to_string(),
@@ -354,18 +355,20 @@ fn verify_tag_expectations(
         },
     };
     let Some(tag) = tagged_file.primary_tag() else {
-        return Some(ExpectationOutcome::VerificationFailure {
+        return Err(ExpectationOutcome::VerificationFailure {
             code: "tag-missing".to_owned(),
             path: Some(path.to_owned()),
             message: "audio file has no primary tag".to_owned(),
         });
     };
 
+    let mut verifications = Vec::new();
+
     for (key, expected) in expectation.tags() {
         let item_key = match ItemKeys::from_string(key) {
             Ok(item_key) => item_key,
             Err(err) => {
-                return Some(ExpectationOutcome::VerificationFailure {
+                return Err(ExpectationOutcome::VerificationFailure {
                     code: "unknown-tag-key".to_owned(),
                     path: Some(path.to_owned()),
                     message: err.to_string(),
@@ -377,17 +380,22 @@ fn verify_tag_expectations(
             .map_or_else(String::new, ToOwned::to_owned);
 
         if actual != *expected {
-            return Some(ExpectationOutcome::VerificationFailure {
-                code: "tag-value-mismatch".to_owned(),
-                path: Some(path.to_owned()),
-                message: format!(
-                    "{key}: expected '{expected}', got '{actual}'"
-                ),
+            return Err(ExpectationOutcome::TagValueMismatch {
+                path: path.to_owned(),
+                key: key.clone(),
+                expected: expected.clone(),
+                actual,
             });
         }
+
+        verifications.push(ExpectationVerification::TagValue {
+            key: key.clone(),
+            expected: expected.clone(),
+            actual,
+        });
     }
 
-    None
+    Ok(verifications)
 }
 
 fn harness_environment() -> BTreeMap<String, String> {

@@ -359,6 +359,7 @@ pub struct CommandOutcome {
     pub arguments: Vec<String>,
     pub status: Status,
     pub exit_code: Option<i32>,
+    pub expected_exit_code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
     pub duration_ms: Option<u128>,
@@ -383,7 +384,15 @@ impl CommandOutcome {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
-        Self { arguments, status, exit_code, stdout, stderr, duration_ms: None }
+        Self {
+            arguments,
+            status,
+            exit_code,
+            expected_exit_code: Some(expected_exit_code),
+            stdout,
+            stderr,
+            duration_ms: None,
+        }
     }
 
     pub fn timed_out(
@@ -395,6 +404,7 @@ impl CommandOutcome {
             arguments,
             status: Status::TimedOut,
             exit_code: None,
+            expected_exit_code: None,
             stdout: stdout.into(),
             stderr: stderr.into(),
             duration_ms: None,
@@ -441,11 +451,20 @@ impl ExpectationsOutcome {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExpectationOutcome {
-    Ok(Utf8PathBuf),
+    Ok {
+        path: Utf8PathBuf,
+        verifications: Vec<ExpectationVerification>,
+    },
     NotPresent(Utf8PathBuf),
     UnexpectedPresent(Utf8PathBuf),
     ChecksumMismatch {
         path: Utf8PathBuf,
+        expected: String,
+        actual: String,
+    },
+    TagValueMismatch {
+        path: Utf8PathBuf,
+        key: String,
         expected: String,
         actual: String,
     },
@@ -458,6 +477,12 @@ pub enum ExpectationOutcome {
 
 impl ExpectationOutcome {
     pub fn passed(&self) -> bool {
-        matches!(self, ExpectationOutcome::Ok(..))
+        matches!(self, ExpectationOutcome::Ok { .. })
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpectationVerification {
+    TagValue { key: String, expected: String, actual: String },
 }

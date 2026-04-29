@@ -2,9 +2,6 @@
 
 ## Backlog
 
-- Append a date and time to report.html and .json, like we did for the now removed container test. Use $frontend-skill to
-  add the new expectations to the report html.
-- Update the test-harness to test validate fix.
 - Fix(?) encoding of German characters
 - Add some sort of strict interpolation of forbidden characters.
 - Do test with interactive app?

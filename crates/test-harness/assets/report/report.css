@@ -549,6 +549,10 @@ dd {
     padding-top: 10px;
 }
 
+.expectations-detail {
+    overflow-x: auto;
+}
+
 .command-detail {
     padding-bottom: 10px;
 }
@@ -576,6 +580,7 @@ dd {
 
 .exit-code {
     display: inline-flex;
+    gap: 6px;
     align-items: center;
     min-height: 24px;
     width: fit-content;
@@ -588,6 +593,11 @@ dd {
     font-size: 0.8rem;
     font-weight: 800;
     white-space: nowrap;
+}
+
+.expected-exit {
+    color: var(--muted);
+    font-weight: 700;
 }
 
 .exit-code.failed {
@@ -709,12 +719,12 @@ pre {
 
 .expectation-table th:nth-child(2),
 .expectation-table td:nth-child(2) {
-    width: 150px;
+    width: 120px;
 }
 
 .expectation-table th:nth-child(4),
 .expectation-table td:nth-child(4) {
-    width: 34%;
+    width: 52%;
 }
 
 .expectation-row strong {
@@ -744,16 +754,38 @@ pre {
     gap: 8px 14px;
 }
 
-.checksum div {
+.checksum div,
+.tag-verification div {
     min-width: 0;
 }
 
-.checksum dt {
+.checksum dt,
+.tag-verification dt {
     font-size: 0.78rem;
 }
 
-.checksum dd {
+.checksum dd,
+.tag-verification dd {
     font-weight: 400;
+}
+
+.tag-verifications {
+    display: grid;
+    gap: 5px;
+}
+
+.tag-verification {
+    display: grid;
+    grid-template-columns: minmax(8ch, 0.75fr) repeat(2, minmax(10ch, 1fr));
+    gap: 8px 12px;
+    padding: 6px 8px;
+    border: 1px solid var(--code-border);
+    border-radius: 4px;
+    background: var(--panel);
+}
+
+.tag-verification.failed {
+    background: rgb(196 59 49 / 8%);
 }
 
 .error {
@@ -809,11 +841,6 @@ pre {
     }
 
     .expectation-table {
-        table-layout: auto;
-    }
-
-    .expectation-table th:nth-child(4),
-    .expectation-table td:nth-child(4) {
-        display: none;
+        min-width: 820px;
     }
 }
