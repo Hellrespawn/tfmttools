@@ -13,6 +13,7 @@ version.workspace = true
 [dependencies]
 tfmt = { path = "../crates/tfmt" }
 clap_complete = { workspace = true }
+clap_mangen = { workspace = true }
 
 [lints]
 workspace = true

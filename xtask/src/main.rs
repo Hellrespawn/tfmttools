@@ -12,6 +12,8 @@ Tasks:
     check             cargo check --workspace
     completions       Generate shell completions into target/completions
     completions DIR   Generate shell completions into DIR
+    manpage           Generate manpages into target/man
+    manpage DIR       Generate manpages into DIR
     test              cargo test --workspace --exclude tfmt
                       cargo test -p tfmt --bin tfmt
                       cargo test -p tfmt --test integration -- --nocapture
@@ -44,6 +46,7 @@ fn main() -> ExitCode {
     match task.as_str() {
         "check" => run_cargo(&["check", "--workspace"]),
         "completions" => generate_completions(&trailing_args),
+        "manpage" => generate_manpage(&trailing_args),
         "test" => {
             run_steps(&[
                 TEST_WORKSPACE_ARGS,
@@ -172,6 +175,34 @@ fn generate_completion_files(out_dir: &Path) -> std::io::Result<Vec<PathBuf>> {
         generate_to(Zsh, &mut command, "tfmt", out_dir)?,
         generate_to(PowerShell, &mut command, "tfmt", out_dir)?,
     ])
+}
+
+fn generate_manpage(args: &[String]) -> ExitCode {
+    if args.len() > 1 {
+        eprintln!("manpage accepts at most one output directory");
+        return ExitCode::FAILURE;
+    }
+
+    let out_dir =
+        args.first().map_or_else(|| PathBuf::from("target/man"), PathBuf::from);
+
+    match generate_manpage_files(&out_dir) {
+        Ok(()) => {
+            println!("generated manpages in {}", out_dir.display());
+
+            ExitCode::SUCCESS
+        },
+        Err(error) => {
+            eprintln!("failed to generate manpage: {error}");
+            ExitCode::FAILURE
+        },
+    }
+}
+
+fn generate_manpage_files(out_dir: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(out_dir)?;
+
+    clap_mangen::generate_to(tfmt::cli::command(), out_dir)
 }
 
 fn run_command(mut command: Command, program_name: &str) -> ExitCode {

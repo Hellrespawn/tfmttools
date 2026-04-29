@@ -11,7 +11,6 @@
 - Fix/warn tag with leading/trailing whitespace?
 - Add year to singles?
 - Standardize use of date/year?
-- Add man pages to release archives?
 - Evaluate Windows long-path mode support.
 - Test Windows behavior on network shares.
 - Test Unicode normalization behavior across supported platforms.
