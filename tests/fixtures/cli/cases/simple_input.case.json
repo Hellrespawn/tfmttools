@@ -11,6 +11,10 @@
         "path": "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
         "checksum": "3490B59A"
       },
+      {
+        "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
+        "checksum": "40C9CD73"
+      },
       { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "5F144F41" },
       {
         "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
@@ -48,6 +52,10 @@
       {
         "path": "Die Antwoord/Gucci Coochie (feat. Dita Von Teese).mp3",
         "checksum": "3490B59A"
+      },
+      {
+        "path": "Lindemann/Ich Weiß Es Nicht.mp3",
+        "checksum": "40C9CD73"
       },
       {
         "path": "MASTER BOOT RECORD/Dune.mp3",

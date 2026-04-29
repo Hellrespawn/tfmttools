@@ -11,6 +11,10 @@
         "path": "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
         "checksum": "3490B59A"
       },
+      {
+        "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
+        "checksum": "40C9CD73"
+      },
       { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "5F144F41" },
       {
         "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
@@ -48,6 +52,10 @@
       {
         "path": "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
         "checksum": "3490B59A"
+      },
+      {
+        "path": "output_dir/Lindemann/2019 - F & M/02 - Ich Weiß Es Nicht.mp3",
+        "checksum": "40C9CD73"
       },
       {
         "path": "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
@@ -98,6 +106,10 @@
       {
         "path": "output_dir2/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
         "checksum": "3490B59A"
+      },
+      {
+        "path": "output_dir2/Lindemann/2019 - F & M/02 - Ich Weiß Es Nicht.mp3",
+        "checksum": "40C9CD73"
       },
       {
         "path": "output_dir2/MASTER BOOT RECORD/WAREZ/Dune.mp3",
