@@ -1,6 +1,6 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::bail;
 use lofty::TextEncoding;
 use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::tag::{ItemKey, Tag, TagItem, TagType};
@@ -17,12 +17,9 @@ use tfmttools_fs::{
 use tfmttools_history::{History, HistoryError};
 use tracing::{debug, trace};
 
-use crate::cli::{
-    ConfirmMode, FixId3EncodingArgs, TFMTOptions, ValidateArgs,
-    ValidateFixSubcommand, ValidateOptions, ValidateSubcommand,
-};
+use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
 use crate::history::load_history;
-use crate::ui::{ConfirmationPrompt, ProgressBar};
+use crate::ui::ProgressBar;
 
 pub fn validate(
     fs_handler: &FsHandler,
@@ -31,30 +28,44 @@ pub fn validate(
 ) -> Result<()> {
     let validate_options =
         ValidateOptions::try_from(validate_args.common_args)?;
+
+    if validate_args.command.is_none() && validate_args.fix {
+        bail!("--fix requires a validation type.");
+    }
+
     let file_paths = gather_file_paths(app_options, &validate_options);
 
     debug!("Read {} files.", file_paths.len());
 
-    match validate_args.command.unwrap_or(ValidateSubcommand::Check) {
-        ValidateSubcommand::Check => {
-            check(app_options, file_paths);
+    match (validate_args.command, validate_args.fix) {
+        (None, false) => {
+            check(app_options, file_paths, ValidationScope::All);
             Ok(())
         },
-        ValidateSubcommand::Fix(fix_args) => {
-            match fix_args.command {
-                ValidateFixSubcommand::Id3Encoding(args) => {
-                    fix_id3_encoding(fs_handler, app_options, file_paths, &args)
-                },
-                ValidateFixSubcommand::Characters => {
-                    fix_characters(fs_handler, app_options, file_paths)
-                },
-            }
+        (None, true) => unreachable!("bare validate --fix is rejected early"),
+        (Some(ValidateType::Characters), false) => {
+            check(app_options, file_paths, ValidationScope::Characters);
+            Ok(())
+        },
+        (Some(ValidateType::Characters), true) => {
+            fix_characters(fs_handler, app_options, file_paths)
+        },
+        (Some(ValidateType::Id3Encoding), false) => {
+            check(app_options, file_paths, ValidationScope::Id3Encoding);
+            Ok(())
+        },
+        (Some(ValidateType::Id3Encoding), true) => {
+            fix_id3_encoding(fs_handler, app_options, file_paths)
         },
     }
 }
 
-fn check(app_options: &TFMTOptions, file_paths: Vec<Utf8PathBuf>) {
-    let result = validate_files(app_options, file_paths);
+fn check(
+    app_options: &TFMTOptions,
+    file_paths: Vec<Utf8PathBuf>,
+    scope: ValidationScope,
+) {
+    let result = validate_files(app_options, file_paths, scope);
 
     result.print();
 
@@ -82,7 +93,7 @@ fn fix_characters(
         fs_handler,
         app_options,
         actions,
-        "validate fix characters",
+        "validate characters --fix",
     )
 }
 
@@ -90,9 +101,7 @@ fn fix_id3_encoding(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    args: &FixId3EncodingArgs,
 ) -> Result<()> {
-    let target_encoding = TargetEncoding::parse(&args.encoding)?;
     let file_paths = file_paths
         .into_iter()
         .filter(|path| path.extension() == Some("mp3"))
@@ -100,47 +109,14 @@ fn fix_id3_encoding(
     let actions =
         create_fix_actions(app_options, file_paths, |tag, item, value| {
             let source_encoding = lofty_id3v2_text_encoding(tag, item.key())?;
-            fix_encoding_value(value, source_encoding, target_encoding)
+            rewrite_id3_text_as_utf16(value, source_encoding)
         });
-    let problems = actions
-        .iter()
-        .flat_map(|action| {
-            match action {
-                Action::EditTagValues { path, changes } => {
-                    changes
-                        .iter()
-                        .flat_map(|change| {
-                            encoding_problems_for(
-                                change.new_value(),
-                                target_encoding,
-                            )
-                            .into_iter()
-                            .map(move |problem| (path, change, problem))
-                        })
-                        .collect::<Vec<_>>()
-                },
-                _ => Vec::new(),
-            }
-        })
-        .collect::<Vec<_>>();
-
-    if !problems.is_empty() {
-        println!("Encoding conversion is lossy.");
-        for (path, change, problem) in &problems {
-            println!("\t{path} [{}]: {problem}", change.key());
-        }
-
-        if !confirm_lossy_encoding_fix(app_options)? {
-            println!("Aborting!");
-            return Ok(());
-        }
-    }
 
     apply_and_store_fix(
         fs_handler,
         app_options,
         actions,
-        "validate fix id3-encoding",
+        "validate id3-encoding --fix",
     )
 }
 
@@ -276,11 +252,6 @@ fn store_history(
     Ok(())
 }
 
-fn confirm_lossy_encoding_fix(app_options: &TFMTOptions) -> Result<bool> {
-    Ok(matches!(app_options.confirm_mode(), ConfirmMode::NoConfirm)
-        || ConfirmationPrompt::new("Apply lossy encoding fixes?").prompt()?)
-}
-
 fn gather_file_paths(
     app_options: &TFMTOptions,
     validate_options: &ValidateOptions,
@@ -318,6 +289,7 @@ fn gather_file_paths(
 fn validate_files(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
+    scope: ValidationScope,
 ) -> ValidationResult {
     let bar = ProgressBar::bar(
         app_options.display_mode(),
@@ -336,7 +308,14 @@ fn validate_files(
             Ok(audio_file) => {
                 trace!("Validated audio file encoding: {audio_file:?}");
                 result.checked_files += 1;
-                result.tag_errors.extend(validate_tag_values(&audio_file));
+                if scope.includes_characters() {
+                    result.tag_issues.extend(validate_tag_values(&audio_file));
+                }
+                if scope.includes_id3_encoding() {
+                    result
+                        .id3_encoding_issues
+                        .extend(validate_id3_encoding(&audio_file));
+                }
             },
             Err(error) => {
                 result.read_errors.push(ValidationReadError { path, error });
@@ -352,7 +331,24 @@ fn validate_files(
     result
 }
 
-fn validate_tag_values(audio_file: &AudioFile) -> Vec<TagValueError> {
+#[derive(Debug, Clone, Copy)]
+enum ValidationScope {
+    All,
+    Characters,
+    Id3Encoding,
+}
+
+impl ValidationScope {
+    fn includes_characters(self) -> bool {
+        matches!(self, Self::All | Self::Characters)
+    }
+
+    fn includes_id3_encoding(self) -> bool {
+        matches!(self, Self::All | Self::Id3Encoding)
+    }
+}
+
+fn validate_tag_values(audio_file: &AudioFile) -> Vec<TagValueIssue> {
     audio_file
         .tag()
         .items()
@@ -361,11 +357,32 @@ fn validate_tag_values(audio_file: &AudioFile) -> Vec<TagValueError> {
             let forbidden_characters = forbidden_characters_in(value);
 
             (!forbidden_characters.is_empty()).then(|| {
-                TagValueError {
+                TagValueIssue {
                     path: audio_file.file().as_path().to_owned(),
                     key: format!("{:?}", item.key()),
                     value: value.to_owned(),
-                    forbidden_characters,
+                    characters: forbidden_characters,
+                }
+            })
+        })
+        .collect()
+}
+
+fn validate_id3_encoding(audio_file: &AudioFile) -> Vec<Id3EncodingIssue> {
+    audio_file
+        .tag()
+        .items()
+        .filter_map(|item| {
+            let (_, value) = tag_item_value(item)?;
+            let encoding =
+                lofty_id3v2_text_encoding(audio_file.tag(), item.key())?;
+
+            should_rewrite_id3_text_as_utf16(value, encoding).then(|| {
+                Id3EncodingIssue {
+                    path: audio_file.file().as_path().to_owned(),
+                    key: format!("{:?}", item.key()),
+                    value: value.to_owned(),
+                    encoding: text_encoding_name(encoding).to_owned(),
                 }
             })
         })
@@ -398,84 +415,26 @@ fn forbidden_characters_in(value: &str) -> Vec<&'static str> {
     forbidden_characters
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum TargetEncoding {
-    Latin1,
-    Utf16,
-    Utf16Be,
-    Utf8,
+fn should_rewrite_id3_text_as_utf16(
+    value: &str,
+    encoding: TextEncoding,
+) -> bool {
+    encoding == TextEncoding::UTF8 && !value.is_ascii()
 }
 
-impl TargetEncoding {
-    fn parse(encoding: &str) -> Result<Self> {
-        match encoding.to_ascii_lowercase().as_str() {
-            "latin1" | "latin-1" | "iso-8859-1" | "iso8859-1" => {
-                Ok(Self::Latin1)
-            },
-            "utf-16" | "utf16" => Ok(Self::Utf16),
-            "utf-16be" | "utf16be" => Ok(Self::Utf16Be),
-            "utf-8" | "utf8" => Ok(Self::Utf8),
-            _ => Err(eyre!("Unsupported encoding: {encoding}")),
-        }
-    }
-
-    fn text_encoding(self) -> TextEncoding {
-        match self {
-            Self::Latin1 => TextEncoding::Latin1,
-            Self::Utf16 => TextEncoding::UTF16,
-            Self::Utf16Be => TextEncoding::UTF16BE,
-            Self::Utf8 => TextEncoding::UTF8,
-        }
-    }
-}
-
-fn fix_encoding_value(
+fn rewrite_id3_text_as_utf16(
     value: &str,
     source_encoding: TextEncoding,
-    target_encoding: TargetEncoding,
 ) -> Option<FieldFix> {
-    let target_text_encoding = target_encoding.text_encoding();
-    let new_value = if source_encoding == TextEncoding::Latin1 {
-        let bytes = encode_latin1_source_bytes(value);
-        match String::from_utf8(bytes.clone()) {
-            Ok(value) => value,
-            Err(_) => String::from_utf8_lossy(&bytes).into_owned(),
+    should_rewrite_id3_text_as_utf16(value, source_encoding).then(|| {
+        FieldFix {
+            new_value: value.to_owned(),
+            old_encoding: Some(text_encoding_name(source_encoding).to_owned()),
+            new_encoding: Some(
+                text_encoding_name(TextEncoding::UTF16).to_owned(),
+            ),
         }
-    } else {
-        value.to_owned()
-    };
-    let new_encoding = (source_encoding != target_text_encoding)
-        .then(|| text_encoding_name(target_text_encoding).to_owned());
-
-    (new_value != value || new_encoding.is_some()).then_some(FieldFix {
-        new_value,
-        old_encoding: Some(text_encoding_name(source_encoding).to_owned()),
-        new_encoding,
     })
-}
-
-fn encode_latin1_source_bytes(value: &str) -> Vec<u8> {
-    value
-        .chars()
-        .map(|character| u8::try_from(u32::from(character)).unwrap_or(b'?'))
-        .collect()
-}
-
-fn encoding_problems_for(
-    value: &str,
-    target_encoding: TargetEncoding,
-) -> Vec<String> {
-    if !matches!(target_encoding, TargetEncoding::Latin1) {
-        return Vec::new();
-    }
-
-    value
-        .chars()
-        .filter(|character| u32::from(*character) > 0xff)
-        .map(|character| {
-            format!("'{character}' cannot be represented in ISO-8859-1")
-        })
-        .collect::<Vec<_>>()
 }
 
 fn lofty_id3v2_text_encoding(
@@ -524,12 +483,15 @@ struct FieldFix {
 struct ValidationResult {
     checked_files: usize,
     read_errors: Vec<ValidationReadError>,
-    tag_errors: Vec<TagValueError>,
+    tag_issues: Vec<TagValueIssue>,
+    id3_encoding_issues: Vec<Id3EncodingIssue>,
 }
 
 impl ValidationResult {
     fn is_valid(&self) -> bool {
-        self.read_errors.is_empty() && self.tag_errors.is_empty()
+        self.read_errors.is_empty()
+            && self.tag_issues.is_empty()
+            && self.id3_encoding_issues.is_empty()
     }
 
     fn print(&self) {
@@ -537,8 +499,6 @@ impl ValidationResult {
             println!("Validated {} audio files.", self.checked_files);
             return;
         }
-
-        println!("Validation failed.");
 
         if !self.read_errors.is_empty() {
             println!();
@@ -548,16 +508,40 @@ impl ValidationResult {
             }
         }
 
-        if !self.tag_errors.is_empty() {
+        if !self.tag_issues.is_empty() {
             println!();
-            println!("Forbidden characters in tag values:");
-            for error in &self.tag_errors {
+            println!(
+                "Some tag values contain characters that may not work well in filenames."
+            );
+            println!(
+                "Run `tfmt validate characters --fix` to strip or replace them."
+            );
+            println!("This changes file tags.");
+            for issue in &self.tag_issues {
                 println!(
                     "\t{} [{}] contains '{}': {}",
-                    error.path,
-                    error.key,
-                    error.forbidden_characters.join("', '"),
-                    error.value
+                    issue.path,
+                    issue.key,
+                    issue.characters.join("', '"),
+                    issue.value
+                );
+            }
+        }
+
+        if !self.id3_encoding_issues.is_empty() {
+            println!();
+            println!(
+                "Some ID3 text frames contain non-ASCII characters but are not encoded as UTF-16."
+            );
+            println!("UTF-16 is recommended for compatibility.");
+            println!(
+                "Run `tfmt validate id3-encoding --fix` to rewrite matching frames as UTF-16."
+            );
+            println!("This changes file tags.");
+            for issue in &self.id3_encoding_issues {
+                println!(
+                    "\t{} [{}] {}: {}",
+                    issue.path, issue.key, issue.encoding, issue.value
                 );
             }
         }
@@ -571,11 +555,19 @@ struct ValidationReadError {
 }
 
 #[derive(Debug)]
-struct TagValueError {
+struct TagValueIssue {
     path: Utf8PathBuf,
     key: String,
     value: String,
-    forbidden_characters: Vec<&'static str>,
+    characters: Vec<&'static str>,
+}
+
+#[derive(Debug)]
+struct Id3EncodingIssue {
+    path: Utf8PathBuf,
+    key: String,
+    value: String,
+    encoding: String,
 }
 
 #[cfg(test)]
@@ -583,8 +575,8 @@ mod tests {
     use lofty::TextEncoding;
 
     use super::{
-        TargetEncoding, encoding_problems_for, fix_encoding_value,
-        forbidden_characters_in, safe_interpolation_value,
+        forbidden_characters_in, rewrite_id3_text_as_utf16,
+        safe_interpolation_value, should_rewrite_id3_text_as_utf16,
     };
 
     #[test]
@@ -598,27 +590,10 @@ mod tests {
     }
 
     #[test]
-    fn fixes_latin1_mojibake_when_lossless() {
-        let fix = fix_encoding_value(
-            "FranÃ§ois",
-            TextEncoding::Latin1,
-            TargetEncoding::Utf16,
-        )
-        .unwrap();
-
-        assert_eq!(fix.new_value, "François");
-        assert_eq!(fix.old_encoding.as_deref(), Some("Latin1"));
-        assert_eq!(fix.new_encoding.as_deref(), Some("UTF16"));
-    }
-
-    #[test]
-    fn keeps_value_when_changing_target_encoding() {
-        let fix = fix_encoding_value(
-            "Ich Weiß Es Nicht",
-            TextEncoding::UTF8,
-            TargetEncoding::Utf16,
-        )
-        .unwrap();
+    fn rewrites_non_ascii_utf8_text_as_utf16() {
+        let fix =
+            rewrite_id3_text_as_utf16("Ich Weiß Es Nicht", TextEncoding::UTF8)
+                .unwrap();
 
         assert_eq!(fix.new_value, "Ich Weiß Es Nicht");
         assert_eq!(fix.old_encoding.as_deref(), Some("UTF8"));
@@ -626,22 +601,34 @@ mod tests {
     }
 
     #[test]
-    fn skips_value_that_already_matches_target_encoding() {
+    fn skips_ascii_id3_text() {
         assert!(
-            fix_encoding_value(
-                "Ich Weiß Es Nicht",
-                TextEncoding::UTF16,
-                TargetEncoding::Utf16,
-            )
-            .is_none()
+            rewrite_id3_text_as_utf16("Nothing To Fix", TextEncoding::UTF8)
+                .is_none()
         );
     }
 
     #[test]
-    fn reports_lossy_encoding_problems() {
+    fn skips_id3_text_that_is_already_utf16() {
         assert!(
-            !encoding_problems_for("Бейонсе", TargetEncoding::Latin1)
-                .is_empty()
+            rewrite_id3_text_as_utf16("Ich Weiß Es Nicht", TextEncoding::UTF16)
+                .is_none()
         );
+    }
+
+    #[test]
+    fn uses_same_id3_encoding_predicate_for_check_and_fix() {
+        assert!(should_rewrite_id3_text_as_utf16(
+            "Ich Weiß Es Nicht",
+            TextEncoding::UTF8
+        ));
+        assert!(!should_rewrite_id3_text_as_utf16(
+            "Nothing To Fix",
+            TextEncoding::UTF8
+        ));
+        assert!(!should_rewrite_id3_text_as_utf16(
+            "Ich Weiß Es Nicht",
+            TextEncoding::UTF16
+        ));
     }
 }

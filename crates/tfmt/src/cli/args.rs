@@ -7,9 +7,8 @@ use tracing::debug;
 
 use super::TFMTOptions;
 pub use super::args_definition::{
-    FixId3EncodingArgs, RenameArgs, TFMTArgs, TFMTSubcommand, TemplateArgs,
-    ValidateArgs, ValidateCommonArgs, ValidateFixSubcommand,
-    ValidateSubcommand,
+    RenameArgs, TFMTArgs, TFMTSubcommand, TemplateArgs, ValidateArgs,
+    ValidateCommonArgs, ValidateType,
 };
 use crate::commands::{
     clear_history, list_templates, rename, show_history, undo_redo, validate,

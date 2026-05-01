@@ -6,6 +6,19 @@
 
 - Added generated shell completions to release archives and Arch packages.
 - Added generated man pages to release archives and Arch packages.
+- Added `tfmt validate id3-encoding` to report non-ASCII ID3 text frames
+  stored as UTF-8.
+
+### Changed
+
+- Changed validation commands to use validation types directly:
+  `tfmt validate`, `tfmt validate characters`, and
+  `tfmt validate id3-encoding`.
+- Changed validation fixes to use `--fix`, such as
+  `tfmt validate characters --fix` and
+  `tfmt validate id3-encoding --fix`.
+- Removed the `validate fix id3-encoding --encoding` option; matching ID3 text
+  frames are now always rewritten as UTF-16.
 
 ## 0.24.0 - 2026-04-30
 

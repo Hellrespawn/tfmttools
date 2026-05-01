@@ -81,6 +81,10 @@ All test step fields are optional. A step without `command` can verify
 the initial fixture state. Commands are split on whitespace before they
 are passed to the CLI.
 
+Validation fixture commands use the current validation-type first shape,
+for example `validate -i input characters --fix` and
+`validate -i input id3-encoding --fix`.
+
 ## Harness Behavior
 
 Every case starts from a fresh temporary work directory. Before each

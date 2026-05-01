@@ -14,10 +14,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt, registry};
 
 use self::args::TFMTArgs;
-pub(crate) use self::args::{
-    FixId3EncodingArgs, RenameArgs, ValidateArgs, ValidateFixSubcommand,
-    ValidateSubcommand,
-};
+pub(crate) use self::args::{RenameArgs, ValidateArgs, ValidateType};
 pub use self::options::{
     ConfirmMode, DisplayMode, RenameOptions, TFMTOptions, TemplateOption,
     ValidateOptions,

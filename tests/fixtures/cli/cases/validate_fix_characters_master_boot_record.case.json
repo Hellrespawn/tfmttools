@@ -1,5 +1,5 @@
 {
-  "description": "Validate fix characters replaces forbidden characters in MASTER BOOT RECORD tag values",
+  "description": "Validate characters --fix replaces filename-unfriendly characters in MASTER BOOT RECORD tag values",
   "expectations": {
     "initial-state": [
       {
@@ -33,16 +33,16 @@
       "expectations": "initial-state"
     },
     "check-fails": {
-      "command": "--simple validate -i input check",
+      "command": "--simple validate -i input characters",
       "expected-exit-code": 1,
       "expectations": "initial-state"
     },
     "fix-characters": {
-      "command": "--simple --yes validate -i input fix characters",
+      "command": "--simple --yes validate -i input characters --fix",
       "expectations": "fixed"
     },
     "check-passes": {
-      "command": "--simple validate -i input check",
+      "command": "--simple validate -i input characters",
       "expectations": "fixed"
     }
   }

@@ -74,6 +74,36 @@ tfmt --simple --yes rename -t examples/stef.tfmt
 
 See also the "examples"-folder.
 
+### Validate
+
+`tfmt validate` checks audio files and tags without modifying files. It runs
+all validation checks and exits with a non-zero status when issues are found.
+
+Run a single check by validation type:
+
+```sh
+tfmt validate characters
+tfmt validate id3-encoding
+```
+
+`tfmt validate characters` reports tag values containing characters that may
+not work well in filenames. Fixing these issues is optional. To strip or
+replace the same characters used by template sanitization, run:
+
+```sh
+tfmt validate characters --fix
+```
+
+`tfmt validate id3-encoding` reports MP3 ID3 text frames with non-ASCII text
+stored as UTF-8. To rewrite matching frames as UTF-16 while preserving their
+text values, run:
+
+```sh
+tfmt validate id3-encoding --fix
+```
+
+Both `--fix` commands change file tags and record undoable history.
+
 ### Templates
 
 Templates render target paths without the file extension. `tfmt` keeps the

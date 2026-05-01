@@ -101,7 +101,11 @@ pub struct ValidateArgs {
     pub common_args: ValidateCommonArgs,
 
     #[command(subcommand)]
-    pub command: Option<ValidateSubcommand>,
+    pub command: Option<ValidateType>,
+
+    #[arg(long, global = true)]
+    /// Apply fixes. Requires an explicit validation type.
+    pub fix: bool,
 }
 
 #[derive(Args, Debug)]
@@ -116,35 +120,13 @@ pub struct ValidateCommonArgs {
 }
 
 #[derive(Subcommand, Debug)]
-pub enum ValidateSubcommand {
-    /// Check audio files and their tags.
-    Check,
-
-    /// Fix audio files and their tags.
-    Fix(ValidateFixArgs),
-}
-
-#[derive(Args, Debug)]
-pub struct ValidateFixArgs {
-    #[command(subcommand)]
-    pub command: ValidateFixSubcommand,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum ValidateFixSubcommand {
-    /// Fix ID3 text decoded as the wrong encoding in MP3 files.
-    #[command(name = "id3-encoding")]
-    Id3Encoding(FixId3EncodingArgs),
-
-    /// Replace forbidden characters in tag values.
+pub enum ValidateType {
+    /// Check tag values for characters that may not work well in filenames.
     Characters,
-}
 
-#[derive(Args, Debug)]
-pub struct FixId3EncodingArgs {
-    #[arg(long, default_value = "UTF-16")]
-    /// Target ID3 text encoding to write. Defaults to UTF-16.
-    pub encoding: String,
+    /// Check ID3 text frames that should be rewritten as UTF-16.
+    #[command(name = "id3-encoding")]
+    Id3Encoding,
 }
 
 #[derive(Args, Debug)]
