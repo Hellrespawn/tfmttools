@@ -9,8 +9,8 @@ Use `minijinja` to rename audio files according to their tags.
 Download a release archive from Forgejo, extract it, and place the
 `tfmt` binary on your `PATH`.
 
-Linux archives contain `tfmt` and the `examples/` directory with starter
-templates.
+Linux archives contain `tfmt`, shell completions, man pages, and the
+`examples/` directory with starter templates.
 
 Verify the installed binary:
 

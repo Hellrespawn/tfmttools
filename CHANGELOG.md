@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Added generated shell completions to release archives and Arch packages.
+- Added generated man pages to release archives and Arch packages.
+
 ## 0.24.0 - 2026-04-30
 
 ### Added

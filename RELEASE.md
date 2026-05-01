@@ -60,4 +60,5 @@ Use this checklist from the workspace root.
    - Arch Linux package
    - `SHA256SUMS-x86_64-unknown-linux-gnu`
    - changelog text
-   - packaged `README.md`, `LICENSE`, `CHANGELOG.md`, and `examples/`
+   - packaged `README.md`, `LICENSE`, `CHANGELOG.md`, `examples/`,
+     completions, and man pages

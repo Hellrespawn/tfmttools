@@ -32,6 +32,9 @@ Use Cargo from the workspace root.
 - `cargo build --workspace` builds every crate.
 - `cargo run -- --help` runs the CLI locally.
 - `cargo xtask check` runs `cargo check --workspace`.
+- `cargo xtask completions` generates shell completions into
+  `target/completions`.
+- `cargo xtask manpage` generates man pages into `target/man`.
 - `cargo xtask test` runs unit and integration tests across the workspace.
 - `cargo xtask test-integration` runs the fixture-backed CLI integration suite.
 - `cargo +nightly fmt --all` applies the workspace formatting rules.
@@ -55,6 +58,9 @@ snake_case for files, modules, and functions. Use PascalCase for types
 and traits. Prefer small, explicit helper functions over dense inline
 logic. When adding CLI behavior, keep argument parsing in
 `crates/tfmt/src/cli/args.rs` or `crates/tfmt/src/commands/`.
+When changing user-visible CLI behavior, update README.md,
+CHANGELOG.md, and any relevant fixture docs or examples in the same
+change.
 
 ## Testing Guidelines
 
@@ -84,7 +90,7 @@ Recent commits use short, imperative subjects such as `Add option to specify tem
 
 ## Contributor Notes
 
-The workspace MSRV is Rust 1.85.0 (`edition = "2024"`). If you touch
+The workspace MSRV is Rust 1.89.0 (`edition = "2024"`). If you touch
 templates or reports, check `examples/`, fixture report expectations, and
 the shared report viewer assets under `crates/test-harness/assets/report/`
 so sample output and test reporting stay aligned.
