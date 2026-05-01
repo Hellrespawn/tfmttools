@@ -12,7 +12,7 @@ Use this checklist from the workspace root.
    scripts/ci.sh
    ```
 
-4. Confirm GitHub and Forgejo CI pass on Linux and Windows.
+4. Confirm Forgejo CI passes on Linux.
 5. Build local release artifacts where practical:
 
    ```sh
@@ -46,20 +46,18 @@ Use this checklist from the workspace root.
    Release artifact workflows only accept tags shaped like `v0.24.0`, and the
    tag must match the workspace version in `Cargo.toml`.
 
-2. Download the Linux and Windows artifacts from the tag workflow.
-3. Combine the per-platform checksum files into one release checksum file:
+2. Download the Linux artifact from the tag workflow.
+3. Verify the generated checksum file:
 
    ```sh
-   cat SHA256SUMS-* > SHA256SUMS
-   sha256sum --check SHA256SUMS
+   sha256sum --check SHA256SUMS-x86_64-unknown-linux-gnu
    ```
 
-4. Publish release notes and artifacts manually on GitHub.
-5. Publish the same release notes and artifacts manually on Forgejo.
+5. Publish release notes and artifacts manually on Forgejo.
 6. Verify both release pages include:
    - source archive
    - Linux x86_64 archive
-   - Windows x86_64 archive
-   - `SHA256SUMS`
+   - Arch Linux package
+   - `SHA256SUMS-x86_64-unknown-linux-gnu`
    - changelog text
    - packaged `README.md`, `LICENSE`, `CHANGELOG.md`, and `examples/`

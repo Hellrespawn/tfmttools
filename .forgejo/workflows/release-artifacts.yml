@@ -2,33 +2,45 @@ name: Release Artifacts
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  artifacts:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+  linux-release:
+    name: Linux Release Package
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: dtolnay/rust-toolchain@nightly
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build release archive
+        uses: ./.forgejo/actions/rust-run
         with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: sh scripts/validate-release-tag.sh "${GITHUB_REF_NAME}"
-      - run: sh scripts/ci.sh
-      - run: sh scripts/package-release.sh
-      - uses: actions/upload-artifact@v4
+          command: scripts/package-release.sh
+
+      - name: Build Arch package
+        uses: docker://docker.io/library/archlinux:latest
         with:
-          name: tfmt-${{ matrix.os }}
-          path: |
-            dist/tfmt-*
-            dist/SHA256SUMS-*
+          entrypoint: /bin/sh
+          args: scripts/package-arch-in-container.sh
+
+      - name: Stage release artifacts
+        run: |
+          set -eu
+          rm -rf release-artifacts
+          mkdir -p release-artifacts
+          cp dist/*.tar.gz release-artifacts/
+          cp dist/*.pkg.tar.* release-artifacts/
+          cp dist/SHA256SUMS-* release-artifacts/
+
+      - name: Upload release archive
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: tfmt-release-linux-x86_64
+          path: release-artifacts/
+          if-no-files-found: error

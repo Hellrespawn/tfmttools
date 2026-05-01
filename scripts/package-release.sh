@@ -26,21 +26,30 @@ if ! find examples -type f -name '*.tfmt' | grep -q .; then
 fi
 
 case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)
-        target="x86_64-pc-windows-msvc"
-        binary="tfmt.exe"
-        archive="tfmt-${version}-${target}.zip"
+    Linux)
         ;;
     *)
-        target="x86_64-unknown-linux-gnu"
-        binary="tfmt"
-        archive="tfmt-${version}-${target}.tar.gz"
+        echo "Release packaging is currently supported on Linux only." >&2
+        exit 1
         ;;
 esac
 
+target="x86_64-unknown-linux-gnu"
+binary="tfmt"
+archive="tfmt-${version}-${target}.tar.gz"
+
 checksums="SHA256SUMS-${target}"
 
+rm -rf target/release-completions target/release-man
+
+echo "Doing release build..."
 cargo build --release
+
+echo "Building shell completions"
+cargo xtask completions "target/release-completions"
+
+echo "Building manpage..."
+cargo xtask manpage "target/release-man"
 
 binary_version="$(target/release/${binary} --version)"
 
@@ -63,21 +72,15 @@ cp README.md "$package_dir/"
 cp LICENSE "$package_dir/"
 cp CHANGELOG.md "$package_dir/"
 cp -R examples "$package_dir/"
+cp -R target/release-completions "$package_dir/completions"
+cp -R target/release-man "$package_dir/man"
 
 mkdir -p "$dist_dir"
 rm -f "${dist_dir}/${archive}"
 rm -f "${dist_dir}/${checksums}"
 
-case "$archive" in
-    *.zip)
-        powershell.exe -NoLogo -NoProfile -Command \
-            "Compress-Archive -Path '${package_dir}/*' -DestinationPath '${dist_dir}/${archive}' -Force"
-        ;;
-    *.tar.gz)
-        tar -C "$dist_dir" -czf "${dist_dir}/${archive}" \
-            "tfmt-${version}-${target}"
-        ;;
-esac
+tar -C "$dist_dir" -czf "${dist_dir}/${archive}" \
+    "tfmt-${version}-${target}"
 
 (
     cd "$dist_dir"

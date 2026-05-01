@@ -6,11 +6,11 @@ Use `minijinja` to rename audio files according to their tags.
 
 ### Release Archives
 
-Download a release archive from GitHub or Forgejo, extract it, and place the
+Download a release archive from Forgejo, extract it, and place the
 `tfmt` binary on your `PATH`.
 
-Windows archives contain `tfmt.exe`. Linux archives contain `tfmt`.
-Release archives include the `examples/` directory with starter templates.
+Linux archives contain `tfmt` and the `examples/` directory with starter
+templates.
 
 Verify the installed binary:
 
@@ -143,6 +143,6 @@ tfmt clear-history
 
 ### Windows Notes
 
-Windows support targets normal NTFS usage. Long-path mode, network shares,
-unusual Unicode normalization, and cross-volume edge cases are not full
-compatibility promises for this release.
+Windows support is best-effort. Windows binaries are not release artifacts for
+this release, and Windows-specific filesystem behavior is not a compatibility
+promise.

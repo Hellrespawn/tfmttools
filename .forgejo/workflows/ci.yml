@@ -2,24 +2,23 @@ name: CI
 
 on:
   push:
-  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  ci:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+  linux:
+    name: Linux Checks
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: dtolnay/rust-toolchain@nightly
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run CI script
+        uses: ./.forgejo/actions/rust-run
         with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: sh scripts/ci.sh
+          command: scripts/ci.sh

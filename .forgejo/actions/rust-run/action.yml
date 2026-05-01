@@ -1,0 +1,13 @@
+name: Rust Run
+description: Run a shell command in the repository's Rust CI container.
+
+inputs:
+  command:
+    description: Shell command to run inside the container.
+    required: true
+
+runs:
+  using: docker
+  image: Containerfile
+  args:
+    - ${{ inputs.command }}
