@@ -27,7 +27,7 @@ jobs:
         uses: docker://docker.io/library/archlinux:latest
         with:
           entrypoint: /bin/sh
-          args: scripts/package-arch-in-container.sh
+          args: .forgejo/scripts/package-arch-in-container.sh
 
       - name: Stage release artifacts
         run: |
