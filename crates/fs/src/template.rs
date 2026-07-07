@@ -63,7 +63,12 @@ impl<'tl> TemplateLoader<'tl> {
 
         let source = fs::read_to_string(path)?;
 
-        Self::register_template(&mut environment, &mut frontmatters, name, source)?;
+        Self::register_template(
+            &mut environment,
+            &mut frontmatters,
+            name,
+            source,
+        )?;
 
         Ok(Self {
             template_names: vec![name.to_owned()],
@@ -102,7 +107,9 @@ impl<'tl> TemplateLoader<'tl> {
         let frontmatter = self.frontmatters.get(name);
 
         let description = match frontmatter {
-            Some(frontmatter) => frontmatter.description().map(ToOwned::to_owned),
+            Some(frontmatter) => {
+                frontmatter.description().map(ToOwned::to_owned)
+            },
             None => Self::description(minijinja_template.source()),
         };
 
@@ -225,7 +232,9 @@ impl<'tl> TemplateLoader<'tl> {
         let body = source[body_start..].to_owned();
 
         if Self::body_uses_indexed_args(&body) {
-            return Err(TFMTError::IndexedArgsWithFrontmatter(label.to_owned()));
+            return Err(TFMTError::IndexedArgsWithFrontmatter(
+                label.to_owned(),
+            ));
         }
 
         Ok((body, Some(frontmatter)))
@@ -383,7 +392,8 @@ mod tests {
     fn split_frontmatter_errors_when_unterminated() {
         let source = "+++\nname = \"Test\"\n{{ artist }}".to_owned();
 
-        let error = TemplateLoader::split_frontmatter("test", source).unwrap_err();
+        let error =
+            TemplateLoader::split_frontmatter("test", source).unwrap_err();
 
         assert!(matches!(error, TFMTError::UnterminatedFrontmatter(_)));
     }
@@ -392,7 +402,8 @@ mod tests {
     fn split_frontmatter_errors_when_body_uses_indexed_args() {
         let source = "+++\nname = \"Test\"\n+++\n{{ args[0] }}".to_owned();
 
-        let error = TemplateLoader::split_frontmatter("test", source).unwrap_err();
+        let error =
+            TemplateLoader::split_frontmatter("test", source).unwrap_err();
 
         assert!(matches!(error, TFMTError::IndexedArgsWithFrontmatter(_)));
     }
@@ -451,10 +462,9 @@ mod tests {
         let loader = TemplateLoader::read_script(script).unwrap();
 
         let template = loader
-            .get_template(
-                TemplateLoader::DEFAULT_SCRIPT_NAME,
-                vec!["a".to_owned()],
-            )
+            .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, vec![
+                "a".to_owned(),
+            ])
             .unwrap();
 
         assert!(template.is_some());
@@ -482,7 +492,10 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        assert_eq!(template.description(), Some(&"From frontmatter.".to_owned()));
+        assert_eq!(
+            template.description(),
+            Some(&"From frontmatter.".to_owned())
+        );
     }
 
     #[test]

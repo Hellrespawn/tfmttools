@@ -25,14 +25,22 @@ impl<'templates, 'source> Template<'templates, 'source> {
         frontmatter: Option<&Frontmatter>,
     ) -> TFMTResult<Self> {
         let (declared_args, resolved) = match frontmatter {
-            Some(frontmatter) => (
-                frontmatter.args().to_vec(),
-                frontmatter.resolve(lookup_name, &arguments)?,
-            ),
+            Some(frontmatter) => {
+                (
+                    frontmatter.args().to_vec(),
+                    frontmatter.resolve(lookup_name, &arguments)?,
+                )
+            },
             None => (Vec::new(), ResolvedArgs::raw(arguments)),
         };
 
-        Ok(Self { inner, name: display_name, description, declared_args, resolved })
+        Ok(Self {
+            inner,
+            name: display_name,
+            description,
+            declared_args,
+            resolved,
+        })
     }
 
     #[must_use]
@@ -67,8 +75,10 @@ impl<'templates, 'source> Template<'templates, 'source> {
     }
 
     pub fn render(&self, audio_file: &AudioFile) -> TFMTResult<String> {
-        let context =
-            AudioFileContext::safe(audio_file.to_owned(), self.resolved.clone());
+        let context = AudioFileContext::safe(
+            audio_file.to_owned(),
+            self.resolved.clone(),
+        );
 
         let context_value = Value::from_object(context);
 

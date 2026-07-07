@@ -29,19 +29,27 @@ pub enum TFMTError {
     #[error("Failed to parse frontmatter TOML in template '{0}': {1}")]
     FrontmatterParse(String, toml::de::Error),
 
-    #[error("Unterminated frontmatter block in template '{0}': missing closing '+++'")]
+    #[error(
+        "Unterminated frontmatter block in template '{0}': missing closing '+++'"
+    )]
     UnterminatedFrontmatter(String),
 
-    #[error("Duplicate argument name '{1}' declared in frontmatter of template '{0}'")]
+    #[error(
+        "Duplicate argument name '{1}' declared in frontmatter of template '{0}'"
+    )]
     DuplicateArgumentName(String, String),
 
     #[error("Missing required argument '{1}' for template '{0}': {2}")]
     MissingRequiredArgument(String, String, String),
 
-    #[error("Template '{0}' accepts at most {1} argument(s), but {2} were supplied")]
+    #[error(
+        "Template '{0}' accepts at most {1} argument(s), but {2} were supplied"
+    )]
     TooManyArguments(String, usize, usize),
 
-    #[error("Argument '{1}' for template '{0}' has an invalid value '{3}': {2}")]
+    #[error(
+        "Argument '{1}' for template '{0}' has an invalid value '{3}': {2}"
+    )]
     InvalidArgumentValue(String, String, String, String),
 
     #[error(

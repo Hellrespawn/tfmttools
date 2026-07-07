@@ -98,8 +98,10 @@ fn describe(description: Option<&str>) -> String {
 
 impl Frontmatter {
     pub fn parse(toml_str: &str, label: &str) -> TFMTResult<Self> {
-        let frontmatter: Frontmatter = toml::from_str(toml_str)
-            .map_err(|error| TFMTError::FrontmatterParse(label.to_owned(), error))?;
+        let frontmatter: Frontmatter =
+            toml::from_str(toml_str).map_err(|error| {
+                TFMTError::FrontmatterParse(label.to_owned(), error)
+            })?;
 
         let mut seen = HashSet::new();
 
@@ -133,7 +135,8 @@ impl Frontmatter {
         let mut ordered = Vec::with_capacity(self.args.len());
 
         for (index, spec) in self.args.iter().enumerate() {
-            let raw = positional.get(index).cloned().or_else(|| spec.default.clone());
+            let raw =
+                positional.get(index).cloned().or_else(|| spec.default.clone());
 
             let value = match raw {
                 Some(raw) => spec.coerce(label, &raw)?,
@@ -159,16 +162,20 @@ impl ArgSpec {
     #[allow(dead_code)]
     fn coerce(&self, label: &str, raw: &str) -> TFMTResult<Value> {
         match self.kind {
-            ArgKind::Int => raw.parse::<i64>().map(Value::from).map_err(|_| {
-                TFMTError::InvalidArgumentValue(
-                    label.to_owned(),
-                    self.name.clone(),
-                    describe(self.description.as_deref()),
-                    raw.to_owned(),
-                )
-            }),
+            ArgKind::Int => {
+                raw.parse::<i64>().map(Value::from).map_err(|_| {
+                    TFMTError::InvalidArgumentValue(
+                        label.to_owned(),
+                        self.name.clone(),
+                        describe(self.description.as_deref()),
+                        raw.to_owned(),
+                    )
+                })
+            },
             ArgKind::String => {
-                Ok(Value::from(AudioFileContext::remove_forbidden_characters(raw.to_owned())))
+                Ok(Value::from(AudioFileContext::remove_forbidden_characters(
+                    raw.to_owned(),
+                )))
             },
             ArgKind::Path => Ok(Value::from(sanitize_path(raw))),
         }
@@ -180,7 +187,9 @@ fn sanitize_path(raw: &str) -> String {
     let segments: Vec<String> = raw
         .split(['/', '\\'])
         .filter(|segment| !segment.is_empty())
-        .map(|segment| AudioFileContext::remove_forbidden_characters(segment.to_owned()))
+        .map(|segment| {
+            AudioFileContext::remove_forbidden_characters(segment.to_owned())
+        })
         .collect();
 
     if segments.is_empty() {
@@ -298,8 +307,7 @@ args = [
 
     #[test]
     fn resolve_errors_on_missing_required_argument() {
-        let toml =
-            "args = [{ name = \"prefix\", type = \"string\", required = true }]";
+        let toml = "args = [{ name = \"prefix\", type = \"string\", required = true }]";
         let frontmatter = Frontmatter::parse(toml, "test").unwrap();
 
         let error = frontmatter.resolve("test", &[]).unwrap_err();
@@ -378,9 +386,6 @@ args = [
         let resolved =
             frontmatter.resolve("test", &["a:b/c*d".to_owned()]).unwrap();
 
-        assert_eq!(
-            resolved.get_named("prefix").unwrap().to_string(),
-            "ab/cd/"
-        );
+        assert_eq!(resolved.get_named("prefix").unwrap().to_string(), "ab/cd/");
     }
 }

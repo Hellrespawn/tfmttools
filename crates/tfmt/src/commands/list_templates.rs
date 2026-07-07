@@ -67,7 +67,13 @@ fn format_arg(arg: &ArgSpec) -> String {
         .map(|description| format!(" - {description}"))
         .unwrap_or_default();
 
-    format!("    {} ({}, {}){}", arg.name(), arg.kind(), requirement, description)
+    format!(
+        "    {} ({}, {}){}",
+        arg.name(),
+        arg.kind(),
+        requirement,
+        description
+    )
 }
 
 #[cfg(test)]
