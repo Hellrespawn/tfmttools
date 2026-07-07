@@ -1,20 +1,24 @@
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use camino::Utf8Path;
 use fs_err as fs;
 use minijinja::{Environment, Value, escape_formatter};
 use regex::Regex;
-use tfmttools_core::error::TFMTResult;
-use tfmttools_core::templates::Template;
+use tfmttools_core::error::{TFMTError, TFMTResult};
+use tfmttools_core::templates::{Frontmatter, Template};
 use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 
 use crate::PathIterator;
 
 pub const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
 
+const FRONTMATTER_FENCE: &str = "+++";
+
 #[derive(Debug)]
 pub struct TemplateLoader<'tl> {
     template_names: Vec<String>,
+    frontmatters: HashMap<String, Frontmatter>,
     environment: Environment<'tl>,
 }
 
@@ -25,6 +29,7 @@ impl<'tl> TemplateLoader<'tl> {
         template_directory: &Utf8Directory,
     ) -> TFMTResult<Self> {
         let mut template_names = Vec::new();
+        let mut frontmatters = HashMap::new();
         let mut environment = Self::create_environment();
 
         let iter = PathIterator::single_directory(template_directory.as_path())
@@ -37,34 +42,50 @@ impl<'tl> TemplateLoader<'tl> {
                 .expect("Template::path_is_template should only return files.")
                 .to_owned();
 
-            template_names.push(name.clone());
-            environment
-                .add_template_owned(name, fs::read_to_string(template_path)?)?;
+            let source = fs::read_to_string(&template_path)?;
+
+            Self::register_template(
+                &mut environment,
+                &mut frontmatters,
+                &name,
+                source,
+            )?;
+
+            template_names.push(name);
         }
 
-        Ok(Self { template_names, environment })
+        Ok(Self { template_names, frontmatters, environment })
     }
 
     pub fn read_filename(path: &Utf8Path, name: &str) -> TFMTResult<Self> {
+        let mut frontmatters = HashMap::new();
         let mut environment = Self::create_environment();
 
-        let template = fs::read_to_string(path)?;
+        let source = fs::read_to_string(path)?;
 
-        environment.add_template_owned(name.to_owned(), template)?;
+        Self::register_template(&mut environment, &mut frontmatters, name, source)?;
 
-        Ok(Self { template_names: vec![name.to_owned()], environment })
+        Ok(Self {
+            template_names: vec![name.to_owned()],
+            frontmatters,
+            environment,
+        })
     }
 
     pub fn read_script(script: &str) -> TFMTResult<Self> {
+        let mut frontmatters = HashMap::new();
         let mut environment = Self::create_environment();
 
-        environment.add_template_owned(
-            Self::DEFAULT_SCRIPT_NAME.to_owned(),
+        Self::register_template(
+            &mut environment,
+            &mut frontmatters,
+            Self::DEFAULT_SCRIPT_NAME,
             script.to_owned(),
         )?;
 
         Ok(Self {
             template_names: vec![Self::DEFAULT_SCRIPT_NAME.to_owned()],
+            frontmatters,
             environment,
         })
     }
@@ -73,33 +94,143 @@ impl<'tl> TemplateLoader<'tl> {
         &'_ self,
         name: &str,
         arguments: Vec<String>,
-    ) -> Option<Template<'_, '_>> {
-        let minijinja_template: minijinja::Template<'_, '_> =
-            self.environment.get_template(name).ok()?;
+    ) -> TFMTResult<Option<Template<'_, '_>>> {
+        let Ok(minijinja_template) = self.environment.get_template(name) else {
+            return Ok(None);
+        };
 
-        let description = Self::description(&minijinja_template);
+        let frontmatter = self.frontmatters.get(name);
+
+        let description = match frontmatter {
+            Some(frontmatter) => frontmatter.description().map(ToOwned::to_owned),
+            None => Self::description(minijinja_template.source()),
+        };
+
+        let display_name = frontmatter
+            .and_then(|frontmatter| frontmatter.name())
+            .map_or_else(|| name.to_owned(), ToOwned::to_owned);
 
         let template = Template::new(
             minijinja_template,
-            name.to_owned(),
+            name,
+            display_name,
             description,
             arguments,
-        );
+            frontmatter,
+        )?;
 
-        Some(template)
+        Ok(Some(template))
     }
 
     pub fn get_all_templates(&'_ self) -> Vec<Template<'_, '_>> {
         self.template_names
             .iter()
-            .map(|name| self.get_template(name, Vec::new()).expect("Templates::template_names should not contain names of non-existent templates.")).collect()
+            .map(|name| {
+                let minijinja_template = self.environment.get_template(name).expect(
+                    "TemplateLoader::template_names should not contain names of non-existent templates.",
+                );
+
+                let frontmatter = self.frontmatters.get(name);
+
+                let description = match frontmatter {
+                    Some(frontmatter) => frontmatter.description().map(ToOwned::to_owned),
+                    None => Self::description(minijinja_template.source()),
+                };
+
+                let display_name = frontmatter
+                    .and_then(|frontmatter| frontmatter.name())
+                    .map_or_else(|| name.to_owned(), ToOwned::to_owned);
+
+                let declared_args = frontmatter
+                    .map(|frontmatter| frontmatter.args().to_vec())
+                    .unwrap_or_default();
+
+                Template::for_display(
+                    minijinja_template,
+                    display_name,
+                    description,
+                    declared_args,
+                )
+            })
+            .collect()
     }
 
-    fn description(template: &minijinja::Template) -> Option<String> {
+    fn register_template(
+        environment: &mut Environment<'tl>,
+        frontmatters: &mut HashMap<String, Frontmatter>,
+        name: &str,
+        source: String,
+    ) -> TFMTResult<()> {
+        let (body, frontmatter) = Self::split_frontmatter(name, source)?;
+
+        if frontmatter.is_none() {
+            Self::warn_on_deprecated_usage(name, &body);
+        }
+
+        if let Some(frontmatter) = frontmatter {
+            frontmatters.insert(name.to_owned(), frontmatter);
+        }
+
+        environment.add_template_owned(name.to_owned(), body)?;
+
+        Ok(())
+    }
+
+    fn split_frontmatter(
+        label: &str,
+        source: String,
+    ) -> TFMTResult<(String, Option<Frontmatter>)> {
+        static RE_FRONTMATTER: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"(?s)\A\+\+\+[ \t]*\r?\n(?P<toml>.*?)\r?\n\+\+\+[ \t]*\r?\n?")
+                .unwrap()
+        });
+
+        if !source.starts_with(FRONTMATTER_FENCE) {
+            return Ok((source, None));
+        }
+
+        let Some(captures) = RE_FRONTMATTER.captures(&source) else {
+            return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
+        };
+
+        let whole_match = captures.get(0).expect("group 0 always matches");
+        let toml_text = &captures["toml"];
+
+        let frontmatter = Frontmatter::parse(toml_text, label)?;
+
+        let body = source[whole_match.end()..].to_owned();
+
+        if Self::body_uses_indexed_args(&body) {
+            return Err(TFMTError::IndexedArgsWithFrontmatter(label.to_owned()));
+        }
+
+        Ok((body, Some(frontmatter)))
+    }
+
+    fn body_uses_indexed_args(body: &str) -> bool {
+        static RE_ARGS_INDEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"args\s*\[").unwrap());
+
+        RE_ARGS_INDEX.is_match(body)
+    }
+
+    fn warn_on_deprecated_usage(label: &str, body: &str) {
+        if Self::body_uses_indexed_args(body) {
+            tracing::warn!(
+                "Template '{label}' uses positional `args[N]` without frontmatter; declare arguments to migrate."
+            );
+        }
+
+        if Self::description(body).is_some() {
+            tracing::warn!(
+                "Template '{label}' uses a leading comment as its description; move it to frontmatter's `description` field."
+            );
+        }
+    }
+
+    fn description(source: &str) -> Option<String> {
         const COMMENT_START: &str = "{#";
         const COMMENT_END: &str = "#}";
-
-        let source = template.source();
 
         if source.trim().starts_with(COMMENT_START) {
             source.split_once(COMMENT_END).map(|(left, _)| {
@@ -169,5 +300,164 @@ impl<'tl> TemplateLoader<'tl> {
 
     fn zero_pad(value: &Value, width: usize) -> String {
         format!("{value:0>width$}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tfmttools_core::error::TFMTError;
+
+    use super::*;
+
+    #[test]
+    fn split_frontmatter_returns_none_when_absent() {
+        let source = "{{ artist }}/{{ title }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source.clone()).unwrap();
+
+        assert_eq!(body, source);
+        assert!(frontmatter.is_none());
+    }
+
+    #[test]
+    fn split_frontmatter_parses_present_block() {
+        let source = "+++\nname = \"Test\"\n+++\n{{ artist }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source).unwrap();
+
+        assert_eq!(body, "{{ artist }}");
+        assert_eq!(frontmatter.unwrap().name(), Some("Test"));
+    }
+
+    #[test]
+    fn split_frontmatter_errors_when_unterminated() {
+        let source = "+++\nname = \"Test\"\n{{ artist }}".to_owned();
+
+        let error = TemplateLoader::split_frontmatter("test", source).unwrap_err();
+
+        assert!(matches!(error, TFMTError::UnterminatedFrontmatter(_)));
+    }
+
+    #[test]
+    fn split_frontmatter_errors_when_body_uses_indexed_args() {
+        let source = "+++\nname = \"Test\"\n+++\n{{ args[0] }}".to_owned();
+
+        let error = TemplateLoader::split_frontmatter("test", source).unwrap_err();
+
+        assert!(matches!(error, TFMTError::IndexedArgsWithFrontmatter(_)));
+    }
+
+    #[test]
+    fn split_frontmatter_allows_indexed_args_without_frontmatter() {
+        let source = "{{ args[0] }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source.clone()).unwrap();
+
+        assert_eq!(body, source);
+        assert!(frontmatter.is_none());
+    }
+
+    #[test]
+    fn read_script_populates_frontmatter_side_table() {
+        let script = "+++\nname = \"Test\"\n+++\n{{ artist }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+
+        assert_eq!(
+            loader
+                .frontmatters
+                .get(TemplateLoader::DEFAULT_SCRIPT_NAME)
+                .unwrap()
+                .name(),
+            Some("Test")
+        );
+    }
+
+    #[test]
+    fn read_script_without_frontmatter_has_empty_side_table() {
+        let loader = TemplateLoader::read_script("{{ args[0] }}").unwrap();
+
+        assert!(loader.frontmatters.is_empty());
+    }
+
+    #[test]
+    fn get_template_errors_on_missing_required_argument() {
+        let script = "+++\nargs = [{ name = \"prefix\", type = \"string\", required = true }]\n+++\n{{ prefix }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+
+        let error = loader
+            .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
+            .unwrap_err();
+
+        assert!(matches!(error, TFMTError::MissingRequiredArgument(_, _, _)));
+    }
+
+    #[test]
+    fn get_template_resolves_declared_arguments() {
+        let script = "+++\nargs = [{ name = \"prefix\", type = \"string\" }]\n+++\n{{ prefix }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+
+        let template = loader
+            .get_template(
+                TemplateLoader::DEFAULT_SCRIPT_NAME,
+                vec!["a".to_owned()],
+            )
+            .unwrap();
+
+        assert!(template.is_some());
+    }
+
+    #[test]
+    fn get_all_templates_never_errors_for_required_arguments() {
+        let script = "+++\nargs = [{ name = \"prefix\", type = \"string\", required = true }]\n+++\n{{ prefix }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+
+        let templates = loader.get_all_templates();
+
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].declared_args().len(), 1);
+    }
+
+    #[test]
+    fn description_comes_only_from_frontmatter_when_present() {
+        let script = "+++\ndescription = \"From frontmatter.\"\n+++\n{# Leading comment #}\n{{ artist }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+        let template = loader
+            .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(template.description(), Some(&"From frontmatter.".to_owned()));
+    }
+
+    #[test]
+    fn display_name_falls_back_to_lookup_name_without_override() {
+        let loader = TemplateLoader::read_script("{{ artist }}").unwrap();
+        let template = loader
+            .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(template.name(), TemplateLoader::DEFAULT_SCRIPT_NAME);
+    }
+
+    #[test]
+    fn display_name_uses_frontmatter_override() {
+        let script = "+++\nname = \"Pretty Name\"\n+++\n{{ artist }}";
+
+        let loader = TemplateLoader::read_script(script).unwrap();
+        let template = loader
+            .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(template.name(), "Pretty Name");
     }
 }
