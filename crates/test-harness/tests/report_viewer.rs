@@ -146,6 +146,17 @@ fn successful_output() -> Output {
     }
 }
 
+#[cfg(windows)]
+fn successful_output() -> Output {
+    use std::os::windows::process::ExitStatusExt;
+
+    Output {
+        status: ExitStatus::from_raw(0),
+        stdout: Vec::new(),
+        stderr: Vec::new(),
+    }
+}
+
 fn temp_report_dir() -> Utf8PathBuf {
     let unique = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

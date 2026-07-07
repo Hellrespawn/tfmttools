@@ -73,6 +73,7 @@ mod test {
         errors
     }
 
+    #[cfg(unix)]
     fn assert_double_separator_error(rename_actions: &[RenameAction]) {
         let error = assert_single_error(rename_actions);
 

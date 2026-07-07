@@ -104,6 +104,17 @@ mod tests {
         Ok(fs_err::read_to_string(path)?)
     }
 
+    fn dir_entry_name(path: &Utf8PathBuf) -> Result<String> {
+        let parent = path.parent().expect("path should have a parent");
+
+        Ok(fs_err::read_dir(parent)?
+            .next()
+            .expect("directory should contain exactly one entry")?
+            .file_name()
+            .to_string_lossy()
+            .into_owned())
+    }
+
     fn rename_action(
         source: &Utf8PathBuf,
         target: &Utf8PathBuf,
@@ -201,7 +212,7 @@ mod tests {
         let fs_handler = FsHandler::new(FSMode::Default);
         apply_actions(&fs_handler, vec![rename_action(&lower, &title)?])?;
 
-        assert!(!lower.exists());
+        assert_eq!(dir_entry_name(&title)?, "Track.mp3");
         assert_eq!(read_file(&title)?, "track");
 
         Ok(())
