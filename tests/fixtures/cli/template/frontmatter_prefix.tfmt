@@ -1,0 +1,24 @@
++++
+name = "Frontmatter Prefix Demo"
+description = "Group by artist and album under a required directory prefix, declared via frontmatter."
+
+args = [
+    { name = "prefix", type = "path", required = true, description = "Directory prefix to place output under." },
+]
++++
+{{- prefix -}}
+{{- albumartist or artist -}}
+/
+{%- if album -%}
+    {%- if date -%}
+      {{- date | year -}}
+      {{- albumsort and "." ~ (albumsort | zero_pad(2)) -}}
+      {{- " - " -}}
+    {%- endif -%}
+    {{- album -}}
+    /
+{%- endif -%}
+{{- discnumber and discnumber | zero_pad(1) -}}
+{{- tracknumber and tracknumber | zero_pad(2) ~ " - " -}}
+{{- albumartist and artist ~ " - " -}}
+{{- title -}}
