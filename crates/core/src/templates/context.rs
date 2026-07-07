@@ -24,7 +24,7 @@ impl AudioFileContext {
         Self::remove_forbidden_characters(value)
     }
 
-    fn remove_forbidden_characters(value: String) -> String {
+    pub(super) fn remove_forbidden_characters(value: String) -> String {
         let value = FORBIDDEN_CHARACTERS.iter().fold(
             value,
             |string, forbidden_character| {
