@@ -88,7 +88,6 @@ impl ArgSpec {
     }
 }
 
-#[allow(dead_code)]
 fn describe(description: Option<&str>) -> String {
     description.map_or_else(
         || "(no description provided)".to_owned(),
@@ -117,7 +116,6 @@ impl Frontmatter {
         Ok(frontmatter)
     }
 
-    #[allow(dead_code)]
     pub(super) fn resolve(
         &self,
         label: &str,
@@ -159,7 +157,6 @@ impl Frontmatter {
 }
 
 impl ArgSpec {
-    #[allow(dead_code)]
     fn coerce(&self, label: &str, raw: &str) -> TFMTResult<Value> {
         match self.kind {
             ArgKind::Int => {
@@ -182,7 +179,6 @@ impl ArgSpec {
     }
 }
 
-#[allow(dead_code)]
 fn sanitize_path(raw: &str) -> String {
     let segments: Vec<String> = raw
         .split(['/', '\\'])
@@ -200,14 +196,12 @@ fn sanitize_path(raw: &str) -> String {
 }
 
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)]
 pub(super) struct ResolvedArgs {
     named: HashMap<String, Value>,
     positional: Vec<Value>,
 }
 
 impl ResolvedArgs {
-    #[allow(dead_code)]
     pub(super) fn raw(arguments: Vec<String>) -> Self {
         Self {
             named: HashMap::new(),
@@ -215,12 +209,10 @@ impl ResolvedArgs {
         }
     }
 
-    #[allow(dead_code)]
     pub(super) fn get_named(&self, name: &str) -> Option<Value> {
         self.named.get(name).cloned()
     }
 
-    #[allow(dead_code)]
     pub(super) fn positional(&self) -> Value {
         Value::from(self.positional.clone())
     }
@@ -386,6 +378,16 @@ args = [
         let resolved = frontmatter.resolve("test", &["a".to_owned()]).unwrap();
 
         assert_eq!(resolved.get_named("prefix").unwrap().to_string(), "a");
+    }
+
+    #[test]
+    fn raw_resolved_args_preserve_unsanitized_positional_values() {
+        let resolved = ResolvedArgs::raw(vec!["a:b*c.".to_owned()]);
+
+        assert_eq!(
+            resolved.positional(),
+            Value::from(vec!["a:b*c.".to_owned()])
+        );
     }
 
     #[test]

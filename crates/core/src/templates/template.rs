@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[test]
-    fn new_without_frontmatter_keeps_raw_positional_arguments() {
+    fn new_without_frontmatter_has_no_declared_args() {
         let mut env = Environment::new();
         env.add_template("t", "{{ args[0] }}").unwrap();
         let inner = build_minijinja_template(&env, "t");
@@ -118,6 +118,8 @@ mod tests {
         )
         .unwrap();
 
+        // Raw positional passthrough itself is covered by
+        // frontmatter::tests::raw_resolved_args_preserve_unsanitized_positional_values.
         assert_eq!(template.declared_args().len(), 0);
     }
 

@@ -220,7 +220,3 @@ tfmt clear-history
 Windows support is best-effort. Windows binaries are not release artifacts for
 this release, and Windows-specific filesystem behavior is not a compatibility
 promise.
-
-## TODO
-
-- Testing on windows?

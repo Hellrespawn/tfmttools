@@ -104,18 +104,8 @@ impl<'tl> TemplateLoader<'tl> {
             return Ok(None);
         };
 
-        let frontmatter = self.frontmatters.get(name);
-
-        let description = match frontmatter {
-            Some(frontmatter) => {
-                frontmatter.description().map(ToOwned::to_owned)
-            },
-            None => Self::description(minijinja_template.source()),
-        };
-
-        let display_name = frontmatter
-            .and_then(|frontmatter| frontmatter.name())
-            .map_or_else(|| name.to_owned(), ToOwned::to_owned);
+        let (display_name, description, frontmatter) =
+            self.resolve_display_metadata(name, &minijinja_template);
 
         let template = Template::new(
             minijinja_template,
@@ -137,16 +127,8 @@ impl<'tl> TemplateLoader<'tl> {
                     "TemplateLoader::template_names should not contain names of non-existent templates.",
                 );
 
-                let frontmatter = self.frontmatters.get(name);
-
-                let description = match frontmatter {
-                    Some(frontmatter) => frontmatter.description().map(ToOwned::to_owned),
-                    None => Self::description(minijinja_template.source()),
-                };
-
-                let display_name = frontmatter
-                    .and_then(|frontmatter| frontmatter.name())
-                    .map_or_else(|| name.to_owned(), ToOwned::to_owned);
+                let (display_name, description, frontmatter) =
+                    self.resolve_display_metadata(name, &minijinja_template);
 
                 let declared_args = frontmatter
                     .map(|frontmatter| frontmatter.args().to_vec())
@@ -160,6 +142,31 @@ impl<'tl> TemplateLoader<'tl> {
                 )
             })
             .collect()
+    }
+
+    /// Resolves the display name, description, and frontmatter (if any) for
+    /// a registered template, following the "frontmatter description never
+    /// falls back to a leading comment" rule shared by `get_template` and
+    /// `get_all_templates`.
+    fn resolve_display_metadata(
+        &self,
+        name: &str,
+        minijinja_template: &minijinja::Template<'_, '_>,
+    ) -> (String, Option<String>, Option<&Frontmatter>) {
+        let frontmatter = self.frontmatters.get(name);
+
+        let description = match frontmatter {
+            Some(frontmatter) => {
+                frontmatter.description().map(ToOwned::to_owned)
+            },
+            None => Self::description(minijinja_template.source()),
+        };
+
+        let display_name = frontmatter
+            .and_then(Frontmatter::name)
+            .map_or_else(|| name.to_owned(), ToOwned::to_owned);
+
+        (display_name, description, frontmatter)
     }
 
     fn register_template(

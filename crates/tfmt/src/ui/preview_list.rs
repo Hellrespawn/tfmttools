@@ -24,8 +24,8 @@ pub enum PreviewListSize {
 }
 
 impl PreviewListSize {
-    pub fn new(columns: usize) -> Self {
-        match columns {
+    pub fn new(rows: usize) -> Self {
+        match rows {
             0..24 => Self::Small,
             24..36 => Self::Medium,
             36.. => Self::Large,
