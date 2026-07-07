@@ -18,7 +18,7 @@ pub(super) fn create_actions_from_template(
 ) -> Result<Vec<RenameAction>> {
     let template = resolved
         .loader
-        .get_template(&resolved.template_name, resolved.arguments.clone())
+        .get_template(&resolved.template_name, resolved.arguments.clone())?
         .ok_or(eyre!("Unable to find template: {}", resolved.template_name))?;
 
     let paths = gather_file_paths(session);
