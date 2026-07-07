@@ -8,11 +8,11 @@ use tfmttools_core::util::Utf8Directory;
 static TERM: LazyLock<Term> = LazyLock::new(Term::stdout);
 
 pub fn terminal_width() -> usize {
-    TERM.size().0 as usize
+    TERM.size().1 as usize
 }
 
 pub fn terminal_height() -> usize {
-    TERM.size().1 as usize
+    TERM.size().0 as usize
 }
 
 /// Make the cursor visible again, ignoring the result.

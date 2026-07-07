@@ -4,15 +4,7 @@ use tfmttools_core::templates::{ArgSpec, Template};
 use tfmttools_core::util::Utf8Directory;
 use tfmttools_fs::TemplateLoader;
 
-#[allow(unused_imports)]
 use crate::ui::terminal_width;
-
-#[cfg(test)]
-mod test_utils {
-    pub fn get_terminal_width() -> usize {
-        120
-    }
-}
 
 pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
     let loader = TemplateLoader::read_directory(template_directory)?;
@@ -45,14 +37,9 @@ fn format_template(template: &Template) -> String {
         name.to_owned()
     };
 
-    #[cfg(test)]
-    let width = test_utils::get_terminal_width();
-    #[cfg(not(test))]
-    let width = terminal_width();
-
     let header = textwrap::fill(
         &header_string,
-        Options::new(width)
+        Options::new(terminal_width())
             .subsequent_indent(&" ".repeat(name.len() + 2)),
     );
 
