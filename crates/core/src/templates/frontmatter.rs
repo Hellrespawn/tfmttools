@@ -1,9 +1,3 @@
-// `resolve`, `coerce`, `sanitize_path`, `describe`, and the `ResolvedArgs`
-// helpers are not yet called from outside this module: `context.rs` and
-// `template.rs` start consuming them in the next tasks of the script
-// frontmatter feature. Suppress dead-code warnings until then.
-#![allow(dead_code)]
-
 use std::collections::{HashMap, HashSet};
 
 use minijinja::Value;
@@ -94,6 +88,7 @@ impl ArgSpec {
     }
 }
 
+#[allow(dead_code)]
 fn describe(description: Option<&str>) -> String {
     description.map_or_else(
         || "(no description provided)".to_owned(),
@@ -120,13 +115,8 @@ impl Frontmatter {
         Ok(frontmatter)
     }
 
-    // `ResolvedArgs` is `pub(super)` (visible only within `crate::templates`),
-    // narrower than this method's `pub(crate)` visibility. That split is
-    // intentional: `resolve`'s only consumers are `context.rs` and
-    // `template.rs`, both inside `crate::templates`, but its exact
-    // visibility is fixed by contract for later tasks.
-    #[allow(private_interfaces)]
-    pub(crate) fn resolve(
+    #[allow(dead_code)]
+    pub(super) fn resolve(
         &self,
         label: &str,
         positional: &[String],
@@ -166,6 +156,7 @@ impl Frontmatter {
 }
 
 impl ArgSpec {
+    #[allow(dead_code)]
     fn coerce(&self, label: &str, raw: &str) -> TFMTResult<Value> {
         match self.kind {
             ArgKind::Int => raw.parse::<i64>().map(Value::from).map_err(|_| {
@@ -184,6 +175,7 @@ impl ArgSpec {
     }
 }
 
+#[allow(dead_code)]
 fn sanitize_path(raw: &str) -> String {
     let segments: Vec<String> = raw
         .split(['/', '\\'])
@@ -199,12 +191,14 @@ fn sanitize_path(raw: &str) -> String {
 }
 
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub(super) struct ResolvedArgs {
     named: HashMap<String, Value>,
     positional: Vec<Value>,
 }
 
 impl ResolvedArgs {
+    #[allow(dead_code)]
     pub(super) fn raw(arguments: Vec<String>) -> Self {
         Self {
             named: HashMap::new(),
@@ -212,10 +206,12 @@ impl ResolvedArgs {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn get_named(&self, name: &str) -> Option<Value> {
         self.named.get(name).cloned()
     }
 
+    #[allow(dead_code)]
     pub(super) fn positional(&self) -> Value {
         Value::from(self.positional.clone())
     }
