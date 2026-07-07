@@ -53,6 +53,7 @@ pub fn run() -> Result<()> {
     #[cfg(not(feature = "debug"))]
     if let Err(err) = result {
         render_cli_error(&err, name);
+        std::process::exit(1);
     }
 
     #[cfg(feature = "debug")]
