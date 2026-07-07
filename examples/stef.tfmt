@@ -1,5 +1,12 @@
-{# Stef's personal script. `args[0]` should be a directory prefix with trailing slash. #}
-{{- args[0] -}}
++++
+name = "Stef's layout"
+description = "Group by artist and album, with a directory prefix."
+
+args = [
+    { name = "prefix", type = "path", required = true, description = "Directory prefix to place output under." },
+]
++++
+{{- prefix -}}
 {{- albumartist or artist -}}
 /
 {%- if album -%}
