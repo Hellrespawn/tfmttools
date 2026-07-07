@@ -28,13 +28,11 @@ impl<'tl> TemplateLoader<'tl> {
     pub fn read_directory(
         template_directory: &Utf8Directory,
     ) -> TFMTResult<Self> {
-        let mut template_names = Vec::new();
-        let mut frontmatters = HashMap::new();
-        let mut environment = Self::create_environment();
-
         let iter = PathIterator::single_directory(template_directory.as_path())
             .flatten()
             .filter(|path| Self::path_is_template(path));
+
+        let mut sources = Vec::new();
 
         for template_path in iter {
             let name = template_path
@@ -44,6 +42,33 @@ impl<'tl> TemplateLoader<'tl> {
 
             let source = fs::read_to_string(&template_path)?;
 
+            sources.push((name, source));
+        }
+
+        Self::build(sources)
+    }
+
+    pub fn read_filename(path: &Utf8Path, name: &str) -> TFMTResult<Self> {
+        let source = fs::read_to_string(path)?;
+
+        Self::build([(name.to_owned(), source)])
+    }
+
+    pub fn read_script(script: &str) -> TFMTResult<Self> {
+        Self::build([(Self::DEFAULT_SCRIPT_NAME.to_owned(), script.to_owned())])
+    }
+
+    /// Registers each `(name, source)` pair against a fresh [`Environment`]
+    /// and assembles the resulting loader. Shared by all `read_*`
+    /// constructors so the environment/frontmatter setup lives in one place.
+    fn build(
+        sources: impl IntoIterator<Item = (String, String)>,
+    ) -> TFMTResult<Self> {
+        let mut template_names = Vec::new();
+        let mut frontmatters = HashMap::new();
+        let mut environment = Self::create_environment();
+
+        for (name, source) in sources {
             Self::register_template(
                 &mut environment,
                 &mut frontmatters,
@@ -55,44 +80,6 @@ impl<'tl> TemplateLoader<'tl> {
         }
 
         Ok(Self { template_names, frontmatters, environment })
-    }
-
-    pub fn read_filename(path: &Utf8Path, name: &str) -> TFMTResult<Self> {
-        let mut frontmatters = HashMap::new();
-        let mut environment = Self::create_environment();
-
-        let source = fs::read_to_string(path)?;
-
-        Self::register_template(
-            &mut environment,
-            &mut frontmatters,
-            name,
-            source,
-        )?;
-
-        Ok(Self {
-            template_names: vec![name.to_owned()],
-            frontmatters,
-            environment,
-        })
-    }
-
-    pub fn read_script(script: &str) -> TFMTResult<Self> {
-        let mut frontmatters = HashMap::new();
-        let mut environment = Self::create_environment();
-
-        Self::register_template(
-            &mut environment,
-            &mut frontmatters,
-            Self::DEFAULT_SCRIPT_NAME,
-            script.to_owned(),
-        )?;
-
-        Ok(Self {
-            template_names: vec![Self::DEFAULT_SCRIPT_NAME.to_owned()],
-            frontmatters,
-            environment,
-        })
     }
 
     pub fn get_template(
