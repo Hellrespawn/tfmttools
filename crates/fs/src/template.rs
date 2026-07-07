@@ -180,25 +180,49 @@ impl<'tl> TemplateLoader<'tl> {
         label: &str,
         source: String,
     ) -> TFMTResult<(String, Option<Frontmatter>)> {
-        static RE_FRONTMATTER: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(r"(?s)\A\+\+\+[ \t]*\r?\n(?P<toml>.*?)\r?\n\+\+\+[ \t]*\r?\n?")
-                .unwrap()
-        });
+        // The regex crate doesn't support look-around, so the opening and
+        // closing fences are matched with two separate anchored patterns
+        // instead of one monolithic `open ... \r?\n ... close` capture. The
+        // closing fence is found by searching for a line consisting solely
+        // of `+++` (optionally followed by trailing spaces/tabs) starting
+        // right after the opening fence. This lets the closing fence
+        // immediately follow the opening fence's own newline when the
+        // frontmatter block has no content (e.g. "+++\n+++\n"), since
+        // `find_at` treats the position right after that newline as a valid
+        // line start rather than requiring a second, independent `\r?\n`
+        // between the two fences.
+        static RE_OPENING_FENCE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"\A\+\+\+[ \t]*\r?\n").unwrap());
+
+        static RE_CLOSING_FENCE: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"(?m)^\+\+\+[ \t]*\r?$").unwrap());
 
         if !source.starts_with(FRONTMATTER_FENCE) {
             return Ok((source, None));
         }
 
-        let Some(captures) = RE_FRONTMATTER.captures(&source) else {
+        let Some(opening) = RE_OPENING_FENCE.find(&source) else {
             return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
         };
 
-        let whole_match = captures.get(0).expect("group 0 always matches");
-        let toml_text = &captures["toml"];
+        let Some(closing) = RE_CLOSING_FENCE.find_at(&source, opening.end())
+        else {
+            return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
+        };
+
+        let toml_text = &source[opening.end()..closing.start()];
 
         let frontmatter = Frontmatter::parse(toml_text, label)?;
 
-        let body = source[whole_match.end()..].to_owned();
+        let mut body_start = closing.end();
+
+        if let Some(rest) = source[body_start..].strip_prefix("\r\n") {
+            body_start = source.len() - rest.len();
+        } else if let Some(rest) = source[body_start..].strip_prefix('\n') {
+            body_start = source.len() - rest.len();
+        }
+
+        let body = source[body_start..].to_owned();
 
         if Self::body_uses_indexed_args(&body) {
             return Err(TFMTError::IndexedArgsWithFrontmatter(label.to_owned()));
@@ -329,6 +353,30 @@ mod tests {
 
         assert_eq!(body, "{{ artist }}");
         assert_eq!(frontmatter.unwrap().name(), Some("Test"));
+    }
+
+    #[test]
+    fn split_frontmatter_handles_empty_toml_block() {
+        let source = "+++\n+++\n{{ artist }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source).unwrap();
+
+        assert_eq!(body, "{{ artist }}");
+        assert!(frontmatter.is_some());
+        assert_eq!(frontmatter.unwrap().name(), None);
+    }
+
+    #[test]
+    fn split_frontmatter_handles_empty_toml_block_crlf() {
+        let source = "+++\r\n+++\r\n{{ artist }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source).unwrap();
+
+        assert_eq!(body, "{{ artist }}");
+        assert!(frontmatter.is_some());
+        assert_eq!(frontmatter.unwrap().name(), None);
     }
 
     #[test]
