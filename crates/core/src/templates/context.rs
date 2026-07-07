@@ -5,6 +5,7 @@ use minijinja::Value;
 use minijinja::value::Object;
 use tracing::trace;
 
+use super::frontmatter::ResolvedArgs;
 use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
@@ -12,12 +13,12 @@ use crate::item_keys::ItemKeys;
 #[derive(Debug)]
 pub struct AudioFileContext {
     audio_file: AudioFile,
-    arguments: Vec<String>,
+    resolved_args: ResolvedArgs,
 }
 
 impl AudioFileContext {
-    pub fn safe(audio_file: AudioFile, arguments: Vec<String>) -> Self {
-        Self { audio_file, arguments }
+    pub fn safe(audio_file: AudioFile, resolved_args: ResolvedArgs) -> Self {
+        Self { audio_file, resolved_args }
     }
 
     fn safe_interpolation_value(value: String) -> String {
@@ -118,8 +119,12 @@ impl Object for AudioFileContext {
         let field = key.as_str()?;
         let normalized_field = field.to_lowercase();
 
+        if let Some(value) = self.resolved_args.get_named(&normalized_field) {
+            return Some(value);
+        }
+
         match normalized_field.as_str() {
-            "args" | "arguments" => Some(self.arguments.clone().into()),
+            "args" | "arguments" => Some(self.resolved_args.positional()),
             "date" => self.get_date(),
             _ => {
                 let key = ItemKeys::from_string(&normalized_field).ok()?;
