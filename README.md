@@ -119,6 +119,50 @@ Literal `/` or `\` characters in the template create directories. Separators
 coming from interpolated tag values are sanitized so tags cannot accidentally
 create extra directories.
 
+### Script Frontmatter
+
+A script may start with an optional TOML frontmatter block, fenced by `+++` on
+its own line at the very start of the file:
+
+```jinja
++++
+name = "Stef's layout"
+description = "Group by artist and album, with a directory prefix."
+
+args = [
+    { name = "prefix", type = "path", required = true, description = "Directory prefix to place output under." },
+    { name = "extra", type = "string", required = false, default = "", description = "Optional suffix tag." },
+]
++++
+{{- prefix -}}
+{{- albumartist or artist -}}
+...
+```
+
+- `name` overrides the display name shown by `tfmt list-templates`. The
+  lookup name used by `--template <name>` is always the filename stem.
+- `description` becomes the template's description; when frontmatter is
+  present, no other description source (such as a leading comment) is used.
+- Each entry in `args` is matched to CLI-supplied positional values by
+  declaration order and is available in the script both by name (`{{ prefix }}`)
+  and by index (`{{ args[0] }}`).
+  - `type` is one of `string` (default), `int`, or `path`.
+  - `required = true` makes omitting the argument (with no `default`) a hard
+    error before rendering.
+  - `string` and `path` values are sanitized with the same forbidden-character
+    rules as tag values (see Filename Sanitization below); `path` values are
+    additionally split on `/`/`\`, sanitized segment-by-segment, and rejoined
+    with exactly one trailing `/`.
+  - `int` values that fail to parse are a hard error before rendering.
+- Supplying more positional arguments than a script declares is a hard error,
+  unless the script declares no `args` at all.
+- Scripts without a frontmatter block are unaffected: `args[N]` remains raw,
+  unsanitized, and unlimited in count, exactly as before. Using `args[N]`
+  without frontmatter, or relying on a leading comment as the description,
+  now logs a deprecation warning steering scripts toward frontmatter. Using
+  `args[N]` in a script that *does* have a frontmatter block is a hard error,
+  even if that block declares no `args`.
+
 ### Safety
 
 `tfmt` validates the full rename plan before it moves files. It rejects:
@@ -179,5 +223,4 @@ promise.
 
 ## TODO
 
-- Add frontmatter to script with basic types.
 - Testing on windows?
