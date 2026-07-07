@@ -150,7 +150,7 @@ impl Frontmatter {
                 None => Value::UNDEFINED,
             };
 
-            named.insert(spec.name.clone(), value.clone());
+            named.insert(spec.name.to_lowercase(), value.clone());
             ordered.push(value);
         }
 
@@ -376,6 +376,16 @@ args = [
                 "a/b/"
             );
         }
+    }
+
+    #[test]
+    fn resolve_normalizes_argument_name_case() {
+        let toml = "args = [{ name = \"Prefix\", type = \"string\" }]";
+        let frontmatter = Frontmatter::parse(toml, "test").unwrap();
+
+        let resolved = frontmatter.resolve("test", &["a".to_owned()]).unwrap();
+
+        assert_eq!(resolved.get_named("prefix").unwrap().to_string(), "a");
     }
 
     #[test]

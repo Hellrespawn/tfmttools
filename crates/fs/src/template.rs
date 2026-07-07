@@ -242,7 +242,7 @@ impl<'tl> TemplateLoader<'tl> {
 
     fn body_uses_indexed_args(body: &str) -> bool {
         static RE_ARGS_INDEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"args\s*\[").unwrap());
+            LazyLock::new(|| Regex::new(r"\bargs\s*\[").unwrap());
 
         RE_ARGS_INDEX.is_match(body)
     }
@@ -406,6 +406,17 @@ mod tests {
             TemplateLoader::split_frontmatter("test", source).unwrap_err();
 
         assert!(matches!(error, TFMTError::IndexedArgsWithFrontmatter(_)));
+    }
+
+    #[test]
+    fn split_frontmatter_allows_kwargs_identifier_with_frontmatter() {
+        let source = "+++\nname = \"Test\"\n+++\n{{ kwargs[0] }}".to_owned();
+
+        let (body, frontmatter) =
+            TemplateLoader::split_frontmatter("test", source).unwrap();
+
+        assert_eq!(body, "{{ kwargs[0] }}");
+        assert!(frontmatter.is_some());
     }
 
     #[test]
