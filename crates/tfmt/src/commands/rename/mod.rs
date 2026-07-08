@@ -2,6 +2,7 @@ mod apply;
 mod discovery;
 mod finish;
 mod planning;
+mod preview;
 mod session;
 mod shared;
 mod template_resolution;
