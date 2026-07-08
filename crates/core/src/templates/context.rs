@@ -22,7 +22,7 @@ impl AudioFileContext {
     }
 
     fn safe_interpolation_value(value: String) -> String {
-        Self::remove_forbidden_characters(value)
+        Self::remove_forbidden_characters(value.trim().to_owned())
     }
 
     pub(super) fn remove_forbidden_characters(value: String) -> String {
@@ -59,7 +59,18 @@ impl AudioFileContext {
     }
 
     fn read_safe_tag_value(&self, key: ItemKey) -> Option<String> {
-        self.read_raw_tag_value(key).map(Self::safe_interpolation_value)
+        let raw = self.read_raw_tag_value(key)?;
+
+        if raw != raw.trim() {
+            eprintln!(
+                "Warning: [{}][{:?}] tag value has leading/trailing whitespace: {:?}",
+                self.audio_file.file().file_name(),
+                key,
+                raw,
+            );
+        }
+
+        Some(Self::safe_interpolation_value(raw))
     }
 
     fn coerce_output_value(string: String) -> Value {

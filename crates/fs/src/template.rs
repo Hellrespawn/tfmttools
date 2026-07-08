@@ -243,14 +243,14 @@ impl<'tl> TemplateLoader<'tl> {
 
     fn warn_on_deprecated_usage(label: &str, body: &str) {
         if Self::body_uses_indexed_args(body) {
-            tracing::warn!(
-                "Template '{label}' uses positional `args[N]` without frontmatter; declare arguments to migrate."
+            eprintln!(
+                "Warning: template '{label}' uses positional `args[N]` without frontmatter; declare arguments to migrate."
             );
         }
 
         if Self::description(body).is_some() {
-            tracing::warn!(
-                "Template '{label}' uses a leading comment as its description; move it to frontmatter's `description` field."
+            eprintln!(
+                "Warning: template '{label}' uses a leading comment as its description; move it to frontmatter's `description` field."
             );
         }
     }
