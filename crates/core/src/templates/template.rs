@@ -5,6 +5,7 @@ use super::frontmatter::ResolvedArgs;
 use super::{ArgSpec, Frontmatter};
 use crate::audiofile::AudioFile;
 use crate::error::TFMTResult;
+use crate::warning::Warning;
 
 #[derive(Debug)]
 pub struct Template<'templates, 'source> {
@@ -74,7 +75,10 @@ impl<'templates, 'source> Template<'templates, 'source> {
         &self.declared_args
     }
 
-    pub fn render(&self, audio_file: &AudioFile) -> TFMTResult<String> {
+    pub fn render(
+        &self,
+        audio_file: &AudioFile,
+    ) -> TFMTResult<(String, Vec<Warning>)> {
         let context = AudioFileContext::safe(
             audio_file.to_owned(),
             self.resolved.clone(),
@@ -84,7 +88,11 @@ impl<'templates, 'source> Template<'templates, 'source> {
 
         let output = self.inner.render(&context_value)?;
 
-        Ok(output)
+        let warnings = context_value
+            .downcast_object::<AudioFileContext>()
+            .map_or_else(Vec::new, |ctx| ctx.take_warnings());
+
+        Ok((output, warnings))
     }
 }
 

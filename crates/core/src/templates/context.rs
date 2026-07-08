@@ -1,5 +1,6 @@
-use std::sync::Arc;
+use std::sync::Mutex;
 
+use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
 use minijinja::Value;
 use minijinja::value::Object;
@@ -9,19 +10,25 @@ use super::frontmatter::ResolvedArgs;
 use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
+use crate::warning::Warning;
 
 #[derive(Debug)]
 pub struct AudioFileContext {
     audio_file: AudioFile,
     resolved_args: ResolvedArgs,
+    warnings: Mutex<Vec<Warning>>,
 }
 
 impl AudioFileContext {
     pub fn safe(audio_file: AudioFile, resolved_args: ResolvedArgs) -> Self {
-        Self { audio_file, resolved_args }
+        Self { audio_file, resolved_args, warnings: Mutex::new(Vec::new()) }
     }
 
-    fn safe_interpolation_value(value: String) -> String {
+    pub fn take_warnings(&self) -> Vec<Warning> {
+        self.warnings.lock().unwrap().drain(..).collect()
+    }
+
+    fn safe_interpolation_value(value: &str) -> String {
         Self::remove_forbidden_characters(value.trim().to_owned())
     }
 
@@ -62,15 +69,16 @@ impl AudioFileContext {
         let raw = self.read_raw_tag_value(key)?;
 
         if raw != raw.trim() {
-            eprintln!(
-                "Warning: [{}][{:?}] tag value has leading/trailing whitespace: {:?}",
-                self.audio_file.file().file_name(),
-                key,
-                raw,
-            );
+            let tag_name = format!("{key:?}")
+                .from_case(Case::Pascal)
+                .to_case(Case::Snake);
+            self.warnings.lock().unwrap().push(Warning::WhitespaceInTag {
+                file: self.audio_file.file().file_name().to_owned(),
+                tag_name,
+            });
         }
 
-        Some(Self::safe_interpolation_value(raw))
+        Some(Self::safe_interpolation_value(&raw))
     }
 
     fn coerce_output_value(string: String) -> Value {
@@ -126,7 +134,7 @@ impl AudioFileContext {
 }
 
 impl Object for AudioFileContext {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+    fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
         let field = key.as_str()?;
         let normalized_field = field.to_lowercase();
 

@@ -8,6 +8,7 @@ use regex::Regex;
 use tfmttools_core::error::{TFMTError, TFMTResult};
 use tfmttools_core::templates::{Frontmatter, Template};
 use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
+use tfmttools_core::warning::Warning;
 
 use crate::PathIterator;
 
@@ -27,7 +28,7 @@ impl<'tl> TemplateLoader<'tl> {
 
     pub fn read_directory(
         template_directory: &Utf8Directory,
-    ) -> TFMTResult<Self> {
+    ) -> TFMTResult<(Self, Vec<Warning>)> {
         let iter = PathIterator::single_directory(template_directory.as_path())
             .flatten()
             .filter(|path| Self::path_is_template(path));
@@ -48,13 +49,16 @@ impl<'tl> TemplateLoader<'tl> {
         Self::build(sources)
     }
 
-    pub fn read_filename(path: &Utf8Path, name: &str) -> TFMTResult<Self> {
+    pub fn read_filename(
+        path: &Utf8Path,
+        name: &str,
+    ) -> TFMTResult<(Self, Vec<Warning>)> {
         let source = fs::read_to_string(path)?;
 
         Self::build([(name.to_owned(), source)])
     }
 
-    pub fn read_script(script: &str) -> TFMTResult<Self> {
+    pub fn read_script(script: &str) -> TFMTResult<(Self, Vec<Warning>)> {
         Self::build([(Self::DEFAULT_SCRIPT_NAME.to_owned(), script.to_owned())])
     }
 
@@ -63,23 +67,25 @@ impl<'tl> TemplateLoader<'tl> {
     /// constructors so the environment/frontmatter setup lives in one place.
     fn build(
         sources: impl IntoIterator<Item = (String, String)>,
-    ) -> TFMTResult<Self> {
+    ) -> TFMTResult<(Self, Vec<Warning>)> {
         let mut template_names = Vec::new();
         let mut frontmatters = HashMap::new();
         let mut environment = Self::create_environment();
+        let mut warnings = Vec::new();
 
         for (name, source) in sources {
-            Self::register_template(
+            let template_warnings = Self::register_template(
                 &mut environment,
                 &mut frontmatters,
                 &name,
                 source,
             )?;
 
+            warnings.extend(template_warnings);
             template_names.push(name);
         }
 
-        Ok(Self { template_names, frontmatters, environment })
+        Ok((Self { template_names, frontmatters, environment }, warnings))
     }
 
     pub fn get_template(
@@ -161,12 +167,14 @@ impl<'tl> TemplateLoader<'tl> {
         frontmatters: &mut HashMap<String, Frontmatter>,
         name: &str,
         source: String,
-    ) -> TFMTResult<()> {
+    ) -> TFMTResult<Vec<Warning>> {
         let (body, frontmatter) = Self::split_frontmatter(name, source)?;
 
-        if frontmatter.is_none() {
-            Self::warn_on_deprecated_usage(name, &body);
-        }
+        let warnings = if frontmatter.is_none() {
+            Self::deprecation_warnings(name, &body)
+        } else {
+            Vec::new()
+        };
 
         if let Some(frontmatter) = frontmatter {
             frontmatters.insert(name.to_owned(), frontmatter);
@@ -174,7 +182,25 @@ impl<'tl> TemplateLoader<'tl> {
 
         environment.add_template_owned(name.to_owned(), body)?;
 
-        Ok(())
+        Ok(warnings)
+    }
+
+    fn deprecation_warnings(label: &str, body: &str) -> Vec<Warning> {
+        let mut warnings = Vec::new();
+
+        if Self::body_uses_indexed_args(body) {
+            warnings.push(Warning::DeprecatedPositionalArgs {
+                template: label.to_owned(),
+            });
+        }
+
+        if Self::description(body).is_some() {
+            warnings.push(Warning::DeprecatedLeadingComment {
+                template: label.to_owned(),
+            });
+        }
+
+        warnings
     }
 
     fn split_frontmatter(
@@ -239,20 +265,6 @@ impl<'tl> TemplateLoader<'tl> {
             LazyLock::new(|| Regex::new(r"\bargs\s*\[").unwrap());
 
         RE_ARGS_INDEX.is_match(body)
-    }
-
-    fn warn_on_deprecated_usage(label: &str, body: &str) {
-        if Self::body_uses_indexed_args(body) {
-            eprintln!(
-                "Warning: template '{label}' uses positional `args[N]` without frontmatter; declare arguments to migrate."
-            );
-        }
-
-        if Self::description(body).is_some() {
-            eprintln!(
-                "Warning: template '{label}' uses a leading comment as its description; move it to frontmatter's `description` field."
-            );
-        }
     }
 
     fn description(source: &str) -> Option<String> {
@@ -333,8 +345,45 @@ impl<'tl> TemplateLoader<'tl> {
 #[cfg(test)]
 mod tests {
     use tfmttools_core::error::TFMTError;
+    use tfmttools_core::warning::Warning;
 
     use super::*;
+
+    #[test]
+    fn read_script_without_frontmatter_using_indexed_args_returns_warning() {
+        let (_, warnings) =
+            TemplateLoader::read_script("{{ args[0] }}").unwrap();
+
+        assert_eq!(warnings.len(), 1);
+        assert!(matches!(
+            warnings[0],
+            Warning::DeprecatedPositionalArgs { ref template }
+            if template == TemplateLoader::DEFAULT_SCRIPT_NAME
+        ));
+    }
+
+    #[test]
+    fn read_script_without_frontmatter_with_leading_comment_returns_warning() {
+        let (_, warnings) =
+            TemplateLoader::read_script("{# A description #}\n{{ artist }}")
+                .unwrap();
+
+        assert_eq!(warnings.len(), 1);
+        assert!(matches!(
+            warnings[0],
+            Warning::DeprecatedLeadingComment { ref template }
+            if template == TemplateLoader::DEFAULT_SCRIPT_NAME
+        ));
+    }
+
+    #[test]
+    fn read_script_with_frontmatter_returns_no_warnings() {
+        let (_, warnings) =
+            TemplateLoader::read_script("+++\nname = \"Test\"\n+++\n{{ artist }}")
+                .unwrap();
+
+        assert!(warnings.is_empty());
+    }
 
     #[test]
     fn split_frontmatter_returns_none_when_absent() {
@@ -428,7 +477,7 @@ mod tests {
     fn read_script_populates_frontmatter_side_table() {
         let script = "+++\nname = \"Test\"\n+++\n{{ artist }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
 
         assert_eq!(
             loader
@@ -442,7 +491,7 @@ mod tests {
 
     #[test]
     fn read_script_without_frontmatter_has_empty_side_table() {
-        let loader = TemplateLoader::read_script("{{ args[0] }}").unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script("{{ args[0] }}").unwrap();
 
         assert!(loader.frontmatters.is_empty());
     }
@@ -451,7 +500,7 @@ mod tests {
     fn get_template_errors_on_missing_required_argument() {
         let script = "+++\nargs = [{ name = \"prefix\", type = \"string\", required = true }]\n+++\n{{ prefix }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
 
         let error = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
@@ -464,7 +513,7 @@ mod tests {
     fn get_template_resolves_declared_arguments() {
         let script = "+++\nargs = [{ name = \"prefix\", type = \"string\" }]\n+++\n{{ prefix }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
 
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, vec![
@@ -479,7 +528,7 @@ mod tests {
     fn get_all_templates_never_errors_for_required_arguments() {
         let script = "+++\nargs = [{ name = \"prefix\", type = \"string\", required = true }]\n+++\n{{ prefix }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
 
         let templates = loader.get_all_templates();
 
@@ -491,7 +540,7 @@ mod tests {
     fn description_comes_only_from_frontmatter_when_present() {
         let script = "+++\ndescription = \"From frontmatter.\"\n+++\n{# Leading comment #}\n{{ artist }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap()
@@ -505,7 +554,7 @@ mod tests {
 
     #[test]
     fn display_name_falls_back_to_lookup_name_without_override() {
-        let loader = TemplateLoader::read_script("{{ artist }}").unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script("{{ artist }}").unwrap();
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap()
@@ -518,7 +567,7 @@ mod tests {
     fn display_name_uses_frontmatter_override() {
         let script = "+++\nname = \"Pretty Name\"\n+++\n{{ artist }}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap()

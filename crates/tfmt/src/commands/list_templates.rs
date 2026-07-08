@@ -2,12 +2,13 @@ use color_eyre::Result;
 use textwrap::Options;
 use tfmttools_core::templates::{ArgSpec, Template};
 use tfmttools_core::util::Utf8Directory;
+use tfmttools_core::warning::Warning;
 use tfmttools_fs::TemplateLoader;
 
 use crate::ui::terminal_width;
 
 pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
-    let loader = TemplateLoader::read_directory(template_directory)?;
+    let (loader, warnings) = TemplateLoader::read_directory(template_directory)?;
 
     let all_templates = loader.get_all_templates();
 
@@ -25,7 +26,37 @@ pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
         println!("{}", format_template(&template));
     }
 
+    if let Some(report) = format_template_warnings(&warnings) {
+        println!();
+        println!("{report}");
+    }
+
     Ok(())
+}
+
+fn format_template_warnings(warnings: &[Warning]) -> Option<String> {
+    if warnings.is_empty() {
+        return None;
+    }
+
+    let lines: Vec<String> = warnings
+        .iter()
+        .filter_map(|w| match w {
+            Warning::DeprecatedPositionalArgs { template } => Some(format!(
+                "  \u{26a0} '{template}': uses positional args[N] without frontmatter; declare arguments to migrate."
+            )),
+            Warning::DeprecatedLeadingComment { template } => Some(format!(
+                "  \u{26a0} '{template}': uses a leading comment as its description; move it to frontmatter's `description` field."
+            )),
+            Warning::WhitespaceInTag { .. } => None,
+        })
+        .collect();
+
+    if lines.is_empty() {
+        None
+    } else {
+        Some(format!("Warnings:\n{}", lines.join("\n")))
+    }
 }
 
 fn format_template(template: &Template) -> String {
@@ -86,7 +117,7 @@ mod tests {
     fn format_template_lists_declared_arguments() {
         let script = "+++\nname = \"Test Template\"\ndescription = \"A test template.\"\n\nargs = [\n    { name = \"prefix\", type = \"path\", required = true, description = \"Directory prefix.\" },\n    { name = \"suffix\", type = \"string\", required = false, default = \"\", description = \"Optional suffix.\" },\n]\n+++\n{{- prefix -}}{{- suffix -}}";
 
-        let loader = TemplateLoader::read_script(script).unwrap();
+        let (loader, _warnings) = TemplateLoader::read_script(script).unwrap();
         let templates = loader.get_all_templates();
 
         let formatted = format_template(&templates[0]);
@@ -103,11 +134,26 @@ mod tests {
 
     #[test]
     fn format_template_without_args_has_no_arg_lines() {
-        let loader = TemplateLoader::read_script("{{ artist }}").unwrap();
+        let (loader, _warnings) =
+            TemplateLoader::read_script("{{ artist }}").unwrap();
         let templates = loader.get_all_templates();
 
         let formatted = format_template(&templates[0]);
 
         assert_eq!(formatted, TemplateLoader::DEFAULT_SCRIPT_NAME);
+    }
+
+    #[test]
+    fn format_template_warnings_is_empty_for_modern_template() {
+        let script = "+++\nname = \"Test Template\"\n+++\n{{ artist }}";
+        let (_, warnings) = TemplateLoader::read_script(script).unwrap();
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn format_template_warnings_contains_deprecated_template_name() {
+        let script = "{{ args[0] }}";
+        let (_, warnings) = TemplateLoader::read_script(script).unwrap();
+        assert!(!warnings.is_empty());
     }
 }

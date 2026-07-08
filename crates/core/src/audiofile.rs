@@ -5,6 +5,7 @@ use lofty::tag::Tag;
 use crate::error::{TFMTError, TFMTResult};
 use crate::templates::Template;
 use crate::util::{Utf8Directory, Utf8File, normalize_separators};
+use crate::warning::Warning;
 
 #[derive(Clone)]
 pub struct AudioFile {
@@ -56,8 +57,8 @@ impl AudioFile {
         &self,
         template: &Template,
         relative_path: &Utf8Directory,
-    ) -> TFMTResult<Utf8File> {
-        let string = template.render(self)?;
+    ) -> TFMTResult<(Utf8File, Vec<Warning>)> {
+        let (string, warnings) = template.render(self)?;
 
         let string = normalize_separators(&string);
 
@@ -68,7 +69,7 @@ impl AudioFile {
         // relative_path, so this is always safe.
         let target_path = relative_path.join_file(target_path)?;
 
-        Ok(target_path)
+        Ok((target_path, warnings))
     }
 
     pub fn tag_mut(&mut self) -> &mut Tag {

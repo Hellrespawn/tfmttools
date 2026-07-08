@@ -11,14 +11,16 @@ pub(crate) use session::RenameSession;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::Utf8File;
+use tfmttools_core::warning::Warning;
 use tfmttools_fs::FsHandler;
 
 use crate::cli::{RenameArgs, TFMTOptions};
 
 pub(crate) struct RenamePlan {
-    actions: Vec<RenameAction>,
-    unchanged_files: Vec<Utf8File>,
-    metadata: ActionRecordMetadata,
+    pub(crate) actions: Vec<RenameAction>,
+    pub(crate) unchanged_files: Vec<Utf8File>,
+    pub(crate) metadata: ActionRecordMetadata,
+    pub(crate) warnings: Vec<Warning>,
 }
 
 pub(crate) enum RenameExecutionResult {

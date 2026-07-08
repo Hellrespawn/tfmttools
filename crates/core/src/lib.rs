@@ -9,5 +9,6 @@ pub mod history;
 pub mod item_keys;
 pub mod templates;
 pub mod util;
+pub mod warning;
 
 pub const MAX_PATH_LENGTH: usize = 256;

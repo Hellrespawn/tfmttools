@@ -5,6 +5,7 @@ use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
+use tfmttools_core::warning::Warning;
 use tfmttools_fs::PathIterator;
 use tracing::{debug, trace};
 
@@ -15,7 +16,7 @@ use crate::ui::{ProgressBar, current_dir_utf8};
 pub(super) fn create_actions_from_template(
     session: &RenameSession,
     resolved: &ResolvedTemplate,
-) -> Result<Vec<RenameAction>> {
+) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
     let template = resolved
         .loader
         .get_template(&resolved.template_name, resolved.arguments.clone())?
@@ -29,10 +30,10 @@ pub(super) fn create_actions_from_template(
 
     debug!("Found {} audio files.", audio_files.len());
 
-    let rename_actions =
+    let (rename_actions, warnings) =
         create_rename_actions(session, &template, &audio_files)?;
 
-    Ok(rename_actions)
+    Ok((rename_actions, warnings))
 }
 
 fn gather_file_paths(session: &RenameSession) -> Vec<Utf8PathBuf> {
@@ -99,7 +100,7 @@ fn create_rename_actions(
     session: &RenameSession,
     template: &Template,
     files: &[AudioFile],
-) -> Result<Vec<RenameAction>> {
+) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
     let cwd = current_dir_utf8()?;
 
     let bar = ProgressBar::bar(
@@ -110,13 +111,18 @@ fn create_rename_actions(
         true,
     );
 
+    let mut all_warnings: Vec<Warning> = Vec::new();
+
     let rename_actions: Result<Vec<RenameAction>> = files
         .iter()
         .map(|audiofile| {
-            let rename_action = RenameAction::new(
-                audiofile.file().to_owned(),
-                audiofile.construct_target_path(template, &cwd)?,
-            );
+            let (target, warnings) =
+                audiofile.construct_target_path(template, &cwd)?;
+
+            all_warnings.extend(warnings);
+
+            let rename_action =
+                RenameAction::new(audiofile.file().to_owned(), target);
 
             bar.inc_found();
             trace!("Created rename action: {rename_action:?}");
@@ -130,5 +136,5 @@ fn create_rename_actions(
 
     bar.finish();
 
-    rename_actions
+    Ok((rename_actions?, all_warnings))
 }
