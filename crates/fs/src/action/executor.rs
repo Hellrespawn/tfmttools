@@ -1,10 +1,10 @@
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::error::TFMTResult;
 use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
 
 use super::PlannedAction;
 use super::handler::ActionHandler;
 use super::rename_planner::RenamePlanner;
+use crate::error::FsResult;
 use crate::fs_handler::FsHandler;
 
 pub struct ActionExecutor<'a> {
@@ -26,7 +26,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn apply_rename_actions(
         &self,
         rename_actions: Vec<RenameAction>,
-    ) -> impl Iterator<Item = TFMTResult<Action>> + '_ {
+    ) -> impl Iterator<Item = FsResult<Action>> + '_ {
         let planned_actions = Self::plan_rename_actions(rename_actions);
 
         planned_actions.into_iter().flat_map(|planned_action| {
@@ -56,7 +56,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn apply_actions(
         &self,
         actions: impl IntoIterator<Item = Action>,
-    ) -> TFMTResult<Vec<Action>> {
+    ) -> FsResult<Vec<Action>> {
         actions
             .into_iter()
             .map(|action| {
@@ -70,7 +70,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn remove_directories(
         &self,
         directories: Vec<Utf8Directory>,
-    ) -> TFMTResult<Vec<Action>> {
+    ) -> FsResult<Vec<Action>> {
         self.apply_actions(
             directories
                 .into_iter()
@@ -86,7 +86,6 @@ mod tests {
     use camino::Utf8PathBuf;
     use color_eyre::Result;
     use tfmttools_core::action::{Action, RenameAction};
-    use tfmttools_core::error::TFMTResult;
     use tfmttools_core::util::{FSMode, Utf8File};
 
     use super::*;
@@ -128,7 +127,7 @@ mod tests {
     ) -> Result<Vec<Action>> {
         ActionExecutor::new(fs_handler)
             .apply_rename_actions(actions)
-            .collect::<TFMTResult<Vec<_>>>()
+            .collect::<FsResult<Vec<_>>>()
             .map_err(Into::into)
     }
 
