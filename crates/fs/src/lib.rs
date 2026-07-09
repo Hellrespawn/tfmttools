@@ -3,6 +3,7 @@
 #![allow(clippy::missing_panics_doc)]
 
 mod action;
+mod audiofile;
 mod checksum;
 mod error;
 mod file_or_name;
@@ -12,6 +13,7 @@ mod template;
 mod verify;
 
 pub use action::{ActionExecutor, ActionHandler};
+pub use audiofile::read_audio_file;
 pub use checksum::{get_file_checksum, get_path_checksum};
 pub use error::{FsError, FsResult};
 pub use file_or_name::FileOrName;
