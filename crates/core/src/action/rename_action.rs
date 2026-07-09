@@ -18,6 +18,7 @@ impl RenameAction {
         Self { source, target }
     }
 
+    #[must_use]
     pub fn from_path_bufs(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
         Self { source: Utf8File::new(source), target: Utf8File::new(target) }
     }

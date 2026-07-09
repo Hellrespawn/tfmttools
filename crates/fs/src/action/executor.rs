@@ -114,6 +114,7 @@ mod tests {
             .into_owned())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn rename_action(
         source: &Utf8PathBuf,
         target: &Utf8PathBuf,

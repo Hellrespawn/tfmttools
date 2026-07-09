@@ -323,6 +323,7 @@ mod tests {
 
     use super::*;
 
+    #[allow(clippy::unnecessary_wraps)]
     fn rename_action(
         source: &str,
         target: &str,

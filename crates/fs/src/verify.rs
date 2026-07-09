@@ -34,12 +34,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn verify_file_accepts_missing_path() -> Result<()> {
+    fn verify_file_accepts_missing_path() {
         let path = Utf8PathBuf::from("/does/not/exist.mp3");
 
         assert!(verify_file(&path).is_ok());
-
-        Ok(())
     }
 
     #[test]
