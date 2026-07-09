@@ -118,7 +118,7 @@ mod tests {
         source: &Utf8PathBuf,
         target: &Utf8PathBuf,
     ) -> Result<RenameAction> {
-        Ok(RenameAction::new(Utf8File::new(source)?, Utf8File::new(target)?))
+        Ok(RenameAction::new(Utf8File::new(source), Utf8File::new(target)))
     }
 
     fn apply_actions(

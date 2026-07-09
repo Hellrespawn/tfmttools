@@ -25,7 +25,7 @@ impl AudioFile {
     pub const SUPPORTED_EXTENSIONS: [&'static str; 3] = ["mp3", "ogg", "m4a"];
 
     pub fn new(path: Utf8PathBuf) -> TFMTResult<AudioFile> {
-        let file = Utf8File::new(&path)?;
+        let file = Utf8File::new(&path);
 
         let tagged_file = match lofty::read_from_path(&file) {
             Ok(tagged_file) => tagged_file,
@@ -67,7 +67,7 @@ impl AudioFile {
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
-        let target_path = relative_path.join_file(target_path)?;
+        let target_path = relative_path.join_file(target_path);
 
         Ok((target_path, warnings))
     }

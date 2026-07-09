@@ -85,29 +85,29 @@ mod test {
     // TODO Test fails on Windows
     fn test_validate_double_separators() {
         let valid = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new("/d/e/f/").unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new("/d/e/f/"),
         )];
 
         assert_valid(&valid);
 
         let leading = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new("//d/e/f/").unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new("//d/e/f/"),
         )];
 
         assert_double_separator_error(&leading);
 
         let middle = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new("/d//e/f/").unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new("/d//e/f/"),
         )];
 
         assert_double_separator_error(&middle);
 
         let trailing = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new("/d/e/f//").unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new("/d/e/f//"),
         )];
 
         assert_double_separator_error(&trailing);
@@ -117,12 +117,12 @@ mod test {
     fn test_validate_collision() {
         let valid = [
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/e/f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/e/f/"),
             ),
             RenameAction::new(
-                Utf8File::new("/g/h/i/").unwrap(),
-                Utf8File::new("/j/k/l/").unwrap(),
+                Utf8File::new("/g/h/i/"),
+                Utf8File::new("/j/k/l/"),
             ),
         ];
 
@@ -130,12 +130,12 @@ mod test {
 
         let colliding = [
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/e/f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/e/f/"),
             ),
             RenameAction::new(
-                Utf8File::new("/g/h/i/").unwrap(),
-                Utf8File::new("/d/e/f/").unwrap(),
+                Utf8File::new("/g/h/i/"),
+                Utf8File::new("/d/e/f/"),
             ),
         ];
 
@@ -147,12 +147,12 @@ mod test {
     fn test_validate_case_insensitive_collision() {
         let colliding = [
             RenameAction::new(
-                Utf8File::new("input/a.mp3").unwrap(),
-                Utf8File::new("music/Track.mp3").unwrap(),
+                Utf8File::new("input/a.mp3"),
+                Utf8File::new("music/Track.mp3"),
             ),
             RenameAction::new(
-                Utf8File::new("input/b.mp3").unwrap(),
-                Utf8File::new("music/track.mp3").unwrap(),
+                Utf8File::new("input/b.mp3"),
+                Utf8File::new("music/track.mp3"),
             ),
         ];
 
@@ -164,16 +164,16 @@ mod test {
     fn test_validate_reserved_windows_names() {
         let reserved = [
             RenameAction::new(
-                Utf8File::new("input/a.mp3").unwrap(),
-                Utf8File::new("music/CON.mp3").unwrap(),
+                Utf8File::new("input/a.mp3"),
+                Utf8File::new("music/CON.mp3"),
             ),
             RenameAction::new(
-                Utf8File::new("input/b.mp3").unwrap(),
-                Utf8File::new("music/NUL/track.mp3").unwrap(),
+                Utf8File::new("input/b.mp3"),
+                Utf8File::new("music/NUL/track.mp3"),
             ),
             RenameAction::new(
-                Utf8File::new("input/c.mp3").unwrap(),
-                Utf8File::new("music/lpt1.flac").unwrap(),
+                Utf8File::new("input/c.mp3"),
+                Utf8File::new("music/lpt1.flac"),
             ),
         ];
 
@@ -190,12 +190,12 @@ mod test {
     fn test_validate_forbidden() {
         let valid = [
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/e/f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/e/f/"),
             ),
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/.e/f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/.e/f/"),
             ),
         ];
 
@@ -203,16 +203,16 @@ mod test {
 
         let forbidden_leading = [
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/ e/f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/ e/f/"),
             ),
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/e /f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/e /f/"),
             ),
             RenameAction::new(
-                Utf8File::new("/a/b/c/").unwrap(),
-                Utf8File::new("/d/e./f/").unwrap(),
+                Utf8File::new("/a/b/c/"),
+                Utf8File::new("/d/e./f/"),
             ),
         ];
 
@@ -224,15 +224,15 @@ mod test {
     #[test]
     fn validate_path_too_long() {
         let valid = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new("/d/e/f/").unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new("/d/e/f/"),
         )];
 
         assert_valid(&valid);
 
         let too_long = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new(format!("/d{}/f/", "/e".repeat(128))).unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new(format!("/d{}/f/", "/e".repeat(128))),
         )];
 
         let error = assert_single_error(&too_long);
@@ -240,8 +240,8 @@ mod test {
         assert!(matches!(error, ValidationError::PathTooLong { .. }));
 
         let exact = [RenameAction::new(
-            Utf8File::new("/a/b/c/").unwrap(),
-            Utf8File::new(format!("/d{}/f", "/e".repeat(126))).unwrap(),
+            Utf8File::new("/a/b/c/"),
+            Utf8File::new(format!("/d{}/f", "/e".repeat(126))),
         )];
 
         let error = assert_single_error(&exact);

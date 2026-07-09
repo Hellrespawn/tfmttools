@@ -126,11 +126,8 @@ fn discover_remaining_items(
         remaining.into_iter().partition(|p| p.is_file());
 
     Ok(RemainingItems {
-        files: files.into_iter().map(Utf8File::new_unchecked).collect(),
-        directories: folders
-            .into_iter()
-            .map(Utf8Directory::new_unchecked)
-            .collect(),
+        files: files.into_iter().map(Utf8File::new).collect(),
+        directories: folders.into_iter().map(Utf8Directory::new).collect(),
     })
 }
 
@@ -219,8 +216,8 @@ fn create_rename_action(
         session
             .rename_options()
             .bin_directory()
-            .join(run_id)?
-            .join_file(target_name)?,
+            .join(run_id)
+            .join_file(target_name),
     );
 
     trace!("Created rename action: {rename_action:?}");

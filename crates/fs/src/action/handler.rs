@@ -330,7 +330,7 @@ mod tests {
         let source = Utf8PathBuf::from(source);
         let target = Utf8PathBuf::from(target);
         let action =
-            RenameAction::new(Utf8File::new(&source)?, Utf8File::new(&target)?);
+            RenameAction::new(Utf8File::new(&source), Utf8File::new(&target));
 
         Ok((action, source, target))
     }

@@ -3,8 +3,6 @@ use std::path::Path;
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
-use crate::error::{TFMTError, TFMTResult};
-
 #[must_use]
 pub fn normalize_separators(string: &str) -> String {
     string
@@ -40,42 +38,24 @@ pub trait Utf8PathExt: Sized {
 pub struct Utf8Directory(Utf8PathBuf);
 
 impl Utf8Directory {
-    pub fn new(path: impl AsRef<Utf8Path>) -> TFMTResult<Self> {
-        if path.as_ref().is_dir() || !path.as_ref().exists() {
-            Ok(Self(path.as_ref().to_owned()))
-        } else {
-            Err(TFMTError::NotADirectory(path.as_ref().to_owned()))
-        }
-    }
-
-    pub fn new_unchecked(path: impl AsRef<Utf8Path>) -> Self {
+    #[must_use]
+    pub fn new(path: impl AsRef<Utf8Path>) -> Self {
         Self(path.as_ref().to_owned())
     }
 
     #[must_use]
     pub fn ancestors(self) -> Vec<Utf8Directory> {
-        self.0
-            .ancestors()
-            .map(|path| Utf8Directory::new(path).expect("msg"))
-            .collect()
+        self.0.ancestors().map(Utf8Directory::new).collect()
     }
 
-    pub fn join(
-        &self,
-        path: impl AsRef<Utf8Path>,
-    ) -> TFMTResult<Utf8Directory> {
-        let joined_path = self.as_path().join(path);
-
-        Self::new(joined_path)
+    #[must_use]
+    pub fn join(&self, path: impl AsRef<Utf8Path>) -> Utf8Directory {
+        Utf8Directory::new(self.as_path().join(path))
     }
 
-    pub fn join_file(
-        &self,
-        path: impl AsRef<Utf8Path>,
-    ) -> TFMTResult<Utf8File> {
-        let joined_path = self.as_path().join(path);
-
-        Utf8File::new(joined_path)
+    #[must_use]
+    pub fn join_file(&self, path: impl AsRef<Utf8Path>) -> Utf8File {
+        Utf8File::new(self.as_path().join(path))
     }
 }
 
@@ -117,15 +97,8 @@ impl std::fmt::Display for Utf8Directory {
 pub struct Utf8File(Utf8PathBuf);
 
 impl Utf8File {
-    pub fn new(path: impl AsRef<Utf8Path>) -> TFMTResult<Self> {
-        if path.as_ref().is_file() || !path.as_ref().exists() {
-            Ok(Self(path.as_ref().to_owned()))
-        } else {
-            Err(TFMTError::NotAFile(path.as_ref().to_owned()))
-        }
-    }
-
-    pub fn new_unchecked(path: impl AsRef<Utf8Path>) -> Self {
+    #[must_use]
+    pub fn new(path: impl AsRef<Utf8Path>) -> Self {
         Self(path.as_ref().to_owned())
     }
 
@@ -133,7 +106,7 @@ impl Utf8File {
     pub fn parent(&self) -> Utf8Directory {
         let path = self.0.parent().expect("Utf8File should have parent");
 
-        Utf8Directory::new(path).expect("Utf8File::parent should directory.")
+        Utf8Directory::new(path)
     }
 
     pub fn components(
