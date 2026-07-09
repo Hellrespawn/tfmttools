@@ -21,6 +21,7 @@ lofty = { workspace = true }
 minijinja = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
