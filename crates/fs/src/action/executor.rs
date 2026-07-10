@@ -203,6 +203,27 @@ mod tests {
     }
 
     #[test]
+    fn skips_make_dir_for_directory_that_already_exists() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let existing_dir = temp_dir.path().join("existing");
+        fs_err::create_dir(&existing_dir)?;
+
+        let source = temp_path(&temp_dir, "A.mp3")?;
+        let target =
+            Utf8PathBuf::try_from(existing_dir.join("B.mp3"))?;
+        write_file(&source, "a")?;
+
+        let fs_handler = FsHandler::new(FSMode::Default);
+        // Should not error even though the intermediate directory
+        // ("existing") is already present on disk.
+        apply_actions(&fs_handler, vec![rename_action(&source, &target)?])?;
+
+        assert_eq!(read_file(&target)?, "a");
+
+        Ok(())
+    }
+
+    #[test]
     fn stages_case_only_rename() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let lower = temp_path(&temp_dir, "track.mp3")?;

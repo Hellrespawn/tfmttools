@@ -3,8 +3,7 @@ use std::collections::HashSet;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
-use crate::action::Action;
-use crate::util::{Utf8Directory, Utf8File, Utf8PathExt};
+use crate::util::{Utf8Directory, Utf8File};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct RenameAction {
@@ -48,17 +47,14 @@ impl RenameAction {
         self.source() != self.target()
     }
 
-    pub fn get_make_dir_actions(
+    #[must_use]
+    pub fn intermediate_directories(
         rename_actions: &[RenameAction],
-    ) -> Vec<Action> {
+    ) -> Vec<Utf8Directory> {
         let target_paths =
             rename_actions.iter().map(RenameAction::target).collect::<Vec<_>>();
 
         Self::list_all_intermediate_paths_of_files(&target_paths)
-            .into_iter()
-            .filter(|dir| !dir.exists())
-            .map(|dir| Action::MakeDir(dir.as_path().to_owned()))
-            .collect::<Vec<_>>()
     }
 
     fn list_all_intermediate_paths_of_files(

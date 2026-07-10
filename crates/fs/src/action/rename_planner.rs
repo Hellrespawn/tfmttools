@@ -1,4 +1,5 @@
-use tfmttools_core::action::RenameAction;
+use tfmttools_core::action::{Action, RenameAction};
+use tfmttools_core::util::Utf8PathExt;
 
 use super::PlannedAction;
 use super::rename_cycles::RenameCycleDetector;
@@ -15,9 +16,12 @@ impl RenamePlanner {
 
     pub(super) fn plan(self) -> Vec<PlannedAction> {
         let make_dir_actions =
-            RenameAction::get_make_dir_actions(&self.rename_actions)
+            RenameAction::intermediate_directories(&self.rename_actions)
                 .into_iter()
-                .map(PlannedAction::Action);
+                .filter(|dir| !dir.as_path().exists())
+                .map(|dir| {
+                    PlannedAction::Action(Action::MakeDir(dir.into_path_buf()))
+                });
 
         let move_actions = self.plan_move_actions();
 
