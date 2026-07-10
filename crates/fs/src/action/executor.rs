@@ -209,8 +209,7 @@ mod tests {
         fs_err::create_dir(&existing_dir)?;
 
         let source = temp_path(&temp_dir, "A.mp3")?;
-        let target =
-            Utf8PathBuf::try_from(existing_dir.join("B.mp3"))?;
+        let target = Utf8PathBuf::try_from(existing_dir.join("B.mp3"))?;
         write_file(&source, "a")?;
 
         let fs_handler = FsHandler::new(FSMode::Default);

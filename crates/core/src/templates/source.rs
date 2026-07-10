@@ -73,8 +73,7 @@ fn split_frontmatter(
         return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
     };
 
-    let Some(closing) = RE_CLOSING_FENCE.find_at(&source, opening.end())
-    else {
+    let Some(closing) = RE_CLOSING_FENCE.find_at(&source, opening.end()) else {
         return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
     };
 
@@ -141,8 +140,7 @@ mod tests {
     fn split_frontmatter_parses_present_block() {
         let source = "+++\nname = \"Test\"\n+++\n{{ artist }}".to_owned();
 
-        let (body, frontmatter) =
-            split_frontmatter("test", source).unwrap();
+        let (body, frontmatter) = split_frontmatter("test", source).unwrap();
 
         assert_eq!(body, "{{ artist }}");
         assert_eq!(frontmatter.unwrap().name(), Some("Test"));
@@ -152,8 +150,7 @@ mod tests {
     fn split_frontmatter_handles_empty_toml_block() {
         let source = "+++\n+++\n{{ artist }}".to_owned();
 
-        let (body, frontmatter) =
-            split_frontmatter("test", source).unwrap();
+        let (body, frontmatter) = split_frontmatter("test", source).unwrap();
 
         assert_eq!(body, "{{ artist }}");
         assert!(frontmatter.is_some());
@@ -164,8 +161,7 @@ mod tests {
     fn split_frontmatter_handles_empty_toml_block_crlf() {
         let source = "+++\r\n+++\r\n{{ artist }}".to_owned();
 
-        let (body, frontmatter) =
-            split_frontmatter("test", source).unwrap();
+        let (body, frontmatter) = split_frontmatter("test", source).unwrap();
 
         assert_eq!(body, "{{ artist }}");
         assert!(frontmatter.is_some());
@@ -194,8 +190,7 @@ mod tests {
     fn split_frontmatter_allows_kwargs_identifier_with_frontmatter() {
         let source = "+++\nname = \"Test\"\n+++\n{{ kwargs[0] }}".to_owned();
 
-        let (body, frontmatter) =
-            split_frontmatter("test", source).unwrap();
+        let (body, frontmatter) = split_frontmatter("test", source).unwrap();
 
         assert_eq!(body, "{{ kwargs[0] }}");
         assert!(frontmatter.is_some());

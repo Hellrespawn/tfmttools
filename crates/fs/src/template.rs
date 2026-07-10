@@ -291,9 +291,10 @@ mod tests {
 
     #[test]
     fn read_script_with_frontmatter_returns_no_warnings() {
-        let (_, warnings) =
-            TemplateLoader::read_script("+++\nname = \"Test\"\n+++\n{{ artist }}")
-                .unwrap();
+        let (_, warnings) = TemplateLoader::read_script(
+            "+++\nname = \"Test\"\n+++\n{{ artist }}",
+        )
+        .unwrap();
 
         assert!(warnings.is_empty());
     }
@@ -316,7 +317,8 @@ mod tests {
 
     #[test]
     fn read_script_without_frontmatter_has_empty_side_table() {
-        let (loader, _warnings) = TemplateLoader::read_script("{{ args[0] }}").unwrap();
+        let (loader, _warnings) =
+            TemplateLoader::read_script("{{ args[0] }}").unwrap();
 
         assert!(loader.frontmatters.is_empty());
     }
@@ -333,7 +335,13 @@ mod tests {
 
         assert!(matches!(
             error,
-            FsError::Core(tfmttools_core::error::TFMTError::MissingRequiredArgument(_, _, _))
+            FsError::Core(
+                tfmttools_core::error::TFMTError::MissingRequiredArgument(
+                    _,
+                    _,
+                    _
+                )
+            )
         ));
     }
 
@@ -382,7 +390,8 @@ mod tests {
 
     #[test]
     fn display_name_falls_back_to_lookup_name_without_override() {
-        let (loader, _warnings) = TemplateLoader::read_script("{{ artist }}").unwrap();
+        let (loader, _warnings) =
+            TemplateLoader::read_script("{{ artist }}").unwrap();
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap()

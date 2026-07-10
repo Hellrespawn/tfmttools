@@ -1241,7 +1241,6 @@ dependencies = [
  "camino",
  "convert_case",
  "convert_case_extras",
- "ignore",
  "lofty",
  "minijinja",
  "regex",

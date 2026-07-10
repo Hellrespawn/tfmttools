@@ -5,8 +5,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 use tfmttools_core::util::FSMode;
 use tracing::trace;
 
-use crate::error::{FsError, FsResult};
 use crate::PathIterator;
+use crate::error::{FsError, FsResult};
 use crate::path_iterator::PathIteratorOptions;
 
 #[derive(Copy, Clone)]
@@ -143,10 +143,7 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_dir_all(
-        &self,
-        path: &Utf8Path,
-    ) -> FsResult<RemoveDirResult> {
+    pub fn remove_dir_all(&self, path: &Utf8Path) -> FsResult<RemoveDirResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
@@ -234,9 +231,9 @@ mod tests {
     use assert_fs::TempDir;
     use camino::Utf8PathBuf;
     use color_eyre::Result;
-    use crate::error::FsError;
 
     use super::*;
+    use crate::error::FsError;
 
     fn temp_path(temp_dir: &TempDir, name: &str) -> Result<Utf8PathBuf> {
         Ok(Utf8PathBuf::try_from(temp_dir.path().join(name))?)

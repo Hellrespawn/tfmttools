@@ -8,7 +8,7 @@ pub fn existing_target_paths(
     let mut set = CaseInsensitivePathSet::new();
 
     for rename_action in rename_actions {
-        if rename_action.target().exists() {
+        if rename_action.target().as_path().exists() {
             set.insert(rename_action.target());
         }
     }

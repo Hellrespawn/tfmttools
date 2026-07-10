@@ -1,6 +1,6 @@
 use camino::Utf8PathBuf;
-use thiserror::Error;
 use tfmttools_core::error::TFMTError;
+use thiserror::Error;
 
 pub type FsResult<T = (), E = FsError> = std::result::Result<T, E>;
 

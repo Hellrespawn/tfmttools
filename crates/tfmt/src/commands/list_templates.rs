@@ -8,7 +8,8 @@ use tfmttools_fs::TemplateLoader;
 use crate::ui::terminal_width;
 
 pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
-    let (loader, warnings) = TemplateLoader::read_directory(template_directory)?;
+    let (loader, warnings) =
+        TemplateLoader::read_directory(template_directory)?;
 
     let all_templates = loader.get_all_templates();
 

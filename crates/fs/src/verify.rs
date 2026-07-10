@@ -13,9 +13,7 @@ pub fn verify_file(path: impl AsRef<Utf8Path>) -> FsResult<Utf8File> {
     }
 }
 
-pub fn verify_directory(
-    path: impl AsRef<Utf8Path>,
-) -> FsResult<Utf8Directory> {
+pub fn verify_directory(path: impl AsRef<Utf8Path>) -> FsResult<Utf8Directory> {
     let path = path.as_ref();
 
     if path.is_dir() || !path.exists() {

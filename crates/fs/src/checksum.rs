@@ -3,8 +3,9 @@ use std::io::Read;
 
 use adler2::Adler32;
 use camino::Utf8Path;
-use crate::error::{FsError, FsResult};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
+
+use crate::error::{FsError, FsResult};
 
 // 60 megabytes
 // Accounts for lossless audio

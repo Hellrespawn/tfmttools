@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use super::errors::ValidationError;
-use crate::action::{CaseInsensitivePathKey, CaseInsensitivePathSet, RenameAction};
+use crate::action::{
+    CaseInsensitivePathKey, CaseInsensitivePathSet, RenameAction,
+};
 
 pub(super) fn validate_double_separators(
     rename_actions: &'_ [RenameAction],

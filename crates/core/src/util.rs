@@ -28,8 +28,6 @@ pub trait Utf8PathExt: Sized {
     fn as_path(&self) -> &Utf8Path;
 
     fn into_path_buf(self) -> Utf8PathBuf;
-
-    fn exists(&self) -> bool;
 }
 
 #[derive(
@@ -66,10 +64,6 @@ impl Utf8PathExt for Utf8Directory {
 
     fn into_path_buf(self) -> Utf8PathBuf {
         self.0
-    }
-
-    fn exists(&self) -> bool {
-        self.0.exists()
     }
 }
 
@@ -133,10 +127,6 @@ impl Utf8PathExt for Utf8File {
 
     fn into_path_buf(self) -> Utf8PathBuf {
         self.0
-    }
-
-    fn exists(&self) -> bool {
-        self.0.exists()
     }
 }
 

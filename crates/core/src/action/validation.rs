@@ -53,7 +53,8 @@ mod test {
         existing_targets: &CaseInsensitivePathSet,
     ) {
         assert!(
-            validate_rename_actions(rename_actions, existing_targets).is_empty()
+            validate_rename_actions(rename_actions, existing_targets)
+                .is_empty()
         );
     }
 
@@ -65,7 +66,7 @@ mod test {
             &CaseInsensitivePathSet::new(),
         );
 
-        assert!(errors.len() == 1);
+        assert_eq!(errors.len(), 1);
 
         errors.pop().unwrap()
     }

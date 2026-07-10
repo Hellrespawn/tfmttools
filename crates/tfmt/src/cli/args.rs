@@ -38,12 +38,11 @@ impl TFMTSubcommand {
                 clear_history(app_options)?;
             },
             TFMTSubcommand::ListTemplates(list_templates_args) => {
-                let template_directory = match list_templates_args
-                    .custom_template_directory
-                {
-                    Some(path) => verify_directory(path)?,
-                    None => app_options.config_directory().to_owned(),
-                };
+                let template_directory =
+                    match list_templates_args.custom_template_directory {
+                        Some(path) => verify_directory(path)?,
+                        None => app_options.config_directory().to_owned(),
+                    };
 
                 list_templates(&template_directory)?;
             },

@@ -110,7 +110,13 @@ fn resolve_file_or_name(
         &arguments,
     );
 
-    Ok(ResolvedTemplate { loader, template_name, arguments, metadata, warnings })
+    Ok(ResolvedTemplate {
+        loader,
+        template_name,
+        arguments,
+        metadata,
+        warnings,
+    })
 }
 
 fn resolve_script(
