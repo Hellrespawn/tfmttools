@@ -21,6 +21,7 @@ convert_case_extras = { workspace = true }
 ignore = { workspace = true }
 lofty = { workspace = true }
 minijinja = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
