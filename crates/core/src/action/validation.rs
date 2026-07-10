@@ -16,18 +16,19 @@ use forbidden::{
 };
 use path_rules::validate_target_path_too_long;
 
-use crate::action::RenameAction;
+use crate::action::{CaseInsensitivePathSet, RenameAction};
 
 #[must_use]
-pub fn validate_rename_actions(
-    rename_actions: &'_ [RenameAction],
-) -> Vec<ValidationError<'_>> {
+pub fn validate_rename_actions<'a>(
+    rename_actions: &'a [RenameAction],
+    existing_targets: &CaseInsensitivePathSet,
+) -> Vec<ValidationError<'a>> {
     let mut errors = Vec::new();
 
     errors.extend(validate_double_separators(rename_actions));
     errors.extend(validate_collisions(rename_actions));
     errors.extend(validate_case_insensitive_collisions(rename_actions));
-    errors.extend(validate_existing_files(rename_actions));
+    errors.extend(validate_existing_files(rename_actions, existing_targets));
     errors.extend(validate_reserved_names(rename_actions));
     errors.extend(
         validate_forbidden_leading_or_trailing_characters_in_path_component(
@@ -44,16 +45,25 @@ pub fn validate_rename_actions(
 mod test {
 
     use super::*;
+    use crate::action::CaseInsensitivePathSet;
     use crate::util::Utf8File;
 
-    fn assert_valid(rename_actions: &[RenameAction]) {
-        assert!(validate_rename_actions(rename_actions).is_empty());
+    fn assert_valid(
+        rename_actions: &[RenameAction],
+        existing_targets: &CaseInsensitivePathSet,
+    ) {
+        assert!(
+            validate_rename_actions(rename_actions, existing_targets).is_empty()
+        );
     }
 
     fn assert_single_error(
         rename_actions: &'_ [RenameAction],
     ) -> ValidationError<'_> {
-        let mut errors = validate_rename_actions(rename_actions);
+        let mut errors = validate_rename_actions(
+            rename_actions,
+            &CaseInsensitivePathSet::new(),
+        );
 
         assert!(errors.len() == 1);
 
@@ -64,7 +74,10 @@ mod test {
         rename_actions: &'_ [RenameAction],
         n: usize,
     ) -> Vec<ValidationError<'_>> {
-        let errors = validate_rename_actions(rename_actions);
+        let errors = validate_rename_actions(
+            rename_actions,
+            &CaseInsensitivePathSet::new(),
+        );
 
         let len = errors.len();
 
@@ -89,7 +102,7 @@ mod test {
             Utf8File::new("/d/e/f/"),
         )];
 
-        assert_valid(&valid);
+        assert_valid(&valid, &CaseInsensitivePathSet::new());
 
         let leading = [RenameAction::new(
             Utf8File::new("/a/b/c/"),
@@ -126,7 +139,7 @@ mod test {
             ),
         ];
 
-        assert_valid(&valid);
+        assert_valid(&valid, &CaseInsensitivePathSet::new());
 
         let colliding = [
             RenameAction::new(
@@ -199,7 +212,7 @@ mod test {
             ),
         ];
 
-        assert_valid(&valid);
+        assert_valid(&valid, &CaseInsensitivePathSet::new());
 
         let forbidden_leading = [
             RenameAction::new(
@@ -228,7 +241,7 @@ mod test {
             Utf8File::new("/d/e/f/"),
         )];
 
-        assert_valid(&valid);
+        assert_valid(&valid, &CaseInsensitivePathSet::new());
 
         let too_long = [RenameAction::new(
             Utf8File::new("/a/b/c/"),
@@ -250,5 +263,33 @@ mod test {
             actual_length: 256,
             ..
         }));
+    }
+
+    #[test]
+    fn test_validate_target_exists() {
+        let actions = [RenameAction::new(
+            Utf8File::new("input/a.mp3"),
+            Utf8File::new("music/b.mp3"),
+        )];
+
+        let mut existing = CaseInsensitivePathSet::new();
+        existing.insert("music/b.mp3");
+
+        let errors = validate_rename_actions(&actions, &existing);
+
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(errors[0], ValidationError::TargetExists(_)));
+    }
+
+    #[test]
+    fn test_validate_target_exists_ignores_unrelated_paths() {
+        let actions = [RenameAction::new(
+            Utf8File::new("input/a.mp3"),
+            Utf8File::new("music/b.mp3"),
+        )];
+
+        let existing = CaseInsensitivePathSet::new();
+
+        assert_valid(&actions, &existing);
     }
 }
