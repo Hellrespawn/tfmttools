@@ -4,6 +4,7 @@ use camino::Utf8PathBuf;
 use color_eyre::Result;
 use console::Term;
 use tfmttools_core::util::Utf8Directory;
+use tfmttools_fs::verify_directory;
 
 static TERM: LazyLock<Term> = LazyLock::new(Term::stdout);
 
@@ -30,5 +31,5 @@ pub fn current_dir_utf8() -> Result<Utf8Directory> {
 
     let utf8_path = Utf8PathBuf::try_from(path)?;
 
-    Ok(Utf8Directory::new(utf8_path)?)
+    Ok(verify_directory(utf8_path)?)
 }

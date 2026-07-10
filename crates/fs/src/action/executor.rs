@@ -1,10 +1,10 @@
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::error::TFMTResult;
 use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
 
 use super::PlannedAction;
 use super::handler::ActionHandler;
 use super::rename_planner::RenamePlanner;
+use crate::error::FsResult;
 use crate::fs_handler::FsHandler;
 
 pub struct ActionExecutor<'a> {
@@ -26,7 +26,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn apply_rename_actions(
         &self,
         rename_actions: Vec<RenameAction>,
-    ) -> impl Iterator<Item = TFMTResult<Action>> + '_ {
+    ) -> impl Iterator<Item = FsResult<Action>> + '_ {
         let planned_actions = Self::plan_rename_actions(rename_actions);
 
         planned_actions.into_iter().flat_map(|planned_action| {
@@ -56,7 +56,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn apply_actions(
         &self,
         actions: impl IntoIterator<Item = Action>,
-    ) -> TFMTResult<Vec<Action>> {
+    ) -> FsResult<Vec<Action>> {
         actions
             .into_iter()
             .map(|action| {
@@ -70,7 +70,7 @@ impl<'a> ActionExecutor<'a> {
     pub fn remove_directories(
         &self,
         directories: Vec<Utf8Directory>,
-    ) -> TFMTResult<Vec<Action>> {
+    ) -> FsResult<Vec<Action>> {
         self.apply_actions(
             directories
                 .into_iter()
@@ -86,7 +86,6 @@ mod tests {
     use camino::Utf8PathBuf;
     use color_eyre::Result;
     use tfmttools_core::action::{Action, RenameAction};
-    use tfmttools_core::error::TFMTResult;
     use tfmttools_core::util::{FSMode, Utf8File};
 
     use super::*;
@@ -115,11 +114,12 @@ mod tests {
             .into_owned())
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn rename_action(
         source: &Utf8PathBuf,
         target: &Utf8PathBuf,
     ) -> Result<RenameAction> {
-        Ok(RenameAction::new(Utf8File::new(source)?, Utf8File::new(target)?))
+        Ok(RenameAction::new(Utf8File::new(source), Utf8File::new(target)))
     }
 
     fn apply_actions(
@@ -128,7 +128,7 @@ mod tests {
     ) -> Result<Vec<Action>> {
         ActionExecutor::new(fs_handler)
             .apply_rename_actions(actions)
-            .collect::<TFMTResult<Vec<_>>>()
+            .collect::<FsResult<Vec<_>>>()
             .map_err(Into::into)
     }
 
@@ -198,6 +198,26 @@ mod tests {
         assert_eq!(read_file(&b)?, "a");
         assert_eq!(read_file(&c)?, "b");
         assert_eq!(read_file(&d)?, "c");
+
+        Ok(())
+    }
+
+    #[test]
+    fn skips_make_dir_for_directory_that_already_exists() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let existing_dir = temp_dir.path().join("existing");
+        fs_err::create_dir(&existing_dir)?;
+
+        let source = temp_path(&temp_dir, "A.mp3")?;
+        let target = Utf8PathBuf::try_from(existing_dir.join("B.mp3"))?;
+        write_file(&source, "a")?;
+
+        let fs_handler = FsHandler::new(FSMode::Default);
+        // Should not error even though the intermediate directory
+        // ("existing") is already present on disk.
+        apply_actions(&fs_handler, vec![rename_action(&source, &target)?])?;
+
+        assert_eq!(read_file(&target)?, "a");
 
         Ok(())
     }

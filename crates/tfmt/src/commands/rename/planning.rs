@@ -28,5 +28,10 @@ pub fn create_plan(
     let (actions, unchanged_files) =
         RenameAction::separate_unchanged_destinations(actions);
 
-    Ok(RenamePlan { actions, unchanged_files, metadata: resolved.metadata, warnings })
+    Ok(RenamePlan {
+        actions,
+        unchanged_files,
+        metadata: resolved.metadata,
+        warnings,
+    })
 }

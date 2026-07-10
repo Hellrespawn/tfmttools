@@ -5,6 +5,7 @@ use color_eyre::eyre::eyre;
 use tfmttools_core::action::{RenameAction, validate_rename_actions};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
 use tfmttools_core::warning::Warning;
+use tfmttools_fs::existing_target_paths;
 
 use super::{RenamePlan, RenameSession};
 use crate::ui::{ItemName, PreviewList, current_dir_utf8};
@@ -22,7 +23,9 @@ pub fn preview(session: &RenameSession, plan: &RenamePlan) -> Result<()> {
 fn validate_rename_action_errors(
     rename_actions: &[RenameAction],
 ) -> Result<()> {
-    let validation_errors = validate_rename_actions(rename_actions);
+    let existing_targets = existing_target_paths(rename_actions);
+    let validation_errors =
+        validate_rename_actions(rename_actions, &existing_targets);
 
     if validation_errors.is_empty() {
         Ok(())

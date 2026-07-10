@@ -4,7 +4,7 @@ use color_eyre::eyre::eyre;
 use tfmttools_core::util::{
     FSMode, MoveMode, Utf8Directory, Utf8File, Utf8PathExt,
 };
-use tfmttools_fs::FileOrName;
+use tfmttools_fs::{FileOrName, verify_directory, verify_file};
 
 use crate::cli::args::{
     RenameArgs, TFMTArgs, TemplateArgs, ValidateCommonArgs,
@@ -84,19 +84,19 @@ impl TFMTOptions {
 
         let utf8_path = Utf8PathBuf::try_from(path)?;
 
-        Ok(Utf8Directory::new(utf8_path)?)
+        Ok(verify_directory(utf8_path)?)
     }
 
     pub fn history_file_path(&self) -> Result<Utf8File> {
         let filename = format!("{}.hist", crate::PKG_NAME);
         let path = self.config_directory.as_path().join(filename);
 
-        Ok(Utf8File::new(path)?)
+        Ok(verify_file(path)?)
     }
 
     fn path_or_default(path: Option<&Utf8Path>) -> Result<Utf8Directory> {
         if let Some(path) = path {
-            Ok(Utf8Directory::new(path)?)
+            Ok(verify_directory(path)?)
         } else {
             Ok(Self::default_application_dir()?)
         }
@@ -236,7 +236,7 @@ impl TryFrom<ValidateCommonArgs> for ValidateOptions {
             input_directory: if let Some(input_directory) =
                 validate_args.custom_input_directory
             {
-                Utf8Directory::new(input_directory)?
+                verify_directory(input_directory)?
             } else {
                 current_dir_utf8()?
             },
@@ -257,23 +257,23 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             input_directory: if let Some(input_directory) =
                 rename_args.custom_input_directory
             {
-                Utf8Directory::new(input_directory)?
+                verify_directory(input_directory)?
             } else {
                 current_dir_utf8()?
             },
             template_directory: if let Some(template_directory) =
                 rename_args.custom_template_directory
             {
-                Utf8Directory::new(template_directory)?
+                verify_directory(template_directory)?
             } else {
                 options.config_directory().to_owned()
             },
             bin_directory: if let Some(bin_directory) =
                 rename_args.custom_bin_directory
             {
-                Utf8Directory::new(bin_directory)?
+                verify_directory(bin_directory)?
             } else {
-                Utf8Directory::new(
+                verify_directory(
                     options
                         .config_directory()
                         .as_path()

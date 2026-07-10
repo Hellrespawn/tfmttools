@@ -3,23 +3,24 @@ use std::io::Read;
 
 use adler2::Adler32;
 use camino::Utf8Path;
-use tfmttools_core::error::{TFMTError, TFMTResult};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
+
+use crate::error::{FsError, FsResult};
 
 // 60 megabytes
 // Accounts for lossless audio
 const MAX_BYTES_TO_READ: usize = 60 * 1024 * 1024;
 
-pub fn get_file_checksum(file: &Utf8File) -> TFMTResult<String> {
+pub fn get_file_checksum(file: &Utf8File) -> FsResult<String> {
     get_path_checksum(file.as_path())
 }
 
-pub fn get_path_checksum(path: &Utf8Path) -> TFMTResult<String> {
+pub fn get_path_checksum(path: &Utf8Path) -> FsResult<String> {
     let bytes = path
         .metadata()?
         .len()
         .try_into()
-        .map_err(|_| TFMTError::FileTooLargeError(path.to_owned()))?;
+        .map_err(|_| FsError::FileTooLargeError(path.to_owned()))?;
 
     let length = std::cmp::min(MAX_BYTES_TO_READ, bytes);
 

@@ -2,11 +2,11 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use tfmttools_core::error::{TFMTError, TFMTResult};
 use tfmttools_core::util::FSMode;
 use tracing::trace;
 
 use crate::PathIterator;
+use crate::error::{FsError, FsResult};
 use crate::path_iterator::PathIteratorOptions;
 
 #[derive(Copy, Clone)]
@@ -78,7 +78,7 @@ impl FsHandler {
         &self,
         source: &Utf8Path,
         target: &Utf8Path,
-    ) -> TFMTResult<MoveFileResult> {
+    ) -> FsResult<MoveFileResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(MoveFileResult::DryRun)
         } else {
@@ -95,7 +95,7 @@ impl FsHandler {
         &self,
         source: &Utf8Path,
         target: &Utf8Path,
-    ) -> TFMTResult<CopyFileResult> {
+    ) -> FsResult<CopyFileResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(CopyFileResult::DryRun)
         } else {
@@ -105,7 +105,7 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_file(&self, path: &Utf8Path) -> TFMTResult<RemoveFileResult> {
+    pub fn remove_file(&self, path: &Utf8Path) -> FsResult<RemoveFileResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveFileResult::DryRun)
         } else {
@@ -115,13 +115,13 @@ impl FsHandler {
         }
     }
 
-    pub fn create_dir(&self, path: &Utf8Path) -> TFMTResult<CreateDirResult> {
+    pub fn create_dir(&self, path: &Utf8Path) -> FsResult<CreateDirResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(CreateDirResult::DryRun)
         } else if path.is_dir() {
             Ok(CreateDirResult::Exists)
         } else if path.exists() {
-            Err(TFMTError::NotADirectory(path.to_owned()))
+            Err(FsError::NotADirectory(path.to_owned()))
         } else {
             fs_err::create_dir(path)?;
 
@@ -129,7 +129,7 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_dir(&self, path: &Utf8Path) -> TFMTResult<RemoveDirResult> {
+    pub fn remove_dir(&self, path: &Utf8Path) -> FsResult<RemoveDirResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
@@ -143,10 +143,7 @@ impl FsHandler {
         }
     }
 
-    pub fn remove_dir_all(
-        &self,
-        path: &Utf8Path,
-    ) -> TFMTResult<RemoveDirResult> {
+    pub fn remove_dir_all(&self, path: &Utf8Path) -> FsResult<RemoveDirResult> {
         if matches!(self.fs_mode, FSMode::DryRun) {
             Ok(RemoveDirResult::DryRun)
         } else {
@@ -159,7 +156,7 @@ impl FsHandler {
         &self,
         path: &Utf8Path,
         recursion_depth: usize,
-    ) -> TFMTResult<Vec<(Utf8PathBuf, RemoveDirResult)>> {
+    ) -> FsResult<Vec<(Utf8PathBuf, RemoveDirResult)>> {
         let dirs = gather_subdirectories(path, recursion_depth)
             .into_iter()
             .rev()
@@ -170,7 +167,7 @@ impl FsHandler {
 
                 Ok((p, removed))
             })
-            .collect::<TFMTResult<Vec<_>>>()?;
+            .collect::<FsResult<Vec<_>>>()?;
 
         Ok(dirs)
     }
@@ -180,13 +177,13 @@ fn handle_move_error(
     source: &Utf8Path,
     target: &Utf8Path,
     err: &std::io::Error,
-) -> TFMTResult<MoveFileResult> {
+) -> FsResult<MoveFileResult> {
     if err.kind() == ErrorKind::CrossesDevices {
         fs_err::copy(source, target)?;
         fs_err::remove_file(source)?;
         Ok(MoveFileResult::CopiedAndRemoved)
     } else {
-        Err(TFMTError::UnexpectedMoveError(
+        Err(FsError::UnexpectedMoveError(
             source.to_owned(),
             target.to_owned(),
             err.to_string(),
@@ -234,9 +231,9 @@ mod tests {
     use assert_fs::TempDir;
     use camino::Utf8PathBuf;
     use color_eyre::Result;
-    use tfmttools_core::error::TFMTError;
 
     use super::*;
+    use crate::error::FsError;
 
     fn temp_path(temp_dir: &TempDir, name: &str) -> Result<Utf8PathBuf> {
         Ok(Utf8PathBuf::try_from(temp_dir.path().join(name))?)
@@ -274,7 +271,7 @@ mod tests {
             &std::io::Error::from(ErrorKind::PermissionDenied),
         );
 
-        assert!(matches!(result, Err(TFMTError::UnexpectedMoveError(_, _, _))));
+        assert!(matches!(result, Err(FsError::UnexpectedMoveError(_, _, _))));
         assert!(!target.exists());
 
         Ok(())

@@ -3,10 +3,9 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::error::TFMTResult;
 use tfmttools_core::templates::Template;
 use tfmttools_core::warning::Warning;
-use tfmttools_fs::PathIterator;
+use tfmttools_fs::{FsResult, PathIterator, read_audio_file};
 use tracing::{debug, trace};
 
 use super::RenameSession;
@@ -83,13 +82,13 @@ fn read_files(
             crate::debug::delay();
         })
         .map(|path| {
-            let audio_file = AudioFile::new(path)?;
+            let audio_file = read_audio_file(path)?;
 
             trace!("Found audio file: {audio_file:?}");
 
             Ok(audio_file)
         })
-        .collect::<TFMTResult<Vec<_>>>();
+        .collect::<FsResult<Vec<_>>>();
 
     bar.finish();
 

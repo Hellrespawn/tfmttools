@@ -6,11 +6,11 @@ use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{
     Action, RenameAction, TagValueChange, TagValueKind,
 };
-use tfmttools_core::error::TFMTResult;
 use tfmttools_core::item_keys::ItemKeys;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
+use crate::error::{FsError, FsResult};
 use crate::fs_handler::{FsHandler, MoveFileResult};
 
 pub struct ActionHandler<'a> {
@@ -37,7 +37,7 @@ impl<'a> ActionHandler<'a> {
     pub fn rename(
         &self,
         rename_action: &RenameAction,
-    ) -> TFMTResult<Vec<Action>> {
+    ) -> FsResult<Vec<Action>> {
         let applied_actions = if self.always_copy() {
             self.fs_handler.copy_file(
                 rename_action.source().as_path(),
@@ -64,11 +64,11 @@ impl<'a> ActionHandler<'a> {
         Ok(applied_actions)
     }
 
-    pub fn apply(&self, action: &Action) -> TFMTResult {
+    pub fn apply(&self, action: &Action) -> FsResult {
         self.apply_forward(action)
     }
 
-    pub fn undo(&self, action: &Action) -> TFMTResult {
+    pub fn undo(&self, action: &Action) -> FsResult {
         match action {
             Action::MoveFile { source, target } => {
                 self.fs_handler
@@ -100,11 +100,11 @@ impl<'a> ActionHandler<'a> {
         Ok(())
     }
 
-    pub fn redo(&self, action: &Action) -> TFMTResult<()> {
+    pub fn redo(&self, action: &Action) -> FsResult<()> {
         self.apply_forward(action)
     }
 
-    fn apply_forward(&self, action: &Action) -> TFMTResult {
+    fn apply_forward(&self, action: &Action) -> FsResult {
         match action {
             Action::MoveFile { source, target } => {
                 self.fs_handler
@@ -143,10 +143,9 @@ fn apply_tag_changes(
     path: &camino::Utf8Path,
     changes: &[TagValueChange],
     direction: TagChangeDirection,
-) -> TFMTResult {
-    let mut tagged_file = lofty::read_from_path(path).map_err(|err| {
-        tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err)
-    })?;
+) -> FsResult {
+    let mut tagged_file = lofty::read_from_path(path)
+        .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
     let tag = tagged_file.primary_tag_mut().ok_or_else(|| {
         tfmttools_core::error::TFMTError::NoPrimaryTag(path.to_owned())
     })?;
@@ -157,14 +156,14 @@ fn apply_tag_changes(
     let id3v2_tag_with_encoding_changes =
         tag_with_encoding_changes(tag, changes, direction)?;
 
-    tagged_file.save_to_path(path, WriteOptions::default()).map_err(|err| {
-        tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err)
-    })?;
+    tagged_file
+        .save_to_path(path, WriteOptions::default())
+        .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
 
     if let Some(id3v2_tag) = id3v2_tag_with_encoding_changes {
-        id3v2_tag.save_to_path(path, WriteOptions::default()).map_err(
-            |err| tfmttools_core::error::TFMTError::Lofty(path.to_owned(), err),
-        )?;
+        id3v2_tag
+            .save_to_path(path, WriteOptions::default())
+            .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
     }
 
     Ok(())
@@ -174,7 +173,7 @@ fn apply_tag_change(
     tag: &mut lofty::tag::Tag,
     change: &TagValueChange,
     direction: TagChangeDirection,
-) -> TFMTResult {
+) -> FsResult {
     let key = ItemKeys::from_string(change.key())?;
     let (from, to) = match direction {
         TagChangeDirection::Forward => (change.old_value(), change.new_value()),
@@ -200,7 +199,7 @@ fn tag_with_encoding_changes(
     tag: &lofty::tag::Tag,
     changes: &[TagValueChange],
     direction: TagChangeDirection,
-) -> TFMTResult<Option<Id3v2Tag>> {
+) -> FsResult<Option<Id3v2Tag>> {
     if tag.tag_type() != TagType::Id3v2 {
         return Ok(None);
     }
@@ -324,6 +323,7 @@ mod tests {
 
     use super::*;
 
+    #[allow(clippy::unnecessary_wraps)]
     fn rename_action(
         source: &str,
         target: &str,
@@ -331,7 +331,7 @@ mod tests {
         let source = Utf8PathBuf::from(source);
         let target = Utf8PathBuf::from(target);
         let action =
-            RenameAction::new(Utf8File::new(&source)?, Utf8File::new(&target)?);
+            RenameAction::new(Utf8File::new(&source), Utf8File::new(&target));
 
         Ok((action, source, target))
     }

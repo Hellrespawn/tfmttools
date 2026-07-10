@@ -8,11 +8,11 @@ use tfmttools_core::action::{
     Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
 };
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::error::TFMTError;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
 use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{
-    ActionExecutor, FsHandler, PathIterator, PathIteratorOptions,
+    ActionExecutor, FsError, FsHandler, PathIterator, PathIteratorOptions,
+    read_audio_file,
 };
 use tfmttools_history::{History, HistoryError};
 use tracing::{debug, trace};
@@ -137,7 +137,7 @@ fn create_fix_actions(
     for path in file_paths {
         bar.inc_found();
 
-        if let Ok(audio_file) = AudioFile::new(path.clone()) {
+        if let Ok(audio_file) = read_audio_file(path.clone()) {
             let changes = audio_file
                 .tag()
                 .items()
@@ -304,7 +304,7 @@ fn validate_files(
     for path in file_paths {
         bar.inc_found();
 
-        match AudioFile::new(path.clone()) {
+        match read_audio_file(path.clone()) {
             Ok(audio_file) => {
                 trace!("Validated audio file encoding: {audio_file:?}");
                 result.checked_files += 1;
@@ -551,7 +551,7 @@ impl ValidationResult {
 #[derive(Debug)]
 struct ValidationReadError {
     path: Utf8PathBuf,
-    error: TFMTError,
+    error: FsError,
 }
 
 #[derive(Debug)]

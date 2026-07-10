@@ -1241,9 +1241,9 @@ dependencies = [
  "camino",
  "convert_case",
  "convert_case_extras",
- "ignore",
  "lofty",
  "minijinja",
+ "regex",
  "serde",
  "serde_json",
  "tfmttools-history",
@@ -1267,6 +1267,7 @@ dependencies = [
  "regex",
  "serde",
  "tfmttools-core",
+ "thiserror",
  "tracing",
 ]
 

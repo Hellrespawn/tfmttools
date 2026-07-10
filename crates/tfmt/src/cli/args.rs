@@ -1,7 +1,6 @@
 use clap::{Command, CommandFactory, Parser};
 use color_eyre::Result;
-use tfmttools_core::util::Utf8Directory;
-use tfmttools_fs::FsHandler;
+use tfmttools_fs::{FsHandler, verify_directory};
 use tfmttools_history::HistoryMode;
 use tracing::debug;
 
@@ -39,10 +38,11 @@ impl TFMTSubcommand {
                 clear_history(app_options)?;
             },
             TFMTSubcommand::ListTemplates(list_templates_args) => {
-                let template_directory = list_templates_args
-                    .custom_template_directory
-                    .map(Utf8Directory::new)
-                    .unwrap_or(Ok(app_options.config_directory().to_owned()))?;
+                let template_directory =
+                    match list_templates_args.custom_template_directory {
+                        Some(path) => verify_directory(path)?,
+                        None => app_options.config_directory().to_owned(),
+                    };
 
                 list_templates(&template_directory)?;
             },

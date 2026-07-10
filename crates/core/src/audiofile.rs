@@ -1,10 +1,10 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use lofty::file::TaggedFileExt;
+use lofty::file::{TaggedFile, TaggedFileExt};
 use lofty::tag::Tag;
 
 use crate::error::{TFMTError, TFMTResult};
 use crate::templates::Template;
-use crate::util::{Utf8Directory, Utf8File, normalize_separators};
+use crate::util::{Utf8Directory, Utf8File, Utf8PathExt, normalize_separators};
 use crate::warning::Warning;
 
 #[derive(Clone)]
@@ -24,17 +24,13 @@ impl std::fmt::Debug for AudioFile {
 impl AudioFile {
     pub const SUPPORTED_EXTENSIONS: [&'static str; 3] = ["mp3", "ogg", "m4a"];
 
-    pub fn new(path: Utf8PathBuf) -> TFMTResult<AudioFile> {
-        let file = Utf8File::new(&path)?;
-
-        let tagged_file = match lofty::read_from_path(&file) {
-            Ok(tagged_file) => tagged_file,
-            Err(err) => return Err(TFMTError::Lofty(path, err)),
-        };
-
+    pub fn from_tagged_file(
+        file: Utf8File,
+        tagged_file: &TaggedFile,
+    ) -> TFMTResult<AudioFile> {
         match tagged_file.primary_tag() {
-            Some(tag) => Ok(AudioFile { file, tag: tag.clone() }),
-            None => Err(TFMTError::NoPrimaryTag(path)),
+            Some(tag) => Ok(AudioFile { file: file.clone(), tag: tag.clone() }),
+            None => Err(TFMTError::NoPrimaryTag(file.into_path_buf())),
         }
     }
 
@@ -67,7 +63,7 @@ impl AudioFile {
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
-        let target_path = relative_path.join_file(target_path)?;
+        let target_path = relative_path.join_file(target_path);
 
         Ok((target_path, warnings))
     }

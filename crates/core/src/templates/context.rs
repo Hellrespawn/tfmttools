@@ -69,9 +69,8 @@ impl AudioFileContext {
         let raw = self.read_raw_tag_value(key)?;
 
         if raw != raw.trim() {
-            let tag_name = format!("{key:?}")
-                .from_case(Case::Pascal)
-                .to_case(Case::Snake);
+            let tag_name =
+                format!("{key:?}").from_case(Case::Pascal).to_case(Case::Snake);
             self.warnings.lock().unwrap().push(Warning::WhitespaceInTag {
                 file: self.audio_file.file().file_name().to_owned(),
                 tag_name,

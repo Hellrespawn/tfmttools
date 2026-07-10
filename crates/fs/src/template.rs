@@ -5,16 +5,14 @@ use camino::Utf8Path;
 use fs_err as fs;
 use minijinja::{Environment, Value, escape_formatter};
 use regex::Regex;
-use tfmttools_core::error::{TFMTError, TFMTResult};
-use tfmttools_core::templates::{Frontmatter, Template};
+use tfmttools_core::templates::{Frontmatter, Template, parse_template_source};
 use tfmttools_core::util::{Utf8Directory, Utf8PathExt};
 use tfmttools_core::warning::Warning;
 
 use crate::PathIterator;
+use crate::error::{FsError, FsResult};
 
 pub const TEMPLATE_EXTENSIONS: [&str; 3] = ["tfmt", "jinja", "j2"];
-
-const FRONTMATTER_FENCE: &str = "+++";
 
 #[derive(Debug)]
 pub struct TemplateLoader<'tl> {
@@ -28,7 +26,7 @@ impl<'tl> TemplateLoader<'tl> {
 
     pub fn read_directory(
         template_directory: &Utf8Directory,
-    ) -> TFMTResult<(Self, Vec<Warning>)> {
+    ) -> FsResult<(Self, Vec<Warning>)> {
         let iter = PathIterator::single_directory(template_directory.as_path())
             .flatten()
             .filter(|path| Self::path_is_template(path));
@@ -52,13 +50,13 @@ impl<'tl> TemplateLoader<'tl> {
     pub fn read_filename(
         path: &Utf8Path,
         name: &str,
-    ) -> TFMTResult<(Self, Vec<Warning>)> {
+    ) -> FsResult<(Self, Vec<Warning>)> {
         let source = fs::read_to_string(path)?;
 
         Self::build([(name.to_owned(), source)])
     }
 
-    pub fn read_script(script: &str) -> TFMTResult<(Self, Vec<Warning>)> {
+    pub fn read_script(script: &str) -> FsResult<(Self, Vec<Warning>)> {
         Self::build([(Self::DEFAULT_SCRIPT_NAME.to_owned(), script.to_owned())])
     }
 
@@ -67,7 +65,7 @@ impl<'tl> TemplateLoader<'tl> {
     /// constructors so the environment/frontmatter setup lives in one place.
     fn build(
         sources: impl IntoIterator<Item = (String, String)>,
-    ) -> TFMTResult<(Self, Vec<Warning>)> {
+    ) -> FsResult<(Self, Vec<Warning>)> {
         let mut template_names = Vec::new();
         let mut frontmatters = HashMap::new();
         let mut environment = Self::create_environment();
@@ -92,7 +90,7 @@ impl<'tl> TemplateLoader<'tl> {
         &'_ self,
         name: &str,
         arguments: Vec<String>,
-    ) -> TFMTResult<Option<Template<'_, '_>>> {
+    ) -> FsResult<Option<Template<'_, '_>>> {
         let Ok(minijinja_template) = self.environment.get_template(name) else {
             return Ok(None);
         };
@@ -167,104 +165,19 @@ impl<'tl> TemplateLoader<'tl> {
         frontmatters: &mut HashMap<String, Frontmatter>,
         name: &str,
         source: String,
-    ) -> TFMTResult<Vec<Warning>> {
-        let (body, frontmatter) = Self::split_frontmatter(name, source)?;
-
-        let warnings = if frontmatter.is_none() {
-            Self::deprecation_warnings(name, &body)
-        } else {
-            Vec::new()
-        };
+    ) -> FsResult<Vec<Warning>> {
+        let (body, frontmatter, warnings) =
+            parse_template_source(name, source)?;
 
         if let Some(frontmatter) = frontmatter {
             frontmatters.insert(name.to_owned(), frontmatter);
         }
 
-        environment.add_template_owned(name.to_owned(), body)?;
+        environment
+            .add_template_owned(name.to_owned(), body)
+            .map_err(|e| FsError::Core(e.into()))?;
 
         Ok(warnings)
-    }
-
-    fn deprecation_warnings(label: &str, body: &str) -> Vec<Warning> {
-        let mut warnings = Vec::new();
-
-        if Self::body_uses_indexed_args(body) {
-            warnings.push(Warning::DeprecatedPositionalArgs {
-                template: label.to_owned(),
-            });
-        }
-
-        if Self::description(body).is_some() {
-            warnings.push(Warning::DeprecatedLeadingComment {
-                template: label.to_owned(),
-            });
-        }
-
-        warnings
-    }
-
-    fn split_frontmatter(
-        label: &str,
-        source: String,
-    ) -> TFMTResult<(String, Option<Frontmatter>)> {
-        // The regex crate doesn't support look-around, so the opening and
-        // closing fences are matched with two separate anchored patterns
-        // instead of one monolithic `open ... \r?\n ... close` capture. The
-        // closing fence is found by searching for a line consisting solely
-        // of `+++` (optionally followed by trailing spaces/tabs) starting
-        // right after the opening fence. This lets the closing fence
-        // immediately follow the opening fence's own newline when the
-        // frontmatter block has no content (e.g. "+++\n+++\n"), since
-        // `find_at` treats the position right after that newline as a valid
-        // line start rather than requiring a second, independent `\r?\n`
-        // between the two fences.
-        static RE_OPENING_FENCE: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"\A\+\+\+[ \t]*\r?\n").unwrap());
-
-        static RE_CLOSING_FENCE: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"(?m)^\+\+\+[ \t]*\r?$").unwrap());
-
-        if !source.starts_with(FRONTMATTER_FENCE) {
-            return Ok((source, None));
-        }
-
-        let Some(opening) = RE_OPENING_FENCE.find(&source) else {
-            return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
-        };
-
-        let Some(closing) = RE_CLOSING_FENCE.find_at(&source, opening.end())
-        else {
-            return Err(TFMTError::UnterminatedFrontmatter(label.to_owned()));
-        };
-
-        let toml_text = &source[opening.end()..closing.start()];
-
-        let frontmatter = Frontmatter::parse(toml_text, label)?;
-
-        let mut body_start = closing.end();
-
-        if let Some(rest) = source[body_start..].strip_prefix("\r\n") {
-            body_start = source.len() - rest.len();
-        } else if let Some(rest) = source[body_start..].strip_prefix('\n') {
-            body_start = source.len() - rest.len();
-        }
-
-        let body = source[body_start..].to_owned();
-
-        if Self::body_uses_indexed_args(&body) {
-            return Err(TFMTError::IndexedArgsWithFrontmatter(
-                label.to_owned(),
-            ));
-        }
-
-        Ok((body, Some(frontmatter)))
-    }
-
-    fn body_uses_indexed_args(body: &str) -> bool {
-        static RE_ARGS_INDEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"\bargs\s*\[").unwrap());
-
-        RE_ARGS_INDEX.is_match(body)
     }
 
     fn description(source: &str) -> Option<String> {
@@ -344,10 +257,10 @@ impl<'tl> TemplateLoader<'tl> {
 
 #[cfg(test)]
 mod tests {
-    use tfmttools_core::error::TFMTError;
     use tfmttools_core::warning::Warning;
 
     use super::*;
+    use crate::error::FsError;
 
     #[test]
     fn read_script_without_frontmatter_using_indexed_args_returns_warning() {
@@ -378,99 +291,12 @@ mod tests {
 
     #[test]
     fn read_script_with_frontmatter_returns_no_warnings() {
-        let (_, warnings) =
-            TemplateLoader::read_script("+++\nname = \"Test\"\n+++\n{{ artist }}")
-                .unwrap();
+        let (_, warnings) = TemplateLoader::read_script(
+            "+++\nname = \"Test\"\n+++\n{{ artist }}",
+        )
+        .unwrap();
 
         assert!(warnings.is_empty());
-    }
-
-    #[test]
-    fn split_frontmatter_returns_none_when_absent() {
-        let source = "{{ artist }}/{{ title }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source.clone()).unwrap();
-
-        assert_eq!(body, source);
-        assert!(frontmatter.is_none());
-    }
-
-    #[test]
-    fn split_frontmatter_parses_present_block() {
-        let source = "+++\nname = \"Test\"\n+++\n{{ artist }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source).unwrap();
-
-        assert_eq!(body, "{{ artist }}");
-        assert_eq!(frontmatter.unwrap().name(), Some("Test"));
-    }
-
-    #[test]
-    fn split_frontmatter_handles_empty_toml_block() {
-        let source = "+++\n+++\n{{ artist }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source).unwrap();
-
-        assert_eq!(body, "{{ artist }}");
-        assert!(frontmatter.is_some());
-        assert_eq!(frontmatter.unwrap().name(), None);
-    }
-
-    #[test]
-    fn split_frontmatter_handles_empty_toml_block_crlf() {
-        let source = "+++\r\n+++\r\n{{ artist }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source).unwrap();
-
-        assert_eq!(body, "{{ artist }}");
-        assert!(frontmatter.is_some());
-        assert_eq!(frontmatter.unwrap().name(), None);
-    }
-
-    #[test]
-    fn split_frontmatter_errors_when_unterminated() {
-        let source = "+++\nname = \"Test\"\n{{ artist }}".to_owned();
-
-        let error =
-            TemplateLoader::split_frontmatter("test", source).unwrap_err();
-
-        assert!(matches!(error, TFMTError::UnterminatedFrontmatter(_)));
-    }
-
-    #[test]
-    fn split_frontmatter_errors_when_body_uses_indexed_args() {
-        let source = "+++\nname = \"Test\"\n+++\n{{ args[0] }}".to_owned();
-
-        let error =
-            TemplateLoader::split_frontmatter("test", source).unwrap_err();
-
-        assert!(matches!(error, TFMTError::IndexedArgsWithFrontmatter(_)));
-    }
-
-    #[test]
-    fn split_frontmatter_allows_kwargs_identifier_with_frontmatter() {
-        let source = "+++\nname = \"Test\"\n+++\n{{ kwargs[0] }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source).unwrap();
-
-        assert_eq!(body, "{{ kwargs[0] }}");
-        assert!(frontmatter.is_some());
-    }
-
-    #[test]
-    fn split_frontmatter_allows_indexed_args_without_frontmatter() {
-        let source = "{{ args[0] }}".to_owned();
-
-        let (body, frontmatter) =
-            TemplateLoader::split_frontmatter("test", source.clone()).unwrap();
-
-        assert_eq!(body, source);
-        assert!(frontmatter.is_none());
     }
 
     #[test]
@@ -491,7 +317,8 @@ mod tests {
 
     #[test]
     fn read_script_without_frontmatter_has_empty_side_table() {
-        let (loader, _warnings) = TemplateLoader::read_script("{{ args[0] }}").unwrap();
+        let (loader, _warnings) =
+            TemplateLoader::read_script("{{ args[0] }}").unwrap();
 
         assert!(loader.frontmatters.is_empty());
     }
@@ -506,7 +333,16 @@ mod tests {
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap_err();
 
-        assert!(matches!(error, TFMTError::MissingRequiredArgument(_, _, _)));
+        assert!(matches!(
+            error,
+            FsError::Core(
+                tfmttools_core::error::TFMTError::MissingRequiredArgument(
+                    _,
+                    _,
+                    _
+                )
+            )
+        ));
     }
 
     #[test]
@@ -554,7 +390,8 @@ mod tests {
 
     #[test]
     fn display_name_falls_back_to_lookup_name_without_override() {
-        let (loader, _warnings) = TemplateLoader::read_script("{{ artist }}").unwrap();
+        let (loader, _warnings) =
+            TemplateLoader::read_script("{{ artist }}").unwrap();
         let template = loader
             .get_template(TemplateLoader::DEFAULT_SCRIPT_NAME, Vec::new())
             .unwrap()

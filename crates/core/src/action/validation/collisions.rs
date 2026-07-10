@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use super::errors::ValidationError;
-use crate::action::{CaseInsensitivePathKey, RenameAction};
-use crate::util::Utf8PathExt;
+use crate::action::{
+    CaseInsensitivePathKey, CaseInsensitivePathSet, RenameAction,
+};
 
 pub(super) fn validate_double_separators(
     rename_actions: &'_ [RenameAction],
@@ -62,16 +63,17 @@ pub(super) fn validate_case_insensitive_collisions(
         .collect()
 }
 
-pub(super) fn validate_existing_files(
-    rename_actions: &'_ [RenameAction],
-) -> Vec<ValidationError<'_>> {
+pub(super) fn validate_existing_files<'a>(
+    rename_actions: &'a [RenameAction],
+    existing_targets: &CaseInsensitivePathSet,
+) -> Vec<ValidationError<'a>> {
     let sources =
         rename_actions.iter().map(RenameAction::source).collect::<Vec<_>>();
 
     rename_actions
         .iter()
         .filter(|m| {
-            m.target().exists()
+            existing_targets.contains(m.target())
                 && m.target() != m.source()
                 && !sources.iter().any(|source| {
                     CaseInsensitivePathKey::new(source)

@@ -4,12 +4,11 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::error::TFMTResult;
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::{FSMode, Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
-    ActionExecutor, PathIterator, PathIteratorOptions, get_file_checksum,
-    get_longest_common_prefix,
+    ActionExecutor, FsResult, PathIterator, PathIteratorOptions,
+    get_file_checksum, get_longest_common_prefix,
 };
 use tfmttools_history::{History, HistoryError};
 use tracing::{debug, info, trace};
@@ -121,17 +120,14 @@ fn discover_remaining_items(
 
     let remaining = PathIterator::new(&options)
         .filter_ok(|path| !protected_paths.contains(path))
-        .collect::<TFMTResult<Vec<_>>>()?;
+        .collect::<FsResult<Vec<_>>>()?;
 
     let (files, folders): (Vec<_>, Vec<_>) =
         remaining.into_iter().partition(|p| p.is_file());
 
     Ok(RemainingItems {
-        files: files.into_iter().map(Utf8File::new_unchecked).collect(),
-        directories: folders
-            .into_iter()
-            .map(Utf8Directory::new_unchecked)
-            .collect(),
+        files: files.into_iter().map(Utf8File::new).collect(),
+        directories: folders.into_iter().map(Utf8Directory::new).collect(),
     })
 }
 
@@ -220,8 +216,8 @@ fn create_rename_action(
         session
             .rename_options()
             .bin_directory()
-            .join(run_id)?
-            .join_file(target_name)?,
+            .join(run_id)
+            .join_file(target_name),
     );
 
     trace!("Created rename action: {rename_action:?}");
@@ -302,7 +298,7 @@ fn move_files(
 
     Ok(executor
         .apply_rename_actions(rename_actions)
-        .collect::<TFMTResult<_>>()?)
+        .collect::<FsResult<_>>()?)
 }
 
 fn remove_directories(

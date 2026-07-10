@@ -1,6 +1,7 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use ignore::{Walk, WalkBuilder};
-use tfmttools_core::error::TFMTResult;
+
+use crate::error::FsResult;
 
 #[derive(Debug)]
 pub struct PathIteratorOptions<'pio> {
@@ -31,7 +32,7 @@ impl<'pio> PathIteratorOptions<'pio> {
 pub struct PathIterator(Walk);
 
 impl Iterator for PathIterator {
-    type Item = TFMTResult<Utf8PathBuf>;
+    type Item = FsResult<Utf8PathBuf>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self

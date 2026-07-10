@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
-use crate::action::Action;
-use crate::error::TFMTResult;
-use crate::util::{Utf8Directory, Utf8File, Utf8PathExt};
+use crate::util::{Utf8Directory, Utf8File};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct RenameAction {
@@ -19,14 +17,9 @@ impl RenameAction {
         Self { source, target }
     }
 
-    pub fn from_path_bufs(
-        source: Utf8PathBuf,
-        target: Utf8PathBuf,
-    ) -> TFMTResult<Self> {
-        Ok(Self {
-            source: Utf8File::new(source)?,
-            target: Utf8File::new(target)?,
-        })
+    #[must_use]
+    pub fn from_path_bufs(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
+        Self { source: Utf8File::new(source), target: Utf8File::new(target) }
     }
 
     pub fn separate_unchanged_destinations(
@@ -54,17 +47,14 @@ impl RenameAction {
         self.source() != self.target()
     }
 
-    pub fn get_make_dir_actions(
+    #[must_use]
+    pub fn intermediate_directories(
         rename_actions: &[RenameAction],
-    ) -> Vec<Action> {
+    ) -> Vec<Utf8Directory> {
         let target_paths =
             rename_actions.iter().map(RenameAction::target).collect::<Vec<_>>();
 
         Self::list_all_intermediate_paths_of_files(&target_paths)
-            .into_iter()
-            .filter(|dir| !dir.exists())
-            .map(|dir| Action::MakeDir(dir.as_path().to_owned()))
-            .collect::<Vec<_>>()
     }
 
     fn list_all_intermediate_paths_of_files(
@@ -114,11 +104,9 @@ mod test {
         let reference = ["a", "a/b", "a/b/c", "a/b/h"]
             .into_iter()
             .map(Utf8Directory::new)
-            .collect::<TFMTResult<Vec<_>>>()
-            .unwrap();
+            .collect::<Vec<_>>();
 
-        let paths: Vec<Utf8File> =
-            paths.iter().map(Utf8File::new).collect::<TFMTResult<_>>().unwrap();
+        let paths: Vec<Utf8File> = paths.iter().map(Utf8File::new).collect();
 
         let paths_ref = paths.iter().collect::<Vec<_>>();
 
@@ -142,14 +130,9 @@ mod test {
         let reference = ["/", "/a", "/a/b", "/a/b/c", "/a/b/h"]
             .into_iter()
             .map(Utf8Directory::new)
-            .collect::<TFMTResult<Vec<_>>>()
-            .unwrap();
+            .collect::<Vec<_>>();
 
-        let paths = paths
-            .iter()
-            .map(Utf8File::new)
-            .collect::<TFMTResult<Vec<_>>>()
-            .unwrap();
+        let paths = paths.iter().map(Utf8File::new).collect::<Vec<_>>();
 
         let paths_ref = paths.iter().collect::<Vec<_>>();
 
