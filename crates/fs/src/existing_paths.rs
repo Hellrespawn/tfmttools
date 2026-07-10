@@ -5,6 +5,11 @@ use tfmttools_core::util::Utf8PathExt;
 pub fn existing_target_paths(
     rename_actions: &[RenameAction],
 ) -> CaseInsensitivePathSet {
+    // Case-insensitive by design: validate_existing_files uses this set via
+    // CaseInsensitivePathSet::contains, so inserting with case-folded keys
+    // is correct. A same-target-different-case collision would already be
+    // flagged by validate_case_insensitive_collisions, so any redundant
+    // TargetExists error from the set is harmless.
     let mut set = CaseInsensitivePathSet::new();
 
     for rename_action in rename_actions {
