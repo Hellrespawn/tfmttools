@@ -1,6 +1,4 @@
-#![warn(clippy::pedantic)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
+// Crate-specific exception; shared Clippy policy lives in Cargo.toml.
 #![allow(clippy::must_use_candidate)]
 
 mod context;

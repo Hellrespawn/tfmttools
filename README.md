@@ -48,6 +48,10 @@ The workspace is split by responsibility:
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
   integration tests.
 
+All workspace members inherit the Clippy policy from
+`[workspace.lints.clippy]` in the root `Cargo.toml`. Keep targeted lint
+exceptions next to the code they apply to.
+
 Supporting directories:
 
 - `examples/` contains example templates such as

@@ -13,6 +13,10 @@
 
 ### Changed
 
+- Use workspace Cargo lint settings consistently across all crates; remove
+  duplicate crate-level Clippy configuration and retain the test harness's
+  specific `must_use_candidate` exception.
+
 - Share tag sanitization between rendering and character fixes, normalize tag
   alias lookup, and use consistent template labels in diagnostics. Preserve
   numeric overflow and whitespace handling.
