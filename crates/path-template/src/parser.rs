@@ -216,8 +216,8 @@ impl Parser {
                     let width_token = self.expect(&Kind::Number(String::new()), "Expected a nonnegative padding width")?;
                     let Kind::Number(width) = width_token.kind else { unreachable!() };
                     let width = width.parse::<usize>().map_err(|_| Diagnostic::new("Invalid padding width", width_token.span))?;
-                    let close = self.expect(&Kind::CloseParen, "Expected ')' after padding width")?;
-                    Formatter::Pad(width, Span { start: span.start, end: close.span.end })
+                    self.expect(&Kind::CloseParen, "Expected ')' after padding width")?;
+                    Formatter::Pad(width)
                 },
                 _ => return Err(Diagnostic::new("Unknown formatter", span)),
             };

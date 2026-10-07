@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::ast::{Alternative, Expression};
 use crate::value::Value;
-use crate::{ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath, Scalar, Span, args, parser, render};
+use crate::{ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath, Scalar, Span, args, parser, render};
 
 /// Optional listing metadata, independent of argument binding.
 #[derive(Clone, Debug, Default)]
@@ -107,10 +107,15 @@ fn validate_arguments(path: &[Expression], arguments: &[ArgSpec]) -> Result<(), 
     };
     for expression in path {
         match expression {
-            Expression::Interpolation { alternatives, .. } => {
+            Expression::Interpolation { alternatives, formatters, .. } => {
                 for alternative in alternatives {
                     if let Alternative::Reference(reference) = alternative {
                         validate(reference)?;
+                        if !reference.tag && !formatters.is_empty()
+                            && arguments.iter().any(|a| a.name == reference.name && a.kind == ArgKind::Path)
+                        {
+                            return Err(Diagnostic::new("Cannot format a path argument", reference.span));
+                        }
                     }
                 }
             },

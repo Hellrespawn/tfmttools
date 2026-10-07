@@ -112,3 +112,72 @@ fn supplied_empty_value_overrides_default() {
         .render(|_| Ok::<_, Infallible>(None)).unwrap();
     assert_eq!(path.components(), ["AB"]);
 }
+
+#[test]
+fn year_extraction_and_padding() {
+    for date in ["2024-03-10", "10-03-2024", "2024", "released in 2024"] {
+        let path = bind("path: ({$date | year})")
+            .render(|_| Ok::<_, Infallible>(text(date))).unwrap();
+        assert_eq!(path.components(), ["2024"], "{date}");
+    }
+    let path = bind("path: ({$date | year | pad(6)})")
+        .render(|_| Ok::<_, Infallible>(text("2024"))).unwrap();
+    assert_eq!(path.components(), ["002024"]);
+}
+
+#[test]
+fn date_pattern_precedence() {
+    let path = bind("path: ({$date | year})")
+        .render(|_| Ok::<_, Infallible>(text("1999 then 2024-03-10"))).unwrap();
+    assert_eq!(path.components(), ["2024"]);
+}
+
+#[test]
+fn bad_date_has_formatter_span() {
+    let source = "path: ({$date | year})";
+    let error = bind(source).render(|_| Ok::<_, Infallible>(text("unknown"))).unwrap_err();
+    let RenderError::Template(error) = error;
+    assert_eq!(&source[error.span.start..error.span.end], "year");
+    assert!(error.message.contains("year"));
+}
+
+#[test]
+fn absent_formatter_input_emits_nothing() {
+    let path = bind(r#"path: ({$date | year} "Song")"#)
+        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    assert_eq!(path.components(), ["Song"]);
+}
+
+#[test]
+fn padding_is_minimum_width_and_zero_is_preserved() {
+    for (value, width, expected) in [
+        (Scalar::Integer(3), 2, "03"),
+        (Scalar::Text("123".to_owned()), 2, "123"),
+        (Scalar::Integer(0), 2, "00"),
+        (Scalar::Integer(3), 0, "3"),
+        (Scalar::Integer(-2), 3, "0-2"),
+        (Scalar::Text("é".to_owned()), 2, "0é"),
+    ] {
+        let path = bind(&format!("path: ({{$track | pad({width})}})"))
+            .render(|_| Ok::<_, Infallible>(Some(value.clone()))).unwrap();
+        assert_eq!(path.components(), [expected]);
+    }
+}
+
+#[test]
+fn formatter_applies_to_selected_fallback() {
+    let path = bind("path: ({$a ?? $b | pad(2)})")
+        .render(|name| Ok::<_, Infallible>(if name == "b" { text("3") } else { None }))
+        .unwrap();
+    assert_eq!(path.components(), ["03"]);
+}
+
+#[test]
+fn formatters_reject_path_arguments_in_all_alternatives() {
+    for source in [
+        "arg prefix: path(default: \"\") path: ({prefix | year})",
+        "arg prefix: path(default: \"\") path: ({$a ?? prefix | pad(2)})",
+    ] {
+        assert!(Script::compile(source, ArgumentPolicy::new(&[])).is_err());
+    }
+}

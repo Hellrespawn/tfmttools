@@ -16,7 +16,7 @@ pub(crate) enum Alternative {
 #[derive(Clone, Debug)]
 pub(crate) enum Formatter {
     Year(Span),
-    Pad(usize, Span),
+    Pad(usize),
 }
 
 #[derive(Clone, Debug)]

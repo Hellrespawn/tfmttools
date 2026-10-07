@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::{Alternative, Expression, Formatter, Reference};
 use crate::value::Value;
-use crate::{BoundScript, Diagnostic, RenderError, RenderedPath, Scalar};
+use crate::{BoundScript, Diagnostic, RenderError, RenderedPath, Scalar, format};
 
 pub(crate) fn render<E>(
     bound: &BoundScript,
@@ -63,17 +63,17 @@ fn evaluate<E>(
                     }
                 }
                 let Some(value) = selected else { continue };
-                let text = match value {
+                let mut text = match value {
                     Value::Text(text) => text,
                     Value::Integer(integer) => integer.to_string(),
                     Value::Path(_) => return Err(Diagnostic::new("Path insertion not implemented", *span).into()),
                 };
-                if let Some(formatter) = formatters.first() {
-                    let (name, formatter_span) = match formatter {
-                        Formatter::Year(span) => ("year".to_owned(), span),
-                        Formatter::Pad(width, span) => (format!("pad({width})"), span),
+                for formatter in formatters {
+                    text = match formatter {
+                        Formatter::Year(span) => format::year(&text)
+                            .map_err(|message| Diagnostic::new(message, *span))?,
+                        Formatter::Pad(width) => format::pad(&text, *width),
                     };
-                    return Err(Diagnostic::new(format!("Formatter '{name}' not implemented"), *formatter_span).into());
                 }
                 output.push_str(&text);
             },

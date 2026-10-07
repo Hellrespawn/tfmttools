@@ -3,6 +3,7 @@
 mod args;
 mod ast;
 mod diagnostic;
+mod format;
 mod lexer;
 mod parser;
 mod path;
