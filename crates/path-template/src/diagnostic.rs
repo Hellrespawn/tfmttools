@@ -13,6 +13,15 @@ pub struct Diagnostic {
     pub span: Span,
 }
 
+/// A template failure or the original error returned by a metadata resolver.
+#[derive(Debug, thiserror::Error)]
+pub enum RenderError<E> {
+    #[error(transparent)]
+    Template(#[from] Diagnostic),
+    #[error("Could not resolve tag '{name}' (bytes {}..{}): {source}", .span.start, .span.end)]
+    Resolver { name: String, span: Span, source: E },
+}
+
 impl Diagnostic {
     pub(crate) fn new(message: impl Into<String>, span: Span) -> Self {
         Self { message: message.into(), span }

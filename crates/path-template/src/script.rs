@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::ast::{Alternative, Expression};
 use crate::value::Value;
-use crate::{ArgSpec, ArgumentPolicy, Diagnostic, Span, args, parser};
+use crate::{ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath, Scalar, Span, args, parser, render};
 
 /// Optional listing metadata, independent of argument binding.
 #[derive(Clone, Debug, Default)]
@@ -40,6 +40,15 @@ pub struct Script {
 pub struct BoundScript {
     pub(crate) script: Script,
     pub(crate) arguments: HashMap<String, Value>,
+}
+
+impl BoundScript {
+    pub fn render<E>(
+        &self,
+        resolve: impl FnMut(&str) -> Result<Option<Scalar>, E>,
+    ) -> Result<RenderedPath, RenderError<E>> {
+        render::render(self, resolve)
+    }
 }
 
 impl Script {
