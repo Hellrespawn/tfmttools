@@ -187,3 +187,44 @@ fn real_id3_number_pairs_supply_separate_totals() {
     assert!(target.exists(), "{}", String::from_utf8_lossy(&output.stdout));
     assert_eq!(std::fs::read(target).unwrap(), before);
 }
+
+#[cfg(unix)]
+#[test]
+fn cleanup_resolution_failure_preserves_applied_action_history() {
+    let directory = TempDir::new().unwrap();
+    std::fs::create_dir(root(&directory).join("config")).unwrap();
+    std::fs::create_dir(root(&directory).join("input")).unwrap();
+    let source = root(&directory).join("input/song.mp3");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
+    std::fs::copy(fixture, &source).unwrap();
+    std::os::unix::fs::symlink(
+        "missing",
+        root(&directory).join("input/broken-link.txt"),
+    )
+    .unwrap();
+    let before = std::fs::read(&source).unwrap();
+    let output = run(&directory, &[
+        "rename",
+        "-i",
+        "input",
+        "--script",
+        r#"path: ("input" / "Song")"#,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        std::fs::read(root(&directory).join("input/Song.mp3")).unwrap(),
+        before
+    );
+    let output = run(&directory, &["undo"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(std::fs::read(source).unwrap(), before);
+}

@@ -120,7 +120,8 @@ compilable during Task 1 and was removed in Task 2; all shared fixture scripts
 migrated in Task 3 because directory loading compiles every discovered file.
 Case-only coverage uses a dedicated copied input directory. Relative rename
 inputs are resolved against cwd; cleanup canonicalizes both protected and
-scanned paths, skips cleanup on protected-path resolution failures, and
+scanned paths, skips cleanup on path resolution failures (including broken
+symlinks), and
 preserves action history. This can leave extra files for subsequent cleanup.
 
 Existing duplicate-stem lookup and all-discovered-script compilation remain.

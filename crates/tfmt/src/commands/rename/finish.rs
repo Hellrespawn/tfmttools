@@ -43,11 +43,19 @@ pub(crate) fn handle_remaining_files(
                 return Ok(applied_actions);
             },
         };
-        let remaining_items = discover_remaining_items(
+        let remaining_items = match discover_remaining_items(
             session,
             &common_prefix,
             &protected_paths,
-        )?;
+        ) {
+            Ok(items) => items,
+            Err(error) => {
+                eprintln!(
+                    "Unable to resolve remaining paths, skipping cleanup: {error}"
+                );
+                return Ok(applied_actions);
+            },
+        };
 
         // Can't apply compiler attribute to macro invocation directly.
         #[allow(unstable_name_collisions)]
