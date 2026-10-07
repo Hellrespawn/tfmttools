@@ -1,0 +1,23 @@
+name: "Stef's layout"
+description: "Group by artist and album, with a directory prefix."
+
+arg prefix: path(
+  default: "",
+  description: "Directory prefix to place output under."
+)
+
+path: (
+  {prefix} {$albumartist ?? $artist} /
+  [$album?
+    [$date?
+      {$date | year}
+      [$albumsort? "." {$albumsort | pad(2)}]
+      " - "
+    ]
+    {$album} /
+  ]
+  [$discnumber? {$discnumber | pad(1)}]
+  [$tracknumber? {$tracknumber | pad(2)} " - "]
+  [$albumartist? [$artist? {$artist} " - "]]
+  {$title}
+)
