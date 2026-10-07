@@ -1,18 +1,19 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
+use path_template::{BoundTemplate, Template};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
-use tfmttools_fs::{FileOrName, TemplateLoader};
+use tfmttools_fs::{FileOrName, discover_templates};
 use tfmttools_history::{History, LoadHistoryResult};
 use tracing::debug;
 
 use super::RenameSession;
 use crate::cli::TemplateOption;
+use crate::commands::templates;
 
 pub(super) struct ResolvedTemplate {
-    pub(super) loader: TemplateLoader,
-    pub(super) template_name: String,
-    pub(super) arguments: Vec<String>,
+    pub(super) template: BoundTemplate,
+    pub(super) lookup_name: String,
     pub(super) metadata: ActionRecordMetadata,
 }
 
@@ -32,10 +33,10 @@ pub(super) fn resolve_template(
                 session.rename_options().arguments(),
             )
         },
-        TemplateOption::Script(script) => {
-            resolve_script(
+        TemplateOption::InlineTemplate(template) => {
+            resolve_inline_template(
                 session,
-                script,
+                template,
                 session.rename_options().arguments(),
             )
         },
@@ -65,12 +66,12 @@ fn resolve_previous_template(
 
                 resolve_file_or_name(session, &template_name, &arguments)
             },
-            TemplateMetadata::Script(script) => {
+            TemplateMetadata::InlineTemplate(template) => {
                 println!(
-                    "Re-using script\n```\n'{script}'\n```\n and arguments from previous rename."
+                    "Re-using template\n```\n'{template}'\n```\n and arguments from previous rename."
                 );
 
-                resolve_script(session, script, &arguments)
+                resolve_inline_template(session, template, &arguments)
             },
             TemplateMetadata::Validation(_) => {
                 Err(eyre!("No previous rename run found."))
@@ -89,48 +90,60 @@ fn resolve_file_or_name(
     debug!("Using template: '{file_or_name}'");
     debug!("Template arguments: '{}'", arguments.join("', '"));
 
-    let loader = match file_or_name {
-        FileOrName::File(path, name) => {
-            TemplateLoader::read_filename(path, name)
-        },
-        FileOrName::Name(_) => {
-            TemplateLoader::read_directory(
+    let template = match file_or_name {
+        FileOrName::File(path, name) => templates::load(name, path)?,
+        FileOrName::Name(name) => {
+            let paths = discover_templates(
                 session.rename_options().template_directory(),
-            )
+            )?;
+            let matches: Vec<_> = paths
+                .iter()
+                .filter(|path| path.file_stem() == Some(name.as_str()))
+                .collect();
+            match matches.as_slice() {
+                [path] => templates::load(name, path)?,
+                [] => return Err(eyre!("Unable to find template: {name}")),
+                _ => {
+                    return Err(eyre!(
+                        "Template name '{name}' is ambiguous; specify an explicit template file path."
+                    ));
+                },
+            }
         },
-    }?;
+    };
 
     let template_name = file_or_name.as_str().to_owned();
-    let arguments = arguments.to_vec();
     let metadata = create_metadata(
         &TemplateMetadata::FileOrName(template_name.clone()),
         session.app_options().run_id(),
-        &arguments,
-    );
-
-    Ok(ResolvedTemplate { loader, template_name, arguments, metadata })
-}
-
-fn resolve_script(
-    session: &RenameSession,
-    script: &str,
-    arguments: &[String],
-) -> Result<ResolvedTemplate> {
-    debug!("Using script:\n```\n{script}\n```");
-    debug!("Template arguments: '{}'", arguments.join("', '"));
-
-    let loader = TemplateLoader::read_script(script)?;
-    let arguments = arguments.to_vec();
-    let metadata = create_metadata(
-        &TemplateMetadata::Script(script.to_owned()),
-        session.app_options().run_id(),
-        &arguments,
+        arguments,
     );
 
     Ok(ResolvedTemplate {
-        loader,
-        template_name: TemplateLoader::DEFAULT_SCRIPT_NAME.to_owned(),
+        template: bind(&template, &template_name, arguments)?,
+        lookup_name: template_name,
+        metadata,
+    })
+}
+
+fn resolve_inline_template(
+    session: &RenameSession,
+    template: &str,
+    arguments: &[String],
+) -> Result<ResolvedTemplate> {
+    debug!("Using template:\n```\n{template}\n```");
+    debug!("Template arguments: '{}'", arguments.join("', '"));
+
+    let compiled = templates::compile("template", template)?;
+    let metadata = create_metadata(
+        &TemplateMetadata::InlineTemplate(template.to_owned()),
+        session.app_options().run_id(),
         arguments,
+    );
+
+    Ok(ResolvedTemplate {
+        template: bind(&compiled, "template", arguments)?,
+        lookup_name: "template".to_owned(),
         metadata,
     })
 }
@@ -145,4 +158,14 @@ fn create_metadata(
         arguments.to_vec(),
         run_id.to_owned(),
     )
+}
+
+fn bind(
+    template: &Template,
+    name: &str,
+    arguments: &[String],
+) -> Result<BoundTemplate> {
+    template.bind(arguments).map_err(|error| {
+        eyre!("Template '{name}' at {}", template.format_diagnostic(&error))
+    })
 }

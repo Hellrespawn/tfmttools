@@ -8,11 +8,11 @@ mod lexer;
 mod parser;
 mod path;
 mod render;
-mod script;
+mod template;
 mod value;
 
 pub use args::{ArgKind, ArgSpec, ArgumentPolicy};
 pub use diagnostic::{Diagnostic, RenderError, Span};
 pub use path::RenderedPath;
-pub use script::{BoundScript, Metadata, Script, TagReference};
+pub use template::{BoundTemplate, Metadata, TagReference, Template};
 pub use value::Scalar;

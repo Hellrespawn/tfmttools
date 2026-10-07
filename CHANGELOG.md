@@ -13,14 +13,21 @@
 
 ### Changed
 
+- Use template terminology throughout the API, including `Template` and
+  `BoundTemplate`; preserve the `--script` flag and history serialization.
+
+- Compile and bind only the selected rename template; reject ambiguous
+  filename stems and allow selection by explicit file path. Remove the
+  core template wrappers in favor of the language crate's template types.
+
 - Replaced MiniJinja and TOML frontmatter with the path template language.
-  Existing scripts require manual migration; declarations and path rules now
-  share one document, and inline scripts use `path: (...)`.
+  Existing templates require manual migration; declarations and path rules now
+  share one document, and inline templates use `path: (...)`.
 - Treat zero as present in guards and fallbacks. Stef's migrated layout omits
   the filename artist prefix when the track artist is missing or empty.
 - Validate all string/path arguments and defaults against forbidden filename
   characters instead of sanitizing them; preserve accepted argument whitespace.
-- Preserve legacy history undo/redo; saved Jinja scripts require an explicit
+- Preserve legacy history undo/redo; saved Jinja templates require an explicit
   replacement when reused for a new rename.
 - Resolve relative rename input directories before scanning and compare canonical
   paths during cleanup so renamed targets survive alternate path spellings.

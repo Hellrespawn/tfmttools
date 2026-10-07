@@ -2,10 +2,12 @@ use std::convert::Infallible;
 use std::io;
 use std::path::PathBuf;
 
-use path_template::{ArgumentPolicy, BoundScript, RenderError, Scalar, Script};
+use path_template::{
+    ArgumentPolicy, BoundTemplate, RenderError, Scalar, Template,
+};
 
-fn bind(source: &str) -> BoundScript {
-    Script::compile(source, ArgumentPolicy::new(&[]))
+fn bind(source: &str) -> BoundTemplate {
+    Template::compile(source, ArgumentPolicy::new(&[]))
         .unwrap()
         .bind(&[])
         .unwrap()
@@ -95,24 +97,24 @@ fn resolver_error_has_reference_span() {
 
 #[test]
 fn all_references_are_visible_before_rendering() {
-    let script = Script::compile(
+    let template = Template::compile(
         "path: ([$album? {$title}] {$title})",
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
     let names: Vec<_> =
-        script.tag_references().iter().map(|r| r.name.as_str()).collect();
+        template.tag_references().iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, ["album", "title", "title"]);
 }
 
 #[test]
 fn whitespace_only_argument_is_preserved() {
-    let script = Script::compile(
+    let template = Template::compile(
         r#"arg suffix: string path: ("A" {suffix} "B")"#,
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
-    let path = script
+    let path = template
         .bind(&[" ".to_owned()])
         .unwrap()
         .render(|_| Ok::<_, Infallible>(None))
@@ -122,12 +124,12 @@ fn whitespace_only_argument_is_preserved() {
 
 #[test]
 fn supplied_empty_value_overrides_default() {
-    let script = Script::compile(
+    let template = Template::compile(
         r#"arg suffix: string(default: "fallback") path: ("A" {suffix} "B")"#,
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
-    let path = script
+    let path = template
         .bind(&[String::new()])
         .unwrap()
         .render(|_| Ok::<_, Infallible>(None))
@@ -213,7 +215,7 @@ fn formatters_reject_path_arguments_in_all_alternatives() {
         "arg prefix: path(default: \"\") path: ({prefix | year})",
         "arg prefix: path(default: \"\") path: ({$a ?? prefix | pad(2)})",
     ] {
-        assert!(Script::compile(source, ArgumentPolicy::new(&[])).is_err());
+        assert!(Template::compile(source, ArgumentPolicy::new(&[])).is_err());
     }
 }
 
@@ -229,13 +231,13 @@ fn native_separators() {
 
 #[test]
 fn prefix_components() {
-    let script = Script::compile(
+    let template = Template::compile(
         r#"arg prefix: path path: ({prefix} "Artist" / "Song")"#,
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
     for prefix in ["Music/Artists", "Music\\Artists", "/Music//Artists/"] {
-        let path = script
+        let path = template
             .bind(&[prefix.to_owned()])
             .unwrap()
             .render(|_| Ok::<_, Infallible>(None))
@@ -257,12 +259,12 @@ fn empty_prefix_has_no_boundary() {
 
 #[test]
 fn argument_after_component_text_is_error() {
-    let script = Script::compile(
+    let template = Template::compile(
         r#"arg prefix: path path: ("A" {prefix} "B")"#,
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
-    let error = script
+    let error = template
         .bind(&["Music".to_owned()])
         .unwrap()
         .render(|_| Ok::<_, Infallible>(None))
@@ -272,12 +274,12 @@ fn argument_after_component_text_is_error() {
 
 #[test]
 fn explicit_separator_after_path_argument_is_error() {
-    let script = Script::compile(
+    let template = Template::compile(
         r#"arg prefix: path path: ({prefix} / "Song")"#,
         ArgumentPolicy::new(&[]),
     )
     .unwrap();
-    let error = script
+    let error = template
         .bind(&["Music".to_owned()])
         .unwrap()
         .render(|_| Ok::<_, Infallible>(None))

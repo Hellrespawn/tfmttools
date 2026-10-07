@@ -1,8 +1,8 @@
 use std::convert::Infallible;
-use std::sync::Arc;
 
 use path_template::{
-    ArgumentPolicy, BoundScript, Diagnostic, RenderError, RenderedPath, Script,
+    ArgumentPolicy, BoundTemplate, Diagnostic, RenderError, RenderedPath,
+    Template,
 };
 
 use super::context::AudioContext;
@@ -13,112 +13,62 @@ use crate::item_keys::ItemKeys;
 use crate::util::Utf8PathExt;
 use crate::warning::Warning;
 
-#[derive(Clone, Debug)]
-pub struct Template {
-    script: Script,
-    lookup_name: String,
-    source: Arc<str>,
-}
-
-#[derive(Debug)]
-pub struct BoundTemplate {
-    template: Template,
-    script: BoundScript,
-}
-
-impl Template {
-    pub fn compile(lookup_name: &str, source: String) -> TFMTResult<Self> {
-        let forbidden: Vec<char> = FORBIDDEN_CHARACTERS
-            .iter()
-            .flat_map(|entry| entry.char().chars())
-            .collect();
-        let script = Script::compile(&source, ArgumentPolicy::new(&forbidden))
-            .map_err(|error| Self::diagnostic(lookup_name, &source, &error))?;
-        for reference in script.tag_references() {
-            if reference.name != "date"
-                && ItemKeys::from_string(&reference.name).is_err()
-            {
-                return Err(Self::diagnostic(
-                    lookup_name,
-                    &source,
-                    &Diagnostic {
-                        message: format!("Unknown tag: '{}'", reference.name),
-                        span: reference.span,
-                    },
-                ));
-            }
+/// Compile a path template and validate every reference against the audio schema.
+pub fn compile_audio_template(source: &str) -> TFMTResult<Template> {
+    let forbidden: Vec<char> = FORBIDDEN_CHARACTERS
+        .iter()
+        .flat_map(|entry| entry.char().chars())
+        .collect();
+    let template = Template::compile(source, ArgumentPolicy::new(&forbidden))
+        .map_err(|error| compilation_error(source, &error))?;
+    for reference in template.tag_references() {
+        if reference.name != "date"
+            && ItemKeys::from_string(&reference.name).is_err()
+        {
+            return Err(TFMTError::Template(template.format_diagnostic(
+                &Diagnostic {
+                    message: format!("Unknown tag: '{}'", reference.name),
+                    span: reference.span,
+                },
+            )));
         }
-        Ok(Self {
-            script,
-            lookup_name: lookup_name.to_owned(),
-            source: source.into(),
-        })
     }
-
-    fn diagnostic(name: &str, source: &str, error: &Diagnostic) -> TFMTError {
-        let (line, column) = error.line_column(source);
-        let legacy = source.contains("{{")
-            || source.contains("{%-")
-            || source.contains("{%")
-            || source.trim_start().starts_with("+++")
-            || source.trim_start().starts_with("{#");
-        let hint = if legacy {
-            " Legacy Jinja/frontmatter syntax requires manual migration; provide an explicit replacement with `--script 'path: ({$artist} / {$title})'` or `--template` pointing to a migrated file."
-        } else {
-            ""
-        };
-        TFMTError::Template(format!(
-            "Template '{name}' at {line}:{column}: {}{hint}",
-            error.message
-        ))
-    }
-
-    #[must_use]
-    pub fn name(&self) -> &str {
-        self.script.metadata().name.as_deref().unwrap_or(&self.lookup_name)
-    }
-
-    #[must_use]
-    pub fn description(&self) -> Option<&str> {
-        self.script.metadata().description.as_deref()
-    }
-
-    #[must_use]
-    pub fn declared_args(&self) -> &[path_template::ArgSpec] {
-        self.script.arguments()
-    }
-
-    pub fn bind(&self, arguments: &[String]) -> TFMTResult<BoundTemplate> {
-        let script = self.script.bind(arguments).map_err(|error| {
-            Self::diagnostic(&self.lookup_name, &self.source, &error)
-        })?;
-        Ok(BoundTemplate { template: self.clone(), script })
-    }
+    Ok(template)
 }
 
-impl BoundTemplate {
-    pub fn render(
-        &self,
-        audio_file: &AudioFile,
-    ) -> TFMTResult<(RenderedPath, Vec<Warning>)> {
-        let mut context = AudioContext::new(audio_file);
-        let result = self
-            .script
-            .render(|name| Ok::<_, Infallible>(context.resolve(name)));
-        let output = result.map_err(|error| {
+fn compilation_error(source: &str, error: &Diagnostic) -> TFMTError {
+    let (line, column) = error.line_column(source);
+    let legacy = source.contains("{{")
+        || source.contains("{%")
+        || source.trim_start().starts_with("+++")
+        || source.trim_start().starts_with("{#");
+    let hint = if legacy {
+        " Legacy Jinja/frontmatter syntax requires manual migration; provide an explicit replacement with `--script 'path: ({$artist} / {$title})'` or `--template` pointing to a migrated file."
+    } else {
+        ""
+    };
+    TFMTError::Template(format!("{line}:{column}: {}{hint}", error.message))
+}
+
+/// Render using sanitized audio metadata, retaining warnings and file context.
+pub fn render_audio_path(
+    template: &BoundTemplate,
+    audio_file: &AudioFile,
+) -> TFMTResult<(RenderedPath, Vec<Warning>)> {
+    let mut context = AudioContext::new(audio_file);
+    let output = template
+        .render(|name| Ok::<_, Infallible>(context.resolve(name)))
+        .map_err(|error| {
             let diagnostic = match error {
                 RenderError::Template(error) => error,
                 RenderError::Resolver { source, .. } => match source {},
             };
             TFMTError::TemplateRender {
                 file: audio_file.file().clone().into_path_buf(),
-                source: Box::new(Template::diagnostic(
-                    &self.template.lookup_name,
-                    &self.template.source,
-                    &diagnostic,
+                source: Box::new(TFMTError::Template(
+                    template.format_diagnostic(&diagnostic),
                 )),
             }
         })?;
-        Ok((output, context.take_warnings()))
-    }
+    Ok((output, context.take_warnings()))
 }

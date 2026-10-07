@@ -4,21 +4,21 @@ use crate::ast::{Alternative, Expression, Formatter, Reference};
 use crate::path::Builder;
 use crate::value::Value;
 use crate::{
-    BoundScript, Diagnostic, RenderError, RenderedPath, Scalar, format,
+    BoundTemplate, Diagnostic, RenderError, RenderedPath, Scalar, format,
 };
 
 pub(crate) fn render<E>(
-    bound: &BoundScript,
+    bound: &BoundTemplate,
     mut resolve: impl FnMut(&str) -> Result<Option<Scalar>, E>,
 ) -> Result<RenderedPath, RenderError<E>> {
     let mut builder = Builder::default();
     evaluate(
-        &bound.script.inner.path,
+        &bound.template.inner.path,
         &bound.arguments,
         &mut resolve,
         &mut builder,
     )?;
-    Ok(builder.finish(bound.script.inner.span)?)
+    Ok(builder.finish(bound.template.inner.span)?)
 }
 
 fn reference_value<E>(

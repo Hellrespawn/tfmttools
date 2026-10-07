@@ -24,6 +24,7 @@ pub struct TagReference {
 
 #[derive(Debug)]
 pub(crate) struct Compiled {
+    pub source: String,
     pub metadata: Metadata,
     pub arguments: Vec<ArgSpec>,
     pub references: Vec<TagReference>,
@@ -32,20 +33,26 @@ pub(crate) struct Compiled {
     pub policy: ArgumentPolicy,
 }
 
-/// An owned, compiled script. Cloning shares its immutable representation.
+/// An owned, compiled template. Cloning shares its immutable representation.
 #[derive(Clone, Debug)]
-pub struct Script {
+pub struct Template {
     pub(crate) inner: Arc<Compiled>,
 }
 
-/// A script with resolved argument values, ready for metadata rendering.
+/// A template with resolved argument values, ready for metadata rendering.
 #[derive(Clone, Debug)]
-pub struct BoundScript {
-    pub(crate) script: Script,
+pub struct BoundTemplate {
+    pub(crate) template: Template,
     pub(crate) arguments: HashMap<String, Value>,
 }
 
-impl BoundScript {
+impl BoundTemplate {
+    /// Format a diagnostic with a one based line and character column.
+    #[must_use]
+    pub fn format_diagnostic(&self, diagnostic: &Diagnostic) -> String {
+        self.template.format_diagnostic(diagnostic)
+    }
+
     /// Render using prepared scalar metadata supplied on demand by the caller.
     pub fn render<E>(
         &self,
@@ -55,9 +62,20 @@ impl BoundScript {
     }
 }
 
-impl Script {
+impl Template {
+    /// Format a diagnostic using this template's retained source text.
+    /// The caller can prepend a filename or other source label.
+    #[must_use]
+    pub fn format_diagnostic(&self, diagnostic: &Diagnostic) -> String {
+        let (line, column) = diagnostic.line_column(&self.inner.source);
+        format!("{line}:{column}: {}", diagnostic.message)
+    }
+
     /// Bind positional values in declaration order; omitted values use defaults.
-    pub fn bind(&self, supplied: &[String]) -> Result<BoundScript, Diagnostic> {
+    pub fn bind(
+        &self,
+        supplied: &[String],
+    ) -> Result<BoundTemplate, Diagnostic> {
         if supplied.len() > self.inner.arguments.len() {
             return Err(Diagnostic::new(
                 "Too many supplied arguments",
@@ -81,7 +99,7 @@ impl Script {
                 args::coerce(spec, raw, &self.inner.policy)?,
             );
         }
-        Ok(BoundScript { script: self.clone(), arguments })
+        Ok(BoundTemplate { template: self.clone(), arguments })
     }
 
     /// Compile owned expressions and validate all defaults against the policy.

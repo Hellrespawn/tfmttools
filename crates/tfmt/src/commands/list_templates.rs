@@ -1,15 +1,22 @@
 use color_eyre::Result;
+use path_template::{ArgKind, ArgSpec, Template};
 use textwrap::Options;
-use tfmttools_core::templates::{ArgKind, ArgSpec, Template};
 use tfmttools_core::util::Utf8Directory;
-use tfmttools_fs::TemplateLoader;
+use tfmttools_fs::discover_templates;
 
+use super::templates;
 use crate::ui::terminal_width;
 
 pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
-    let loader = TemplateLoader::read_directory(template_directory)?;
-
-    let all_templates = loader.get_all_templates();
+    let all_templates = discover_templates(template_directory)?
+        .into_iter()
+        .map(|path| {
+            let name =
+                path.file_stem().expect("Template path has a stem").to_owned();
+            let template = templates::load(&name, &path)?;
+            Ok((name, template))
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     match all_templates.len() {
         0 => {
@@ -21,21 +28,22 @@ pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
         other => println!("Found {other} templates:"),
     }
 
-    for template in all_templates {
-        println!("{}", format_template(template));
+    for (name, template) in all_templates {
+        println!("{}", format_template(&template, &name));
     }
 
     Ok(())
 }
 
-fn format_template(template: &Template) -> String {
-    let name = template.name();
+fn format_template(template: &Template, lookup_name: &str) -> String {
+    let name = template.metadata().name.as_deref().unwrap_or(lookup_name);
 
-    let header_string = if let Some(description) = template.description() {
-        format!("{name}: {description}")
-    } else {
-        name.to_owned()
-    };
+    let header_string =
+        if let Some(description) = template.metadata().description.as_deref() {
+            format!("{name}: {description}")
+        } else {
+            name.to_owned()
+        };
 
     let header = textwrap::fill(
         &header_string,
@@ -44,7 +52,7 @@ fn format_template(template: &Template) -> String {
     );
 
     let arg_lines: Vec<String> =
-        template.declared_args().iter().map(format_arg).collect();
+        template.arguments().iter().map(format_arg).collect();
 
     if arg_lines.is_empty() {
         header
@@ -77,7 +85,8 @@ mod tests {
 
     #[test]
     fn lists_metadata_and_argument_requirements_without_binding() {
-        let loader = TemplateLoader::read_script(
+        let template = templates::compile(
+            "template",
             r#"
             name: "Test Template"
             description: "A test template."
@@ -87,7 +96,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let formatted = format_template(loader.get_all_templates()[0]);
+        let formatted = format_template(&template, "template");
         assert!(formatted.contains("Test Template: A test template."));
         assert!(formatted.contains("prefix (path, required)"));
         assert!(formatted.contains("suffix (string, default: \"\")"));
@@ -97,7 +106,8 @@ mod tests {
 
     #[test]
     fn listing_uses_lookup_name_without_metadata() {
-        let loader = TemplateLoader::read_script(r#"path: ("Song")"#).unwrap();
-        assert_eq!(format_template(loader.get_all_templates()[0]), "script");
+        let template =
+            templates::compile("template", r#"path: ("Song")"#).unwrap();
+        assert_eq!(format_template(&template, "template"), "template");
     }
 }

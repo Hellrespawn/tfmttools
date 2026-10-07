@@ -177,7 +177,7 @@ impl HistoryFormatter {
             TemplateMetadata::FileOrName(file_or_name) => {
                 file_or_name.to_owned()
             },
-            TemplateMetadata::Script(_) => "script".to_owned(),
+            TemplateMetadata::InlineTemplate(_) => "template".to_owned(),
             TemplateMetadata::Validation(command) => command.to_owned(),
         }
     }

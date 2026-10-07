@@ -44,7 +44,7 @@ The workspace is split by responsibility:
   serde-backed history storage used by the CLI.
 - [crates/path-template/](crates/path-template/README.md) implements the new
   path template language as an independent library. Its example is
-  `examples/stef.tfmt`; the CLI uses this library for all scripts.
+  `examples/stef.tfmt`; the CLI uses this library for all templates.
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
   integration tests.
 
@@ -118,9 +118,12 @@ document syntax directly with `--script` (`-s`):
 tfmt --dry-run rename --script 'path: ({$artist} / {$title})'
 ```
 
-The loader still discovers `.jinja` and `.j2` files, but their contents must
+Template discovery still includes `.jinja` and `.j2` files, but their contents must
 also use the new syntax. Lookup uses the filename stem. `name` and
-`description` control the metadata shown by `tfmt list-templates`.
+`description` control the metadata shown by `tfmt list-templates`. Renaming
+compiles only the selected template, so invalid unrelated templates do not
+block it. If multiple files share a lookup stem, specify an explicit file
+path to resolve the ambiguity.
 
 ```text
 name: "Artist and title"
@@ -165,7 +168,7 @@ Declare arguments in CLI positional order with `arg name: type`. Types are
 `string`, `int`, and `path`. Arguments without `default` are required;
 `default: ""` makes a string or path optional. Supplied empty values override
 defaults. Integer arguments must fit a signed 64-bit integer; empty integers
-are invalid. Excess arguments are errors, including scripts with no declarations.
+are invalid. Excess arguments are errors, including templates with no declarations.
 
 String and path arguments are validated rather than sanitized. They reject
 the characters in the sanitization table below; `/` and `\` are allowed as
@@ -183,7 +186,7 @@ one immediately with `/` is an error.
 See [the language reference](crates/path-template/README.md) and the full
 [Stef layout](examples/stef.tfmt).
 
-### Migrating existing scripts
+### Migrating existing templates
 
 MiniJinja templates and TOML frontmatter are no longer supported. Migration
 is manual; there is no converter or compatibility mode.
@@ -210,10 +213,10 @@ the old `albumartist and artist ~ " - "` expression could produce a dangling
 comparisons, loops, includes, and arbitrary functions are unsupported.
 
 Saved filename references work after the referenced files are migrated.
-Reusing a saved Jinja inline script for a new rename fails with a migration
+Reusing a saved Jinja inline template for a new rename fails with a migration
 hint; select an explicit replacement using `--script` or `--template`.
 Undo and redo still work with old history because they replay stored actions
-without parsing scripts. The history file format is unchanged.
+without parsing templates. The history file format is unchanged.
 
 ### Safety
 

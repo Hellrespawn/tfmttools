@@ -1,27 +1,21 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
+use path_template::BoundTemplate;
 use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::templates::BoundTemplate;
 use tfmttools_core::warning::Warning;
 use tfmttools_fs::{FsResult, PathIterator, read_audio_file};
 use tracing::{debug, trace};
 
 use super::RenameSession;
 use super::template_resolution::ResolvedTemplate;
+use crate::commands::templates;
 use crate::ui::{ProgressBar, current_dir_utf8};
 
 pub(super) fn create_actions_from_template(
     session: &RenameSession,
     resolved: &ResolvedTemplate,
 ) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
-    let template = resolved
-        .loader
-        .get_template(&resolved.template_name)
-        .ok_or(eyre!("Unable to find template: {}", resolved.template_name))?
-        .bind(&resolved.arguments)?;
-
     let paths = gather_file_paths(session);
 
     debug!("Read {} files.", paths.len());
@@ -30,8 +24,12 @@ pub(super) fn create_actions_from_template(
 
     debug!("Found {} audio files.", audio_files.len());
 
-    let (rename_actions, warnings) =
-        create_rename_actions(session, &template, &audio_files)?;
+    let (rename_actions, warnings) = create_rename_actions(
+        session,
+        &resolved.template,
+        &resolved.lookup_name,
+        &audio_files,
+    )?;
 
     Ok((rename_actions, warnings))
 }
@@ -99,6 +97,7 @@ fn read_files(
 fn create_rename_actions(
     session: &RenameSession,
     template: &BoundTemplate,
+    lookup_name: &str,
     files: &[AudioFile],
 ) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
     let cwd = current_dir_utf8()?;
@@ -116,8 +115,9 @@ fn create_rename_actions(
     let rename_actions: Result<Vec<RenameAction>> = files
         .iter()
         .map(|audiofile| {
-            let (target, warnings) =
-                audiofile.construct_target_path(template, &cwd)?;
+            let (target, warnings) = audiofile
+                .construct_target_path(template, &cwd)
+                .map_err(|error| templates::named_error(lookup_name, error))?;
 
             all_warnings.extend(warnings);
 

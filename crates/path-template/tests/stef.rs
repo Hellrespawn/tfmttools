@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use path_template::{ArgumentPolicy, Scalar, Script};
+use path_template::{ArgumentPolicy, Scalar, Template};
 
 const SOURCE: &str = include_str!("fixtures/stef.tfmt");
 
@@ -27,9 +27,9 @@ fn render(
     args: &[String],
 ) -> Vec<String> {
     let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
-    let script =
-        Script::compile(source, ArgumentPolicy::new(&forbidden)).unwrap();
-    script
+    let template =
+        Template::compile(source, ArgumentPolicy::new(&forbidden)).unwrap();
+    template
         .bind(args)
         .unwrap()
         .render(|name| Ok::<_, Infallible>(tags.get(name).cloned()))

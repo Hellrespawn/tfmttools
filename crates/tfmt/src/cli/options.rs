@@ -146,14 +146,14 @@ impl TryFrom<&TFMTArgs> for TFMTOptions {
 pub enum TemplateOption {
     None,
     FileOrName(FileOrName),
-    Script(String),
+    InlineTemplate(String),
 }
 
 impl From<TemplateArgs> for TemplateOption {
     fn from(template_args: TemplateArgs) -> Self {
-        match (template_args.template, template_args.script) {
+        match (template_args.template, template_args.inline_template) {
             (None, None) => Self::None,
-            (None, Some(script)) => Self::Script(script),
+            (None, Some(template)) => Self::InlineTemplate(template),
             (Some(file_or_name), None) => Self::FileOrName(file_or_name),
             (Some(_), Some(_)) => {
                 unreachable!("Mutual exclusion should be guaranteed by clap.")

@@ -1,6 +1,6 @@
 # path-template
 
-A small language for constructing paths from metadata. Scripts contain
+A small language for constructing paths from metadata. Templates contain
 listing metadata, typed argument declarations, and a path rule. Compilation
 owns its data; rendering uses a caller supplied resolver and performs no
 filesystem operations.
@@ -49,9 +49,9 @@ cannot be formatted.
 ```rust
 use std::convert::Infallible;
 
-use path_template::{ArgumentPolicy, Scalar, Script};
+use path_template::{ArgumentPolicy, Scalar, Template};
 
-let script = Script::compile(
+let template = Template::compile(
     r#"
     name: "Artist and title"
     arg prefix: path(default: "")
@@ -61,12 +61,12 @@ let script = Script::compile(
 )?;
 
 // Check the caller's schema before binding or reading any files.
-for reference in script.tag_references() {
+for reference in template.tag_references() {
     assert!(["artist", "title"].contains(&reference.name.as_str()));
 }
-assert_eq!(script.metadata().name.as_deref(), Some("Artist and title"));
+assert_eq!(template.metadata().name.as_deref(), Some("Artist and title"));
 
-let bound = script.bind(&["Music".to_owned()])?;
+let bound = template.bind(&["Music".to_owned()])?;
 let path = bound.render(|name| {
     let value = match name {
         "artist" => Some(Scalar::Text("Example Artist".to_owned())),
@@ -83,8 +83,8 @@ let native_path = path.to_path_buf();
 ```
 
 Metadata and argument declarations can be inspected before supplying
-required arguments. `Script` and `BoundScript` are owned, reusable values;
-cloned scripts share their compiled representation. Argument lookup is
+required arguments. `Template` and `BoundTemplate` are owned, reusable values;
+cloned templates share their compiled representation. Argument lookup is
 case insensitive, and reference names passed to the metadata resolver are
 normalized to ASCII lowercase. Metadata names may contain hyphens, as well
 as letters, digits, and underscores. The library does not impose an audio
@@ -135,9 +135,13 @@ extensions or create directories.
 
 ## Diagnostics and development
 
-`Diagnostic` contains a message and UTF-8 byte span. Use
-`line_column(source)` for a one based line and character column; the caller
-can add a filename or script label. Resolver errors keep the original error
+`Diagnostic` contains a message and UTF-8 byte span. Compiled templates retain
+their source text in the shared compiled representation. Use
+`Template::format_diagnostic()` or `BoundTemplate::format_diagnostic()` to format
+an error as `line:column: message`, with a one based character column. The
+caller can add a filename or template label. Compilation errors can use
+`Diagnostic::line_column(source)` before a compiled template exists.
+Resolver errors keep the original error
 and the failing reference's byte span. The full Stef layout and synthetic
 metadata scenarios are in this package's `tests/` directory.
 

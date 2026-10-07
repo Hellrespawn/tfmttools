@@ -9,7 +9,9 @@ pub type ActionRecord = Record<Action, ActionRecordMetadata>;
 
 pub enum TemplateMetadata {
     FileOrName(String),
-    Script(String),
+    // Preserve the serialized variant name in existing history files.
+    #[serde(rename = "Script")]
+    InlineTemplate(String),
     Validation(String),
 }
 

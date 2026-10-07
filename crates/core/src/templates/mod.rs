@@ -1,5 +1,4 @@
 mod context;
 mod template;
 
-pub use path_template::{ArgKind, ArgSpec};
-pub use template::{BoundTemplate, Template};
+pub use template::{compile_audio_template, render_audio_path};

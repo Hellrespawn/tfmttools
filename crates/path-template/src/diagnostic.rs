@@ -1,4 +1,4 @@
-/// UTF-8 byte offsets into the original script source.
+/// UTF-8 byte offsets into the original template source.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Span {
     pub start: usize,

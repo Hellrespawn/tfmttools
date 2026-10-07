@@ -11,3 +11,5 @@ pub use rename::rename;
 pub use show_history::show_history;
 pub use undo_redo::undo_redo;
 pub use validate::validate;
+
+mod templates;

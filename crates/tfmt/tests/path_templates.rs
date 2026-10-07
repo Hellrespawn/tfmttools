@@ -35,7 +35,9 @@ fn historical_rename() -> TempDir {
                 target: root.join("renamed.mp3"),
             }],
             ActionRecordMetadata::new(
-                TemplateMetadata::Script("{{ artist }}/{{ title }}".to_owned()),
+                TemplateMetadata::InlineTemplate(
+                    "{{ artist }}/{{ title }}".to_owned(),
+                ),
                 Vec::new(),
                 "old-run".to_owned(),
             ),
@@ -99,19 +101,19 @@ fn historical_jinja_does_not_block_undo_and_redo() {
 }
 
 #[test]
-fn script_arguments_are_validated_before_reading_audio() {
+fn template_arguments_are_validated_before_reading_audio() {
     let directory = TempDir::new().unwrap();
     std::fs::create_dir(root(&directory).join("config")).unwrap();
     let input = root(&directory).join("broken.mp3");
     std::fs::write(&input, "not audio").unwrap();
-    for (script, args) in [
+    for (template, args) in [
         (r#"arg unused: string path: ("Song")"#, vec!["bad?"]),
         (r#"arg unused: string(default: "bad?") path: ("Song")"#, vec![
             "valid",
         ]),
         (r#"path: ([$album? {$not_a_tag}] "Song")"#, vec![]),
     ] {
-        let mut arguments = vec!["rename", "--script", script, "--"];
+        let mut arguments = vec!["rename", "--script", template, "--"];
         arguments.extend(args);
         let output = run(&directory, &arguments);
         assert!(!output.status.success());
@@ -227,4 +229,61 @@ fn cleanup_resolution_failure_preserves_applied_action_history() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(std::fs::read(source).unwrap(), before);
+}
+
+#[test]
+fn named_template_ignores_invalid_unselected_template() {
+    let directory = TempDir::new().unwrap();
+    let templates = root(&directory).join("config");
+    std::fs::create_dir_all(&templates).unwrap();
+    std::fs::write(templates.join("selected.tfmt"), r#"path: ("Song")"#)
+        .unwrap();
+    std::fs::write(templates.join("broken.tfmt"), "{{ title }}").unwrap();
+    let output = run(&directory, &["rename", "--template", "selected"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn duplicate_template_stems_are_ambiguous() {
+    let directory = TempDir::new().unwrap();
+    let templates = root(&directory).join("config");
+    std::fs::create_dir_all(&templates).unwrap();
+    for extension in ["tfmt", "j2"] {
+        std::fs::write(
+            templates.join(format!("selected.{extension}")),
+            r#"path: ("Song")"#,
+        )
+        .unwrap();
+    }
+    let output = run(&directory, &["rename", "--template", "selected"]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("ambiguous"));
+    let selected = templates.join("selected.tfmt");
+    let output = run(&directory, &["rename", "--template", selected.as_str()]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn template_errors_use_lookup_name_instead_of_display_name() {
+    let directory = TempDir::new().unwrap();
+    let config = root(&directory).join("config");
+    std::fs::create_dir(&config).unwrap();
+    std::fs::write(
+        config.join("selected.tfmt"),
+        "name: \"Display name\"\npath: ({$unknown_tag})",
+    )
+    .unwrap();
+    let output = run(&directory, &["rename", "--template", "selected"]);
+    assert!(!output.status.success());
+    let message = String::from_utf8_lossy(&output.stderr);
+    assert!(message.contains("Template 'selected' at 2:"), "{message}");
+    assert!(message.contains("unknown_tag"), "{message}");
 }

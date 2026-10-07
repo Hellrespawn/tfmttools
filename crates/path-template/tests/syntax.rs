@@ -1,18 +1,18 @@
-use path_template::{ArgKind, ArgumentPolicy, Script};
+use path_template::{ArgKind, ArgumentPolicy, Template};
 
-fn compile(source: &str) -> Result<Script, path_template::Diagnostic> {
-    Script::compile(source, ArgumentPolicy::new(&[]))
+fn compile(source: &str) -> Result<Template, path_template::Diagnostic> {
+    Template::compile(source, ArgumentPolicy::new(&[]))
 }
 
 #[test]
 fn definitions_and_forward_argument_references() {
-    let script =
+    let template =
         compile("path: ({prefix} {$TITLE}) arg prefix: string(default: \"\")")
             .unwrap();
-    assert_eq!(script.arguments().len(), 1);
-    assert_eq!(script.arguments()[0].kind, ArgKind::String);
-    assert_eq!(script.arguments()[0].default.as_deref(), Some(""));
-    assert_eq!(script.tag_references()[0].name, "title");
+    assert_eq!(template.arguments().len(), 1);
+    assert_eq!(template.arguments()[0].kind, ArgKind::String);
+    assert_eq!(template.arguments()[0].default.as_deref(), Some(""));
+    assert_eq!(template.tag_references()[0].name, "title");
 }
 
 #[test]
@@ -23,22 +23,22 @@ fn quoted_whitespace_and_comments() {
         description: "Windows \\ Unix /"
         path: (" - # [{}] " {$title}) # another comment
     "#;
-    let script = compile(source).unwrap();
-    assert_eq!(script.metadata().name.as_deref(), Some("Quoted \"name\""));
+    let template = compile(source).unwrap();
+    assert_eq!(template.metadata().name.as_deref(), Some("Quoted \"name\""));
     assert_eq!(
-        script.metadata().description.as_deref(),
+        template.metadata().description.as_deref(),
         Some("Windows \\ Unix /")
     );
-    assert_eq!(script.tag_references().len(), 1);
+    assert_eq!(template.tag_references().len(), 1);
 }
 
 #[test]
 fn nested_guards_and_negative_guards() {
-    let script = compile(
+    let template = compile(
         r#"path: ([$album? [$date? {$date | year}]] [!$album? "Singles" /] {$title})"#,
     )
     .unwrap();
-    let names: Vec<_> = script
+    let names: Vec<_> = template
         .tag_references()
         .iter()
         .map(|reference| reference.name.as_str())
@@ -93,13 +93,51 @@ fn diagnostic_unicode_positions() {
 }
 
 #[test]
-fn compiled_script_outlives_source() {
-    let script = {
+fn compiled_template_outlives_source() {
+    let template = {
         let source = String::from("name: \"Owned\" path: ({$title})");
         compile(&source).unwrap()
     };
-    assert_eq!(script.metadata().name.as_deref(), Some("Owned"));
-    assert_eq!(script.tag_references()[0].name, "title");
+    assert_eq!(template.metadata().name.as_deref(), Some("Owned"));
+    assert_eq!(template.tag_references()[0].name, "title");
+}
+
+#[test]
+fn binding_diagnostic_uses_retained_source() {
+    let template = {
+        let source =
+            String::from("name: \"Été\"\narg prefix: int\npath: ({prefix})");
+        compile(&source).unwrap()
+    };
+    let error = template.bind(&["invalid".to_owned()]).unwrap_err();
+    assert_eq!(
+        template.format_diagnostic(&error),
+        "2:1: Argument 'prefix' requires an integer",
+    );
+}
+
+#[test]
+fn bound_render_diagnostic_outlives_template_and_source() {
+    let bound = {
+        let source =
+            String::from("name: \"Été\"\npath: (\"é\" {$date | year})");
+        compile(&source).unwrap().bind(&[]).unwrap()
+    };
+    let error = bound
+        .render(|_| {
+            Ok::<_, std::convert::Infallible>(Some(
+                path_template::Scalar::Text("unknown".to_owned()),
+            ))
+        })
+        .unwrap_err();
+    let error = match error {
+        path_template::RenderError::Template(error) => error,
+        path_template::RenderError::Resolver { source, .. } => match source {},
+    };
+    assert_eq!(
+        bound.format_diagnostic(&error),
+        "2:21: Unable to extract a year from \"unknown\"",
+    );
 }
 
 #[test]

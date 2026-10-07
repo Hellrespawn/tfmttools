@@ -22,6 +22,7 @@ name = "integration"
 harness = false
 
 [dependencies]
+path-template = { path = "../path-template" }
 tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
 tfmttools-history = { path = "../history" }

@@ -2,7 +2,7 @@ use std::mem::discriminant;
 
 use crate::ast::{Alternative, Expression, Formatter, Reference};
 use crate::lexer::{Kind, Token, lex};
-use crate::script::Compiled;
+use crate::template::Compiled;
 use crate::{
     ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, Metadata, Span, TagReference,
 };
@@ -21,7 +21,7 @@ pub(crate) fn parse(
         let definition = parser.take();
         let Kind::Name(name) = &definition.kind else {
             return Err(Diagnostic::new(
-                "Expected a definition; migrate Jinja/frontmatter scripts manually",
+                "Expected a definition; migrate Jinja/frontmatter templates manually",
                 definition.span,
             ));
         };
@@ -79,6 +79,7 @@ pub(crate) fn parse(
         Diagnostic::new("Missing path definition", parser.current().span)
     })?;
     Ok(Compiled {
+        source: source.to_owned(),
         metadata,
         arguments,
         references: parser.references,

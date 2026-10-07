@@ -1,52 +1,52 @@
-use path_template::{ArgumentPolicy, Script};
+use path_template::{ArgumentPolicy, Template};
 
-fn compile(source: &str) -> Result<Script, path_template::Diagnostic> {
+fn compile(source: &str) -> Result<Template, path_template::Diagnostic> {
     let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
-    Script::compile(source, ArgumentPolicy::new(&forbidden))
+    Template::compile(source, ArgumentPolicy::new(&forbidden))
 }
 
 #[test]
 fn no_default_requires_argument() {
-    let script = compile("arg edition: int path: ({$title})").unwrap();
-    let error = script.bind(&[]).unwrap_err();
+    let template = compile("arg edition: int path: ({$title})").unwrap();
+    let error = template.bind(&[]).unwrap_err();
     assert!(error.message.contains("edition"));
 }
 
 #[test]
 fn empty_default_makes_prefix_optional() {
-    let script =
+    let template =
         compile("arg prefix: path(default: \"\") path: ({$title})").unwrap();
-    assert!(script.bind(&[]).is_ok());
+    assert!(template.bind(&[]).is_ok());
 }
 
 #[test]
 fn defaults_do_not_replace_supplied_empty_values() {
-    let script =
+    let template =
         compile("arg suffix: string(default: \"fallback\") path: ({$title})")
             .unwrap();
-    assert!(script.bind(&[String::new()]).is_ok());
+    assert!(template.bind(&[String::new()]).is_ok());
 }
 
 #[test]
 fn integer_validation() {
-    let script = compile("arg edition: int path: ({$title})").unwrap();
+    let template = compile("arg edition: int path: ({$title})").unwrap();
     for value in ["0", "-2", "9223372036854775807", "-9223372036854775808"] {
-        assert!(script.bind(&[value.to_owned()]).is_ok(), "{value}");
+        assert!(template.bind(&[value.to_owned()]).is_ok(), "{value}");
     }
     for value in ["", "no", "9223372036854775808", "-9223372036854775809", " 2"]
     {
-        assert!(script.bind(&[value.to_owned()]).is_err(), "{value}");
+        assert!(template.bind(&[value.to_owned()]).is_err(), "{value}");
     }
 }
 
 #[test]
 fn declaration_order_and_excess_arguments() {
-    let script =
+    let template =
         compile("arg count: int arg label: string path: ({$title})").unwrap();
-    assert!(script.bind(&["2".to_owned(), "label".to_owned()]).is_ok());
-    assert!(script.bind(&["label".to_owned(), "2".to_owned()]).is_err());
+    assert!(template.bind(&["2".to_owned(), "label".to_owned()]).is_ok());
+    assert!(template.bind(&["label".to_owned(), "2".to_owned()]).is_err());
     assert!(
-        script
+        template
             .bind(&["2".to_owned(), "label".to_owned(), "extra".to_owned()])
             .is_err()
     );
@@ -94,7 +94,7 @@ fn invalid_defaults_even_when_overridden() {
 
 #[test]
 fn invalid_unused_argument() {
-    let script = compile("arg unused: string path: ({$title})").unwrap();
-    let error = script.bind(&["bad?".to_owned()]).unwrap_err();
+    let template = compile("arg unused: string path: ({$title})").unwrap();
+    let error = template.bind(&["bad?".to_owned()]).unwrap_err();
     assert!(error.message.contains("unused"));
 }

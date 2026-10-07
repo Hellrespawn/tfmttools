@@ -136,9 +136,9 @@ pub struct TemplateArgs {
     /// Path to or name of template.
     pub template: Option<FileOrName>,
 
-    #[arg(short, long)]
+    #[arg(short = 's', long = "script")]
     /// Inline path template document, e.g. 'path: ({$artist} / {$title})'.
-    pub script: Option<String>,
+    pub inline_template: Option<String>,
 }
 
 #[derive(Args, Debug)]
