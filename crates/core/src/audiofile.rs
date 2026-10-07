@@ -129,7 +129,9 @@ mod path_template_tests {
         for (raw, expected) in [
             ("0003", "3"),
             ("0", "0"),
+            #[cfg(target_pointer_width = "64")]
             ("9223372036854775807", "9223372036854775807"),
+            #[cfg(target_pointer_width = "64")]
             ("9223372036854775808", "9223372036854775808"),
         ] {
             for key in [ItemKey::TrackNumber, ItemKey::TrackTitle] {
@@ -224,12 +226,16 @@ mod path_template_tests {
             ["9223372036854775808"]
         );
         assert_eq!(
-            render("path: ({$tracknumber})", &[(
+            render(r#"path: ({$tracknumber ?? "absent"})"#, &[(
                 ItemKey::TrackNumber,
                 "9223372036854775808"
             )])
             .0,
-            ["9223372036854775808"]
+            [if cfg!(target_pointer_width = "64") {
+                "9223372036854775808"
+            } else {
+                "absent"
+            }]
         );
     }
 
