@@ -14,6 +14,7 @@ members = [
     "crates/core",
     "crates/fs",
     "crates/history",
+    "crates/path-template",
     "crates/test-cli",
     "crates/test-harness",
     "crates/tfmt",

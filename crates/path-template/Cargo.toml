@@ -1,0 +1,17 @@
+[package]
+name = "path-template"
+description = "A small language for constructing paths from metadata."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+version.workspace = true
+
+[dependencies]
+regex.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
