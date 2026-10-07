@@ -4,18 +4,21 @@
     "initial-state": [
       {
         "path": "input/Nightwish - Elvenpath (Live).mp3",
-        "checksum": "781AABD2"
-      },
-      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" }
-    ],
-    "apply": [
-      {
-        "path": "input/Nightwish - Elvenpath (Live).mp3",
         "checksum": "820F92DA"
       },
       {
         "path": "input/Nightwish - Nemo.mp3",
         "checksum": "781AABD2"
+      }
+    ],
+    "apply": [
+      {
+        "path": "input/Nightwish - Elvenpath (Live).mp3",
+        "checksum": "781AABD2"
+      },
+      {
+        "path": "input/Nightwish - Nemo.mp3",
+        "checksum": "820F92DA"
       }
     ]
   },
@@ -35,5 +38,9 @@
       "command": "--simple --yes redo",
       "expectations": "apply"
     }
+  },
+  "initial-sources": {
+    "Nightwish - Nemo.mp3": "Nightwish - Elvenpath (Live).mp3",
+    "Nightwish - Elvenpath (Live).mp3": "Nightwish - Nemo.mp3"
   }
 }

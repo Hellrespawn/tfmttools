@@ -2,11 +2,14 @@
   "description": "Renaming a file to the same path with different casing keeps the renamed target out of cleanup and preserves undo/redo.",
   "expectations": {
     "initial-state": [
-      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" }
+      {
+        "path": "input/case-only/Nightwish - Nemo.mp3",
+        "checksum": "820F92DA"
+      }
     ],
     "apply": [
       {
-        "path": "input/nightwish - nemo.mp3",
+        "path": "input/case-only/nightwish - nemo.mp3",
         "checksum": "820F92DA"
       }
     ]
@@ -16,7 +19,7 @@
       "expectations": "initial-state"
     },
     "apply": {
-      "command": "--simple --yes rename -t case_only_rename",
+      "command": "--simple --yes rename -i input/case-only -t case_only_rename",
       "expectations": "apply"
     },
     "undo": {
@@ -27,5 +30,8 @@
       "command": "--simple --yes redo",
       "expectations": "apply"
     }
+  },
+  "initial-sources": {
+    "case-only/Nightwish - Nemo.mp3": "Nightwish - Nemo.mp3"
   }
 }

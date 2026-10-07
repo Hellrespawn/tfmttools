@@ -47,3 +47,62 @@ pub fn populate_files(
 
     Ok(())
 }
+
+pub fn remap_initial_files(
+    dirs: &FixtureDirs,
+    context: &TestContext,
+    data: &tfmttools_test_harness::TestCaseData,
+) -> Result<()> {
+    for (destination, source) in data.initial_sources() {
+        let target = context.input_audio_dir().join(destination);
+        fs_err::create_dir_all(
+            target.parent().expect("Fixture destination has a parent"),
+        )?;
+        fs_err::copy(dirs.audio_dir().join(source), target)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use assert_fs::prelude::*;
+    use tfmttools_test_harness::TestCaseData;
+
+    use super::*;
+
+    #[test]
+    fn initial_sources_copy_from_original_files_during_swap() {
+        let fixtures = assert_fs::TempDir::new().unwrap();
+        fixtures.child("audio").create_dir_all().unwrap();
+        fixtures.child("extra").create_dir_all().unwrap();
+        fixtures.child("template").create_dir_all().unwrap();
+        fixtures.child("audio/one.mp3").write_str("one").unwrap();
+        fixtures.child("audio/two.mp3").write_str("two").unwrap();
+        fixtures
+            .child("case.json")
+            .write_str(
+                r#"{
+            "description": "swap", "expectations": {}, "tests": {},
+            "initial-sources": { "one.mp3": "two.mp3", "two.mp3": "one.mp3", "selected/one.mp3": "one.mp3" }
+        }"#,
+            )
+            .unwrap();
+        let root =
+            Utf8PathBuf::from_path_buf(fixtures.path().to_owned()).unwrap();
+        let data = TestCaseData::from_file(&root.join("case.json")).unwrap();
+        let fixtures = FixtureDirs::new(root);
+        let context = TestContext::new().unwrap();
+        populate_files(&fixtures, &context).unwrap();
+        remap_initial_files(&fixtures, &context, &data).unwrap();
+        assert_eq!(
+            fs_err::read_to_string(context.input_audio_dir().join("one.mp3"))
+                .unwrap(),
+            "two"
+        );
+        assert_eq!(
+            fs_err::read_to_string(context.input_audio_dir().join("two.mp3"))
+                .unwrap(),
+            "one"
+        );
+    }
+}

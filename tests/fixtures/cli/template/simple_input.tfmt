@@ -1,1 +1,1 @@
-{{ artist }}/{{ title }}
+path: ({$artist} / {$title})

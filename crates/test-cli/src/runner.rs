@@ -24,7 +24,7 @@ use tfmttools_test_harness::{
     RunnerDetails, SourceMetadata, StepOutcome, write_report,
 };
 
-use crate::case::{TestContext, populate_files};
+use crate::case::{TestContext, populate_files, remap_initial_files};
 
 const TEST_RUN_ID: &str = "run_id";
 const SKIP_PREVIOUS_STEP_FAILED: &str = "previous_step_failed";
@@ -165,6 +165,7 @@ fn run_test_case(
     let context = TestContext::new()?;
 
     populate_files(fixture_dirs, &context)?;
+    remap_initial_files(fixture_dirs, &context, test_case_data)?;
 
     let mut step_outcomes = Vec::new();
     let mut previous_step_failed = false;

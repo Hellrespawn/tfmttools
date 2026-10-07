@@ -151,3 +151,12 @@ All audio-files are of silence, with tags copied to them for testing.
 - "Nightwish - Nemo.mp3": Random initial pick
 - "Nightwish - While Your Lips Are Still Red.mp3": Random initial pick
 - "Van Pletzen - Benaaihilism.m4a": M4A file
+
+### Initial source remapping
+
+Optional `initial-sources` maps input audio filenames to source filenames
+from `audio/`. Copies always come from the original fixture directory,
+so mappings may swap two files without overwriting the source of a later
+copy. This occurs before the first expectation check. The staged swap case
+starts with the two tracks under one another's names and uses ordinary tag
+interpolation to restore them, exercising staging and undo/redo.

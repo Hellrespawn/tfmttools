@@ -7,6 +7,8 @@ use serde::Deserialize;
 #[serde(deny_unknown_fields)]
 pub struct TestCaseData {
     description: String,
+    #[serde(default, rename = "initial-sources")]
+    initial_sources: IndexMap<String, String>,
 
     expectations: IndexMap<String, Vec<Expectation>>,
     tests: IndexMap<String, TestData>,
@@ -19,6 +21,10 @@ impl TestCaseData {
         let test_case_data: TestCaseData = serde_json::from_str(&body)?;
 
         Ok(test_case_data)
+    }
+
+    pub fn initial_sources(&self) -> &IndexMap<String, String> {
+        &self.initial_sources
     }
 
     pub fn description(&self) -> &str {
