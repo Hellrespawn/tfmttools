@@ -166,6 +166,7 @@ fn bind(
     arguments: &[String],
 ) -> Result<BoundTemplate> {
     template.bind(arguments).map_err(|error| {
-        eyre!("Template '{name}' at {}", template.format_diagnostic(&error))
+        templates::named_diagnostic(name, &template.format_diagnostic(&error))
+            .into()
     })
 }

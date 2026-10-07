@@ -13,6 +13,10 @@
 
 ### Changed
 
+- Share tag sanitization between rendering and character fixes, normalize tag
+  alias lookup, and use consistent template labels in diagnostics. Preserve
+  numeric overflow and whitespace handling.
+
 - Use template terminology throughout the API, including `Template` and
   `BoundTemplate`; preserve the `--script` flag and history serialization.
 

@@ -2,7 +2,7 @@ use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
 use tfmttools_picotmpl::Scalar;
 
-use crate::action::FORBIDDEN_CHARACTERS;
+use super::sanitize_tag_value;
 use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
 use crate::warning::Warning;
@@ -38,16 +38,7 @@ impl<'a> AudioContext<'a> {
                 self.warnings.push(warning);
             }
         }
-        let text = FORBIDDEN_CHARACTERS.iter().fold(
-            raw.trim().to_owned(),
-            |text, forbidden| {
-                text.replace(
-                    forbidden.char(),
-                    forbidden.replacement().unwrap_or(""),
-                )
-            },
-        );
-        Some(Self::scalar(text.trim_end_matches('.').to_owned()))
+        Some(Self::scalar(sanitize_tag_value(raw.trim())))
     }
 
     fn scalar(text: String) -> Scalar {
@@ -55,6 +46,11 @@ impl<'a> AudioContext<'a> {
             .ok()
             .and_then(|number| i64::try_from(number).ok())
             .map_or_else(|| Scalar::Text(text), Scalar::Integer)
+    }
+
+    fn numeric_scalar(number: usize) -> Scalar {
+        i64::try_from(number)
+            .map_or_else(|_| Scalar::Text(number.to_string()), Scalar::Integer)
     }
 
     fn number(&self, key: ItemKey, total: bool) -> Option<Scalar> {
@@ -67,7 +63,7 @@ impl<'a> AudioContext<'a> {
             (raw.parse::<usize>().ok()?, None)
         };
         let number = if total { count? } else { current };
-        Some(Self::scalar(number.to_string()))
+        Some(Self::numeric_scalar(number))
     }
 
     fn total(&self, key: ItemKey, current_key: ItemKey) -> Option<Scalar> {

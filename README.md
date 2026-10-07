@@ -256,7 +256,9 @@ Interpolated tag values are sanitized before rendering final paths:
 | `/`       | `-`         |
 | `\`       | `-`         |
 
-Trailing periods are also removed from interpolated tag values.
+Trailing periods are also removed from interpolated tag values. Rendering
+trims surrounding whitespace and reports a warning; `validate characters --fix`
+preserves surrounding whitespace when applying the shared sanitization rules.
 
 ### History
 

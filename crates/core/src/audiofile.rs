@@ -125,6 +125,40 @@ mod path_template_tests {
     }
 
     #[test]
+    fn numeric_tags_preserve_normalization_and_overflow() {
+        for (raw, expected) in [
+            ("0003", "3"),
+            ("0", "0"),
+            ("9223372036854775807", "9223372036854775807"),
+            ("9223372036854775808", "9223372036854775808"),
+        ] {
+            for key in [ItemKey::TrackNumber, ItemKey::TrackTitle] {
+                let name = if key == ItemKey::TrackNumber {
+                    "tracknumber"
+                } else {
+                    "title"
+                };
+                assert_eq!(
+                    render(&format!("path: ({{${name}}})"), &[(key, raw)]).0,
+                    [expected]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn overflowing_text_keeps_leading_zeros() {
+        assert_eq!(
+            render("path: ({$title})", &[(
+                ItemKey::TrackTitle,
+                "009223372036854775808"
+            )])
+            .0,
+            ["009223372036854775808"]
+        );
+    }
+
+    #[test]
     fn path_language_sanitizes_tags_and_reports_whitespace() {
         let (components, warnings) = render("path: ({$artist} / {$title})", &[
             (ItemKey::TrackArtist, " AC/DC: Live. "),

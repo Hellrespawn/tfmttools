@@ -17,7 +17,7 @@ impl ItemKeys {
 
     pub fn from_string(string: &str) -> TFMTResult<ItemKey> {
         STRING_TO_ITEM_KEY_MAP
-            .get(string)
+            .get(&string.to_ascii_lowercase())
             .copied()
             .ok_or(TFMTError::UnknownTag(string.to_owned()))
     }
@@ -66,30 +66,14 @@ fn insert_case(
 
     let all_cases = all_cases(&pascal_case);
 
-    for (i, new_case) in all_cases.into_iter().enumerate() {
-        if map.contains_key(new_case.as_str()) {
-            assert!(
-                i != 0,
-                "Key collision!\nAttempt: '{new_case}' => '{key:?}'\nExists: '{new_case}' => '{:?}'",
-                map.get(new_case.as_str()).unwrap()
-            );
+    for new_case in all_cases {
+        if let Some(existing) = map.insert(new_case.clone(), key) {
+            assert_eq!(existing, key, "Key collision for '{new_case}'");
         }
-
-        map.insert(new_case, key);
     }
 }
 
-const CASES: [Case; 9] = [
-    Case::Camel,
-    Case::Cobol,
-    Case::Flat,
-    Case::Kebab,
-    Case::Pascal,
-    Case::UpperSnake,
-    Case::Snake,
-    Case::Train,
-    Case::UpperFlat,
-];
+const CASES: [Case; 3] = [Case::Flat, Case::Snake, Case::Kebab];
 
 const ITEM_KEYS: [ItemKey; 100] = [
     // Titles
@@ -276,3 +260,52 @@ const ITEM_KEYS: [ItemKey; 100] = [
 // fn autocomplete(key: &ItemKey) {
 //     match key {}
 // }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn retains_all_tag_casings_and_aliases() {
+        let cases = [
+            Case::Camel,
+            Case::Cobol,
+            Case::Flat,
+            Case::Kebab,
+            Case::Pascal,
+            Case::UpperSnake,
+            Case::Snake,
+            Case::Train,
+            Case::UpperFlat,
+        ];
+        let names = ITEM_KEYS
+            .into_iter()
+            .map(|key| {
+                let name = format!("{key:?}");
+                let name = if name == "AppleId3v2ContentGroup" {
+                    "AppleId3V2ContentGroup".to_owned()
+                } else {
+                    name
+                };
+                (name, key)
+            })
+            .chain([
+                ("Album".to_owned(), ItemKey::AlbumTitle),
+                ("Artist".to_owned(), ItemKey::TrackArtist),
+                ("AlbumSort".to_owned(), ItemKey::AlbumTitleSortOrder),
+                ("DiskNumber".to_owned(), ItemKey::DiscNumber),
+                ("Title".to_owned(), ItemKey::TrackTitle),
+            ]);
+        for (name, key) in names {
+            for case in cases {
+                let alias = name.from_case(Case::Pascal).to_case(case);
+                assert_eq!(
+                    ItemKeys::from_string(&alias).unwrap(),
+                    key,
+                    "{alias}"
+                );
+            }
+        }
+        assert!(ItemKeys::from_string("not_a_tag").is_err());
+    }
+}

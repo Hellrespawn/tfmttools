@@ -16,9 +16,7 @@ pub(super) fn load(lookup_name: &str, path: &Utf8Path) -> Result<Template> {
 
 pub(super) fn named_error(name: &str, error: TFMTError) -> TFMTError {
     match error {
-        TFMTError::Template(message) => {
-            TFMTError::Template(format!("Template '{name}' at {message}"))
-        },
+        TFMTError::Template(message) => named_diagnostic(name, &message),
         TFMTError::TemplateRender { file, source } => {
             TFMTError::TemplateRender {
                 file,
@@ -27,4 +25,8 @@ pub(super) fn named_error(name: &str, error: TFMTError) -> TFMTError {
         },
         other => other,
     }
+}
+
+pub(super) fn named_diagnostic(name: &str, diagnostic: &str) -> TFMTError {
+    TFMTError::Template(format!("Template '{name}' at {diagnostic}"))
 }

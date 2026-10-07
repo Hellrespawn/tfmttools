@@ -273,17 +273,27 @@ fn duplicate_template_stems_are_ambiguous() {
 
 #[test]
 fn template_errors_use_lookup_name_instead_of_display_name() {
-    let directory = TempDir::new().unwrap();
-    let config = root(&directory).join("config");
-    std::fs::create_dir(&config).unwrap();
-    std::fs::write(
-        config.join("selected.tfmt"),
-        "name: \"Display name\"\npath: ({$unknown_tag})",
-    )
-    .unwrap();
-    let output = run(&directory, &["rename", "--template", "selected"]);
-    assert!(!output.status.success());
-    let message = String::from_utf8_lossy(&output.stderr);
-    assert!(message.contains("Template 'selected' at 2:"), "{message}");
-    assert!(message.contains("unknown_tag"), "{message}");
+    let directory = historical_rename();
+    let selected = root(&directory).join("config/selected.tfmt");
+    for (source, expected) in [
+        ("name: \"Display name\"\npath: ({$unknown_tag})", "unknown_tag"),
+        (
+            "name: \"Display name\"\narg required: string\npath: ({required})",
+            "Missing required argument",
+        ),
+        (
+            "name: \"Display name\"\npath: ({$title | year})",
+            "Unable to extract a year",
+        ),
+    ] {
+        std::fs::write(&selected, source).unwrap();
+        let output = run(&directory, &["rename", "--template", "selected"]);
+        assert!(!output.status.success());
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert!(message.contains("Template 'selected' at 2:"), "{message}");
+        assert!(message.contains(expected), "{message}");
+        if expected == "Unable to extract a year" {
+            assert!(message.contains("renamed.mp3"), "{message}");
+        }
+    }
 }

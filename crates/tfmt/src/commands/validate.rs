@@ -9,6 +9,7 @@ use tfmttools_core::action::{
 };
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
+use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{
     ActionExecutor, FsError, FsHandler, PathIterator, PathIteratorOptions,
@@ -80,7 +81,7 @@ fn fix_characters(
     file_paths: Vec<Utf8PathBuf>,
 ) -> Result<()> {
     let actions = create_fix_actions(app_options, file_paths, |_, _, value| {
-        let fixed = safe_interpolation_value(value);
+        let fixed = sanitize_tag_value(value);
 
         (fixed != value).then_some(FieldFix {
             new_value: fixed,
@@ -389,20 +390,6 @@ fn validate_id3_encoding(audio_file: &AudioFile) -> Vec<Id3EncodingIssue> {
         .collect()
 }
 
-fn safe_interpolation_value(value: &str) -> String {
-    let value = FORBIDDEN_CHARACTERS.iter().fold(
-        value.to_owned(),
-        |string, forbidden_character| {
-            string.replace(
-                forbidden_character.char(),
-                forbidden_character.replacement().unwrap_or(""),
-            )
-        },
-    );
-
-    value.trim_end_matches('.').to_owned()
-}
-
 fn forbidden_characters_in(value: &str) -> Vec<&'static str> {
     let mut forbidden_characters = Vec::new();
 
@@ -575,8 +562,8 @@ mod tests {
     use lofty::TextEncoding;
 
     use super::{
-        forbidden_characters_in, rewrite_id3_text_as_utf16,
-        safe_interpolation_value, should_rewrite_id3_text_as_utf16,
+        forbidden_characters_in, rewrite_id3_text_as_utf16, sanitize_tag_value,
+        should_rewrite_id3_text_as_utf16,
     };
 
     #[test]
@@ -586,7 +573,8 @@ mod tests {
 
     #[test]
     fn replaces_forbidden_characters_like_templates() {
-        assert_eq!(safe_interpolation_value("AC/DC: Live."), "AC-DC Live");
+        assert_eq!(sanitize_tag_value("AC/DC: Live."), "AC-DC Live");
+        assert_eq!(sanitize_tag_value(" AC/DC: Live. "), " AC-DC Live. ");
     }
 
     #[test]
