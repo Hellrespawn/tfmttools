@@ -243,19 +243,43 @@ cross platform relative directory prefixes are supported.
 
 ## Parser, renderer, and crate boundaries
 
-Implement a small lexer and recursive descent parser in
-`crates/core/src/templates/`. Parsing produces an owned compiled script
-with metadata, declared arguments, and path expressions carrying source
-spans. Parsing resolves references and formatter names once. The
-filesystem loader owns compiled scripts directly; no environment,
-template registration, or source lifetime coupling is needed.
+Implement the language in a separate workspace crate at
+`crates/path-template/`, with the provisional package name `path-template`.
+It must have no dependencies on other tfmt crates, `lofty`, or application
+warning/history types. Give it its own package description and README.
+Workspace package metadata and lints may be inherited initially; extraction
+should require ordinary manifest edits, not a redesign of its API.
 
-Argument binding is separate from compilation so listing templates does
-not require their required arguments. Bound arguments use an engine
-independent scalar/path value model. The renderer reads tags on demand,
-collects the existing whitespace warnings, and returns a constructed
-`Utf8PathBuf` with warnings. The audio file rename flow appends the source
-extension to that path and resolves it against the working directory.
+The language crate owns a small lexer, recursive descent parser, source
+spans and diagnostics, metadata, argument declarations and binding,
+guards, fallbacks, `year`/`pad` formatters, and structural path rendering.
+Compiled scripts own their data. No environment, template registration,
+filesystem loading, or source lifetime coupling is needed. Argument binding
+is separate from compilation so metadata can be inspected without supplying
+required arguments.
+
+The caller supplies an argument validation policy containing forbidden
+characters. For tfmt this comes from `FORBIDDEN_CHARACTERS`; the language
+crate must not duplicate tfmt's table. Its path argument validation handles
+structural `/` and `\` separators before checking component text. Defaults
+are validated when compiling with that policy; CLI values are validated
+when binding. Tags are supplied on demand by a caller resolver as optional
+text or integer values. The resolver can fail, and its failure is reported
+with the reference's source span. The language crate does not sanitize tags.
+
+Expose all referenced tag names and their source spans so the tfmt adapter
+can reject unrecognized aliases before rendering, including references in
+skipped guards. The generic language does not contain an audio tag schema;
+an absent value returned by a resolver means missing metadata.
+
+Rendering returns owned path components and a root indicator, with a
+method to construct a standard `PathBuf` using the host platform's
+separator. tfmt converts that path to its UTF-8 path type. Tag lookup,
+aliases, date fallback, number/total parsing, sanitization, and whitespace
+warnings remain in `crates/core/src/templates/` as the adapter to audio
+files. The audio file rename flow appends the source extension and resolves
+the target against the working directory. The caller retains warnings;
+they are not part of the language crate's return types.
 
 Filesystem discovery stays in `crates/fs/`. Preserve current discovery
 extensions during the transition, but every discovered file must use the
@@ -264,6 +288,14 @@ history metadata, and rename planning consume the compiled script API.
 Remove MiniJinja dependencies from core, filesystem helpers, errors, and
 the workspace when all consumers have moved. Frontmatter TOML parsing is
 also removed; any TOML dependency removal must account for other users.
+
+Implement and evaluate the standalone language crate first, using the new
+Stef example as a real script and synthetic metadata values in its tests.
+During this milestone the existing CLI and MiniJinja templates continue to
+work. Integrating the crate and removing MiniJinja are the following
+milestone, with a separate implementation plan. Equality-based staging and
+case-only fixture scripts require explicit migration work in that plan:
+their general Jinja comparisons are outside the agreed language grammar.
 
 ## Errors and migration
 
