@@ -1,5 +1,5 @@
 {
-  "description": "Single apply, undo and redo of frontmatter_prefix.tfmt, exercising a resolved required frontmatter argument",
+  "description": "Single apply, undo and redo of declared_prefix.tfmt, exercising a resolved required argument declaration",
   "expectations": {
     "initial-state": [
       { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "64E9A6E7" },
@@ -104,7 +104,7 @@
       "expectations": "initial-state"
     },
     "apply": {
-      "command": "--simple --yes rename -t frontmatter_prefix -- output_dir/",
+      "command": "--simple --yes rename -t declared_prefix -- output_dir/",
       "expectations": "apply",
       "previous-expectations": "initial-state"
     },

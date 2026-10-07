@@ -63,7 +63,7 @@ impl Template {
             || source.trim_start().starts_with("+++")
             || source.trim_start().starts_with("{#");
         let hint = if legacy {
-            " Legacy Jinja/frontmatter syntax requires manual migration; use a new script such as `path: ({$artist} / {$title})`."
+            " Legacy Jinja/frontmatter syntax requires manual migration; provide an explicit replacement with `--script 'path: ({$artist} / {$title})'` or `--template` pointing to a migrated file."
         } else {
             ""
         };

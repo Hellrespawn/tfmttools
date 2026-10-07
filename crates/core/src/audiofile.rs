@@ -322,4 +322,50 @@ mod path_template_tests {
         .unwrap();
         assert!(script.render(&audio(&[])).is_err());
     }
+    #[test]
+    fn path_language_stef_example_with_audio_metadata() {
+        let script = Template::compile(
+            "stef",
+            include_str!("../../../examples/stef.tfmt").to_owned(),
+        )
+        .unwrap();
+        let bound = script.bind(&["Music/Artists".to_owned()]).unwrap();
+        let file = audio(&[
+            (ItemKey::AlbumArtist, "Example Artist"),
+            (ItemKey::TrackArtist, "Example Artist"),
+            (ItemKey::AlbumTitle, "Example Album"),
+            (ItemKey::RecordingDate, "2024-03-10"),
+            (ItemKey::AlbumTitleSortOrder, "2"),
+            (ItemKey::DiscNumber, "1"),
+            (ItemKey::TrackNumber, "3/12"),
+            (ItemKey::TrackTitle, "Example Song"),
+        ]);
+        assert_eq!(bound.render(&file).unwrap().0.components(), [
+            "Music",
+            "Artists",
+            "Example Artist",
+            "2024.02 - Example Album",
+            "103 - Example Artist - Example Song"
+        ]);
+        for artist in [None, Some("")] {
+            let mut values = vec![
+                (ItemKey::AlbumArtist, "Album Artist"),
+                (ItemKey::TrackTitle, "Song"),
+                (ItemKey::TrackNumber, "0"),
+            ];
+            if let Some(artist) = artist {
+                values.push((ItemKey::TrackArtist, artist));
+            }
+            assert_eq!(
+                script
+                    .bind(&[])
+                    .unwrap()
+                    .render(&audio(&values))
+                    .unwrap()
+                    .0
+                    .components(),
+                ["Album Artist", "00 - Song"]
+            );
+        }
+    }
 }

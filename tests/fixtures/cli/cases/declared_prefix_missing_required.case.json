@@ -1,5 +1,5 @@
 {
-  "description": "Rename with frontmatter_prefix.tfmt fails before touching files when the required 'prefix' argument is omitted",
+  "description": "Rename with declared_prefix.tfmt fails before touching files when the required 'prefix' argument is omitted",
   "expectations": {
     "initial-state": [
       { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "64E9A6E7" },
@@ -50,7 +50,7 @@
       "expectations": "initial-state"
     },
     "missing-required-argument": {
-      "command": "--simple --yes rename -t frontmatter_prefix",
+      "command": "--simple --yes rename -t declared_prefix",
       "expected-exit-code": 1,
       "expectations": "initial-state"
     }
