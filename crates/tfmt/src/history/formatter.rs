@@ -1,8 +1,9 @@
 use std::fmt::Write;
 
 use color_eyre::Result;
-use tfmttools_core::action::Action;
-use tfmttools_core::history::{History, Record, TemplateMetadata};
+use tfmttools_core::history::{
+    History, Record, StoredAction, TemplateMetadata,
+};
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -168,11 +169,15 @@ impl HistoryFormatter {
 
     pub fn format_template_name(metadata: &TemplateMetadata) -> String {
         match metadata {
-            TemplateMetadata::FileOrName(file_or_name) => {
+            TemplateMetadata::FileOrName { value: file_or_name } => {
                 file_or_name.to_owned()
             },
-            TemplateMetadata::InlineTemplate(_) => "template".to_owned(),
-            TemplateMetadata::Validation(command) => command.to_owned(),
+            TemplateMetadata::InlineTemplate { value: _ } => {
+                "template".to_owned()
+            },
+            TemplateMetadata::Validation { value: command } => {
+                command.to_owned()
+            },
         }
     }
 }
@@ -197,12 +202,12 @@ impl RecordSummary {
 
         for action in record.iter() {
             match action {
-                Action::MoveFile { .. } => summary.mv += 1,
-                Action::CopyFile { .. } => summary.cp += 1,
-                Action::RemoveFile(_) => summary.rm_file += 1,
-                Action::MakeDir(_) => summary.mk_dir += 1,
-                Action::RemoveDir(_) => summary.rm_dir += 1,
-                Action::EditTagValues { .. } => summary.tag += 1,
+                StoredAction::MoveFile { .. } => summary.mv += 1,
+                StoredAction::CopyFile { .. } => summary.cp += 1,
+                StoredAction::RemoveFile { .. } => summary.rm_file += 1,
+                StoredAction::MakeDir { .. } => summary.mk_dir += 1,
+                StoredAction::RemoveDir { .. } => summary.rm_dir += 1,
+                StoredAction::EditTagValues { .. } => summary.tag += 1,
             }
         }
 

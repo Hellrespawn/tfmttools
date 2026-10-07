@@ -1,27 +1,40 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
-use crate::action::Action;
+use super::StoredAction;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RecordState {
+    #[serde(rename = "applied")]
     Applied,
+    #[serde(rename = "undone")]
     Undone,
+    #[serde(rename = "redone")]
     Redone,
+    #[serde(rename = "superseded")]
     Superseded,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct Record {
+    #[serde(rename = "id")]
     id: Option<usize>,
-    actions: Vec<Action>,
+    #[serde(rename = "actions")]
+    actions: Vec<StoredAction>,
+    #[serde(rename = "state")]
     state: RecordState,
+    #[serde(rename = "timestamp")]
     timestamp: DateTime<Local>,
+    #[serde(rename = "metadata")]
     metadata: ActionRecordMetadata,
 }
 
 impl Record {
-    pub fn new(items: Vec<Action>, metadata: ActionRecordMetadata) -> Self {
+    pub fn new(
+        items: Vec<StoredAction>,
+        metadata: ActionRecordMetadata,
+    ) -> Self {
         Self {
             id: None,
             actions: items,
@@ -31,7 +44,7 @@ impl Record {
         }
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Action> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &StoredAction> {
         self.actions.iter()
     }
 
@@ -51,7 +64,7 @@ impl Record {
         &mut self.id
     }
 
-    pub fn actions(&self) -> &[Action] {
+    pub fn actions(&self) -> &[StoredAction] {
         &self.actions
     }
 
@@ -73,19 +86,33 @@ impl Record {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum TemplateMetadata {
-    FileOrName(String),
-    // Preserve the serialized variant name in existing history files.
-    #[serde(rename = "Script")]
-    InlineTemplate(String),
-    Validation(String),
+    #[serde(rename = "file_or_name")]
+    FileOrName {
+        #[serde(rename = "value")]
+        value: String,
+    },
+    #[serde(rename = "inline_template")]
+    InlineTemplate {
+        #[serde(rename = "value")]
+        value: String,
+    },
+    #[serde(rename = "validation")]
+    Validation {
+        #[serde(rename = "value")]
+        value: String,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct ActionRecordMetadata {
+    #[serde(rename = "template")]
     template: TemplateMetadata,
+    #[serde(rename = "arguments")]
     arguments: Vec<String>,
+    #[serde(rename = "run_id")]
     run_id: String,
 }
 

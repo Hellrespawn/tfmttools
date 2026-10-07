@@ -57,7 +57,7 @@ fn resolve_previous_template(
         debug!("Using data from previous rename");
 
         return match metadata.template() {
-            TemplateMetadata::FileOrName(file_or_name) => {
+            TemplateMetadata::FileOrName { value: file_or_name } => {
                 let template_name = FileOrName::from(file_or_name.as_str());
 
                 println!(
@@ -66,14 +66,14 @@ fn resolve_previous_template(
 
                 resolve_file_or_name(session, &template_name, &arguments)
             },
-            TemplateMetadata::InlineTemplate(template) => {
+            TemplateMetadata::InlineTemplate { value: template } => {
                 println!(
                     "Re-using template\n```\n'{template}'\n```\n and arguments from previous rename."
                 );
 
                 resolve_inline_template(session, template, &arguments)
             },
-            TemplateMetadata::Validation(_) => {
+            TemplateMetadata::Validation { value: _ } => {
                 Err(eyre!("No previous rename run found."))
             },
         };
@@ -114,7 +114,7 @@ fn resolve_file_or_name(
 
     let template_name = file_or_name.as_str().to_owned();
     let metadata = create_metadata(
-        &TemplateMetadata::FileOrName(template_name.clone()),
+        &TemplateMetadata::FileOrName { value: template_name.clone() },
         session.app_options().run_id(),
         arguments,
     );
@@ -136,7 +136,7 @@ fn resolve_inline_template(
 
     let compiled = templates::compile("template", template)?;
     let metadata = create_metadata(
-        &TemplateMetadata::InlineTemplate(template.to_owned()),
+        &TemplateMetadata::InlineTemplate { value: template.to_owned() },
         session.app_options().run_id(),
         arguments,
     );

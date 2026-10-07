@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": 0,
+      "actions": [
+        {"type": "move_file", "source": "a", "target": "b"},
+        {"type": "copy_file", "source": "b", "target": "c"},
+        {"type": "remove_file", "path": "c"},
+        {"type": "make_dir", "path": "dir"},
+        {"type": "remove_dir", "path": "dir"},
+        {"type": "edit_tag_values", "path": "b", "changes": [
+          {"key": "track_artist", "kind": "text", "old_value": "old", "new_value": "new", "old_encoding": "UTF8", "new_encoding": "UTF16"},
+          {"key": "audio_file_url", "kind": "locator", "old_value": "", "new_value": "https://example.test", "old_encoding": null, "new_encoding": null}
+        ]}
+      ],
+      "state": "applied",
+      "timestamp": "2026-10-07T10:00:00+00:00",
+      "metadata": {"template": {"type": "inline_template", "value": "path: $title"}, "arguments": ["opaque"], "run_id": "first"}
+    },
+    {"id": 1, "actions": [], "state": "undone", "timestamp": "2026-10-07T10:01:00+00:00", "metadata": {"template": {"type": "file_or_name", "value": "name"}, "arguments": [], "run_id": "second"}},
+    {"id": 2, "actions": [], "state": "redone", "timestamp": "2026-10-07T10:02:00+00:00", "metadata": {"template": {"type": "validation", "value": "characters"}, "arguments": [], "run_id": "third"}},
+    {"id": null, "actions": [], "state": "superseded", "timestamp": "2026-10-07T10:03:00+00:00", "metadata": {"template": {"type": "inline_template", "value": "{{ title }}"}, "arguments": [], "run_id": "fourth"}}
+  ]
+}

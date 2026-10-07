@@ -1,5 +1,4 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use serde::{Deserialize, Serialize};
 
 mod case_insensitive_path;
 mod rename_action;
@@ -13,7 +12,7 @@ pub use validation::{FORBIDDEN_CHARACTERS, validate_rename_actions};
 
 use crate::util::Utf8PathExt;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub enum Action {
     MoveFile { source: Utf8PathBuf, target: Utf8PathBuf },
     CopyFile { source: Utf8PathBuf, target: Utf8PathBuf },
@@ -23,21 +22,19 @@ pub enum Action {
     EditTagValues { path: Utf8PathBuf, changes: Vec<TagValueChange> },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub enum TagValueKind {
     Text,
     Locator,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct TagValueChange {
     key: String,
     kind: TagValueKind,
     old_value: String,
     new_value: String,
-    #[serde(default)]
     old_encoding: Option<String>,
-    #[serde(default)]
     new_encoding: Option<String>,
 }
 

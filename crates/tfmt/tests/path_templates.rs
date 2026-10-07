@@ -36,9 +36,9 @@ fn historical_rename() -> TempDir {
                 target: root.join("renamed.mp3"),
             }],
             ActionRecordMetadata::new(
-                TemplateMetadata::InlineTemplate(
-                    "{{ artist }}/{{ title }}".to_owned(),
-                ),
+                TemplateMetadata::InlineTemplate {
+                    value: "{{ artist }}/{{ title }}".to_owned(),
+                },
                 Vec::new(),
                 "old-run".to_owned(),
             ),

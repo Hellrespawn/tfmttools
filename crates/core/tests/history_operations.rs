@@ -9,7 +9,7 @@ fn history() -> History {
 
 fn metadata() -> ActionRecordMetadata {
     ActionRecordMetadata::new(
-        TemplateMetadata::InlineTemplate("path: $title".into()),
+        TemplateMetadata::InlineTemplate { value: "path: $title".into() },
         vec![],
         "test".into(),
     )
@@ -110,7 +110,7 @@ fn state_updates_require_unique_saved_id() {
     *duplicate.id_mut() = Some(0);
     // A duplicate loaded ID is covered through persistence below; mutation
     // itself must reject ambiguous saved IDs rather than changing one silently.
-    let doc = r#"{"records":[{"id":0,"actions":[],"state":"Applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"Script":"text"},"arguments":[],"run_id":"a"}},{"id":0,"actions":[],"state":"Applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"Script":"text"},"arguments":[],"run_id":"b"}}]}"#;
+    let doc = r#"{"schema_version":1,"records":[{"id":0,"actions":[],"state":"applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"type":"inline_template","value":"text"},"arguments":[],"run_id":"a"}},{"id":0,"actions":[],"state":"applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"type":"inline_template","value":"text"},"arguments":[],"run_id":"b"}}]}"#;
     let path = std::env::temp_dir()
         .join(format!("tfmt-duplicate-{}.json", std::process::id()));
     std::fs::write(&path, doc).unwrap();

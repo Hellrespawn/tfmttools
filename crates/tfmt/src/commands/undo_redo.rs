@@ -1,4 +1,5 @@
 use color_eyre::Result;
+use tfmttools_core::action::Action;
 use tfmttools_core::history::{
     History, HistoryMode, LoadHistoryResult, Record, RecordState,
 };
@@ -143,12 +144,12 @@ fn perform_undo_redo_actions(
         match mode {
             HistoryMode::Undo => {
                 for action in record.iter().rev() {
-                    action_handler.undo(action)?;
+                    action_handler.undo(&Action::try_from(action)?)?;
                 }
             },
             HistoryMode::Redo => {
                 for action in record.iter() {
-                    action_handler.redo(action)?;
+                    action_handler.redo(&Action::try_from(action)?)?;
                 }
             },
         }

@@ -235,7 +235,7 @@ fn store_history(
     command: &str,
 ) -> Result<()> {
     let metadata = ActionRecordMetadata::new(
-        TemplateMetadata::Validation(command.to_owned()),
+        TemplateMetadata::Validation { value: command.to_owned() },
         Vec::new(),
         app_options.run_id().to_owned(),
     );

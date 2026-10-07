@@ -1,6 +1,9 @@
+mod conversion;
 mod error;
 mod history;
 mod model;
+mod persistence;
+mod stored;
 
 pub use error::{HistoryError, Result};
 pub use history::{History, LoadHistoryResult};
@@ -29,3 +32,8 @@ impl HistoryMode {
         }
     }
 }
+
+pub use stored::{
+    CURRENT_SCHEMA_VERSION, StoredAction, StoredHistory, StoredTagValueChange,
+    StoredTagValueKind,
+};
