@@ -104,5 +104,37 @@ mod tests {
                 .unwrap(),
             "one"
         );
+        assert_eq!(
+            fs_err::read_to_string(
+                context.input_audio_dir().join("selected/one.mp3")
+            )
+            .unwrap(),
+            "one"
+        );
+        let default_case = context.work_dir_path().join("default.json");
+        fs_err::write(
+            &default_case,
+            r#"{"description":"default","expectations":{},"tests":{}}"#,
+        )
+        .unwrap();
+        let default_data = TestCaseData::from_file(&default_case).unwrap();
+        let default_context = TestContext::new().unwrap();
+        populate_files(&fixtures, &default_context).unwrap();
+        remap_initial_files(&fixtures, &default_context, &default_data)
+            .unwrap();
+        assert_eq!(
+            fs_err::read_to_string(
+                default_context.input_audio_dir().join("one.mp3")
+            )
+            .unwrap(),
+            "one"
+        );
+        assert_eq!(
+            fs_err::read_to_string(
+                default_context.input_audio_dir().join("two.mp3")
+            )
+            .unwrap(),
+            "two"
+        );
     }
 }

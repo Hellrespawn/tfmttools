@@ -257,7 +257,7 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             input_directory: if let Some(input_directory) =
                 rename_args.custom_input_directory
             {
-                verify_directory(input_directory)?
+                verify_directory(current_dir_utf8()?.join(input_directory))?
             } else {
                 current_dir_utf8()?
             },
