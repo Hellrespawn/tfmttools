@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use path_template::{
+use tfmttools_picotmpl::{
     ArgumentPolicy, BoundTemplate, Diagnostic, RenderError, RenderedPath,
     Template,
 };

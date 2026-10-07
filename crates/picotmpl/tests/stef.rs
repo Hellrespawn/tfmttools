@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use path_template::{ArgumentPolicy, Scalar, Template};
+use tfmttools_picotmpl::{ArgumentPolicy, Scalar, Template};
 
 const SOURCE: &str = include_str!("fixtures/stef.tfmt");
 

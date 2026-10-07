@@ -1,6 +1,6 @@
-use path_template::{ArgumentPolicy, Template};
+use tfmttools_picotmpl::{ArgumentPolicy, Template};
 
-fn compile(source: &str) -> Result<Template, path_template::Diagnostic> {
+fn compile(source: &str) -> Result<Template, tfmttools_picotmpl::Diagnostic> {
     let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
     Template::compile(source, ArgumentPolicy::new(&forbidden))
 }

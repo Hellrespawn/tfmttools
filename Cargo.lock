@@ -1008,14 +1008,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "path-template"
-version = "0.24.0"
-dependencies = [
- "regex",
- "thiserror",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1357,11 +1349,11 @@ dependencies = [
  "indicatif",
  "itertools",
  "lofty",
- "path-template",
  "textwrap",
  "tfmttools-core",
  "tfmttools-fs",
  "tfmttools-history",
+ "tfmttools-picotmpl",
  "tfmttools-test-cli",
  "tracing",
  "tracing-appender",
@@ -1376,10 +1368,10 @@ dependencies = [
  "convert_case",
  "convert_case_extras",
  "lofty",
- "path-template",
  "serde",
  "serde_json",
  "tfmttools-history",
+ "tfmttools-picotmpl",
  "thiserror",
  "tracing",
 ]
@@ -1412,6 +1404,14 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tracing",
+]
+
+[[package]]
+name = "tfmttools-picotmpl"
+version = "0.24.0"
+dependencies = [
+ "regex",
+ "thiserror",
 ]
 
 [[package]]

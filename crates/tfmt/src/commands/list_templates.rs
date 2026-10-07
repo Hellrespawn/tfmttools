@@ -1,8 +1,8 @@
 use color_eyre::Result;
-use path_template::{ArgKind, ArgSpec, Template};
 use textwrap::Options;
 use tfmttools_core::util::Utf8Directory;
 use tfmttools_fs::discover_templates;
+use tfmttools_picotmpl::{ArgKind, ArgSpec, Template};
 
 use super::templates;
 use crate::ui::terminal_width;

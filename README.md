@@ -42,7 +42,7 @@ The workspace is split by responsibility:
   handling helpers.
 - `crates/history/` contains the history data model and the concrete
   serde-backed history storage used by the CLI.
-- [crates/path-template/](crates/path-template/README.md) implements the new
+- [crates/picotmpl/](crates/picotmpl/README.md) implements the new
   path template language as an independent library. Its example is
   `examples/stef.tfmt`; the CLI uses this library for all templates.
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
@@ -183,7 +183,7 @@ Thus `{prefix} {$artist}` needs no `/` after `{prefix}`. A path argument must
 occur at a component boundary; inserting one after unfinished text or following
 one immediately with `/` is an error.
 
-See [the language reference](crates/path-template/README.md) and the full
+See [the language reference](crates/picotmpl/README.md) and the full
 [Stef layout](examples/stef.tfmt).
 
 ### Migrating existing templates

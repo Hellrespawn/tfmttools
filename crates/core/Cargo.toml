@@ -14,7 +14,7 @@ version.workspace = true
 debug = []
 
 [dependencies]
-path-template = { path = "../path-template" }
+tfmttools-picotmpl = { workspace = true }
 tfmttools-history = { path = "../history" }
 camino = { workspace = true }
 convert_case = { workspace = true }

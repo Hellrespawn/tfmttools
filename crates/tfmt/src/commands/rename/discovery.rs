@@ -1,10 +1,10 @@
 use camino::Utf8PathBuf;
 use color_eyre::Result;
-use path_template::BoundTemplate;
 use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::warning::Warning;
 use tfmttools_fs::{FsResult, PathIterator, read_audio_file};
+use tfmttools_picotmpl::BoundTemplate;
 use tracing::{debug, trace};
 
 use super::RenameSession;

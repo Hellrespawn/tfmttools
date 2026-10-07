@@ -1,5 +1,5 @@
 [package]
-name = "path-template"
+name = "tfmttools-picotmpl"
 description = "A small language for constructing paths from metadata."
 authors.workspace = true
 edition.workspace = true

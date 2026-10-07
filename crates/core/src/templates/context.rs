@@ -1,6 +1,6 @@
 use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
-use path_template::Scalar;
+use tfmttools_picotmpl::Scalar;
 
 use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;

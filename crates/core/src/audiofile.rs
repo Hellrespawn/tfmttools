@@ -1,7 +1,7 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use lofty::file::{TaggedFile, TaggedFileExt};
 use lofty::tag::Tag;
-use path_template::BoundTemplate;
+use tfmttools_picotmpl::BoundTemplate;
 
 use crate::error::{TFMTError, TFMTResult};
 use crate::templates::render_audio_path;

@@ -1,6 +1,6 @@
-use path_template::{ArgKind, ArgumentPolicy, Template};
+use tfmttools_picotmpl::{ArgKind, ArgumentPolicy, Template};
 
-fn compile(source: &str) -> Result<Template, path_template::Diagnostic> {
+fn compile(source: &str) -> Result<Template, tfmttools_picotmpl::Diagnostic> {
     Template::compile(source, ArgumentPolicy::new(&[]))
 }
 
@@ -126,13 +126,15 @@ fn bound_render_diagnostic_outlives_template_and_source() {
     let error = bound
         .render(|_| {
             Ok::<_, std::convert::Infallible>(Some(
-                path_template::Scalar::Text("unknown".to_owned()),
+                tfmttools_picotmpl::Scalar::Text("unknown".to_owned()),
             ))
         })
         .unwrap_err();
     let error = match error {
-        path_template::RenderError::Template(error) => error,
-        path_template::RenderError::Resolver { source, .. } => match source {},
+        tfmttools_picotmpl::RenderError::Template(error) => error,
+        tfmttools_picotmpl::RenderError::Resolver { source, .. } => {
+            match source {}
+        },
     };
     assert_eq!(
         bound.format_diagnostic(&error),

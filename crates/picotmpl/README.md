@@ -1,4 +1,4 @@
-# path-template
+# picotmpl
 
 A small language for constructing paths from metadata. Templates contain
 listing metadata, typed argument declarations, and a path rule. Compilation
@@ -49,7 +49,7 @@ cannot be formatted.
 ```rust
 use std::convert::Infallible;
 
-use path_template::{ArgumentPolicy, Scalar, Template};
+use tfmttools_picotmpl::{ArgumentPolicy, Scalar, Template};
 
 let template = Template::compile(
     r#"
@@ -145,6 +145,6 @@ Resolver errors keep the original error
 and the failing reference's byte span. The full Stef layout and synthetic
 metadata scenarios are in this package's `tests/` directory.
 
-From the workspace root, run `cargo test -p path-template` or
-`cargo clippy -p path-template --all-targets`. tfmt uses this crate through its
+From the workspace root, run `cargo test -p tfmttools-picotmpl` or
+`cargo clippy -p tfmttools-picotmpl --all-targets`. tfmt uses this crate through its
 audio metadata adapter; the library remains independent of application code.

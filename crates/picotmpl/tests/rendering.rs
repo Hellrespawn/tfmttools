@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::io;
 use std::path::PathBuf;
 
-use path_template::{
+use tfmttools_picotmpl::{
     ArgumentPolicy, BoundTemplate, RenderError, Scalar, Template,
 };
 

@@ -1,9 +1,9 @@
 use camino::Utf8Path;
 use color_eyre::Result;
-use path_template::Template;
 use tfmttools_core::error::TFMTError;
 use tfmttools_core::templates::compile_audio_template;
 use tfmttools_fs::read_template;
+use tfmttools_picotmpl::Template;
 
 pub(super) fn compile(lookup_name: &str, source: &str) -> Result<Template> {
     compile_audio_template(source)

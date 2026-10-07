@@ -1,10 +1,10 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use path_template::{BoundTemplate, Template};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
 use tfmttools_fs::{FileOrName, discover_templates};
 use tfmttools_history::{History, LoadHistoryResult};
+use tfmttools_picotmpl::{BoundTemplate, Template};
 use tracing::debug;
 
 use super::RenameSession;
