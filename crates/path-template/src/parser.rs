@@ -249,7 +249,13 @@ impl Parser {
                 Kind::Text(_) => Expression::Literal(self.literal()?, span),
                 Kind::Slash => {
                     self.take();
-                    Expression::Separator(span)
+                    if matches!(closing, Kind::CloseParen)
+                        && expressions.is_empty()
+                    {
+                        Expression::Root
+                    } else {
+                        Expression::Separator(span)
+                    }
                 },
                 Kind::OpenBrace => {
                     self.take();
@@ -314,6 +320,12 @@ impl Parser {
                             width_token.span,
                         )
                     })?;
+                    if width > 1024 {
+                        return Err(Diagnostic::new(
+                            "Padding width exceeds maximum of 1024",
+                            width_token.span,
+                        ));
+                    }
                     self.expect(
                         &Kind::CloseParen,
                         "Expected ')' after padding width",

@@ -22,6 +22,7 @@ pub(crate) enum Formatter {
 #[derive(Clone, Debug)]
 pub(crate) enum Expression {
     Literal(String, Span),
+    Root,
     Separator(Span),
     Interpolation {
         alternatives: Vec<Alternative>,

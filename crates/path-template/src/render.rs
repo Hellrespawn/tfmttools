@@ -50,6 +50,7 @@ fn evaluate<E>(
     for expression in expressions {
         match expression {
             Expression::Literal(text, span) => output.append(text, *span)?,
+            Expression::Root => output.root(),
             Expression::Separator(span) => output.separator(*span)?,
             Expression::Guard { reference, negative, contents } => {
                 let present = reference_value(reference, arguments, resolve)?

@@ -330,3 +330,21 @@ and synthetic metadata. No audio files, workspace test harness, or tfmt dependen
 - [x] Commit the evaluated crate and documentation. Report synthetic
   Stef output, verification results, and the remaining CLI integration
   milestone. Do not claim the application has migrated to the new language.
+
+## Final review and verification
+
+Independent whole-branch review found one Important issue: empty initial
+output could accidentally select the platform root. Root selection now
+requires `/` as the first top-level expression. Regression tests failed
+before the fix and pass afterward, covering missing tags, empty literals,
+empty path arguments, and separators inside guards. Explicit roots remain
+supported.
+
+The Minor padding allocation concern was also addressed: compilation rejects
+widths above 1024. Boundary tests failed before the fix and pass afterward.
+Both findings were handled in one final fix pass without a second review.
+
+Workspace tests, nightly lint/format, Rust 1.89 checking, and independent
+Cargo package verification pass. Existing core redundant-else and nix
+future-incompatibility warnings remain. Windows execution was unavailable.
+CLI migration is the next milestone.

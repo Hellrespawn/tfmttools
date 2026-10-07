@@ -155,7 +155,9 @@ fn validate_arguments(
                 validate(reference)?;
                 validate_arguments(contents, arguments)?;
             },
-            Expression::Literal(..) | Expression::Separator(_) => {},
+            Expression::Literal(..)
+            | Expression::Root
+            | Expression::Separator(_) => {},
         }
     }
     Ok(())

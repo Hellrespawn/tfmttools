@@ -39,7 +39,7 @@ Missing interpolation values emit nothing. A final filename must be nonempty.
 
 `| year` extracts a four digit year, prioritizing ISO style dates, then
 day/month/year style dates, then other four digit year matches. A present
-value with no matching year is an error. `| pad(width)` left pads displayed
+value with no matching year is an error. `| pad(width)` accepts widths from 0 through 1024 and left pads displayed
 text with zeros to a minimum width; it never truncates text. Formatters
 apply to the selected fallback value and can be chained. Path arguments
 cannot be formatted.
@@ -118,7 +118,8 @@ A path argument inserts complete directory components and must be used
 at a component boundary. It supplies its own boundary, so write
 `{prefix} {$title}` rather than `{prefix} / {$title}`. Path arguments are
 relative prefixes; leading input separators are discarded when splitting.
-A leading bare `/` in the rule sets the rendered root indicator. Repeated
+A bare `/` as the first top-level expression sets the rendered root indicator.
+An empty expression before `/` is an invalid empty component. Repeated
 separators, trailing separators, and empty final filenames are errors.
 `to_path_buf()` uses the host platform's separator. On Windows a leading
 separator is rooted on the current drive; this language does not express

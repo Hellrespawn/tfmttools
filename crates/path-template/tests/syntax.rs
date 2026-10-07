@@ -128,3 +128,9 @@ fn multiple_fallbacks_and_chained_formatters() {
         compile(r#"path: ({$a ?? $b ?? "Unknown" | year | pad(6)})"#,).is_ok()
     );
 }
+
+#[test]
+fn padding_width_is_bounded() {
+    assert!(compile("path: ({$track | pad(1024)})").is_ok());
+    assert!(compile("path: ({$track | pad(1025)})").is_err());
+}

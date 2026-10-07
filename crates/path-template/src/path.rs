@@ -53,19 +53,18 @@ impl Builder {
         Ok(())
     }
 
+    pub fn root(&mut self) {
+        self.rooted = true;
+    }
+
     pub fn separator(&mut self, span: Span) -> Result<(), Diagnostic> {
         if self.current.is_empty() {
-            if self.components.is_empty() && !self.rooted {
-                self.rooted = true;
-            } else {
-                return Err(Diagnostic::new(
-                    "Separator creates an empty component",
-                    span,
-                ));
-            }
-        } else {
-            self.components.push(std::mem::take(&mut self.current));
+            return Err(Diagnostic::new(
+                "Separator creates an empty component",
+                span,
+            ));
         }
+        self.components.push(std::mem::take(&mut self.current));
         Ok(())
     }
 

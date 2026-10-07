@@ -326,3 +326,20 @@ fn prepared_tag_cannot_inject_boundary() {
         assert!(error.to_string().contains("separator"));
     }
 }
+
+#[test]
+fn absent_initial_component_cannot_select_root() {
+    for source in [
+        r#"path: ({$artist} / "Song")"#,
+        r#"path: ("" / "Song")"#,
+        r#"arg prefix: path(default: "") path: ({prefix} / "Song")"#,
+        r#"path: ([$artist? "Artist"] / "Song")"#,
+        r#"path: ([$artist? / "Song"])"#,
+    ] {
+        let result = bind(source).render(|_| Ok::<_, Infallible>(None));
+        assert!(result.is_err(), "{source}");
+    }
+    let result = bind(r#"path: ([$artist? / "Song"])"#)
+        .render(|_| Ok::<_, Infallible>(Some(text("Artist"))));
+    assert!(result.is_err());
+}
