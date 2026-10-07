@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{Alternative, Expression, Formatter, Reference};
+use crate::path::Builder;
 use crate::value::Value;
 use crate::{BoundScript, Diagnostic, RenderError, RenderedPath, Scalar, format};
 
@@ -8,9 +9,9 @@ pub(crate) fn render<E>(
     bound: &BoundScript,
     mut resolve: impl FnMut(&str) -> Result<Option<Scalar>, E>,
 ) -> Result<RenderedPath, RenderError<E>> {
-    let mut text = String::new();
-    evaluate(&bound.script.inner.path, &bound.arguments, &mut resolve, &mut text)?;
-    Ok(RenderedPath { components: vec![text], rooted: false })
+    let mut builder = Builder::default();
+    evaluate(&bound.script.inner.path, &bound.arguments, &mut resolve, &mut builder)?;
+    Ok(builder.finish(bound.script.inner.span)?)
 }
 
 fn reference_value<E>(
@@ -35,14 +36,12 @@ fn evaluate<E>(
     expressions: &[Expression],
     arguments: &HashMap<String, Value>,
     resolve: &mut impl FnMut(&str) -> Result<Option<Scalar>, E>,
-    output: &mut String,
+    output: &mut Builder,
 ) -> Result<(), RenderError<E>> {
     for expression in expressions {
         match expression {
-            Expression::Literal(text, _) => output.push_str(text),
-            Expression::Separator(span) => {
-                return Err(Diagnostic::new("Separators not implemented", *span).into());
-            },
+            Expression::Literal(text, span) => output.append(text, *span)?,
+            Expression::Separator(span) => output.separator(*span)?,
             Expression::Guard { reference, negative, contents } => {
                 let present = reference_value(reference, arguments, resolve)?
                     .is_some_and(|value| value.is_present());
@@ -66,7 +65,10 @@ fn evaluate<E>(
                 let mut text = match value {
                     Value::Text(text) => text,
                     Value::Integer(integer) => integer.to_string(),
-                    Value::Path(_) => return Err(Diagnostic::new("Path insertion not implemented", *span).into()),
+                    Value::Path(components) => {
+                        output.insert(components, *span)?;
+                        continue;
+                    },
                 };
                 for formatter in formatters {
                     text = match formatter {
@@ -75,7 +77,7 @@ fn evaluate<E>(
                         Formatter::Pad(width) => format::pad(&text, *width),
                     };
                 }
-                output.push_str(&text);
+                output.append(&text, *span)?;
             },
         }
     }

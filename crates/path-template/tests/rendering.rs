@@ -1,5 +1,6 @@
 use std::convert::Infallible;
 use std::io;
+use std::path::PathBuf;
 
 use path_template::{ArgumentPolicy, BoundScript, RenderError, Scalar, Script};
 
@@ -179,5 +180,92 @@ fn formatters_reject_path_arguments_in_all_alternatives() {
         "arg prefix: path(default: \"\") path: ({$a ?? prefix | pad(2)})",
     ] {
         assert!(Script::compile(source, ArgumentPolicy::new(&[])).is_err());
+    }
+}
+
+#[test]
+fn native_separators() {
+    let path = bind(r#"path: ("Artist" / "Song")"#)
+        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    assert_eq!(path.components(), ["Artist", "Song"]);
+    assert_eq!(path.to_path_buf(), PathBuf::from("Artist").join("Song"));
+    assert!(!path.is_rooted());
+}
+
+#[test]
+fn prefix_components() {
+    let script = Script::compile(
+        r#"arg prefix: path path: ({prefix} "Artist" / "Song")"#,
+        ArgumentPolicy::new(&[]),
+    ).unwrap();
+    for prefix in ["Music/Artists", "Music\\Artists", "/Music//Artists/"] {
+        let path = script.bind(&[prefix.to_owned()]).unwrap()
+            .render(|_| Ok::<_, Infallible>(None)).unwrap();
+        assert_eq!(path.components(), ["Music", "Artists", "Artist", "Song"]);
+        assert!(!path.is_rooted());
+    }
+}
+
+#[test]
+fn empty_prefix_has_no_boundary() {
+    let path = bind(r#"arg prefix: path(default: "") path: ({prefix} "Artist" / "Song")"#)
+        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    assert_eq!(path.components(), ["Artist", "Song"]);
+}
+
+#[test]
+fn argument_after_component_text_is_error() {
+    let script = Script::compile(
+        r#"arg prefix: path path: ("A" {prefix} "B")"#,
+        ArgumentPolicy::new(&[]),
+    ).unwrap();
+    let error = script.bind(&["Music".to_owned()]).unwrap()
+        .render(|_| Ok::<_, Infallible>(None)).unwrap_err();
+    assert!(error.to_string().contains("boundary"));
+}
+
+#[test]
+fn explicit_separator_after_path_argument_is_error() {
+    let script = Script::compile(
+        r#"arg prefix: path path: ({prefix} / "Song")"#,
+        ArgumentPolicy::new(&[]),
+    ).unwrap();
+    let error = script.bind(&["Music".to_owned()]).unwrap()
+        .render(|_| Ok::<_, Infallible>(None)).unwrap_err();
+    assert!(error.to_string().contains("empty component"));
+}
+
+#[test]
+fn invalid_boundaries() {
+    for source in [
+        r#"path: ("A" / / "B")"#,
+        r#"path: ("A" /)"#,
+        "path: ()",
+        "path: ({$missing})",
+        r#"path: ("A" / {$missing})"#,
+        r#"path: (/ / "A")"#,
+    ] {
+        assert!(bind(source).render(|_| Ok::<_, Infallible>(None)).is_err(), "{source}");
+    }
+}
+
+#[test]
+fn root_separator() {
+    let path = bind(r#"path: (/ "Artist" / "Song")"#)
+        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    assert!(path.is_rooted());
+    assert_eq!(path.components(), ["Artist", "Song"]);
+    assert_eq!(
+        path.to_path_buf(),
+        PathBuf::from(std::path::MAIN_SEPARATOR_STR).join("Artist").join("Song"),
+    );
+}
+
+#[test]
+fn prepared_tag_cannot_inject_boundary() {
+    for value in ["Artist/Album", "Artist\\Album"] {
+        let error = bind("path: ({$artist})")
+            .render(|_| Ok::<_, Infallible>(text(value))).unwrap_err();
+        assert!(error.to_string().contains("separator"));
     }
 }
