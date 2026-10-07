@@ -6,10 +6,9 @@ fn compile(source: &str) -> Result<Script, path_template::Diagnostic> {
 
 #[test]
 fn definitions_and_forward_argument_references() {
-    let script = compile(
-        "path: ({prefix} {$TITLE}) arg prefix: string(default: \"\")",
-    )
-    .unwrap();
+    let script =
+        compile("path: ({prefix} {$TITLE}) arg prefix: string(default: \"\")")
+            .unwrap();
     assert_eq!(script.arguments().len(), 1);
     assert_eq!(script.arguments()[0].kind, ArgKind::String);
     assert_eq!(script.arguments()[0].default.as_deref(), Some(""));
@@ -26,7 +25,10 @@ fn quoted_whitespace_and_comments() {
     "#;
     let script = compile(source).unwrap();
     assert_eq!(script.metadata().name.as_deref(), Some("Quoted \"name\""));
-    assert_eq!(script.metadata().description.as_deref(), Some("Windows \\ Unix /"));
+    assert_eq!(
+        script.metadata().description.as_deref(),
+        Some("Windows \\ Unix /")
+    );
     assert_eq!(script.tag_references().len(), 1);
 }
 
@@ -122,7 +124,7 @@ fn malformed_documents_and_strings() {
 
 #[test]
 fn multiple_fallbacks_and_chained_formatters() {
-    assert!(compile(
-        r#"path: ({$a ?? $b ?? "Unknown" | year | pad(6)})"#,
-    ).is_ok());
+    assert!(
+        compile(r#"path: ({$a ?? $b ?? "Unknown" | year | pad(6)})"#,).is_ok()
+    );
 }

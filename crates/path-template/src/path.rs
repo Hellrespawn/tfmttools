@@ -44,7 +44,10 @@ pub(crate) struct Builder {
 impl Builder {
     pub fn append(&mut self, text: &str, span: Span) -> Result<(), Diagnostic> {
         if text.contains(['/', '\\']) {
-            return Err(Diagnostic::new("Component text contains a path separator", span));
+            return Err(Diagnostic::new(
+                "Component text contains a path separator",
+                span,
+            ));
         }
         self.current.push_str(text);
         Ok(())
@@ -55,7 +58,10 @@ impl Builder {
             if self.components.is_empty() && !self.rooted {
                 self.rooted = true;
             } else {
-                return Err(Diagnostic::new("Separator creates an empty component", span));
+                return Err(Diagnostic::new(
+                    "Separator creates an empty component",
+                    span,
+                ));
             }
         } else {
             self.components.push(std::mem::take(&mut self.current));
@@ -63,9 +69,16 @@ impl Builder {
         Ok(())
     }
 
-    pub fn insert(&mut self, components: Vec<String>, span: Span) -> Result<(), Diagnostic> {
+    pub fn insert(
+        &mut self,
+        components: Vec<String>,
+        span: Span,
+    ) -> Result<(), Diagnostic> {
         if !self.current.is_empty() {
-            return Err(Diagnostic::new("Path arguments require a component boundary", span));
+            return Err(Diagnostic::new(
+                "Path arguments require a component boundary",
+                span,
+            ));
         }
         self.components.extend(components);
         Ok(())
@@ -73,7 +86,10 @@ impl Builder {
 
     pub fn finish(mut self, span: Span) -> Result<RenderedPath, Diagnostic> {
         if self.current.is_empty() {
-            return Err(Diagnostic::new("Path has an empty final filename", span));
+            return Err(Diagnostic::new(
+                "Path has an empty final filename",
+                span,
+            ));
         }
         self.components.push(self.current);
         Ok(RenderedPath { components: self.components, rooted: self.rooted })

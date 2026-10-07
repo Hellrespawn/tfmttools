@@ -38,16 +38,23 @@ pub(crate) fn coerce(
     policy: &ArgumentPolicy,
 ) -> Result<Value, Diagnostic> {
     match spec.kind {
-        ArgKind::Int => raw.parse::<i64>().map(Value::Integer).map_err(|_| {
-            Diagnostic::new(format!("Argument '{}' requires an integer", spec.name), spec.span)
-        }),
+        ArgKind::Int => {
+            raw.parse::<i64>().map(Value::Integer).map_err(|_| {
+                Diagnostic::new(
+                    format!("Argument '{}' requires an integer", spec.name),
+                    spec.span,
+                )
+            })
+        },
         ArgKind::String => {
             validate_text(spec, raw, policy, false)?;
             Ok(Value::Text(raw.to_owned()))
         },
         ArgKind::Path => {
             let mut components = Vec::new();
-            for component in raw.split(['/', '\\']).filter(|part| !part.is_empty()) {
+            for component in
+                raw.split(['/', '\\']).filter(|part| !part.is_empty())
+            {
                 validate_text(spec, component, policy, true)?;
                 components.push(component.to_owned());
             }
@@ -62,12 +69,20 @@ fn validate_text(
     policy: &ArgumentPolicy,
     path: bool,
 ) -> Result<(), Diagnostic> {
-    if let Some(character) = text.chars().find(|c| {
-        ['/', '\\'].contains(c) || policy.forbidden.contains(c)
-    }) {
-        let component = if path { format!(" in component {text:?}") } else { String::new() };
+    if let Some(character) = text
+        .chars()
+        .find(|c| ['/', '\\'].contains(c) || policy.forbidden.contains(c))
+    {
+        let component = if path {
+            format!(" in component {text:?}")
+        } else {
+            String::new()
+        };
         return Err(Diagnostic::new(
-            format!("Argument '{}' contains forbidden character {character:?}{component}", spec.name),
+            format!(
+                "Argument '{}' contains forbidden character {character:?}{component}",
+                spec.name
+            ),
             spec.span,
         ));
     }

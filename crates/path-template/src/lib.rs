@@ -1,4 +1,4 @@
-//! Compile path templates with caller supplied metadata.
+#![doc = include_str!("../README.md")]
 
 mod args;
 mod ast;

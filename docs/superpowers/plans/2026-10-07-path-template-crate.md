@@ -1,6 +1,6 @@
 # Path Template Crate Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Implement the agreed language as an independently usable workspace
 crate and evaluate it with the new Stef script before CLI integration.
@@ -138,7 +138,7 @@ diagnostics, script types, argument/value/path type definitions, and
 inspection, `Span`, `Diagnostic`, `ArgSpec`, and the type declarations above.
 Argument policy validation is completed in Task 2; rendering in Tasks 3–5.
 
-- [ ] Write failing lexer/parser tests with these names and assertions:
+- [x] Write failing lexer/parser tests with these names and assertions:
   `definitions_and_forward_argument_references` compiles
   `path: ({prefix} {$title}) arg prefix: string(default: "")` and reports
   one argument and one `$title` reference;
@@ -155,15 +155,15 @@ Argument policy validation is completed in Task 2; rendering in Tasks 3–5.
   column after a quoted Unicode string, with byte offsets matching source;
   `compiled_script_outlives_source` compiles from a temporary String and
   inspects metadata after dropping it.
-- [ ] Run `cargo test -p path-template --test syntax` and establish failures.
-- [ ] Implement the grammar and source spans with a lexer and recursive
+- [x] Run `cargo test -p path-template --test syntax` and establish failures.
+- [x] Implement the grammar and source spans with a lexer and recursive
   descent parser. Recognize `??` before `?`. Require one path definition,
   validate bare names after all declarations are collected, and preserve
   every tag reference. Quoted strings accept `\"` and `\\`; reject unknown
   escapes and separators in path text literals. Definitions can be adjacent
   without newline significance; parse each by its grammar and delimiter.
-- [ ] Run the syntax suite and `cargo check -p path-template` successfully.
-- [ ] Commit the compiling language crate and grammar tests.
+- [x] Run the syntax suite and `cargo check -p path-template` successfully.
+- [x] Commit the compiling language crate and grammar tests.
 
 ## Task 2: Bind arguments and enforce caller character policy
 
@@ -174,7 +174,7 @@ Argument policy validation is completed in Task 2; rendering in Tasks 3–5.
 `ArgumentPolicy::new`, `Script::bind`, and owned `BoundScript` values.
 Compilation must validate every declared default against its type/policy.
 
-- [ ] Write failing tests:
+- [x] Write failing tests:
   `no_default_requires_argument` rejects omitted `arg edition: int`;
   `empty_default_makes_prefix_optional` binds omitted
   `arg prefix: path(default: "")` successfully;
@@ -192,13 +192,13 @@ Compilation must validate every declared default against its type/policy.
   string/path defaults and empty integer defaults;
   `invalid_unused_argument` rejects a forbidden supplied value even if the
   path rule never references it.
-- [ ] Run `cargo test -p path-template --test arguments` and confirm failures.
-- [ ] Implement binding and compile-time defaults validation. Preserve text
+- [x] Run `cargo test -p path-template --test arguments` and confirm failures.
+- [x] Implement binding and compile-time defaults validation. Preserve text
   without trimming/replacement. Split path arguments on both separators,
   discard empty segments, and validate remaining text. Character errors
   identify the argument, offending character, and path component as needed.
-- [ ] Run syntax and argument suites successfully.
-- [ ] Commit argument binding and policy enforcement.
+- [x] Run syntax and argument suites successfully.
+- [x] Commit argument binding and policy enforcement.
 
 ## Task 3: Evaluate scalar values, fallbacks, and guards
 
@@ -209,7 +209,7 @@ Compilation must validate every declared default against its type/policy.
 `BoundScript::render`, typed resolver errors, and path component accessors.
 Formatter evaluation is completed in Task 4; path argument insertion in Task 5.
 
-- [ ] Write failing tests:
+- [x] Write failing tests:
   `quoted_literals_and_adjacent_values` renders `path: ("A" {$title} " B")`
   with title `"T"` to component `"AT B"`;
   `zero_is_present` renders `[$track? {$track}]` with Integer(0) to `"0"`;
@@ -225,12 +225,12 @@ Formatter evaluation is completed in Task 4; path argument insertion in Task 5.
   skipped guards, including duplicates;
   `whitespace_only_argument_is_preserved` renders a string argument containing
   a space inside `"A" {suffix} "B"` to `"A B"`.
-- [ ] Run `cargo test -p path-template --test rendering` and confirm failures.
-- [ ] Implement ordered/lazy evaluation. Absence emits no text; only empty
+- [x] Run `cargo test -p path-template --test rendering` and confirm failures.
+- [x] Implement ordered/lazy evaluation. Absence emits no text; only empty
   text/paths or missing values are absent. Resolve tag names on demand using
   the caller closure. Keep original typed errors and source spans.
-- [ ] Run all existing crate tests successfully.
-- [ ] Commit scalar rendering, guards, and fallback behavior.
+- [x] Run all existing crate tests successfully.
+- [x] Commit scalar rendering, guards, and fallback behavior.
 
 ## Task 4: Implement year extraction and zero padding
 
@@ -241,18 +241,18 @@ private `year(text: &str) -> Result<String, String>` and
 `pad(text: &str, width: usize) -> String`; rendering wraps failures in a
 Diagnostic at the formatter span.
 
-- [ ] Write failing tests: ISO `2024-03-10`, `10-03-2024`, and `2024` all
+- [x] Write failing tests: ISO `2024-03-10`, `10-03-2024`, and `2024` all
   render year `"2024"`; a present `"unknown"` errors; a missing date and
   a skipped date guard do not error. Padding Integer(3) with width 2 yields
   `"03"`, Text("123") stays `"123"`, width 0 preserves the value, and
   Integer(0) with width 2 yields `"00"`. A formatter following fallback
   operates on the selected value. `year | pad(6)` on `2024` yields `"002024"`.
-- [ ] Run the formatter rendering tests and confirm failures.
-- [ ] Implement the existing three date matching patterns with regex,
+- [x] Run the formatter rendering tests and confirm failures.
+- [x] Implement the existing three date matching patterns with regex,
   preserving matching precedence. Pad displayed text without truncation.
   Absent formatter input emits nothing. Reject formatting path arguments
   during compilation, including path alternatives in a fallback expression.
-- [ ] Run all crate tests successfully and commit formatter support.
+- [x] Run all crate tests successfully and commit formatter support.
 
 ## Task 5: Construct structural paths and insert directory arguments
 
@@ -261,7 +261,7 @@ Diagnostic at the formatter span.
 **Interfaces:** Produce `RenderedPath::is_rooted`, `components`, and
 `to_path_buf`; complete path argument rendering and separator validation.
 
-- [ ] Write failing tests:
+- [x] Write failing tests:
   `native_separators` renders `"Artist" / "Song"` to two components and
   compares conversion with `PathBuf::from("Artist").join("Song")`;
   `prefix_components` binds `Music/Artists` and `Music\\Artists` to
@@ -278,16 +278,16 @@ Diagnostic at the formatter span.
   native conversion joins the platform separator with its components;
   `prepared_tag_cannot_inject_boundary` rejects unsanitized resolver text
   containing `/` or `\`, rather than allowing it to create directories.
-- [ ] Run the structural path tests and confirm failures.
-- [ ] Implement a component builder without parsing a joined string.
+- [x] Run the structural path tests and confirm failures.
+- [x] Implement a component builder without parsing a joined string.
   A path argument inserts completed directory components at a component
   boundary; scalar values append text. Reject separator characters in scalar
   component text, but perform no tfmt character replacement. Apply the
   spec's root and empty component rules after conditional evaluation.
-- [ ] Run all crate tests successfully on the available host. Include
+- [x] Run all crate tests successfully on the available host. Include
   platform-independent expectations and conditional native-root tests;
   record whether Windows execution was available.
-- [ ] Commit structural path rendering.
+- [x] Commit structural path rendering.
 
 ## Task 6: Evaluate the Stef script and verify independent use
 
@@ -299,7 +299,7 @@ not depend on files outside the package.
 **Interfaces:** Use only the public API, standard library, local fixtures,
 and synthetic metadata. No audio files, workspace test harness, or tfmt dependencies.
 
-- [ ] Write end-to-end tests with the exact example source. Compile using
+- [x] Write end-to-end tests with the exact example source. Compile using
   the tfmt character table supplied as a test policy, bind prefix `Music`,
   and render synthetic tags to components:
   `["Music", "Example Artist", "2024.02 - Example Album",
@@ -309,24 +309,24 @@ and synthetic metadata. No audio files, workspace test harness, or tfmt dependen
   assert exact components and delimiter absence.
   Assert zero track/album sort values render as present. Assert unchanged
   output when outside-string whitespace and comments are added.
-- [ ] Run `cargo test -p path-template --test stef` and establish any failures.
-- [ ] Complete any missing behavior through the owning module and rerun
+- [x] Run `cargo test -p path-template --test stef` and establish any failures.
+- [x] Complete any missing behavior through the owning module and rerun
   its targeted tests. Keep the language grammar unchanged unless the
   results expose a concrete requirement requiring a design revision.
-- [ ] Document compile → inspect references → bind → resolve → render,
+- [x] Document compile → inspect references → bind → resolve → render,
   with a doctest that compiles and renders a small script. Explain caller
   character policy, prepared metadata, schema validation, typed resolver
   errors, standalone installation assumptions, and root/path limitations.
-- [ ] Verify fixture consistency with
+- [x] Verify fixture consistency with
   `cmp examples/stef-next.tfmt crates/path-template/tests/fixtures/stef.tfmt`.
   Run `cargo test -p path-template` including doc tests, and inspect
   `cargo package --list --allow-dirty --offline -p path-template` for local
   sources/fixtures/README. Its tests must not reference root example paths.
-- [ ] Run `cargo test --workspace`,
+- [x] Run `cargo test --workspace`,
   `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`.
   Fix actionable findings introduced by this change and report any
   pre-existing or environment failures. Check MSRV with
   `cargo +1.89.0 check -p path-template` when cached dependencies permit it.
-- [ ] Commit the evaluated crate and documentation. Report synthetic
+- [x] Commit the evaluated crate and documentation. Report synthetic
   Stef output, verification results, and the remaining CLI integration
   milestone. Do not claim the application has migrated to the new language.

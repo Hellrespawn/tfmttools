@@ -14,13 +14,16 @@ fn no_default_requires_argument() {
 
 #[test]
 fn empty_default_makes_prefix_optional() {
-    let script = compile("arg prefix: path(default: \"\") path: ({$title})").unwrap();
+    let script =
+        compile("arg prefix: path(default: \"\") path: ({$title})").unwrap();
     assert!(script.bind(&[]).is_ok());
 }
 
 #[test]
 fn defaults_do_not_replace_supplied_empty_values() {
-    let script = compile("arg suffix: string(default: \"fallback\") path: ({$title})").unwrap();
+    let script =
+        compile("arg suffix: string(default: \"fallback\") path: ({$title})")
+            .unwrap();
     assert!(script.bind(&[String::new()]).is_ok());
 }
 
@@ -30,18 +33,29 @@ fn integer_validation() {
     for value in ["0", "-2", "9223372036854775807", "-9223372036854775808"] {
         assert!(script.bind(&[value.to_owned()]).is_ok(), "{value}");
     }
-    for value in ["", "no", "9223372036854775808", "-9223372036854775809", " 2"] {
+    for value in ["", "no", "9223372036854775808", "-9223372036854775809", " 2"]
+    {
         assert!(script.bind(&[value.to_owned()]).is_err(), "{value}");
     }
 }
 
 #[test]
 fn declaration_order_and_excess_arguments() {
-    let script = compile("arg count: int arg label: string path: ({$title})").unwrap();
+    let script =
+        compile("arg count: int arg label: string path: ({$title})").unwrap();
     assert!(script.bind(&["2".to_owned(), "label".to_owned()]).is_ok());
     assert!(script.bind(&["label".to_owned(), "2".to_owned()]).is_err());
-    assert!(script.bind(&["2".to_owned(), "label".to_owned(), "extra".to_owned()]).is_err());
-    assert!(compile("path: ({$title})").unwrap().bind(&["extra".to_owned()]).is_err());
+    assert!(
+        script
+            .bind(&["2".to_owned(), "label".to_owned(), "extra".to_owned()])
+            .is_err()
+    );
+    assert!(
+        compile("path: ({$title})")
+            .unwrap()
+            .bind(&["extra".to_owned()])
+            .is_err()
+    );
 }
 
 #[test]
@@ -73,7 +87,9 @@ fn invalid_defaults_even_when_overridden() {
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
-    assert!(compile("arg prefix: path(default: \"A/B\") path: ({$title})").is_ok());
+    assert!(
+        compile("arg prefix: path(default: \"A/B\") path: ({$title})").is_ok()
+    );
 }
 
 #[test]

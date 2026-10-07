@@ -1,7 +1,8 @@
 # Path template language
 
-Status: draft for review. The example uses proposed syntax that the current
-binary cannot parse.
+Status: approved. The standalone `path-template` crate implements this
+syntax. The CLI integration milestone is pending; the current binary
+continues to use MiniJinja.
 
 ## Purpose and agreed scope
 

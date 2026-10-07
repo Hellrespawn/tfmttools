@@ -3,7 +3,10 @@ use std::sync::Arc;
 
 use crate::ast::{Alternative, Expression};
 use crate::value::Value;
-use crate::{ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath, Scalar, Span, args, parser, render};
+use crate::{
+    ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath,
+    Scalar, Span, args, parser, render,
+};
 
 /// Optional listing metadata, independent of argument binding.
 #[derive(Clone, Debug, Default)]
@@ -43,6 +46,7 @@ pub struct BoundScript {
 }
 
 impl BoundScript {
+    /// Render using prepared scalar metadata supplied on demand by the caller.
     pub fn render<E>(
         &self,
         resolve: impl FnMut(&str) -> Result<Option<Scalar>, E>,
@@ -52,22 +56,39 @@ impl BoundScript {
 }
 
 impl Script {
+    /// Bind positional values in declaration order; omitted values use defaults.
     pub fn bind(&self, supplied: &[String]) -> Result<BoundScript, Diagnostic> {
         if supplied.len() > self.inner.arguments.len() {
-            return Err(Diagnostic::new("Too many supplied arguments", self.inner.span));
+            return Err(Diagnostic::new(
+                "Too many supplied arguments",
+                self.inner.span,
+            ));
         }
         let mut arguments = HashMap::new();
         for (index, spec) in self.inner.arguments.iter().enumerate() {
-            let raw = supplied.get(index).map(String::as_str).or(spec.default.as_deref());
-            let raw = raw.ok_or_else(|| Diagnostic::new(
-                format!("Missing required argument '{}'", spec.name), spec.span,
-            ))?;
-            arguments.insert(spec.name.clone(), args::coerce(spec, raw, &self.inner.policy)?);
+            let raw = supplied
+                .get(index)
+                .map(String::as_str)
+                .or(spec.default.as_deref());
+            let raw = raw.ok_or_else(|| {
+                Diagnostic::new(
+                    format!("Missing required argument '{}'", spec.name),
+                    spec.span,
+                )
+            })?;
+            arguments.insert(
+                spec.name.clone(),
+                args::coerce(spec, raw, &self.inner.policy)?,
+            );
         }
         Ok(BoundScript { script: self.clone(), arguments })
     }
 
-    pub fn compile(source: &str, policy: ArgumentPolicy) -> Result<Self, Diagnostic> {
+    /// Compile owned expressions and validate all defaults against the policy.
+    pub fn compile(
+        source: &str,
+        policy: ArgumentPolicy,
+    ) -> Result<Self, Diagnostic> {
         let compiled = parser::parse(source, policy)?;
         validate_arguments(&compiled.path, &compiled.arguments)?;
         for spec in &compiled.arguments {
@@ -94,9 +115,13 @@ impl Script {
     }
 }
 
-fn validate_arguments(path: &[Expression], arguments: &[ArgSpec]) -> Result<(), Diagnostic> {
+fn validate_arguments(
+    path: &[Expression],
+    arguments: &[ArgSpec],
+) -> Result<(), Diagnostic> {
     let validate = |reference: &crate::ast::Reference| {
-        if !reference.tag && !arguments.iter().any(|a| a.name == reference.name) {
+        if !reference.tag && !arguments.iter().any(|a| a.name == reference.name)
+        {
             Err(Diagnostic::new(
                 format!("Undeclared argument '{}'", reference.name),
                 reference.span,
@@ -111,10 +136,17 @@ fn validate_arguments(path: &[Expression], arguments: &[ArgSpec]) -> Result<(), 
                 for alternative in alternatives {
                     if let Alternative::Reference(reference) = alternative {
                         validate(reference)?;
-                        if !reference.tag && !formatters.is_empty()
-                            && arguments.iter().any(|a| a.name == reference.name && a.kind == ArgKind::Path)
+                        if !reference.tag
+                            && !formatters.is_empty()
+                            && arguments.iter().any(|a| {
+                                a.name == reference.name
+                                    && a.kind == ArgKind::Path
+                            })
                         {
-                            return Err(Diagnostic::new("Cannot format a path argument", reference.span));
+                            return Err(Diagnostic::new(
+                                "Cannot format a path argument",
+                                reference.span,
+                            ));
                         }
                     }
                 }

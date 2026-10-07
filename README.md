@@ -42,6 +42,9 @@ The workspace is split by responsibility:
   handling helpers.
 - `crates/history/` contains the history data model and the concrete
   serde-backed history storage used by the CLI.
+- [crates/path-template/](crates/path-template/README.md) implements the new
+  path template language as an independent library. Its example is
+  `examples/stef-next.tfmt`; CLI integration is a subsequent milestone.
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
   integration tests.
 

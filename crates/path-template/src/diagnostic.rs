@@ -36,7 +36,8 @@ impl Diagnostic {
         }
         let before = &source[..start];
         let line = before.bytes().filter(|&byte| byte == b'\n').count() + 1;
-        let column = before.rsplit('\n').next().unwrap_or("").chars().count() + 1;
+        let column =
+            before.rsplit('\n').next().unwrap_or("").chars().count() + 1;
         (line, column)
     }
 }

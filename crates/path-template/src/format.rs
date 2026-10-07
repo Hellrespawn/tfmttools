@@ -6,7 +6,9 @@ pub(crate) fn year(text: &str) -> Result<String, String> {
     static PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
         [r"(\d{4})-\d{2}-\d{2}", r"\d{2}-\d{2}-(\d{4})", r"(\d{4})"]
             .iter()
-            .map(|pattern| Regex::new(pattern).expect("Built-in date pattern is valid"))
+            .map(|pattern| {
+                Regex::new(pattern).expect("Built-in date pattern is valid")
+            })
             .collect()
     });
     for pattern in PATTERNS.iter() {

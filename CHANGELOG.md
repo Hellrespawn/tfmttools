@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added an independent `path-template` workspace crate implementing the new
+  path template language, with a Stef layout example and behavior tests.
 - Added generated shell completions to release archives and Arch packages.
 - Added generated man pages to release archives and Arch packages.
 - Added `tfmt validate id3-encoding` to report non-ASCII ID3 text frames

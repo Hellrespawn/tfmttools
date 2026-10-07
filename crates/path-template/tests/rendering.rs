@@ -5,17 +5,20 @@ use std::path::PathBuf;
 use path_template::{ArgumentPolicy, BoundScript, RenderError, Scalar, Script};
 
 fn bind(source: &str) -> BoundScript {
-    Script::compile(source, ArgumentPolicy::new(&[])).unwrap().bind(&[]).unwrap()
+    Script::compile(source, ArgumentPolicy::new(&[]))
+        .unwrap()
+        .bind(&[])
+        .unwrap()
 }
 
-fn text(value: &str) -> Option<Scalar> {
-    Some(Scalar::Text(value.to_owned()))
+fn text(value: &str) -> Scalar {
+    Scalar::Text(value.to_owned())
 }
 
 #[test]
 fn quoted_literals_and_adjacent_values() {
     let path = bind(r#"path: ("A" {$title} " B")"#)
-        .render(|_| Ok::<_, Infallible>(text("T")))
+        .render(|_| Ok::<_, Infallible>(Some(text("T"))))
         .unwrap();
     assert_eq!(path.components(), ["AT B"]);
 }
@@ -30,7 +33,7 @@ fn zero_is_present() {
 
 #[test]
 fn missing_and_empty_are_absent() {
-    for value in [None, text("")] {
+    for value in [None, Some(text(""))] {
         let path = bind(r#"path: ([$album? "Album"] [!$album? "Single"])"#)
             .render(|_| Ok::<_, Infallible>(value.clone()))
             .unwrap();
@@ -44,7 +47,7 @@ fn fallback_is_lazy() {
     let path = bind(r#"path: ({$albumartist ?? $artist ?? "Unknown"})"#)
         .render(|name| {
             calls.push(name.to_owned());
-            Ok::<_, Infallible>(text("Album Artist"))
+            Ok::<_, Infallible>(Some(text("Album Artist")))
         })
         .unwrap();
     assert_eq!(path.components(), ["Album Artist"]);
@@ -61,7 +64,11 @@ fn skipped_guard_does_not_lookup_contents() {
     let path = bind("path: ([$album? {$date | year} /] {$title})")
         .render(|name| {
             calls.push(name.to_owned());
-            Ok::<_, Infallible>(if name == "title" { text("Song") } else { None })
+            Ok::<_, Infallible>(if name == "title" {
+                Some(text("Song"))
+            } else {
+                None
+            })
         })
         .unwrap();
     assert_eq!(path.components(), ["Song"]);
@@ -72,7 +79,11 @@ fn skipped_guard_does_not_lookup_contents() {
 fn resolver_error_has_reference_span() {
     let source = "path: ({$title})";
     let error = bind(source)
-        .render(|_| Err::<Option<Scalar>, _>(io::Error::from(io::ErrorKind::PermissionDenied)))
+        .render(|_| {
+            Err::<Option<Scalar>, _>(io::Error::from(
+                io::ErrorKind::PermissionDenied,
+            ))
+        })
         .unwrap_err();
     let RenderError::Resolver { name, span, source: error } = error else {
         panic!("Expected the original resolver error");
@@ -87,8 +98,10 @@ fn all_references_are_visible_before_rendering() {
     let script = Script::compile(
         "path: ([$album? {$title}] {$title})",
         ArgumentPolicy::new(&[]),
-    ).unwrap();
-    let names: Vec<_> = script.tag_references().iter().map(|r| r.name.as_str()).collect();
+    )
+    .unwrap();
+    let names: Vec<_> =
+        script.tag_references().iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, ["album", "title", "title"]);
 }
 
@@ -97,9 +110,13 @@ fn whitespace_only_argument_is_preserved() {
     let script = Script::compile(
         r#"arg suffix: string path: ("A" {suffix} "B")"#,
         ArgumentPolicy::new(&[]),
-    ).unwrap();
-    let path = script.bind(&[" ".to_owned()]).unwrap()
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    )
+    .unwrap();
+    let path = script
+        .bind(&[" ".to_owned()])
+        .unwrap()
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap();
     assert_eq!(path.components(), ["A B"]);
 }
 
@@ -108,9 +125,13 @@ fn supplied_empty_value_overrides_default() {
     let script = Script::compile(
         r#"arg suffix: string(default: "fallback") path: ("A" {suffix} "B")"#,
         ArgumentPolicy::new(&[]),
-    ).unwrap();
-    let path = script.bind(&[String::new()]).unwrap()
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    )
+    .unwrap();
+    let path = script
+        .bind(&[String::new()])
+        .unwrap()
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap();
     assert_eq!(path.components(), ["AB"]);
 }
 
@@ -118,25 +139,30 @@ fn supplied_empty_value_overrides_default() {
 fn year_extraction_and_padding() {
     for date in ["2024-03-10", "10-03-2024", "2024", "released in 2024"] {
         let path = bind("path: ({$date | year})")
-            .render(|_| Ok::<_, Infallible>(text(date))).unwrap();
+            .render(|_| Ok::<_, Infallible>(Some(text(date))))
+            .unwrap();
         assert_eq!(path.components(), ["2024"], "{date}");
     }
     let path = bind("path: ({$date | year | pad(6)})")
-        .render(|_| Ok::<_, Infallible>(text("2024"))).unwrap();
+        .render(|_| Ok::<_, Infallible>(Some(text("2024"))))
+        .unwrap();
     assert_eq!(path.components(), ["002024"]);
 }
 
 #[test]
 fn date_pattern_precedence() {
     let path = bind("path: ({$date | year})")
-        .render(|_| Ok::<_, Infallible>(text("1999 then 2024-03-10"))).unwrap();
+        .render(|_| Ok::<_, Infallible>(Some(text("1999 then 2024-03-10"))))
+        .unwrap();
     assert_eq!(path.components(), ["2024"]);
 }
 
 #[test]
 fn bad_date_has_formatter_span() {
     let source = "path: ({$date | year})";
-    let error = bind(source).render(|_| Ok::<_, Infallible>(text("unknown"))).unwrap_err();
+    let error = bind(source)
+        .render(|_| Ok::<_, Infallible>(Some(text("unknown"))))
+        .unwrap_err();
     let RenderError::Template(error) = error;
     assert_eq!(&source[error.span.start..error.span.end], "year");
     assert!(error.message.contains("year"));
@@ -145,7 +171,8 @@ fn bad_date_has_formatter_span() {
 #[test]
 fn absent_formatter_input_emits_nothing() {
     let path = bind(r#"path: ({$date | year} "Song")"#)
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap();
     assert_eq!(path.components(), ["Song"]);
 }
 
@@ -160,7 +187,8 @@ fn padding_is_minimum_width_and_zero_is_preserved() {
         (Scalar::Text("é".to_owned()), 2, "0é"),
     ] {
         let path = bind(&format!("path: ({{$track | pad({width})}})"))
-            .render(|_| Ok::<_, Infallible>(Some(value.clone()))).unwrap();
+            .render(|_| Ok::<_, Infallible>(Some(value.clone())))
+            .unwrap();
         assert_eq!(path.components(), [expected]);
     }
 }
@@ -168,7 +196,13 @@ fn padding_is_minimum_width_and_zero_is_preserved() {
 #[test]
 fn formatter_applies_to_selected_fallback() {
     let path = bind("path: ({$a ?? $b | pad(2)})")
-        .render(|name| Ok::<_, Infallible>(if name == "b" { text("3") } else { None }))
+        .render(|name| {
+            Ok::<_, Infallible>(if name == "b" {
+                Some(text("3"))
+            } else {
+                None
+            })
+        })
         .unwrap();
     assert_eq!(path.components(), ["03"]);
 }
@@ -186,7 +220,8 @@ fn formatters_reject_path_arguments_in_all_alternatives() {
 #[test]
 fn native_separators() {
     let path = bind(r#"path: ("Artist" / "Song")"#)
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap();
     assert_eq!(path.components(), ["Artist", "Song"]);
     assert_eq!(path.to_path_buf(), PathBuf::from("Artist").join("Song"));
     assert!(!path.is_rooted());
@@ -197,10 +232,14 @@ fn prefix_components() {
     let script = Script::compile(
         r#"arg prefix: path path: ({prefix} "Artist" / "Song")"#,
         ArgumentPolicy::new(&[]),
-    ).unwrap();
+    )
+    .unwrap();
     for prefix in ["Music/Artists", "Music\\Artists", "/Music//Artists/"] {
-        let path = script.bind(&[prefix.to_owned()]).unwrap()
-            .render(|_| Ok::<_, Infallible>(None)).unwrap();
+        let path = script
+            .bind(&[prefix.to_owned()])
+            .unwrap()
+            .render(|_| Ok::<_, Infallible>(None))
+            .unwrap();
         assert_eq!(path.components(), ["Music", "Artists", "Artist", "Song"]);
         assert!(!path.is_rooted());
     }
@@ -208,8 +247,11 @@ fn prefix_components() {
 
 #[test]
 fn empty_prefix_has_no_boundary() {
-    let path = bind(r#"arg prefix: path(default: "") path: ({prefix} "Artist" / "Song")"#)
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+    let path = bind(
+        r#"arg prefix: path(default: "") path: ({prefix} "Artist" / "Song")"#,
+    )
+    .render(|_| Ok::<_, Infallible>(None))
+    .unwrap();
     assert_eq!(path.components(), ["Artist", "Song"]);
 }
 
@@ -218,9 +260,13 @@ fn argument_after_component_text_is_error() {
     let script = Script::compile(
         r#"arg prefix: path path: ("A" {prefix} "B")"#,
         ArgumentPolicy::new(&[]),
-    ).unwrap();
-    let error = script.bind(&["Music".to_owned()]).unwrap()
-        .render(|_| Ok::<_, Infallible>(None)).unwrap_err();
+    )
+    .unwrap();
+    let error = script
+        .bind(&["Music".to_owned()])
+        .unwrap()
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap_err();
     assert!(error.to_string().contains("boundary"));
 }
 
@@ -229,9 +275,13 @@ fn explicit_separator_after_path_argument_is_error() {
     let script = Script::compile(
         r#"arg prefix: path path: ({prefix} / "Song")"#,
         ArgumentPolicy::new(&[]),
-    ).unwrap();
-    let error = script.bind(&["Music".to_owned()]).unwrap()
-        .render(|_| Ok::<_, Infallible>(None)).unwrap_err();
+    )
+    .unwrap();
+    let error = script
+        .bind(&["Music".to_owned()])
+        .unwrap()
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap_err();
     assert!(error.to_string().contains("empty component"));
 }
 
@@ -245,19 +295,25 @@ fn invalid_boundaries() {
         r#"path: ("A" / {$missing})"#,
         r#"path: (/ / "A")"#,
     ] {
-        assert!(bind(source).render(|_| Ok::<_, Infallible>(None)).is_err(), "{source}");
+        assert!(
+            bind(source).render(|_| Ok::<_, Infallible>(None)).is_err(),
+            "{source}"
+        );
     }
 }
 
 #[test]
 fn root_separator() {
     let path = bind(r#"path: (/ "Artist" / "Song")"#)
-        .render(|_| Ok::<_, Infallible>(None)).unwrap();
+        .render(|_| Ok::<_, Infallible>(None))
+        .unwrap();
     assert!(path.is_rooted());
     assert_eq!(path.components(), ["Artist", "Song"]);
     assert_eq!(
         path.to_path_buf(),
-        PathBuf::from(std::path::MAIN_SEPARATOR_STR).join("Artist").join("Song"),
+        PathBuf::from(std::path::MAIN_SEPARATOR_STR)
+            .join("Artist")
+            .join("Song"),
     );
 }
 
@@ -265,7 +321,8 @@ fn root_separator() {
 fn prepared_tag_cannot_inject_boundary() {
     for value in ["Artist/Album", "Artist\\Album"] {
         let error = bind("path: ({$artist})")
-            .render(|_| Ok::<_, Infallible>(text(value))).unwrap_err();
+            .render(|_| Ok::<_, Infallible>(Some(text(value))))
+            .unwrap_err();
         assert!(error.to_string().contains("separator"));
     }
 }

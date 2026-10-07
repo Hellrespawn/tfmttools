@@ -3,10 +3,16 @@ use std::mem::discriminant;
 use crate::ast::{Alternative, Expression, Formatter, Reference};
 use crate::lexer::{Kind, Token, lex};
 use crate::script::Compiled;
-use crate::{ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, Metadata, Span, TagReference};
+use crate::{
+    ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, Metadata, Span, TagReference,
+};
 
-pub(crate) fn parse(source: &str, policy: ArgumentPolicy) -> Result<Compiled, Diagnostic> {
-    let mut parser = Parser { tokens: lex(source)?, index: 0, references: Vec::new() };
+pub(crate) fn parse(
+    source: &str,
+    policy: ArgumentPolicy,
+) -> Result<Compiled, Diagnostic> {
+    let mut parser =
+        Parser { tokens: lex(source)?, index: 0, references: Vec::new() };
     let mut metadata = Metadata::default();
     let mut arguments = Vec::<ArgSpec>::new();
     let mut path = None;
@@ -22,7 +28,10 @@ pub(crate) fn parse(source: &str, policy: ArgumentPolicy) -> Result<Compiled, Di
         if name == "arg" {
             let argument = parser.argument(definition.span.start)?;
             if arguments.iter().any(|existing| existing.name == argument.name) {
-                return Err(Diagnostic::new("Duplicate argument", argument.span));
+                return Err(Diagnostic::new(
+                    "Duplicate argument",
+                    argument.span,
+                ));
             }
             arguments.push(argument);
             continue;
@@ -30,25 +39,53 @@ pub(crate) fn parse(source: &str, policy: ArgumentPolicy) -> Result<Compiled, Di
         parser.expect(&Kind::Colon, "Expected ':' after definition name")?;
         match name.as_str() {
             "name" | "description" => {
-                let slot = if name == "name" { &mut metadata.name } else { &mut metadata.description };
+                let slot = if name == "name" {
+                    &mut metadata.name
+                } else {
+                    &mut metadata.description
+                };
                 if slot.is_some() {
-                    return Err(Diagnostic::new("Duplicate definition", definition.span));
+                    return Err(Diagnostic::new(
+                        "Duplicate definition",
+                        definition.span,
+                    ));
                 }
                 *slot = Some(parser.text()?);
             },
             "path" => {
                 if path.is_some() {
-                    return Err(Diagnostic::new("Duplicate path definition", definition.span));
+                    return Err(Diagnostic::new(
+                        "Duplicate path definition",
+                        definition.span,
+                    ));
                 }
-                parser.expect(&Kind::OpenParen, "Expected '(' after 'path:'")?;
+                parser
+                    .expect(&Kind::OpenParen, "Expected '(' after 'path:'")?;
                 path = Some(parser.sequence(&Kind::CloseParen)?);
-                path_span = Span { start: definition.span.start, end: parser.previous_span().end };
+                path_span = Span {
+                    start: definition.span.start,
+                    end: parser.previous_span().end,
+                };
             },
-            _ => return Err(Diagnostic::new("Unknown definition", definition.span)),
+            _ => {
+                return Err(Diagnostic::new(
+                    "Unknown definition",
+                    definition.span,
+                ));
+            },
         }
     }
-    let path = path.ok_or_else(|| Diagnostic::new("Missing path definition", parser.current().span))?;
-    Ok(Compiled { metadata, arguments, references: parser.references, path, span: path_span, policy })
+    let path = path.ok_or_else(|| {
+        Diagnostic::new("Missing path definition", parser.current().span)
+    })?;
+    Ok(Compiled {
+        metadata,
+        arguments,
+        references: parser.references,
+        path,
+        span: path_span,
+        policy,
+    })
 }
 
 struct Parser {
@@ -87,7 +124,11 @@ impl Parser {
         }
     }
 
-    fn expect(&mut self, kind: &Kind, message: &str) -> Result<Token, Diagnostic> {
+    fn expect(
+        &mut self,
+        kind: &Kind,
+        message: &str,
+    ) -> Result<Token, Diagnostic> {
         if self.at(kind) {
             Ok(self.take())
         } else {
@@ -96,13 +137,15 @@ impl Parser {
     }
 
     fn name(&mut self) -> Result<String, Diagnostic> {
-        let token = self.expect(&Kind::Name(String::new()), "Expected an identifier")?;
+        let token =
+            self.expect(&Kind::Name(String::new()), "Expected an identifier")?;
         let Kind::Name(name) = token.kind else { unreachable!() };
         Ok(name)
     }
 
     fn text(&mut self) -> Result<String, Diagnostic> {
-        let token = self.expect(&Kind::Text(String::new()), "Expected a quoted string")?;
+        let token = self
+            .expect(&Kind::Text(String::new()), "Expected a quoted string")?;
         let Kind::Text(text) = token.kind else { unreachable!() };
         Ok(text)
     }
@@ -115,7 +158,12 @@ impl Parser {
             "string" => ArgKind::String,
             "int" => ArgKind::Int,
             "path" => ArgKind::Path,
-            _ => return Err(Diagnostic::new("Unknown argument type", kind_span)),
+            _ => {
+                return Err(Diagnostic::new(
+                    "Unknown argument type",
+                    kind_span,
+                ));
+            },
         };
         let mut default = None;
         let mut description = None;
@@ -127,19 +175,36 @@ impl Parser {
                 let slot = match setting.as_str() {
                     "default" => &mut default,
                     "description" => &mut description,
-                    _ => return Err(Diagnostic::new("Unknown argument option", setting_span)),
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "Unknown argument option",
+                            setting_span,
+                        ));
+                    },
                 };
                 if slot.is_some() {
-                    return Err(Diagnostic::new("Duplicate argument option", setting_span));
+                    return Err(Diagnostic::new(
+                        "Duplicate argument option",
+                        setting_span,
+                    ));
                 }
                 *slot = Some(self.text()?);
                 if !self.consume(&Kind::Comma) {
-                    self.expect(&Kind::CloseParen, "Expected ',' or ')' after option")?;
+                    self.expect(
+                        &Kind::CloseParen,
+                        "Expected ',' or ')' after option",
+                    )?;
                     break;
                 }
             }
         }
-        Ok(ArgSpec { name, kind, default, description, span: Span { start, end: self.previous_span().end } })
+        Ok(ArgSpec {
+            name,
+            kind,
+            default,
+            description,
+            span: Span { start, end: self.previous_span().end },
+        })
     }
 
     fn reference(&mut self) -> Result<Reference, Diagnostic> {
@@ -147,10 +212,16 @@ impl Parser {
         let (name, tag) = match token.kind {
             Kind::Name(name) => (name, false),
             Kind::Tag(name) => (name, true),
-            _ => return Err(Diagnostic::new("Expected an argument or '$tag' reference", token.span)),
+            _ => {
+                return Err(Diagnostic::new(
+                    "Expected an argument or '$tag' reference",
+                    token.span,
+                ));
+            },
         };
         if tag {
-            self.references.push(TagReference { name: name.clone(), span: token.span });
+            self.references
+                .push(TagReference { name: name.clone(), span: token.span });
         }
         Ok(Reference { name, tag, span: token.span })
     }
@@ -159,12 +230,18 @@ impl Parser {
         let span = self.current().span;
         let text = self.text()?;
         if text.contains(['/', '\\']) {
-            return Err(Diagnostic::new("Use a bare '/' for path separators", span));
+            return Err(Diagnostic::new(
+                "Use a bare '/' for path separators",
+                span,
+            ));
         }
         Ok(text)
     }
 
-    fn sequence(&mut self, closing: &Kind) -> Result<Vec<Expression>, Diagnostic> {
+    fn sequence(
+        &mut self,
+        closing: &Kind,
+    ) -> Result<Vec<Expression>, Diagnostic> {
         let mut expressions = Vec::new();
         while !self.consume(closing) {
             let span = self.current().span;
@@ -182,18 +259,29 @@ impl Parser {
                     self.take();
                     let negative = self.consume(&Kind::Bang);
                     let reference = self.reference()?;
-                    self.expect(&Kind::Question, "Expected '?' after guard reference")?;
+                    self.expect(
+                        &Kind::Question,
+                        "Expected '?' after guard reference",
+                    )?;
                     let contents = self.sequence(&Kind::CloseBracket)?;
                     Expression::Guard { reference, negative, contents }
                 },
-                _ => return Err(Diagnostic::new("Expected a quoted literal, interpolation, guard, or '/'", span)),
+                _ => {
+                    return Err(Diagnostic::new(
+                        "Expected a quoted literal, interpolation, guard, or '/'",
+                        span,
+                    ));
+                },
             };
             expressions.push(expression);
         }
         Ok(expressions)
     }
 
-    fn interpolation(&mut self, start: usize) -> Result<Expression, Diagnostic> {
+    fn interpolation(
+        &mut self,
+        start: usize,
+    ) -> Result<Expression, Diagnostic> {
         let mut alternatives = Vec::new();
         loop {
             let alternative = if self.at(&Kind::Text(String::new())) {
@@ -213,17 +301,35 @@ impl Parser {
                 "year" => Formatter::Year(span),
                 "pad" => {
                     self.expect(&Kind::OpenParen, "Expected '(' after pad")?;
-                    let width_token = self.expect(&Kind::Number(String::new()), "Expected a nonnegative padding width")?;
-                    let Kind::Number(width) = width_token.kind else { unreachable!() };
-                    let width = width.parse::<usize>().map_err(|_| Diagnostic::new("Invalid padding width", width_token.span))?;
-                    self.expect(&Kind::CloseParen, "Expected ')' after padding width")?;
+                    let width_token = self.expect(
+                        &Kind::Number(String::new()),
+                        "Expected a nonnegative padding width",
+                    )?;
+                    let Kind::Number(width) = width_token.kind else {
+                        unreachable!()
+                    };
+                    let width = width.parse::<usize>().map_err(|_| {
+                        Diagnostic::new(
+                            "Invalid padding width",
+                            width_token.span,
+                        )
+                    })?;
+                    self.expect(
+                        &Kind::CloseParen,
+                        "Expected ')' after padding width",
+                    )?;
                     Formatter::Pad(width)
                 },
                 _ => return Err(Diagnostic::new("Unknown formatter", span)),
             };
             formatters.push(formatter);
         }
-        let close = self.expect(&Kind::CloseBrace, "Expected '}' after interpolation")?;
-        Ok(Expression::Interpolation { alternatives, formatters, span: Span { start, end: close.span.end } })
+        let close =
+            self.expect(&Kind::CloseBrace, "Expected '}' after interpolation")?;
+        Ok(Expression::Interpolation {
+            alternatives,
+            formatters,
+            span: Span { start, end: close.span.end },
+        })
     }
 }

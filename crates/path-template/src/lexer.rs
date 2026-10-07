@@ -64,7 +64,9 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
             '"' => Kind::Text(lexer.string(start)?),
             '$' => {
                 if !lexer.peek().is_some_and(is_name_start) {
-                    return Err(lexer.error("Expected a tag name after '$'", start));
+                    return Err(
+                        lexer.error("Expected a tag name after '$'", start)
+                    );
                 }
                 let name_start = lexer.offset;
                 lexer.name_tail(true);
@@ -129,12 +131,18 @@ impl Lexer<'_> {
             self.advance();
             match c {
                 '"' => return Ok(result),
-                '\\' => match self.peek() {
-                    Some(escaped @ ('"' | '\\')) => {
-                        self.advance();
-                        result.push(escaped);
-                    },
-                    _ => return Err(self.error("Invalid string escape", start)),
+                '\\' => {
+                    match self.peek() {
+                        Some(escaped @ ('"' | '\\')) => {
+                            self.advance();
+                            result.push(escaped);
+                        },
+                        _ => {
+                            return Err(
+                                self.error("Invalid string escape", start)
+                            );
+                        },
+                    }
                 },
                 _ => result.push(c),
             }

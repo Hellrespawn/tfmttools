@@ -1,0 +1,131 @@
+use std::collections::BTreeMap;
+use std::convert::Infallible;
+
+use path_template::{ArgumentPolicy, Scalar, Script};
+
+const SOURCE: &str = include_str!("fixtures/stef.tfmt");
+
+fn tags() -> BTreeMap<String, Scalar> {
+    [
+        ("artist", "Example Artist"),
+        ("albumartist", "Example Artist"),
+        ("album", "Example Album"),
+        ("date", "2024-03-10"),
+        ("albumsort", "2"),
+        ("discnumber", "1"),
+        ("tracknumber", "3"),
+        ("title", "Example Song"),
+    ]
+    .into_iter()
+    .map(|(name, value)| (name.to_owned(), Scalar::Text(value.to_owned())))
+    .collect()
+}
+
+fn render(
+    source: &str,
+    tags: &BTreeMap<String, Scalar>,
+    args: &[String],
+) -> Vec<String> {
+    let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
+    let script =
+        Script::compile(source, ArgumentPolicy::new(&forbidden)).unwrap();
+    script
+        .bind(args)
+        .unwrap()
+        .render(|name| Ok::<_, Infallible>(tags.get(name).cloned()))
+        .unwrap()
+        .components()
+        .to_vec()
+}
+
+#[test]
+fn stef_complete_layout() {
+    assert_eq!(render(SOURCE, &tags(), &["Music".to_owned()]), [
+        "Music",
+        "Example Artist",
+        "2024.02 - Example Album",
+        "103 - Example Artist - Example Song"
+    ],);
+}
+
+#[test]
+fn stef_missing_optional_tags() {
+    for (missing, album_directory, filename) in [
+        ("album", None, "103 - Example Artist - Example Song"),
+        ("date", Some("Example Album"), "103 - Example Artist - Example Song"),
+        (
+            "albumsort",
+            Some("2024 - Example Album"),
+            "103 - Example Artist - Example Song",
+        ),
+        ("albumartist", Some("2024.02 - Example Album"), "103 - Example Song"),
+        ("artist", Some("2024.02 - Example Album"), "103 - Example Song"),
+        (
+            "discnumber",
+            Some("2024.02 - Example Album"),
+            "03 - Example Artist - Example Song",
+        ),
+        (
+            "tracknumber",
+            Some("2024.02 - Example Album"),
+            "1Example Artist - Example Song",
+        ),
+    ] {
+        let mut tags = tags();
+        tags.remove(missing);
+        let mut expected = vec!["Example Artist".to_owned()];
+        if let Some(directory) = album_directory {
+            expected.push(directory.to_owned());
+        }
+        expected.push(filename.to_owned());
+        assert_eq!(render(SOURCE, &tags, &[]), expected, "{missing}");
+    }
+}
+
+#[test]
+fn stef_empty_tags_behave_like_missing_tags() {
+    let mut missing = tags();
+    missing.remove("album");
+    let mut empty = tags();
+    empty.insert("album".to_owned(), Scalar::Text(String::new()));
+    assert_eq!(render(SOURCE, &missing, &[]), render(SOURCE, &empty, &[]));
+    assert_eq!(render(SOURCE, &empty, &[]), [
+        "Example Artist",
+        "103 - Example Artist - Example Song"
+    ]);
+}
+
+#[test]
+fn stef_zero_is_present() {
+    let mut tags = tags();
+    tags.insert("albumsort".to_owned(), Scalar::Integer(0));
+    tags.insert("tracknumber".to_owned(), Scalar::Integer(0));
+    assert_eq!(render(SOURCE, &tags, &[]), [
+        "Example Artist",
+        "2024.00 - Example Album",
+        "100 - Example Artist - Example Song"
+    ],);
+}
+
+#[test]
+fn stef_directory_prefix_is_structural() {
+    assert_eq!(render(SOURCE, &tags(), &["Music\\Artists".to_owned()]), [
+        "Music",
+        "Artists",
+        "Example Artist",
+        "2024.02 - Example Album",
+        "103 - Example Artist - Example Song"
+    ],);
+}
+
+#[test]
+fn stef_outside_string_whitespace_does_not_change_output() {
+    let expanded = SOURCE
+        .replace("path: (", "path: (\n # path comment\n")
+        .replace("[$album?", "[ $album ?\n # album comment\n");
+    assert_eq!(render(&expanded, &tags(), &[]), [
+        "Example Artist",
+        "2024.02 - Example Album",
+        "103 - Example Artist - Example Song"
+    ],);
+}
