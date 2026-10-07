@@ -1,7 +1,7 @@
 [workspace.package]
 version = "0.24.0"
 authors = ["Stef Korporaal <stef@skorporaal.com>"]
-description = "Use `minijinja` to rename audio files according to their tags."
+description = "Rename audio files according to their tags using path templates."
 edition = "2024"
 license = "BSD-3-Clause"
 rust-version = "1.89.0"
@@ -46,17 +46,11 @@ indicatif = { version = "0.18.4", features = ["improved_unicode"] }
 itertools = "0.14.0"
 libtest-mimic = "0.8.2"
 lofty = "0.24.0"
-minijinja = { version = "2.19.0", default-features = false, features = [
-    "loader",
-    "serde",
-    "builtins",
-] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 textwrap = "0.16.1"
 thiserror = "2.0.18"
-toml = "1.1.2"
 tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

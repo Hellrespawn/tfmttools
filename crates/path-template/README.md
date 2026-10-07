@@ -142,6 +142,5 @@ and the failing reference's byte span. The full Stef layout and synthetic
 metadata scenarios are in this package's `tests/` directory.
 
 From the workspace root, run `cargo test -p path-template` or
-`cargo clippy -p path-template --all-targets`. CLI integration into tfmt is
-a following milestone; this crate currently evaluates the new language
-independently of the application's `MiniJinja` engine.
+`cargo clippy -p path-template --all-targets`. tfmt uses this crate through its
+audio metadata adapter; the library remains independent of application code.

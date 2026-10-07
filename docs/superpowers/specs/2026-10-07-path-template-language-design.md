@@ -1,8 +1,7 @@
 # Path template language
 
-Status: approved. The standalone `path-template` crate implements this
-syntax. The CLI integration milestone is pending; the current binary
-continues to use MiniJinja.
+Status: approved and implemented. The standalone `path-template` crate and
+tfmt CLI use this syntax. MiniJinja and TOML frontmatter have been removed.
 
 ## Purpose and agreed scope
 

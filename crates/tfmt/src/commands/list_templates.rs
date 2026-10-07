@@ -22,7 +22,7 @@ pub fn list_templates(template_directory: &Utf8Directory) -> Result<()> {
     }
 
     for template in all_templates {
-        println!("{}", format_template(&template));
+        println!("{}", format_template(template));
     }
 
     Ok(())
@@ -87,7 +87,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        let formatted = format_template(&loader.get_all_templates()[0]);
+        let formatted = format_template(loader.get_all_templates()[0]);
         assert!(formatted.contains("Test Template: A test template."));
         assert!(formatted.contains("prefix (path, required)"));
         assert!(formatted.contains("suffix (string, default: \"\")"));
@@ -98,6 +98,6 @@ mod tests {
     #[test]
     fn listing_uses_lookup_name_without_metadata() {
         let loader = TemplateLoader::read_script(r#"path: ("Song")"#).unwrap();
-        assert_eq!(format_template(&loader.get_all_templates()[0]), "script");
+        assert_eq!(format_template(loader.get_all_templates()[0]), "script");
     }
 }

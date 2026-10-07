@@ -1,6 +1,6 @@
 # tfmt
 
-Use `minijinja` to rename audio files according to their tags.
+Rename audio files according to their tags using small path templates.
 
 ## Installation
 
@@ -30,7 +30,7 @@ tfmt --version
 ## Workspace Map
 
 `tfmt` is a CLI for renaming audio files from their tags using
-`minijinja` templates.
+path templates.
 
 The workspace is split by responsibility:
 
@@ -44,7 +44,7 @@ The workspace is split by responsibility:
   serde-backed history storage used by the CLI.
 - [crates/path-template/](crates/path-template/README.md) implements the new
   path template language as an independent library. Its example is
-  `examples/stef-next.tfmt`; CLI integration is a subsequent milestone.
+  `examples/stef.tfmt`; the CLI uses this library for all scripts.
 - `crates/test-harness/` contains shared test utilities used by fixture-backed
   integration tests.
 
@@ -60,7 +60,7 @@ Supporting directories:
 
 ## Usage
 
-Write a `minijinja` template and run `tfmt rename` against a directory of audio
+Write a path template and run `tfmt rename` against a directory of audio
 files.
 
 Always inspect a large rename plan with `--dry-run` first:
@@ -109,62 +109,111 @@ Both `--fix` commands change file tags and record undoable history.
 
 ### Templates
 
-Templates render target paths without the file extension. `tfmt` keeps the
-source file extension.
+Templates render target paths without the file extension. `tfmt` appends the
+source extension, including when the rendered filename already contains dots.
+Use `.tfmt` files and select them with `--template` (`-t`), or pass the same
+document syntax directly with `--script` (`-s`):
 
-For example, a template can group files by artist and title:
-
-```jinja
-{{ artist }}/{{ title }}
+```sh
+tfmt --dry-run rename --script 'path: ({$artist} / {$title})'
 ```
 
-Literal `/` or `\` characters in the template create directories. Separators
-coming from interpolated tag values are sanitized so tags cannot accidentally
-create extra directories.
+The loader still discovers `.jinja` and `.j2` files, but their contents must
+also use the new syntax. Lookup uses the filename stem. `name` and
+`description` control the metadata shown by `tfmt list-templates`.
 
-### Script Frontmatter
-
-A script may start with an optional TOML frontmatter block, fenced by `+++` on
-its own line at the very start of the file:
-
-```jinja
-+++
-name = "Stef's layout"
-description = "Group by artist and album, with a directory prefix."
-
-args = [
-    { name = "prefix", type = "path", required = true, description = "Directory prefix to place output under." },
-    { name = "extra", type = "string", required = false, default = "", description = "Optional suffix tag." },
-]
-+++
-{{- prefix -}}
-{{- albumartist or artist -}}
-...
+```text
+name: "Artist and title"
+description: "Place tracks under an optional directory prefix."
+arg prefix: path(default: "", description: "Directory prefix.")
+arg suffix: string(default: "")
+path: ({prefix} {$artist} / {$title} {suffix})
 ```
 
-- `name` overrides the display name shown by `tfmt list-templates`. The
-  lookup name used by `--template <name>` is always the filename stem.
-- `description` becomes the template's description; when frontmatter is
-  present, no other description source (such as a leading comment) is used.
-- Each entry in `args` is matched to CLI-supplied positional values by
-  declaration order and is available in the script both by name (`{{ prefix }}`)
-  and by index (`{{ args[0] }}`).
-  - `type` is one of `string` (default), `int`, or `path`.
-  - `required = true` makes omitting the argument (with no `default`) a hard
-    error before rendering.
-  - `string` and `path` values are sanitized with the same forbidden-character
-    rules as tag values (see Filename Sanitization below); `path` values are
-    additionally split on `/`/`\`, sanitized segment-by-segment, and rejoined
-    with exactly one trailing `/`.
-  - `int` values that fail to parse are a hard error before rendering.
-- Supplying more positional arguments than a script declares is a hard error,
-  unless the script declares no `args` at all.
-- Scripts without a frontmatter block are unaffected: `args[N]` remains raw,
-  unsanitized, and unlimited in count, exactly as before. Using `args[N]`
-  without frontmatter, or relying on a leading comment as the description,
-  now logs a deprecation warning steering scripts toward frontmatter. Using
-  `args[N]` in a script that *does* have a frontmatter block is a hard error,
-  even if that block declares no `args`.
+Arguments are bare names; tags start with `$`. Adjacent expressions concatenate,
+with all literal text in double quotes. Whitespace outside strings is ignored.
+`#` starts a comment. Strings support escaped quotes (`\\"`) and backslashes
+(`\\`); other escapes are rejected. Tag names and argument names are case
+insensitive. Existing audio tag aliases are supported; unknown tags are errors,
+even in skipped guards. Missing recognized tags are allowed.
+
+| Construct | Example | Meaning |
+| --- | --- | --- |
+| Tag interpolation | `{$title}` | Insert a prepared tag value. |
+| Argument interpolation | `{suffix}` | Insert a declared argument. |
+| Fallback | `{$albumartist ?? $artist ?? "Unknown"}` | Select the first present value. |
+| Positive guard | `[$album? {$album} /]` | Include content when present. |
+| Negative guard | `[!$album? "Singles" /]` | Include content when missing or empty. |
+| Year extraction | `{$date \| year}` | Extract a four-digit year. |
+| Number padding | `{$tracknumber \| pad(2)}` | Pad displayed text to a minimum width. |
+
+Missing or empty values are absent; numeric zero is present. Guards and
+fallbacks evaluate only selected content. Nest guards for combined presence
+conditions. `year` checks ISO-style dates first, then day/month/year-style
+dates, then any four-digit year. Invalid present dates are errors. Padding
+accepts widths from 0 through 1024 and never truncates text.
+
+A bare `/` separates components using the host platform's native separator.
+Quoted path literals cannot contain `/` or `\`; tag separators are sanitized.
+Only a bare `/` as the first top-level expression requests the platform root;
+empty initial directories, repeated separators, and empty final filenames
+are errors. Windows drive and UNC prefixes are outside the initial grammar.
+
+### Arguments
+
+Declare arguments in CLI positional order with `arg name: type`. Types are
+`string`, `int`, and `path`. Arguments without `default` are required;
+`default: ""` makes a string or path optional. Supplied empty values override
+defaults. Integer arguments must fit a signed 64-bit integer; empty integers
+are invalid. Excess arguments are errors, including scripts with no declarations.
+
+String and path arguments are validated rather than sanitized. They reject
+the characters in the sanitization table below; `/` and `\` are allowed as
+structural separators in path arguments. Argument text is preserved without
+trimming or replacement. All defaults are validated during compilation, and
+all supplied values are checked before reading audio, including unused ones.
+Accepted whitespace still undergoes final filename validation.
+
+A path argument splits on both `/` and `\`, discards empty segments, and inserts
+complete directory components. Leading separators do not make it absolute.
+Thus `{prefix} {$artist}` needs no `/` after `{prefix}`. A path argument must
+occur at a component boundary; inserting one after unfinished text or following
+one immediately with `/` is an error.
+
+See [the language reference](crates/path-template/README.md) and the full
+[Stef layout](examples/stef.tfmt).
+
+### Migrating existing scripts
+
+MiniJinja templates and TOML frontmatter are no longer supported. Migration
+is manual; there is no converter or compatibility mode.
+
+| Old syntax | New syntax |
+| --- | --- |
+| `{{ artist }}/{{ title }}` | `path: ({$artist} / {$title})` |
+| `{{ albumartist or artist }}` | `{$albumartist ?? $artist}` |
+| `{% if album %}...{% endif %}` | `[$album? ...]` |
+| `{{ tracknumber \| zero_pad(2) }}` | `{$tracknumber \| pad(2)}` |
+| Frontmatter `name = "Layout"` | `name: "Layout"` |
+| Positional `args[0]` | Declare an argument, then interpolate its bare name. |
+
+Use first-class argument declarations instead of frontmatter `args` entries.
+Remove `required` settings: omit `default` to require an argument, or specify
+`default: ""` to make it optional. Arguments previously sanitized may now be
+rejected and must be corrected by the caller. Move leading description
+comments to `description: "..."`.
+
+Guards and fallbacks now retain zero values. The migrated Stef example also
+omits the filename artist prefix when the track artist is missing or empty:
+the old `albumartist and artist ~ " - "` expression could produce a dangling
+`" - "`; the new nested guards require both tags to be present. General Jinja
+comparisons, loops, includes, and arbitrary functions are unsupported.
+
+Saved filename references work after the referenced files are migrated.
+Reusing a saved Jinja inline script for a new rename fails with a migration
+hint; select an explicit replacement using `--script` or `--template`.
+Undo and redo still work with old history because they replay stored actions
+without parsing scripts. The history file format is unchanged.
 
 ### Safety
 

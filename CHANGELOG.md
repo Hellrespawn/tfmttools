@@ -13,6 +13,18 @@
 
 ### Changed
 
+- Replaced MiniJinja and TOML frontmatter with the path template language.
+  Existing scripts require manual migration; declarations and path rules now
+  share one document, and inline scripts use `path: (...)`.
+- Treat zero as present in guards and fallbacks. Stef's migrated layout omits
+  the filename artist prefix when the track artist is missing or empty.
+- Validate all string/path arguments and defaults against forbidden filename
+  characters instead of sanitizing them; preserve accepted argument whitespace.
+- Preserve legacy history undo/redo; saved Jinja scripts require an explicit
+  replacement when reused for a new rename.
+- Resolve relative rename input directories before scanning so cleanup retains
+  renamed targets in the input directory.
+
 - Changed validation commands to use validation types directly:
   `tfmt validate`, `tfmt validate characters`, and
   `tfmt validate id3-encoding`.
