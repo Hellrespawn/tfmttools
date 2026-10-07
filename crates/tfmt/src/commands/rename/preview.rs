@@ -79,27 +79,10 @@ fn format_warnings(warnings: &[Warning]) -> Option<String> {
 
     let mut lines: Vec<String> = Vec::new();
 
-    for warning in warnings {
-        match warning {
-            Warning::DeprecatedPositionalArgs { template } => {
-                lines.push(format!(
-                    "  \u{26a0} Template '{template}': uses positional args[N] without frontmatter; declare arguments to migrate."
-                ));
-            },
-            Warning::DeprecatedLeadingComment { template } => {
-                lines.push(format!(
-                    "  \u{26a0} Template '{template}': uses a leading comment as its description; move it to frontmatter's `description` field."
-                ));
-            },
-            Warning::WhitespaceInTag { .. } => {},
-        }
-    }
-
     let mut whitespace_by_tag: HashMap<&str, usize> = HashMap::new();
     for warning in warnings {
-        if let Warning::WhitespaceInTag { tag_name, .. } = warning {
-            *whitespace_by_tag.entry(tag_name.as_str()).or_insert(0) += 1;
-        }
+        let Warning::WhitespaceInTag { tag_name, .. } = warning;
+        *whitespace_by_tag.entry(tag_name.as_str()).or_insert(0) += 1;
     }
 
     let mut whitespace_entries: Vec<(&str, usize)> =
@@ -147,16 +130,5 @@ mod tests {
         let output = format_warnings(&warnings).unwrap();
         assert!(output.contains("2 files") && output.contains("track_artist"));
         assert!(output.contains("1 file") && output.contains("album"));
-    }
-
-    #[test]
-    fn format_warnings_includes_template_warnings() {
-        let warnings = vec![Warning::DeprecatedPositionalArgs {
-            template: "my_template".to_owned(),
-        }];
-
-        let output = format_warnings(&warnings).unwrap();
-        assert!(output.contains("my_template"));
-        assert!(output.contains("positional"));
     }
 }

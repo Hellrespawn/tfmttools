@@ -2,7 +2,6 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
-use tfmttools_core::warning::Warning;
 use tfmttools_fs::{FileOrName, TemplateLoader};
 use tfmttools_history::{History, LoadHistoryResult};
 use tracing::debug;
@@ -11,11 +10,10 @@ use super::RenameSession;
 use crate::cli::TemplateOption;
 
 pub(super) struct ResolvedTemplate {
-    pub(super) loader: TemplateLoader<'static>,
+    pub(super) loader: TemplateLoader,
     pub(super) template_name: String,
     pub(super) arguments: Vec<String>,
     pub(super) metadata: ActionRecordMetadata,
-    pub(super) warnings: Vec<Warning>,
 }
 
 pub(super) fn resolve_template(
@@ -91,7 +89,7 @@ fn resolve_file_or_name(
     debug!("Using template: '{file_or_name}'");
     debug!("Template arguments: '{}'", arguments.join("', '"));
 
-    let (loader, warnings) = match file_or_name {
+    let loader = match file_or_name {
         FileOrName::File(path, name) => {
             TemplateLoader::read_filename(path, name)
         },
@@ -110,13 +108,7 @@ fn resolve_file_or_name(
         &arguments,
     );
 
-    Ok(ResolvedTemplate {
-        loader,
-        template_name,
-        arguments,
-        metadata,
-        warnings,
-    })
+    Ok(ResolvedTemplate { loader, template_name, arguments, metadata })
 }
 
 fn resolve_script(
@@ -127,7 +119,7 @@ fn resolve_script(
     debug!("Using script:\n```\n{script}\n```");
     debug!("Template arguments: '{}'", arguments.join("', '"));
 
-    let (loader, warnings) = TemplateLoader::read_script(script)?;
+    let loader = TemplateLoader::read_script(script)?;
     let arguments = arguments.to_vec();
     let metadata = create_metadata(
         &TemplateMetadata::Script(script.to_owned()),
@@ -140,7 +132,6 @@ fn resolve_script(
         template_name: TemplateLoader::DEFAULT_SCRIPT_NAME.to_owned(),
         arguments,
         metadata,
-        warnings,
     })
 }
 

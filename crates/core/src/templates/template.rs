@@ -1,183 +1,124 @@
-use minijinja::Value;
+use std::convert::Infallible;
+use std::sync::Arc;
 
-use super::context::AudioFileContext;
-use super::frontmatter::ResolvedArgs;
-use super::{ArgSpec, Frontmatter};
+use path_template::{
+    ArgumentPolicy, BoundScript, Diagnostic, RenderError, RenderedPath, Script,
+};
+
+use super::context::AudioContext;
+use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
-use crate::error::TFMTResult;
+use crate::error::{TFMTError, TFMTResult};
+use crate::item_keys::ItemKeys;
+use crate::util::Utf8PathExt;
 use crate::warning::Warning;
 
-#[derive(Debug)]
-pub struct Template<'templates, 'source> {
-    inner: minijinja::Template<'templates, 'source>,
-    name: String,
-    description: Option<String>,
-    declared_args: Vec<ArgSpec>,
-    resolved: ResolvedArgs,
+#[derive(Clone, Debug)]
+pub struct Template {
+    script: Script,
+    lookup_name: String,
+    source: Arc<str>,
 }
 
-impl<'templates, 'source> Template<'templates, 'source> {
-    pub fn new(
-        inner: minijinja::Template<'templates, 'source>,
-        lookup_name: &str,
-        display_name: String,
-        description: Option<String>,
-        arguments: Vec<String>,
-        frontmatter: Option<&Frontmatter>,
-    ) -> TFMTResult<Self> {
-        let (declared_args, resolved) = match frontmatter {
-            Some(frontmatter) => {
-                (
-                    frontmatter.args().to_vec(),
-                    frontmatter.resolve(lookup_name, &arguments)?,
-                )
-            },
-            None => (Vec::new(), ResolvedArgs::raw(arguments)),
-        };
+#[derive(Debug)]
+pub struct BoundTemplate {
+    template: Template,
+    script: BoundScript,
+}
 
+impl Template {
+    pub fn compile(lookup_name: &str, source: String) -> TFMTResult<Self> {
+        let forbidden: Vec<char> = FORBIDDEN_CHARACTERS
+            .iter()
+            .flat_map(|entry| entry.char().chars())
+            .collect();
+        let script = Script::compile(&source, ArgumentPolicy::new(&forbidden))
+            .map_err(|error| Self::diagnostic(lookup_name, &source, &error))?;
+        for reference in script.tag_references() {
+            if reference.name != "date"
+                && ItemKeys::from_string(&reference.name).is_err()
+            {
+                return Err(Self::diagnostic(
+                    lookup_name,
+                    &source,
+                    &Diagnostic {
+                        message: format!("Unknown tag: '{}'", reference.name),
+                        span: reference.span,
+                    },
+                ));
+            }
+        }
         Ok(Self {
-            inner,
-            name: display_name,
-            description,
-            declared_args,
-            resolved,
+            script,
+            lookup_name: lookup_name.to_owned(),
+            source: source.into(),
         })
     }
 
-    #[must_use]
-    pub fn for_display(
-        inner: minijinja::Template<'templates, 'source>,
-        display_name: String,
-        description: Option<String>,
-        declared_args: Vec<ArgSpec>,
-    ) -> Self {
-        Self {
-            inner,
-            name: display_name,
-            description,
-            declared_args,
-            resolved: ResolvedArgs::default(),
-        }
+    fn diagnostic(name: &str, source: &str, error: &Diagnostic) -> TFMTError {
+        let (line, column) = error.line_column(source);
+        let legacy = source.contains("{{")
+            || source.contains("{%-")
+            || source.contains("{%")
+            || source.trim_start().starts_with("+++")
+            || source.trim_start().starts_with("{#");
+        let hint = if legacy {
+            " Legacy Jinja/frontmatter syntax requires manual migration; use a new script such as `path: ({$artist} / {$title})`."
+        } else {
+            ""
+        };
+        TFMTError::Template(format!(
+            "Template '{name}' at {line}:{column}: {}{hint}",
+            error.message
+        ))
     }
 
     #[must_use]
     pub fn name(&self) -> &str {
-        self.name.as_ref()
+        self.script.metadata().name.as_deref().unwrap_or(&self.lookup_name)
     }
 
     #[must_use]
-    pub fn description(&self) -> Option<&String> {
-        self.description.as_ref()
+    pub fn description(&self) -> Option<&str> {
+        self.script.metadata().description.as_deref()
     }
 
     #[must_use]
-    pub fn declared_args(&self) -> &[ArgSpec] {
-        &self.declared_args
+    pub fn declared_args(&self) -> &[path_template::ArgSpec] {
+        self.script.arguments()
     }
 
-    pub fn render(
-        &self,
-        audio_file: &AudioFile,
-    ) -> TFMTResult<(String, Vec<Warning>)> {
-        let context = AudioFileContext::safe(
-            audio_file.to_owned(),
-            self.resolved.clone(),
-        );
-
-        let context_value = Value::from_object(context);
-
-        let output = self.inner.render(&context_value)?;
-
-        let warnings = context_value
-            .downcast_object::<AudioFileContext>()
-            .map_or_else(Vec::new, |ctx| ctx.take_warnings());
-
-        Ok((output, warnings))
+    pub fn bind(&self, arguments: &[String]) -> TFMTResult<BoundTemplate> {
+        let script = self.script.bind(arguments).map_err(|error| {
+            Self::diagnostic(&self.lookup_name, &self.source, &error)
+        })?;
+        Ok(BoundTemplate { template: self.clone(), script })
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use minijinja::Environment;
-
-    use super::*;
-    use crate::templates::Frontmatter;
-
-    fn build_minijinja_template<'a>(
-        env: &'a Environment<'static>,
-        name: &'static str,
-    ) -> minijinja::Template<'a, 'a> {
-        env.get_template(name).unwrap()
-    }
-
-    #[test]
-    fn new_without_frontmatter_has_no_declared_args() {
-        let mut env = Environment::new();
-        env.add_template("t", "{{ args[0] }}").unwrap();
-        let inner = build_minijinja_template(&env, "t");
-
-        let template = Template::new(
-            inner,
-            "t",
-            "t".to_owned(),
-            None,
-            vec!["raw:value".to_owned()],
-            None,
-        )
-        .unwrap();
-
-        // Raw positional passthrough itself is covered by
-        // frontmatter::tests::raw_resolved_args_preserve_unsanitized_positional_values.
-        assert_eq!(template.declared_args().len(), 0);
-    }
-
-    #[test]
-    fn new_with_frontmatter_errors_on_missing_required_argument() {
-        let mut env = Environment::new();
-        env.add_template("t", "{{ prefix }}").unwrap();
-        let inner = build_minijinja_template(&env, "t");
-
-        let frontmatter = Frontmatter::parse(
-            "args = [{ name = \"prefix\", type = \"string\", required = true }]",
-            "t",
-        )
-        .unwrap();
-
-        let error = Template::new(
-            inner,
-            "t",
-            "t".to_owned(),
-            None,
-            Vec::new(),
-            Some(&frontmatter),
-        )
-        .unwrap_err();
-
-        assert!(matches!(
-            error,
-            crate::error::TFMTError::MissingRequiredArgument(_, _, _)
-        ));
-    }
-
-    #[test]
-    fn for_display_never_resolves_arguments() {
-        let mut env = Environment::new();
-        env.add_template("t", "{{ prefix }}").unwrap();
-        let inner = build_minijinja_template(&env, "t");
-
-        let frontmatter = Frontmatter::parse(
-            "args = [{ name = \"prefix\", type = \"string\", required = true }]",
-            "t",
-        )
-        .unwrap();
-
-        let template = Template::for_display(
-            inner,
-            "t".to_owned(),
-            None,
-            frontmatter.args().to_vec(),
-        );
-
-        assert_eq!(template.declared_args().len(), 1);
+impl BoundTemplate {
+    pub fn render(
+        &self,
+        audio_file: &AudioFile,
+    ) -> TFMTResult<(RenderedPath, Vec<Warning>)> {
+        let mut context = AudioContext::new(audio_file);
+        let result = self
+            .script
+            .render(|name| Ok::<_, Infallible>(context.resolve(name)));
+        let output = result.map_err(|error| {
+            let diagnostic = match error {
+                RenderError::Template(error) => error,
+                RenderError::Resolver { source, .. } => match source {},
+            };
+            TFMTError::TemplateRender {
+                file: audio_file.file().clone().into_path_buf(),
+                source: Box::new(Template::diagnostic(
+                    &self.template.lookup_name,
+                    &self.template.source,
+                    &diagnostic,
+                )),
+            }
+        })?;
+        Ok((output, context.take_warnings()))
     }
 }

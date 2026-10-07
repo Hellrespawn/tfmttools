@@ -1,162 +1,91 @@
-use std::sync::Mutex;
-
 use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
-use minijinja::Value;
-use minijinja::value::Object;
-use tracing::trace;
+use path_template::Scalar;
 
-use super::frontmatter::ResolvedArgs;
 use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
 use crate::item_keys::ItemKeys;
 use crate::warning::Warning;
 
-#[derive(Debug)]
-pub struct AudioFileContext {
-    audio_file: AudioFile,
-    resolved_args: ResolvedArgs,
-    warnings: Mutex<Vec<Warning>>,
+pub(super) struct AudioContext<'a> {
+    audio: &'a AudioFile,
+    warnings: Vec<Warning>,
 }
 
-impl AudioFileContext {
-    pub fn safe(audio_file: AudioFile, resolved_args: ResolvedArgs) -> Self {
-        Self { audio_file, resolved_args, warnings: Mutex::new(Vec::new()) }
+impl<'a> AudioContext<'a> {
+    pub fn new(audio: &'a AudioFile) -> Self {
+        Self { audio, warnings: Vec::new() }
     }
 
-    pub fn take_warnings(&self) -> Vec<Warning> {
-        self.warnings.lock().unwrap().drain(..).collect()
+    pub fn take_warnings(self) -> Vec<Warning> {
+        self.warnings
     }
 
-    fn safe_interpolation_value(value: &str) -> String {
-        Self::remove_forbidden_characters(value.trim().to_owned())
+    fn raw(&self, key: ItemKey) -> Option<&str> {
+        self.audio.tag().get_string(key)
     }
 
-    pub(super) fn remove_forbidden_characters(value: String) -> String {
-        let value = FORBIDDEN_CHARACTERS.iter().fold(
-            value,
-            |string, forbidden_character| {
-                string.replace(
-                    forbidden_character.char(),
-                    forbidden_character.replacement().unwrap_or(""),
+    fn safe(&mut self, key: ItemKey) -> Option<Scalar> {
+        let raw = self.raw(key)?.to_owned();
+        if raw != raw.trim() {
+            let warning = Warning::WhitespaceInTag {
+                file: self.audio.file().file_name().to_owned(),
+                tag_name: format!("{key:?}")
+                    .from_case(Case::Pascal)
+                    .to_case(Case::Snake),
+            };
+            if !self.warnings.contains(&warning) {
+                self.warnings.push(warning);
+            }
+        }
+        let text = FORBIDDEN_CHARACTERS.iter().fold(
+            raw.trim().to_owned(),
+            |text, forbidden| {
+                text.replace(
+                    forbidden.char(),
+                    forbidden.replacement().unwrap_or(""),
                 )
             },
         );
-
-        let value = value.trim_end_matches('.');
-
-        value.to_owned()
+        Some(Self::scalar(text.trim_end_matches('.').to_owned()))
     }
 
-    fn read_raw_tag_value(&self, key: ItemKey) -> Option<String> {
-        let tag = self
-            .audio_file
-            .tag()
-            .get_string(key)
-            .map(std::borrow::ToOwned::to_owned);
-
-        trace!(
-            "[{}][{:?}] => '{}'",
-            self.audio_file.file().file_name(),
-            key,
-            if let Some(tag) = &tag { tag } else { "unknown" }
-        );
-
-        tag
+    fn scalar(text: String) -> Scalar {
+        text.parse::<usize>()
+            .ok()
+            .and_then(|number| i64::try_from(number).ok())
+            .map_or_else(|| Scalar::Text(text), Scalar::Integer)
     }
 
-    fn read_safe_tag_value(&self, key: ItemKey) -> Option<String> {
-        let raw = self.read_raw_tag_value(key)?;
-
-        if raw != raw.trim() {
-            let tag_name =
-                format!("{key:?}").from_case(Case::Pascal).to_case(Case::Snake);
-            self.warnings.lock().unwrap().push(Warning::WhitespaceInTag {
-                file: self.audio_file.file().file_name().to_owned(),
-                tag_name,
-            });
-        }
-
-        Some(Self::safe_interpolation_value(&raw))
-    }
-
-    fn coerce_output_value(string: String) -> Value {
-        if let Ok(number) = string.parse::<usize>() {
-            number.into()
+    fn number(&self, key: ItemKey, total: bool) -> Option<Scalar> {
+        let raw = self.raw(key)?;
+        let (current, count) = if let Some((current, count)) =
+            raw.split_once('/')
+        {
+            (current.parse::<usize>().ok()?, Some(count.parse::<usize>().ok()?))
         } else {
-            string.into()
+            (raw.parse::<usize>().ok()?, None)
+        };
+        let number = if total { count? } else { current };
+        Some(Self::scalar(number.to_string()))
+    }
+
+    pub fn resolve(&mut self, name: &str) -> Option<Scalar> {
+        if name == "date" {
+            return self
+                .safe(ItemKey::RecordingDate)
+                .or_else(|| self.safe(ItemKey::Year))
+                .or_else(|| self.safe(ItemKey::OriginalReleaseDate));
         }
-    }
-
-    fn get_value_for_item_key(&self, key: ItemKey) -> Option<Value> {
-        Some(Self::coerce_output_value(self.read_safe_tag_value(key)?))
-    }
-
-    fn parse_number_with_optional_total(
-        string: &str,
-    ) -> Option<(usize, Option<usize>)> {
-        if let Some((current, total)) = string.split_once('/') {
-            let current = current.parse::<usize>().ok()?;
-            let total = total.parse::<usize>().ok()?;
-
-            Some((current, Some(total)))
-        } else {
-            let string = string.parse::<usize>().ok()?;
-
-            Some((string, None))
-        }
-    }
-
-    fn get_current(&self, key: ItemKey) -> Option<Value> {
-        let tag = self.read_raw_tag_value(key)?;
-
-        let (current, _) = Self::parse_number_with_optional_total(&tag)?;
-
-        Some(current.into())
-    }
-
-    fn get_total(&self, key: ItemKey) -> Option<Value> {
-        let tag = self.read_raw_tag_value(key)?;
-
-        let total = Self::parse_number_with_optional_total(&tag)?.1?;
-
-        Some(total.into())
-    }
-
-    fn get_date(&self) -> Option<Value> {
-        self.get_value_for_item_key(ItemKey::RecordingDate)
-            .or_else(|| self.get_value_for_item_key(ItemKey::Year))
-            .or_else(|| {
-                self.get_value_for_item_key(ItemKey::OriginalReleaseDate)
-            })
-    }
-}
-
-impl Object for AudioFileContext {
-    fn get_value(self: &std::sync::Arc<Self>, key: &Value) -> Option<Value> {
-        let field = key.as_str()?;
-        let normalized_field = field.to_lowercase();
-
-        if let Some(value) = self.resolved_args.get_named(&normalized_field) {
-            return Some(value);
-        }
-
-        match normalized_field.as_str() {
-            "args" | "arguments" => Some(self.resolved_args.positional()),
-            "date" => self.get_date(),
-            _ => {
-                let key = ItemKeys::from_string(&normalized_field).ok()?;
-
-                match key {
-                    ItemKey::DiscTotal
-                    | ItemKey::TrackTotal
-                    | ItemKey::MovementTotal => self.get_total(key),
-                    ItemKey::TrackNumber
-                    | ItemKey::DiscNumber
-                    | ItemKey::MovementNumber => self.get_current(key),
-                    _ => self.get_value_for_item_key(key),
-                }
-            },
+        let key = ItemKeys::from_string(name).ok()?;
+        match key {
+            ItemKey::DiscTotal
+            | ItemKey::TrackTotal
+            | ItemKey::MovementTotal => self.number(key, true),
+            ItemKey::DiscNumber
+            | ItemKey::TrackNumber
+            | ItemKey::MovementNumber => self.number(key, false),
+            _ => self.safe(key),
         }
     }
 }

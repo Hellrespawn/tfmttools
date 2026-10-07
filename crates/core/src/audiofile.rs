@@ -3,8 +3,8 @@ use lofty::file::{TaggedFile, TaggedFileExt};
 use lofty::tag::Tag;
 
 use crate::error::{TFMTError, TFMTResult};
-use crate::templates::Template;
-use crate::util::{Utf8Directory, Utf8File, Utf8PathExt, normalize_separators};
+use crate::templates::BoundTemplate;
+use crate::util::{Utf8Directory, Utf8File, Utf8PathExt};
 use crate::warning::Warning;
 
 #[derive(Clone)]
@@ -51,15 +51,18 @@ impl AudioFile {
 
     pub fn construct_target_path(
         &self,
-        template: &Template,
+        template: &BoundTemplate,
         relative_path: &Utf8Directory,
     ) -> TFMTResult<(Utf8File, Vec<Warning>)> {
-        let (string, warnings) = template.render(self)?;
-
-        let string = normalize_separators(&string);
-
-        let target_path =
-            Utf8PathBuf::from(format!("{string}.{}", self.extension()));
+        let (path, warnings) = template.render(self)?;
+        let mut target_path = Utf8PathBuf::from_path_buf(path.to_path_buf())
+            .expect("Rendered components are UTF-8");
+        let filename = format!(
+            "{}.{}",
+            target_path.file_name().expect("Rendered path has a filename"),
+            self.extension()
+        );
+        target_path.set_file_name(filename);
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
@@ -91,7 +94,7 @@ mod path_template_tests {
     use lofty::tag::{ItemKey, ItemValue, TagItem, TagType};
 
     use super::*;
-    use crate::templates::CompiledTemplate;
+    use crate::templates::Template;
 
     fn audio(values: &[(ItemKey, &str)]) -> AudioFile {
         let mut tag = Tag::new(TagType::Id3v2);
@@ -108,8 +111,7 @@ mod path_template_tests {
         source: &str,
         values: &[(ItemKey, &str)],
     ) -> (Vec<String>, Vec<Warning>) {
-        let template =
-            CompiledTemplate::compile("test", source.to_owned()).unwrap();
+        let template = Template::compile("test", source.to_owned()).unwrap();
         let (path, warnings) =
             template.bind(&[]).unwrap().render(&audio(values)).unwrap();
         (path.components().to_vec(), warnings)
@@ -192,7 +194,7 @@ mod path_template_tests {
 
     #[test]
     fn path_language_checks_skipped_unknown_tags() {
-        let error = CompiledTemplate::compile(
+        let error = Template::compile(
             "my-script",
             "path: (\n [$album? {$not_a_tag}] \"Song\"\n)".to_owned(),
         )
@@ -209,11 +211,115 @@ mod path_template_tests {
             "{{ artist }}/{{ title }}",
             "+++\nname = \"Old\"\n+++\n{{ title }}",
         ] {
-            let message = CompiledTemplate::compile("old", source.to_owned())
+            let message = Template::compile("old", source.to_owned())
                 .unwrap_err()
                 .to_string();
             assert!(message.contains("migrat"), "{message}");
             assert!(message.contains("path:"), "{message}");
         }
+    }
+    #[test]
+    fn path_language_native_destination_preserves_extension() {
+        let script = Template::compile(
+            "test",
+            r#"arg prefix: path path: ({prefix} "Song.part")"#.to_owned(),
+        )
+        .unwrap();
+        let bound = script.bind(&[r"Music\Artists".to_owned()]).unwrap();
+        let (target, _) = audio(&[])
+            .construct_target_path(&bound, &Utf8Directory::new("work"))
+            .unwrap();
+        assert_eq!(
+            target.as_path(),
+            camino::Utf8Path::new("work")
+                .join("Music")
+                .join("Artists")
+                .join("Song.part.mp3")
+        );
+        let script =
+            Template::compile("root", r#"path: (/ "Song")"#.to_owned())
+                .unwrap();
+        let (target, _) = audio(&[])
+            .construct_target_path(
+                &script.bind(&[]).unwrap(),
+                &Utf8Directory::new("work"),
+            )
+            .unwrap();
+        assert_eq!(
+            target.as_path(),
+            camino::Utf8Path::new(std::path::MAIN_SEPARATOR_STR)
+                .join("Song.mp3")
+        );
+    }
+
+    #[test]
+    fn path_language_argument_policy_validates_every_forbidden_character() {
+        use crate::action::FORBIDDEN_CHARACTERS;
+        let script = Template::compile(
+            "test",
+            r#"arg unused: string path: ("Song")"#.to_owned(),
+        )
+        .unwrap();
+        for entry in FORBIDDEN_CHARACTERS.iter() {
+            assert!(
+                script.bind(&[format!("bad{}value", entry.char())]).is_err()
+            );
+        }
+        let path = Template::compile(
+            "test",
+            r#"arg unused: path path: ("Song")"#.to_owned(),
+        )
+        .unwrap();
+        for entry in FORBIDDEN_CHARACTERS
+            .iter()
+            .filter(|entry| !["/", "\\"].contains(&entry.char()))
+        {
+            let message = path
+                .bind(&[format!("ok/bad{}value", entry.char())])
+                .unwrap_err()
+                .to_string();
+            assert!(message.contains("unused"));
+            assert!(message.contains("component"));
+        }
+        assert!(script.bind(&[]).is_err());
+        assert!(script.bind(&["ok".to_owned(), "extra".to_owned()]).is_err());
+        let optional = Template::compile(
+            "test",
+            r#"arg unused: string(default: "") path: ("Song")"#.to_owned(),
+        )
+        .unwrap();
+        assert!(optional.bind(&[]).is_ok());
+        let invalid = Template::compile(
+            "test",
+            r#"arg unused: string(default: "bad?") path: ("Song")"#.to_owned(),
+        )
+        .unwrap_err();
+        assert!(invalid.to_string().contains("unused"));
+    }
+
+    #[test]
+    fn path_language_render_errors_identify_file_and_source() {
+        let script = Template::compile(
+            "layout",
+            "path: (\n {$date | year}\n)".to_owned(),
+        )
+        .unwrap()
+        .bind(&[])
+        .unwrap();
+        let message = script
+            .render(&audio(&[(ItemKey::RecordingDate, "invalid")]))
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("input/song.mp3"));
+        assert!(message.contains("layout"));
+        assert!(message.contains("2:"));
+        let script = Template::compile(
+            "layout",
+            r#"path: ({$artist} / "Song")"#.to_owned(),
+        )
+        .unwrap()
+        .bind(&[])
+        .unwrap();
+        assert!(script.render(&audio(&[])).is_err());
     }
 }

@@ -3,7 +3,7 @@ use color_eyre::Result;
 use color_eyre::eyre::eyre;
 use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::templates::Template;
+use tfmttools_core::templates::BoundTemplate;
 use tfmttools_core::warning::Warning;
 use tfmttools_fs::{FsResult, PathIterator, read_audio_file};
 use tracing::{debug, trace};
@@ -18,8 +18,9 @@ pub(super) fn create_actions_from_template(
 ) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
     let template = resolved
         .loader
-        .get_template(&resolved.template_name, resolved.arguments.clone())?
-        .ok_or(eyre!("Unable to find template: {}", resolved.template_name))?;
+        .get_template(&resolved.template_name)
+        .ok_or(eyre!("Unable to find template: {}", resolved.template_name))?
+        .bind(&resolved.arguments)?;
 
     let paths = gather_file_paths(session);
 
@@ -97,7 +98,7 @@ fn read_files(
 
 fn create_rename_actions(
     session: &RenameSession,
-    template: &Template,
+    template: &BoundTemplate,
     files: &[AudioFile],
 ) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
     let cwd = current_dir_utf8()?;
