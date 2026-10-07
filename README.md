@@ -288,11 +288,14 @@ History files use schema version 1. Existing unversioned files (version 0)
 are migrated in memory when loaded; `show-history` does not rewrite them or
 create backups. The next normal save writes version 1 and first preserves the
 exact original bytes beside the history file as `<history filename>.v0.bak`.
-An existing backup is reused only when its bytes match the original; a
-collision stops the save without overwriting either file.
+An existing backup is reused only when it is a regular file and its bytes
+match the original; a
+collision is checked before rename, validation-fix, and undo/redo actions; it
+stops the command without changing files or overwriting either history file.
 
 Saves write a temporary file in the destination directory and atomically
-replace the history file. Invalid documents, unknown fields/actions/tag keys,
+replace the history file. History symlinks remain intact: saves replace the
+referent and put upgrade backups beside that file. Invalid documents, unknown fields/actions/tag keys,
 and invalid or unsupported versions are errors; they are never treated as
 empty history. A failed load stops action execution. A failed save preserves
 the history source, but actions already applied by the command remain applied.

@@ -1,7 +1,8 @@
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::action::Action;
-use tfmttools_core::util::Utf8File;
+use tfmttools_core::history::History;
+use tfmttools_core::util::{FSMode, Utf8File};
 use tfmttools_fs::ActionExecutor;
 use tracing::trace;
 
@@ -10,6 +11,7 @@ use crate::ui::ProgressBar;
 
 pub fn execute(
     session: &RenameSession,
+    history: &History,
     plan: RenamePlan,
 ) -> Result<RenameExecutionResult> {
     // Can't apply compiler attribute to macro invocation directly.
@@ -31,6 +33,9 @@ pub fn execute(
         let confirmation = super::shared::confirm(session, "Move files?")?;
 
         if confirmation {
+            if !matches!(session.app_options().fs_mode(), FSMode::DryRun) {
+                history.prepare_save()?;
+            }
             match move_files(session, plan.actions) {
                 Ok(actions) => {
                     Ok(RenameExecutionResult::Applied {

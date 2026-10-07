@@ -204,6 +204,7 @@ fn apply_and_store_fix(
         return Ok(());
     }
 
+    history.prepare_save()?;
     let applied_actions =
         ActionExecutor::new(fs_handler).apply_actions(actions)?;
     store_history(app_options, &mut history, applied_actions, command)?;

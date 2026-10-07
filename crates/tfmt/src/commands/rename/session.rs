@@ -64,7 +64,7 @@ impl<'a> RenameSession<'a> {
             preview::preview(&self, &plan)?;
         }
 
-        let execution = apply::execute(&self, plan)?;
+        let execution = apply::execute(&self, &self.history, plan)?;
         self.finish(execution)
     }
 

@@ -9,7 +9,8 @@
 - Migrate legacy history in memory on load, restoring historical tag-edit
   undo/redo. The next save preserves exact source bytes in `<filename>.v0.bak`
   before atomically writing version 1. Matching backups are reused; conflicting
-  backups stop the save. Read-only loads create no backups or rewrites.
+  backups stop commands before applying actions. Read-only loads create no
+  backups or rewrites. Atomic saves follow history symlinks and preserve them.
 
 - Added an independent `tfmttools-picotmpl` workspace crate implementing the new
   path template language, with a Stef layout example and behavior tests.

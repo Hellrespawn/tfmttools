@@ -8,7 +8,14 @@ use super::{History, HistoryError, LoadHistoryResult, Result, StoredHistory};
 
 impl History {
     pub fn load(&mut self) -> Result<LoadHistoryResult> {
-        match fs_err::read(&self.path) {
+        let path = resolve_history_path(&self.path)
+            .map_err(|error| HistoryError::LoadError(error.to_string()))?;
+        if path.exists() && !path.is_file() {
+            return Err(HistoryError::LoadError(format!(
+                "{path} exists but is not a file."
+            )));
+        }
+        match fs_err::read(&path) {
             Ok(bytes) => {
                 let (stored, migrated) =
                     decode_history(&bytes).map_err(|error| {
@@ -32,6 +39,16 @@ impl History {
         }
     }
 
+    /// Check predictable upgrade-backup failures before applying actions.
+    /// This is read-only; save still creates the backup exclusively.
+    pub fn prepare_save(&self) -> Result<()> {
+        let path = resolve_history_path(&self.path)?;
+        if let Some(source) = &self.upgrade_source {
+            check_upgrade_backup(&path, source)?;
+        }
+        Ok(())
+    }
+
     pub fn save(&mut self) -> Result<()> {
         // Prepare and validate everything before creating any output file.
         let stored = StoredHistory::current(self.records.clone());
@@ -43,7 +60,8 @@ impl History {
                 "Unable to serialize history: {error}"
             ))
         })?;
-        if self.path.exists() && !self.path.is_file() {
+        let path = resolve_history_path(&self.path)?;
+        if path.exists() && !path.is_file() {
             let tmp_dir: Utf8PathBuf =
                 std::env::temp_dir().try_into().map_err(|_| {
                     HistoryError::SaveError(
@@ -63,11 +81,11 @@ impl History {
                 recovery,
             ));
         }
-        create_parent(&self.path)?;
+        create_parent(&path)?;
         if let Some(source) = &self.upgrade_source {
-            preserve_upgrade_backup(&self.path, source)?;
+            preserve_upgrade_backup(&path, source)?;
         }
-        write_atomically(&self.path, &bytes)?;
+        write_atomically(&path, &bytes)?;
         self.upgrade_source = None;
         Ok(())
     }
@@ -95,6 +113,72 @@ fn create_parent(path: &Utf8Path) -> Result<()> {
     })
 }
 
+// Follow the final-component link chain, including relative and dangling
+// targets, so atomic replacement updates the history file rather than its link.
+fn resolve_history_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
+    let mut destination = path.to_owned();
+    for _ in 0..40 {
+        match fs_err::symlink_metadata(&destination) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let target = fs_err::read_link(&destination).map_err(|error| {
+                    HistoryError::SaveError(format!("Unable to resolve history link {destination}: {error}"))
+                })?;
+                let target = Utf8PathBuf::from_path_buf(target).map_err(|target| {
+                    HistoryError::SaveError(format!("History link {destination} has a non-UTF-8 target: {}", target.display()))
+                })?;
+                destination = if target.is_absolute() {
+                    target
+                } else {
+                    parent(&destination).join(target)
+                };
+            },
+            Ok(_) => return Ok(destination),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(destination);
+            },
+            Err(error) => {
+                return Err(HistoryError::SaveError(format!(
+                    "Unable to inspect history {destination}: {error}"
+                )));
+            },
+        }
+    }
+    Err(HistoryError::SaveError(format!(
+        "Too many history symlink levels: {path}"
+    )))
+}
+
+fn check_upgrade_backup(path: &Utf8Path, bytes: &[u8]) -> Result<()> {
+    let backup = Utf8PathBuf::from(format!("{path}.v0.bak"));
+    match fs_err::symlink_metadata(&backup) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            Err(HistoryError::SaveError(format!(
+                "Upgrade backup {backup} exists but is not a regular file; refusing to reuse it"
+            )))
+        },
+        Ok(_) => {
+            let existing = fs_err::read(&backup).map_err(|error| {
+                HistoryError::SaveError(format!(
+                    "Unable to read upgrade backup {backup}: {error}"
+                ))
+            })?;
+            if existing == bytes {
+                Ok(())
+            } else {
+                Err(HistoryError::SaveError(format!(
+                    "Upgrade backup {backup} differs from the original history; refusing to overwrite"
+                )))
+            }
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => {
+            Err(HistoryError::SaveError(format!(
+                "Unable to inspect upgrade backup {backup}: {error}"
+            )))
+        },
+    }
+}
+
 fn preserve_upgrade_backup(path: &Utf8Path, bytes: &[u8]) -> Result<()> {
     let backup = Utf8PathBuf::from(format!("{path}.v0.bak"));
     match fs_err::OpenOptions::new().write(true).create_new(true).open(&backup)
@@ -110,18 +194,7 @@ fn preserve_upgrade_backup(path: &Utf8Path, bytes: &[u8]) -> Result<()> {
             Ok(())
         },
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            let existing = fs_err::read(&backup).map_err(|error| {
-                HistoryError::SaveError(format!(
-                    "Unable to read upgrade backup {backup}: {error}"
-                ))
-            })?;
-            if existing == bytes {
-                Ok(())
-            } else {
-                Err(HistoryError::SaveError(format!(
-                    "Upgrade backup {backup} differs from the original history; refusing to overwrite"
-                )))
-            }
+            check_upgrade_backup(path, bytes)
         },
         Err(error) => {
             Err(HistoryError::SaveError(format!(

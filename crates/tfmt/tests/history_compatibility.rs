@@ -232,3 +232,81 @@ fn invalid_history_stops_commands_before_actions() {
         }
     }
 }
+
+#[test]
+fn upgrade_backup_collision_stops_commands_before_mutations() {
+    for command in [
+        vec!["undo", "2"],
+        vec!["redo", "2"],
+        vec!["rename", "--script", "path: (\"Renamed\")"],
+        vec!["validate", "characters", "--fix"],
+        vec!["validate", "id3-encoding", "--fix"],
+    ] {
+        let history = if command[0] == "redo" {
+            FILE_HISTORY.replace("Applied", "Undone")
+        } else {
+            FILE_HISTORY.to_owned()
+        };
+        let directory = setup(&history);
+        audio(&directory, "TPE1", "New ? Ärtist", TextEncoding::UTF8);
+        let initial_file =
+            if command[0] == "redo" { "original.txt" } else { "result.txt" };
+        std::fs::write(directory.path().join(initial_file), b"original bytes")
+            .unwrap();
+        let before = std::fs::read(directory.path().join("song.mp3")).unwrap();
+        let backup = directory.path().join("config/tfmt.hist.v0.bak");
+        std::fs::write(&backup, b"conflicting backup").unwrap();
+        let output = run(&directory, &command);
+        assert!(!output.status.success(), "{command:?}");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("backup"));
+        assert!(
+            std::fs::read(directory.path().join("song.mp3")).unwrap() == before,
+            "audio changed: {command:?}"
+        );
+        assert_eq!(
+            std::fs::read(directory.path().join(initial_file)).unwrap(),
+            b"original bytes",
+            "{command:?}"
+        );
+        assert!(!directory.path().join("stage").exists(), "{command:?}");
+        assert!(!directory.path().join("Renamed.mp3").exists(), "{command:?}");
+        assert_eq!(
+            std::fs::read(directory.path().join("config/tfmt.hist")).unwrap(),
+            history.as_bytes()
+        );
+        assert_eq!(std::fs::read(&backup).unwrap(), b"conflicting backup");
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn undo_redo_preserves_history_symlink_and_updates_referent() {
+    let directory = setup(TAG_HISTORY);
+    audio(&directory, "TPE1", "New artist", TextEncoding::UTF16);
+    let link = directory.path().join("config/tfmt.hist");
+    let target = directory.path().join("actual.hist");
+    std::fs::rename(&link, &target).unwrap();
+    std::os::unix::fs::symlink("../actual.hist", &link).unwrap();
+    success(&run(&directory, &["undo"]));
+    assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+    assert_eq!(
+        std::fs::read_link(&link).unwrap(),
+        std::path::Path::new("../actual.hist")
+    );
+    let document: Value =
+        serde_json::from_slice(&std::fs::read(&target).unwrap()).unwrap();
+    assert_eq!(document["records"][0]["state"], "undone");
+    assert_eq!(
+        std::fs::read(directory.path().join("actual.hist.v0.bak")).unwrap(),
+        TAG_HISTORY.as_bytes()
+    );
+    success(&run(&directory, &["redo"]));
+    assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+    let document: Value =
+        serde_json::from_slice(&std::fs::read(&target).unwrap()).unwrap();
+    assert_eq!(document["records"][0]["state"], "redone");
+    assert_eq!(
+        text_frame(&directory, "TPE1"),
+        ("New artist".into(), TextEncoding::UTF16)
+    );
+}

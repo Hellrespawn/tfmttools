@@ -56,6 +56,7 @@ pub fn undo_redo(
                 )?;
 
                 if confirmation {
+                    history.prepare_save()?;
                     perform_undo_redo_actions(
                         &mut history,
                         records,

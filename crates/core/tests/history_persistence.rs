@@ -175,3 +175,113 @@ fn new_history_creates_nested_parents_and_saves_relative_filenames() {
     );
     std::fs::remove_file(relative).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn preparation_follows_symlink_chain_without_writing_or_creating_backups() {
+    let directory = TempDir::new().unwrap();
+    let destination = directory.path().join("source.hist");
+    std::fs::write(&destination, LEGACY).unwrap();
+    std::os::unix::fs::symlink(
+        "source.hist",
+        directory.path().join("middle.hist"),
+    )
+    .unwrap();
+    std::os::unix::fs::symlink(
+        "middle.hist",
+        directory.path().join("configured.hist"),
+    )
+    .unwrap();
+    let mut history = History::new(
+        Utf8PathBuf::from_path_buf(directory.path().join("configured.hist"))
+            .unwrap(),
+    );
+    history.load().unwrap();
+    history.prepare_save().unwrap();
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 3);
+    assert_eq!(std::fs::read(&destination).unwrap(), LEGACY);
+    let backup = directory.path().join("source.hist.v0.bak");
+    std::fs::write(&backup, b"conflict").unwrap();
+    assert!(history.prepare_save().is_err());
+    assert_eq!(std::fs::read(&destination).unwrap(), LEGACY);
+    std::fs::write(&backup, LEGACY).unwrap();
+    history.prepare_save().unwrap();
+    history.save().unwrap();
+    assert_eq!(std::fs::read(&backup).unwrap(), LEGACY);
+    for name in ["configured.hist", "middle.hist"] {
+        assert!(
+            std::fs::symlink_metadata(directory.path().join(name))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(destination).unwrap())
+            .unwrap()["schema_version"],
+        1
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn dangling_history_link_creates_referent_and_cycles_fail_without_changes() {
+    let directory = TempDir::new().unwrap();
+    let link = directory.path().join("configured.hist");
+    std::os::unix::fs::symlink("new/source.hist", &link).unwrap();
+    let mut history =
+        History::new(Utf8PathBuf::from_path_buf(link.clone()).unwrap());
+    assert!(matches!(history.load().unwrap(), LoadHistoryResult::New));
+    history.prepare_save().unwrap();
+    history.save().unwrap();
+    assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+    assert_eq!(
+        serde_json::from_slice::<Value>(
+            &std::fs::read(directory.path().join("new/source.hist")).unwrap()
+        )
+        .unwrap()["schema_version"],
+        1
+    );
+    std::fs::remove_file(&link).unwrap();
+    std::os::unix::fs::symlink("configured.hist", &link).unwrap();
+    assert!(history.load().is_err());
+    assert!(history.prepare_save().is_err());
+    assert!(history.save().is_err());
+    assert_eq!(
+        std::fs::read_link(&link).unwrap(),
+        std::path::Path::new("configured.hist")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn symlink_upgrade_backup_is_rejected_even_when_its_target_matches() {
+    let directory = TempDir::new().unwrap();
+    let path = path(&directory);
+    std::fs::write(&path, LEGACY).unwrap();
+    std::os::unix::fs::symlink(
+        "tfmt.hist",
+        directory.path().join("tfmt.hist.v0.bak"),
+    )
+    .unwrap();
+    let mut history = History::new(path.clone());
+    history.load().unwrap();
+    assert!(history.prepare_save().is_err());
+    assert!(history.save().is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), LEGACY);
+}
+
+#[cfg(unix)]
+#[test]
+fn existing_non_file_history_fails_before_reading_and_retains_live_records() {
+    let directory = TempDir::new().unwrap();
+    let path = path(&directory);
+    std::fs::write(&path, LEGACY).unwrap();
+    let mut history = History::new(path.clone());
+    history.load().unwrap();
+    std::fs::remove_file(&path).unwrap();
+    std::fs::create_dir(&path).unwrap();
+    let error = history.load().unwrap_err().to_string();
+    assert!(error.contains("not a file"), "{error}");
+    assert_eq!(history.records().len(), 1);
+}
