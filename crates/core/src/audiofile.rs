@@ -55,14 +55,19 @@ impl AudioFile {
         relative_path: &Utf8Directory,
     ) -> TFMTResult<(Utf8File, Vec<Warning>)> {
         let (path, warnings) = template.render(self)?;
-        let mut target_path = Utf8PathBuf::from_path_buf(path.to_path_buf())
-            .expect("Rendered components are UTF-8");
-        let filename = format!(
-            "{}.{}",
-            target_path.file_name().expect("Rendered path has a filename"),
-            self.extension()
-        );
-        target_path.set_file_name(filename);
+        let (filename, directories) = path
+            .components()
+            .split_last()
+            .expect("Rendered path has a filename component");
+        let mut target_path = if path.is_rooted() {
+            Utf8PathBuf::from(std::path::MAIN_SEPARATOR_STR)
+        } else {
+            Utf8PathBuf::new()
+        };
+        for directory in directories {
+            target_path.push(directory);
+        }
+        target_path.push(format!("{filename}.{}", self.extension()));
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
@@ -366,6 +371,72 @@ mod path_template_tests {
                     .components(),
                 ["Album Artist", "00 - Song"]
             );
+        }
+    }
+    #[test]
+    fn path_language_appends_extension_before_dot_component_conversion() {
+        for (source, expected) in [
+            (r#"path: (".")"#, "..mp3"),
+            (r#"path: ("..")"#, "...mp3"),
+            (r#"path: ("Album" / ".")"#, "Album/..mp3"),
+            (r#"path: ("Album" / "..")"#, "Album/...mp3"),
+        ] {
+            let script = Template::compile("dot", source.to_owned())
+                .unwrap()
+                .bind(&[])
+                .unwrap();
+            let (target, _) = audio(&[])
+                .construct_target_path(&script, &Utf8Directory::new("work"))
+                .unwrap();
+            assert_eq!(
+                target.as_path(),
+                camino::Utf8Path::new("work").join(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn path_language_empty_dates_do_not_block_fallback() {
+        for recording in ["", " ", "..."] {
+            assert_eq!(
+                render("path: ({$date})", &[
+                    (ItemKey::RecordingDate, recording),
+                    (ItemKey::Year, "1999"),
+                    (ItemKey::OriginalReleaseDate, "1980"),
+                ])
+                .0,
+                ["1999"]
+            );
+        }
+        assert_eq!(
+            render("path: ({$date})", &[
+                (ItemKey::RecordingDate, " "),
+                (ItemKey::Year, ""),
+                (ItemKey::OriginalReleaseDate, "1980"),
+            ])
+            .0,
+            ["1980"]
+        );
+    }
+
+    #[test]
+    fn path_language_totals_support_separate_fields_and_raw_pairs() {
+        for values in [
+            vec![
+                (ItemKey::TrackNumber, "3"),
+                (ItemKey::TrackTotal, "12"),
+                (ItemKey::DiscNumber, "1"),
+                (ItemKey::DiscTotal, "2"),
+                (ItemKey::MovementNumber, "4"),
+                (ItemKey::MovementTotal, "5"),
+            ],
+            vec![
+                (ItemKey::TrackNumber, "3/12"),
+                (ItemKey::DiscNumber, "1/2"),
+                (ItemKey::MovementNumber, "4/5"),
+            ],
+        ] {
+            assert_eq!(render(r#"path: ({$tracktotal ?? "missing"} "-" {$disctotal ?? "missing"} "-" {$movementtotal ?? "missing"})"#, &values).0, ["12-2-5"]);
         }
     }
 }

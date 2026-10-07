@@ -124,3 +124,66 @@ fn script_arguments_are_validated_before_reading_audio() {
         assert!(!root(&directory).join("Song.mp3").exists());
     }
 }
+
+#[test]
+fn cleanup_preserves_target_with_parent_components_in_input_path() {
+    let directory = TempDir::new().unwrap();
+    std::fs::create_dir(root(&directory).join("config")).unwrap();
+    std::fs::create_dir(root(&directory).join("input")).unwrap();
+    let source = root(&directory).join("input/song.mp3");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
+    std::fs::copy(fixture, &source).unwrap();
+    let before = std::fs::read(&source).unwrap();
+    let output = run(&directory, &[
+        "rename",
+        "-i",
+        "input/../input",
+        "--script",
+        r#"path: ("input" / "Song")"#,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let target = root(&directory).join("input/Song.mp3");
+    assert!(target.exists(), "{}", String::from_utf8_lossy(&output.stdout));
+    assert_eq!(std::fs::read(target).unwrap(), before);
+}
+
+#[test]
+fn real_id3_number_pairs_supply_separate_totals() {
+    use lofty::config::WriteOptions;
+    use lofty::file::{AudioFile, TaggedFileExt};
+    use lofty::tag::ItemKey;
+
+    let directory = historical_rename();
+    let source = root(&directory).join("renamed.mp3");
+    let mut file = lofty::read_from_path(&source).unwrap();
+    let tag = file.primary_tag_mut().unwrap();
+    tag.insert_text(ItemKey::TrackNumber, "3".to_owned());
+    tag.insert_text(ItemKey::TrackTotal, "12".to_owned());
+    tag.insert_text(ItemKey::DiscNumber, "1".to_owned());
+    tag.insert_text(ItemKey::DiscTotal, "2".to_owned());
+    file.save_to_path(&source, WriteOptions::default()).unwrap();
+    let reread = lofty::read_from_path(&source).unwrap();
+    assert_eq!(
+        reread.primary_tag().unwrap().get_string(ItemKey::TrackTotal),
+        Some("12")
+    );
+    let before = std::fs::read(&source).unwrap();
+    let output = run(&directory, &[
+        "rename",
+        "--script",
+        r#"path: ({$tracknumber} "-" {$tracktotal ?? "missing"} "-" {$disctotal ?? "missing"})"#,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let target = root(&directory).join("3-12-2.mp3");
+    assert!(target.exists(), "{}", String::from_utf8_lossy(&output.stdout));
+    assert_eq!(std::fs::read(target).unwrap(), before);
+}

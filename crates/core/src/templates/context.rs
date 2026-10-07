@@ -70,18 +70,34 @@ impl<'a> AudioContext<'a> {
         Some(Self::scalar(number.to_string()))
     }
 
+    fn total(&self, key: ItemKey, current_key: ItemKey) -> Option<Scalar> {
+        match self.raw(key) {
+            Some(raw) => self.number(key, raw.contains('/')),
+            None => self.number(current_key, true),
+        }
+    }
+
+    fn date_value(&mut self, key: ItemKey) -> Option<Scalar> {
+        self.safe(key).filter(|value| {
+            match value {
+                Scalar::Text(text) => !text.is_empty(),
+                Scalar::Integer(_) => true,
+            }
+        })
+    }
+
     pub fn resolve(&mut self, name: &str) -> Option<Scalar> {
         if name == "date" {
             return self
-                .safe(ItemKey::RecordingDate)
-                .or_else(|| self.safe(ItemKey::Year))
-                .or_else(|| self.safe(ItemKey::OriginalReleaseDate));
+                .date_value(ItemKey::RecordingDate)
+                .or_else(|| self.date_value(ItemKey::Year))
+                .or_else(|| self.date_value(ItemKey::OriginalReleaseDate));
         }
         let key = ItemKeys::from_string(name).ok()?;
         match key {
-            ItemKey::DiscTotal
-            | ItemKey::TrackTotal
-            | ItemKey::MovementTotal => self.number(key, true),
+            ItemKey::DiscTotal => self.total(key, ItemKey::DiscNumber),
+            ItemKey::TrackTotal => self.total(key, ItemKey::TrackNumber),
+            ItemKey::MovementTotal => self.total(key, ItemKey::MovementNumber),
             ItemKey::DiscNumber
             | ItemKey::TrackNumber
             | ItemKey::MovementNumber => self.number(key, false),

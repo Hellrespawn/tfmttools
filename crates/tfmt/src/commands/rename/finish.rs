@@ -31,10 +31,18 @@ pub(crate) fn handle_remaining_files(
     if let Some(common_prefix) = common_prefix {
         debug!("Common prefix of renamed files: {}", common_prefix);
 
-        let protected_paths = protected_cleanup_paths(
+        let protected_paths = match protected_cleanup_paths(
             applied_actions.as_slice(),
             unchanged_files,
-        );
+        ) {
+            Ok(paths) => paths,
+            Err(error) => {
+                eprintln!(
+                    "Unable to resolve protected paths, skipping cleanup: {error}"
+                );
+                return Ok(applied_actions);
+            },
+        };
         let remaining_items = discover_remaining_items(
             session,
             &common_prefix,
@@ -119,7 +127,14 @@ fn discover_remaining_items(
     );
 
     let remaining = PathIterator::new(&options)
-        .filter_ok(|path| !protected_paths.contains(path))
+        .map(|result| {
+            result.and_then(|path| {
+                let canonical = path.canonicalize_utf8()?;
+                Ok((path, canonical))
+            })
+        })
+        .filter_ok(|(_, canonical)| !protected_paths.contains(canonical))
+        .map_ok(|(path, _)| path)
         .collect::<FsResult<Vec<_>>>()?;
 
     let (files, folders): (Vec<_>, Vec<_>) =
@@ -134,7 +149,7 @@ fn discover_remaining_items(
 fn protected_cleanup_paths(
     applied_actions: &[Action],
     unchanged_files: &[Utf8File],
-) -> HashSet<camino::Utf8PathBuf> {
+) -> FsResult<HashSet<camino::Utf8PathBuf>> {
     unchanged_files
         .iter()
         .map(|f| f.to_owned().into_path_buf())
@@ -144,6 +159,16 @@ fn protected_cleanup_paths(
                 .filter(|action| action.is_rename_action())
                 .map(|action| action.target().to_owned()),
         )
+        .map(|path| {
+            match path.canonicalize_utf8() {
+                Ok(canonical) => Ok(canonical),
+                // Temporary staging targets may have already been moved again.
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    Ok(path)
+                },
+                Err(error) => Err(error.into()),
+            }
+        })
         .collect()
 }
 

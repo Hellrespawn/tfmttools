@@ -22,8 +22,11 @@
   characters instead of sanitizing them; preserve accepted argument whitespace.
 - Preserve legacy history undo/redo; saved Jinja scripts require an explicit
   replacement when reused for a new rename.
-- Resolve relative rename input directories before scanning so cleanup retains
-  renamed targets in the input directory.
+- Resolve relative rename input directories before scanning and compare canonical
+  paths during cleanup so renamed targets survive alternate path spellings.
+- Read separate track/disc/movement total fields and skip empty date sources
+  when selecting a fallback date. Preserve final dot components when appending
+  the source extension.
 
 - Changed validation commands to use validation types directly:
   `tfmt validate`, `tfmt validate characters`, and
