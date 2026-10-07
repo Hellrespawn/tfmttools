@@ -6,7 +6,8 @@ mod diagnostic;
 mod lexer;
 mod parser;
 mod script;
+mod value;
 
 pub use args::{ArgKind, ArgSpec, ArgumentPolicy};
 pub use diagnostic::{Diagnostic, Span};
-pub use script::{Metadata, Script, TagReference};
+pub use script::{BoundScript, Metadata, Script, TagReference};

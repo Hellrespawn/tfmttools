@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::ast::{Alternative, Expression};
-use crate::{ArgSpec, ArgumentPolicy, Diagnostic, Span, parser};
+use crate::value::Value;
+use crate::{ArgSpec, ArgumentPolicy, Diagnostic, Span, args, parser};
 
 /// Optional listing metadata, independent of argument binding.
 #[derive(Clone, Debug, Default)]
@@ -33,10 +35,37 @@ pub struct Script {
     pub(crate) inner: Arc<Compiled>,
 }
 
+/// A script with resolved argument values, ready for metadata rendering.
+#[derive(Clone, Debug)]
+pub struct BoundScript {
+    pub(crate) script: Script,
+    pub(crate) arguments: HashMap<String, Value>,
+}
+
 impl Script {
+    pub fn bind(&self, supplied: &[String]) -> Result<BoundScript, Diagnostic> {
+        if supplied.len() > self.inner.arguments.len() {
+            return Err(Diagnostic::new("Too many supplied arguments", self.inner.span));
+        }
+        let mut arguments = HashMap::new();
+        for (index, spec) in self.inner.arguments.iter().enumerate() {
+            let raw = supplied.get(index).map(String::as_str).or(spec.default.as_deref());
+            let raw = raw.ok_or_else(|| Diagnostic::new(
+                format!("Missing required argument '{}'", spec.name), spec.span,
+            ))?;
+            arguments.insert(spec.name.clone(), args::coerce(spec, raw, &self.inner.policy)?);
+        }
+        Ok(BoundScript { script: self.clone(), arguments })
+    }
+
     pub fn compile(source: &str, policy: ArgumentPolicy) -> Result<Self, Diagnostic> {
         let compiled = parser::parse(source, policy)?;
         validate_arguments(&compiled.path, &compiled.arguments)?;
+        for spec in &compiled.arguments {
+            if let Some(default) = &spec.default {
+                args::coerce(spec, default, &compiled.policy)?;
+            }
+        }
         Ok(Self { inner: Arc::new(compiled) })
     }
 
