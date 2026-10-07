@@ -70,7 +70,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, Diagnostic> {
                 }
                 let name_start = lexer.offset;
                 lexer.name_tail(true);
-                Kind::Tag(source[name_start..lexer.offset].to_ascii_lowercase())
+                Kind::Tag(source[name_start..lexer.offset].to_owned())
             },
             c if is_name_start(c) => {
                 lexer.name_tail(false);

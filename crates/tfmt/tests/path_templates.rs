@@ -178,7 +178,7 @@ fn real_id3_number_pairs_supply_separate_totals() {
     let output = run(&directory, &[
         "rename",
         "--script",
-        r#"path: ({$tracknumber} "-" {$tracktotal ?? "missing"} "-" {$disctotal ?? "missing"})"#,
+        r#"path: ({$track_number} "-" {$track_total ?? "missing"} "-" {$disc_total ?? "missing"})"#,
     ]);
     assert!(
         output.status.success(),

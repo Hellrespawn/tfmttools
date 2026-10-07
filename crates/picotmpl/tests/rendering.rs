@@ -46,15 +46,15 @@ fn missing_and_empty_are_absent() {
 #[test]
 fn fallback_is_lazy() {
     let mut calls = Vec::new();
-    let path = bind(r#"path: ({$albumartist ?? $artist ?? "Unknown"})"#)
+    let path = bind(r#"path: ({$album_artist ?? $artist ?? "Unknown"})"#)
         .render(|name| {
             calls.push(name.to_owned());
             Ok::<_, Infallible>(Some(text("Album Artist")))
         })
         .unwrap();
     assert_eq!(path.components(), ["Album Artist"]);
-    assert_eq!(calls, ["albumartist"]);
-    let path = bind(r#"path: ({$albumartist ?? $artist ?? "Unknown"})"#)
+    assert_eq!(calls, ["album_artist"]);
+    let path = bind(r#"path: ({$album_artist ?? $artist ?? "Unknown"})"#)
         .render(|_| Ok::<_, Infallible>(None))
         .unwrap();
     assert_eq!(path.components(), ["Unknown"]);

@@ -9,7 +9,7 @@ use super::context::AudioContext;
 use crate::action::FORBIDDEN_CHARACTERS;
 use crate::audiofile::AudioFile;
 use crate::error::{TFMTError, TFMTResult};
-use crate::item_keys::ItemKeys;
+use crate::item_keys::resolve_tag_name;
 use crate::util::Utf8PathExt;
 use crate::warning::Warning;
 
@@ -22,9 +22,7 @@ pub fn compile_audio_template(source: &str) -> TFMTResult<Template> {
     let template = Template::compile(source, ArgumentPolicy::new(&forbidden))
         .map_err(|error| compilation_error(source, &error))?;
     for reference in template.tag_references() {
-        if reference.name != "date"
-            && ItemKeys::from_string(&reference.name).is_err()
-        {
+        if resolve_tag_name(&reference.name).is_none() {
             return Err(TFMTError::Template(template.format_diagnostic(
                 &Diagnostic {
                     message: format!("Unknown tag: '{}'", reference.name),

@@ -7,17 +7,17 @@ arg prefix: path(
 )
 
 path: (
-  {prefix} {$albumartist ?? $artist} /
+  {prefix} {$album_artist ?? $artist} /
   [$album?
     [$date?
       {$date | year}
-      [$albumsort? "." {$albumsort | pad(2)}]
+      [$album_sort? "." {$album_sort | pad(2)}]
       " - "
     ]
     {$album} /
   ]
-  [$discnumber? {$discnumber | pad(1)}]
-  [$tracknumber? {$tracknumber | pad(2)} " - "]
-  [$albumartist? [$artist? {$artist} " - "]]
+  [$disc_number? {$disc_number | pad(1)}]
+  [$track_number? {$track_number | pad(2)} " - "]
+  [$album_artist? [$artist? {$artist} " - "]]
   {$title}
 )

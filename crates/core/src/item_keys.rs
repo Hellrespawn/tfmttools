@@ -1,151 +1,120 @@
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
-use convert_case::{Case, Casing};
-use convert_case_extras::is_case;
 use lofty::tag::ItemKey;
 
 use crate::error::{TFMTError, TFMTResult};
 
-pub struct ItemKeys;
-
-impl ItemKeys {
-    #[must_use]
-    pub fn all() -> &'static [ItemKey] {
-        &ITEM_KEYS
-    }
-
-    pub fn from_string(string: &str) -> TFMTResult<ItemKey> {
-        STRING_TO_ITEM_KEY_MAP
-            .get(&string.to_ascii_lowercase())
-            .copied()
-            .ok_or(TFMTError::UnknownTag(string.to_owned()))
-    }
+/// An audio tag reference, including the computed date fallback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TagSource {
+    Item(ItemKey),
+    DateFallback,
 }
 
-fn all_cases(pascal_case: &str) -> Vec<String> {
-    CASES
-        .into_iter()
-        .map(|case| pascal_case.from_case(Case::Pascal).to_case(case))
-        .collect()
+/// Resolve an exact canonical name or an explicitly supported alias.
+#[must_use]
+pub fn resolve_tag_name(name: &str) -> Option<TagSource> {
+    if name == "date" {
+        return Some(TagSource::DateFallback);
+    }
+    TAG_NAMES.iter().chain(ALIASES).find_map(|&(candidate, key)| {
+        (candidate == name).then_some(TagSource::Item(key))
+    })
 }
 
-static STRING_TO_ITEM_KEY_MAP: LazyLock<HashMap<String, ItemKey>> =
-    LazyLock::new(|| {
-        let mut map = HashMap::new();
-
-        for key in ITEM_KEYS {
-            let pascal_case = format!("{key:?}");
-
-            insert_case(&pascal_case, key, &mut map);
-        }
-
-        insert_case("Album", ItemKey::AlbumTitle, &mut map);
-        insert_case("Artist", ItemKey::TrackArtist, &mut map);
-        insert_case("AlbumSort", ItemKey::AlbumTitleSortOrder, &mut map);
-        insert_case("DiskNumber", ItemKey::DiscNumber, &mut map);
-        insert_case("Title", ItemKey::TrackTitle, &mut map);
-
-        map
-    });
-
-fn insert_case(
-    pascal_case: &str,
-    key: ItemKey,
-    map: &mut HashMap<String, ItemKey>,
-) {
-    let pascal_case = match pascal_case {
-        "AppleId3v2ContentGroup" => "AppleId3V2ContentGroup".to_owned(),
-        _ => pascal_case.to_owned(),
-    };
-
-    assert!(
-        is_case(&pascal_case, Case::Pascal),
-        "Key '{pascal_case}' is not pascal case!",
-    );
-
-    let all_cases = all_cases(&pascal_case);
-
-    for new_case in all_cases {
-        if let Some(existing) = map.insert(new_case.clone(), key) {
-            assert_eq!(existing, key, "Key collision for '{new_case}'");
-        }
+/// Parse a stored metadata key. Computed references are not writable tags.
+pub fn parse_item_key(name: &str) -> TFMTResult<ItemKey> {
+    match resolve_tag_name(name) {
+        Some(TagSource::Item(key)) => Ok(key),
+        _ => Err(TFMTError::UnknownTag(name.to_owned())),
     }
 }
 
-const CASES: [Case; 3] = [Case::Flat, Case::Snake, Case::Kebab];
+/// Return the canonical name used in diagnostics and persisted tag changes.
+#[must_use]
+pub fn canonical_tag_name(key: ItemKey) -> Option<&'static str> {
+    TAG_NAMES
+        .iter()
+        .find_map(|&(name, candidate)| (candidate == key).then_some(name))
+}
 
-const ITEM_KEYS: [ItemKey; 100] = [
+const ALIASES: &[(&str, ItemKey)] = &[
+    ("album", ItemKey::AlbumTitle),
+    ("artist", ItemKey::TrackArtist),
+    ("album_sort", ItemKey::AlbumTitleSortOrder),
+    ("disk_number", ItemKey::DiscNumber),
+    ("title", ItemKey::TrackTitle),
+];
+
+const TAG_NAMES: &[(&str, ItemKey)] = &[
     // Titles
-    ItemKey::AlbumTitle,
-    ItemKey::SetSubtitle,
-    ItemKey::ShowName,
-    ItemKey::ContentGroup,
-    ItemKey::TrackTitle,
-    ItemKey::TrackSubtitle,
+    ("album_title", ItemKey::AlbumTitle),
+    ("set_subtitle", ItemKey::SetSubtitle),
+    ("show_name", ItemKey::ShowName),
+    ("content_group", ItemKey::ContentGroup),
+    ("track_title", ItemKey::TrackTitle),
+    ("track_subtitle", ItemKey::TrackSubtitle),
     // Original names
-    ItemKey::OriginalAlbumTitle,
-    ItemKey::OriginalArtist,
-    ItemKey::OriginalLyricist,
+    ("original_album_title", ItemKey::OriginalAlbumTitle),
+    ("original_artist", ItemKey::OriginalArtist),
+    ("original_lyricist", ItemKey::OriginalLyricist),
     // Sorting
-    ItemKey::AlbumTitleSortOrder,
-    ItemKey::AlbumArtistSortOrder,
-    ItemKey::TrackTitleSortOrder,
-    ItemKey::TrackArtistSortOrder,
-    ItemKey::ShowNameSortOrder,
-    ItemKey::ComposerSortOrder,
+    ("album_title_sort_order", ItemKey::AlbumTitleSortOrder),
+    ("album_artist_sort_order", ItemKey::AlbumArtistSortOrder),
+    ("track_title_sort_order", ItemKey::TrackTitleSortOrder),
+    ("track_artist_sort_order", ItemKey::TrackArtistSortOrder),
+    ("show_name_sort_order", ItemKey::ShowNameSortOrder),
+    ("composer_sort_order", ItemKey::ComposerSortOrder),
     // People & Organizations
-    ItemKey::AlbumArtist,
-    ItemKey::TrackArtist,
-    ItemKey::Arranger,
-    ItemKey::Writer,
-    ItemKey::Composer,
-    ItemKey::Conductor,
-    ItemKey::Director,
-    ItemKey::Engineer,
-    ItemKey::Lyricist,
-    ItemKey::MixDj,
-    ItemKey::MixEngineer,
-    ItemKey::Performer,
-    ItemKey::Producer,
-    ItemKey::Publisher,
-    ItemKey::Label,
-    ItemKey::InternetRadioStationName,
-    ItemKey::InternetRadioStationOwner,
-    ItemKey::Remixer,
+    ("album_artist", ItemKey::AlbumArtist),
+    ("track_artist", ItemKey::TrackArtist),
+    ("arranger", ItemKey::Arranger),
+    ("writer", ItemKey::Writer),
+    ("composer", ItemKey::Composer),
+    ("conductor", ItemKey::Conductor),
+    ("director", ItemKey::Director),
+    ("engineer", ItemKey::Engineer),
+    ("lyricist", ItemKey::Lyricist),
+    ("mix_dj", ItemKey::MixDj),
+    ("mix_engineer", ItemKey::MixEngineer),
+    ("performer", ItemKey::Performer),
+    ("producer", ItemKey::Producer),
+    ("publisher", ItemKey::Publisher),
+    ("label", ItemKey::Label),
+    ("internet_radio_station_name", ItemKey::InternetRadioStationName),
+    ("internet_radio_station_owner", ItemKey::InternetRadioStationOwner),
+    ("remixer", ItemKey::Remixer),
     // Counts & Indexes
-    ItemKey::DiscNumber,
-    ItemKey::DiscTotal,
-    ItemKey::TrackNumber,
-    ItemKey::TrackTotal,
-    ItemKey::Popularimeter,
-    ItemKey::ParentalAdvisory,
+    ("disc_number", ItemKey::DiscNumber),
+    ("disc_total", ItemKey::DiscTotal),
+    ("track_number", ItemKey::TrackNumber),
+    ("track_total", ItemKey::TrackTotal),
+    ("popularimeter", ItemKey::Popularimeter),
+    ("parental_advisory", ItemKey::ParentalAdvisory),
     // Dates
     // Recording date
     //
     // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#date-10>
-    ItemKey::RecordingDate,
+    ("recording_date", ItemKey::RecordingDate),
     // Year
-    ItemKey::Year,
+    ("year", ItemKey::Year),
     // Release date
     //
     // The release date of a podcast episode or any other kind of release.
     //
     // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#release-date-10>
-    ItemKey::ReleaseDate,
+    ("release_date", ItemKey::ReleaseDate),
     // Original release date/year
     //
     // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#original-release-date-1>
     // <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#original-release-year-1>
-    ItemKey::OriginalReleaseDate,
+    ("original_release_date", ItemKey::OriginalReleaseDate),
     // Identifiers
-    ItemKey::Isrc,
-    ItemKey::Barcode,
-    ItemKey::CatalogNumber,
-    ItemKey::Work,
-    ItemKey::Movement,
-    ItemKey::MovementNumber,
-    ItemKey::MovementTotal,
+    ("isrc", ItemKey::Isrc),
+    ("barcode", ItemKey::Barcode),
+    ("catalog_number", ItemKey::CatalogNumber),
+    ("work", ItemKey::Work),
+    ("movement", ItemKey::Movement),
+    ("movement_number", ItemKey::MovementNumber),
+    ("movement_total", ItemKey::MovementTotal),
     //////////////////////////////////////////
     // MusicBrainz Identifiers
     // MusicBrainz Recording ID
@@ -153,159 +122,146 @@ const ITEM_KEYS: [ItemKey; 100] = [
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id21>
-    ItemKey::MusicBrainzRecordingId,
+    ("music_brainz_recording_id", ItemKey::MusicBrainzRecordingId),
     // MusicBrainz Track ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id24>
-    ItemKey::MusicBrainzTrackId,
+    ("music_brainz_track_id", ItemKey::MusicBrainzTrackId),
     // MusicBrainz Release ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id23>
-    ItemKey::MusicBrainzReleaseId,
+    ("music_brainz_release_id", ItemKey::MusicBrainzReleaseId),
     // MusicBrainz Release Group ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#musicbrainz-release-group-id>
-    ItemKey::MusicBrainzReleaseGroupId,
+    ("music_brainz_release_group_id", ItemKey::MusicBrainzReleaseGroupId),
     // MusicBrainz Artist ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id17>
-    ItemKey::MusicBrainzArtistId,
+    ("music_brainz_artist_id", ItemKey::MusicBrainzArtistId),
     // MusicBrainz Release Artist ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#id22>
-    ItemKey::MusicBrainzReleaseArtistId,
+    ("music_brainz_release_artist_id", ItemKey::MusicBrainzReleaseArtistId),
     // MusicBrainz Work ID
     //
     // Textual representation of the UUID.
     //
     // Reference: <https://picard-docs.musicbrainz.org/en/appendices/tag_mapping.html#musicbrainz-work-id>
-    ItemKey::MusicBrainzWorkId,
+    ("music_brainz_work_id", ItemKey::MusicBrainzWorkId),
     //////////////////////////////////////////
 
     // Flags
-    ItemKey::FlagCompilation,
-    ItemKey::FlagPodcast,
+    ("flag_compilation", ItemKey::FlagCompilation),
+    ("flag_podcast", ItemKey::FlagPodcast),
     // File Information
-    ItemKey::FileOwner,
-    ItemKey::TaggingTime,
-    ItemKey::Length,
-    ItemKey::OriginalFileName,
-    ItemKey::OriginalMediaType,
+    ("file_owner", ItemKey::FileOwner),
+    ("tagging_time", ItemKey::TaggingTime),
+    ("length", ItemKey::Length),
+    ("original_file_name", ItemKey::OriginalFileName),
+    ("original_media_type", ItemKey::OriginalMediaType),
     // Encoder information
-    ItemKey::EncodedBy,
-    ItemKey::EncoderSoftware,
-    ItemKey::EncoderSettings,
-    ItemKey::EncodingTime,
-    ItemKey::ReplayGainAlbumGain,
-    ItemKey::ReplayGainAlbumPeak,
-    ItemKey::ReplayGainTrackGain,
-    ItemKey::ReplayGainTrackPeak,
+    ("encoded_by", ItemKey::EncodedBy),
+    ("encoder_software", ItemKey::EncoderSoftware),
+    ("encoder_settings", ItemKey::EncoderSettings),
+    ("encoding_time", ItemKey::EncodingTime),
+    ("replay_gain_album_gain", ItemKey::ReplayGainAlbumGain),
+    ("replay_gain_album_peak", ItemKey::ReplayGainAlbumPeak),
+    ("replay_gain_track_gain", ItemKey::ReplayGainTrackGain),
+    ("replay_gain_track_peak", ItemKey::ReplayGainTrackPeak),
     // URLs
-    ItemKey::AudioFileUrl,
-    ItemKey::AudioSourceUrl,
-    ItemKey::CommercialInformationUrl,
-    ItemKey::CopyrightUrl,
-    ItemKey::TrackArtistUrl,
-    ItemKey::RadioStationUrl,
-    ItemKey::PaymentUrl,
-    ItemKey::PublisherUrl,
+    ("audio_file_url", ItemKey::AudioFileUrl),
+    ("audio_source_url", ItemKey::AudioSourceUrl),
+    ("commercial_information_url", ItemKey::CommercialInformationUrl),
+    ("copyright_url", ItemKey::CopyrightUrl),
+    ("track_artist_url", ItemKey::TrackArtistUrl),
+    ("radio_station_url", ItemKey::RadioStationUrl),
+    ("payment_url", ItemKey::PaymentUrl),
+    ("publisher_url", ItemKey::PublisherUrl),
     // Style
-    ItemKey::Genre,
-    ItemKey::InitialKey,
-    ItemKey::Color,
-    ItemKey::Mood,
+    ("genre", ItemKey::Genre),
+    ("initial_key", ItemKey::InitialKey),
+    ("color", ItemKey::Color),
+    ("mood", ItemKey::Mood),
     // Decimal BPM value with arbitrary precision
     //
     // Only read and written if the tag format supports a field for decimal BPM values
     // that are not restricted to integer values.
     //
     // Not supported by ID3v2 that restricts BPM values to integers in `TBPM`.
-    ItemKey::Bpm,
+    ("bpm", ItemKey::Bpm),
     // Non-fractional BPM value with integer precision
     //
     // Only read and written if the tag format has a field for integer BPM values,
     // e.g. ID3v2 ([`TBPM` frame](https://github.com/id3/ID3v2.4/blob/516075e38ff648a6390e48aff490abed987d3199/id3v2.4.0-frames.txt#L376))
     // and MP4 (`tmpo` integer atom).
-    ItemKey::IntegerBpm,
+    ("integer_bpm", ItemKey::IntegerBpm),
     // Legal
-    ItemKey::CopyrightMessage,
-    ItemKey::License,
+    ("copyright_message", ItemKey::CopyrightMessage),
+    ("license", ItemKey::License),
     // Podcast
-    ItemKey::PodcastDescription,
-    ItemKey::PodcastSeriesCategory,
-    ItemKey::PodcastUrl,
-    ItemKey::PodcastGlobalUniqueId,
-    ItemKey::PodcastKeywords,
+    ("podcast_description", ItemKey::PodcastDescription),
+    ("podcast_series_category", ItemKey::PodcastSeriesCategory),
+    ("podcast_url", ItemKey::PodcastUrl),
+    ("podcast_global_unique_id", ItemKey::PodcastGlobalUniqueId),
+    ("podcast_keywords", ItemKey::PodcastKeywords),
     // Miscellaneous
-    ItemKey::Comment,
-    ItemKey::Description,
-    ItemKey::Language,
-    ItemKey::Script,
-    ItemKey::Lyrics,
+    ("comment", ItemKey::Comment),
+    ("description", ItemKey::Description),
+    ("language", ItemKey::Language),
+    ("script", ItemKey::Script),
+    ("lyrics", ItemKey::Lyrics),
     // Vendor-specific
-    ItemKey::AppleXid,
-    ItemKey::AppleId3v2ContentGroup, // GRP1
+    ("apple_xid", ItemKey::AppleXid),
+    ("apple_id3v2_content_group", ItemKey::AppleId3v2ContentGroup), // GRP1
 ];
-
-// fn autocomplete(key: &ItemKey) {
-//     match key {}
-// }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn retains_all_tag_casings_and_aliases() {
-        let cases = [
-            Case::Camel,
-            Case::Cobol,
-            Case::Flat,
-            Case::Kebab,
-            Case::Pascal,
-            Case::UpperSnake,
-            Case::Snake,
-            Case::Train,
-            Case::UpperFlat,
-        ];
-        let names = ITEM_KEYS
-            .into_iter()
-            .map(|key| {
-                let name = format!("{key:?}");
-                let name = if name == "AppleId3v2ContentGroup" {
-                    "AppleId3V2ContentGroup".to_owned()
-                } else {
-                    name
-                };
-                (name, key)
-            })
-            .chain([
-                ("Album".to_owned(), ItemKey::AlbumTitle),
-                ("Artist".to_owned(), ItemKey::TrackArtist),
-                ("AlbumSort".to_owned(), ItemKey::AlbumTitleSortOrder),
-                ("DiskNumber".to_owned(), ItemKey::DiscNumber),
-                ("Title".to_owned(), ItemKey::TrackTitle),
-            ]);
-        for (name, key) in names {
-            for case in cases {
-                let alias = name.from_case(Case::Pascal).to_case(case);
-                assert_eq!(
-                    ItemKeys::from_string(&alias).unwrap(),
-                    key,
-                    "{alias}"
-                );
-            }
+    fn canonical_names_round_trip_and_are_unique() {
+        for &(name, key) in TAG_NAMES {
+            assert_eq!(parse_item_key(name).unwrap(), key);
+            assert_eq!(canonical_tag_name(key), Some(name));
+            assert_eq!(
+                TAG_NAMES.iter().filter(|&&(n, _)| n == name).count(),
+                1
+            );
         }
-        assert!(ItemKeys::from_string("not_a_tag").is_err());
+    }
+
+    #[test]
+    fn explicit_aliases_and_computed_date() {
+        for &(name, key) in ALIASES {
+            assert_eq!(resolve_tag_name(name), Some(TagSource::Item(key)));
+        }
+        assert_eq!(resolve_tag_name("date"), Some(TagSource::DateFallback));
+        assert!(parse_item_key("date").is_err());
+    }
+
+    #[test]
+    fn rejects_legacy_spellings() {
+        for name in [
+            "TrackArtist",
+            "TRACK_ARTIST",
+            "trackartist",
+            "track-artist",
+            "AlbumSort",
+            "not_a_tag",
+        ] {
+            assert!(parse_item_key(name).is_err(), "{name}");
+        }
     }
 }

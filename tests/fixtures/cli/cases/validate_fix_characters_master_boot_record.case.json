@@ -4,26 +4,26 @@
     "initial-state": [
       {
         "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
-        "tags": { "AlbumTitle": "C:\\>COPY *.* A: /V" }
+        "tags": { "album_title": "C:\\>COPY *.* A: /V" }
       },
       {
         "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
         "tags": {
-          "TrackTitle": "SET MIDI=SYNTH:1 MAP:G MODE:1",
-          "AlbumTitle": "C:\\>EDIT AUTOEXEC.BAT"
+          "track_title": "SET MIDI=SYNTH:1 MAP:G MODE:1",
+          "album_title": "C:\\>EDIT AUTOEXEC.BAT"
         }
       }
     ],
     "fixed": [
       {
         "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
-        "tags": { "AlbumTitle": "C-COPY . A -V" }
+        "tags": { "album_title": "C-COPY . A -V" }
       },
       {
         "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
         "tags": {
-          "TrackTitle": "SET MIDI=SYNTH1 MAPG MODE1",
-          "AlbumTitle": "C-EDIT AUTOEXEC.BAT"
+          "track_title": "SET MIDI=SYNTH1 MAPG MODE1",
+          "album_title": "C-EDIT AUTOEXEC.BAT"
         }
       }
     ]

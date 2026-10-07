@@ -1,10 +1,9 @@
-use convert_case::{Case, Casing};
 use lofty::tag::ItemKey;
 use tfmttools_picotmpl::Scalar;
 
 use super::sanitize_tag_value;
 use crate::audiofile::AudioFile;
-use crate::item_keys::ItemKeys;
+use crate::item_keys::{TagSource, canonical_tag_name, resolve_tag_name};
 use crate::warning::Warning;
 
 pub(super) struct AudioContext<'a> {
@@ -30,9 +29,9 @@ impl<'a> AudioContext<'a> {
         if raw != raw.trim() {
             let warning = Warning::WhitespaceInTag {
                 file: self.audio.file().file_name().to_owned(),
-                tag_name: format!("{key:?}")
-                    .from_case(Case::Pascal)
-                    .to_case(Case::Snake),
+                tag_name: canonical_tag_name(key)
+                    .expect("resolved tag has a canonical name")
+                    .to_owned(),
             };
             if !self.warnings.contains(&warning) {
                 self.warnings.push(warning);
@@ -83,13 +82,15 @@ impl<'a> AudioContext<'a> {
     }
 
     pub fn resolve(&mut self, name: &str) -> Option<Scalar> {
-        if name == "date" {
-            return self
-                .date_value(ItemKey::RecordingDate)
-                .or_else(|| self.date_value(ItemKey::Year))
-                .or_else(|| self.date_value(ItemKey::OriginalReleaseDate));
-        }
-        let key = ItemKeys::from_string(name).ok()?;
+        let key = match resolve_tag_name(name)? {
+            TagSource::DateFallback => {
+                return self
+                    .date_value(ItemKey::RecordingDate)
+                    .or_else(|| self.date_value(ItemKey::Year))
+                    .or_else(|| self.date_value(ItemKey::OriginalReleaseDate));
+            },
+            TagSource::Item(key) => key,
+        };
         match key {
             ItemKey::DiscTotal => self.total(key, ItemKey::DiscNumber),
             ItemKey::TrackTotal => self.total(key, ItemKey::TrackNumber),

@@ -13,6 +13,12 @@
 
 ### Changed
 
+- Require canonical lowercase snake_case audio tag names, with explicit aliases
+  `album`, `artist`, `title`, `album_sort`, and `disk_number`. Remove generated
+  casing aliases and use canonical names for new tag-fix history. Existing
+  history using old key spellings cannot be replayed; clear it with
+  `tfmt clear-history`. The template library preserves metadata name spelling.
+
 - Use workspace Cargo lint settings consistently across all crates; remove
   duplicate crate-level Clippy configuration and retain the test harness's
   specific `must_use_candidate` exception.

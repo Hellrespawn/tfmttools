@@ -6,7 +6,7 @@ use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{
     Action, RenameAction, TagValueChange, TagValueKind,
 };
-use tfmttools_core::item_keys::ItemKeys;
+use tfmttools_core::item_keys::parse_item_key;
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
@@ -174,7 +174,7 @@ fn apply_tag_change(
     change: &TagValueChange,
     direction: TagChangeDirection,
 ) -> FsResult {
-    let key = ItemKeys::from_string(change.key())?;
+    let key = parse_item_key(change.key())?;
     let (from, to) = match direction {
         TagChangeDirection::Forward => (change.old_value(), change.new_value()),
         TagChangeDirection::Backward => {
@@ -217,7 +217,7 @@ fn tag_with_encoding_changes(
         let Some(encoding) = text_encoding_from_name(encoding) else {
             continue;
         };
-        let key = ItemKeys::from_string(change.key())?;
+        let key = parse_item_key(change.key())?;
         let Some(id) = key.map_key(TagType::Id3v2) else {
             continue;
         };

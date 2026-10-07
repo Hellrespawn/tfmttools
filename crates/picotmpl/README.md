@@ -18,9 +18,9 @@ name: "Artist and title"
 arg prefix: path(default: "", description: "Output directory.")
 
 path: (
-  {prefix} {$albumartist ?? $artist ?? "Unknown Artist"} /
+  {prefix} {$album_artist ?? $artist ?? "Unknown Artist"} /
   [$album? {$album} /]
-  [$tracknumber? {$tracknumber | pad(2)} " - "]
+  [$track_number? {$track_number | pad(2)} " - "]
   {$title}
 )
 ```
@@ -85,8 +85,8 @@ let native_path = path.to_path_buf();
 Metadata and argument declarations can be inspected before supplying
 required arguments. `Template` and `BoundTemplate` are owned, reusable values;
 cloned templates share their compiled representation. Argument lookup is
-case insensitive, and reference names passed to the metadata resolver are
-normalized to ASCII lowercase. Metadata names may contain hyphens, as well
+case insensitive. Metadata reference names preserve their original spelling
+when passed to the resolver. Metadata names may contain hyphens, as well
 as letters, digits, and underscores. The library does not impose an audio
 schema; `tag_references()` exposes every occurrence and source span,
 including references inside skipped guards, for the caller to validate.

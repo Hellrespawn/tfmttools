@@ -8,12 +8,12 @@ const SOURCE: &str = include_str!("fixtures/stef.tfmt");
 fn tags() -> BTreeMap<String, Scalar> {
     [
         ("artist", "Example Artist"),
-        ("albumartist", "Example Artist"),
+        ("album_artist", "Example Artist"),
         ("album", "Example Album"),
         ("date", "2024-03-10"),
-        ("albumsort", "2"),
-        ("discnumber", "1"),
-        ("tracknumber", "3"),
+        ("album_sort", "2"),
+        ("disc_number", "1"),
+        ("track_number", "3"),
         ("title", "Example Song"),
     ]
     .into_iter()
@@ -54,19 +54,19 @@ fn stef_missing_optional_tags() {
         ("album", None, "103 - Example Artist - Example Song"),
         ("date", Some("Example Album"), "103 - Example Artist - Example Song"),
         (
-            "albumsort",
+            "album_sort",
             Some("2024 - Example Album"),
             "103 - Example Artist - Example Song",
         ),
-        ("albumartist", Some("2024.02 - Example Album"), "103 - Example Song"),
+        ("album_artist", Some("2024.02 - Example Album"), "103 - Example Song"),
         ("artist", Some("2024.02 - Example Album"), "103 - Example Song"),
         (
-            "discnumber",
+            "disc_number",
             Some("2024.02 - Example Album"),
             "03 - Example Artist - Example Song",
         ),
         (
-            "tracknumber",
+            "track_number",
             Some("2024.02 - Example Album"),
             "1Example Artist - Example Song",
         ),
@@ -98,8 +98,8 @@ fn stef_empty_tags_behave_like_missing_tags() {
 #[test]
 fn stef_zero_is_present() {
     let mut tags = tags();
-    tags.insert("albumsort".to_owned(), Scalar::Integer(0));
-    tags.insert("tracknumber".to_owned(), Scalar::Integer(0));
+    tags.insert("album_sort".to_owned(), Scalar::Integer(0));
+    tags.insert("track_number".to_owned(), Scalar::Integer(0));
     assert_eq!(render(SOURCE, &tags, &[]), [
         "Example Artist",
         "2024.00 - Example Album",

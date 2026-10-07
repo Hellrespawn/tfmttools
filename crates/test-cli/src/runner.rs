@@ -15,7 +15,7 @@ use lofty::TextEncoding;
 use lofty::file::TaggedFileExt;
 use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::tag::{ItemKey, Tag, TagType};
-use tfmttools_core::item_keys::ItemKeys;
+use tfmttools_core::item_keys::parse_item_key;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
@@ -417,7 +417,7 @@ fn item_key_from_expectation(
     key: &str,
     path: &Utf8Path,
 ) -> std::result::Result<ItemKey, ExpectationOutcome> {
-    ItemKeys::from_string(key).map_err(|err| {
+    parse_item_key(key).map_err(|err| {
         ExpectationOutcome::VerificationFailure {
             code: "unknown-tag-key".to_owned(),
             path: Some(path.to_owned()),

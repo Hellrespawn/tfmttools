@@ -125,6 +125,39 @@ mod path_template_tests {
     }
 
     #[test]
+    fn template_tags_require_canonical_names_or_explicit_aliases() {
+        for name in [
+            "track_artist",
+            "album_artist",
+            "artist",
+            "title",
+            "album",
+            "album_sort",
+            "disk_number",
+            "date",
+        ] {
+            assert!(
+                compile_audio_template(&format!("path: ({{${name}}})")).is_ok(),
+                "{name}"
+            );
+        }
+        for name in [
+            "TrackArtist",
+            "TRACK_ARTIST",
+            "trackartist",
+            "track-artist",
+            "albumartist",
+            "DATE",
+        ] {
+            assert!(
+                compile_audio_template(&format!("path: ({{${name}}})"))
+                    .is_err(),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
     fn numeric_tags_preserve_normalization_and_overflow() {
         for (raw, expected) in [
             ("0003", "3"),
@@ -136,7 +169,7 @@ mod path_template_tests {
         ] {
             for key in [ItemKey::TrackNumber, ItemKey::TrackTitle] {
                 let name = if key == ItemKey::TrackNumber {
-                    "tracknumber"
+                    "track_number"
                 } else {
                     "title"
                 };
@@ -176,7 +209,7 @@ mod path_template_tests {
     #[test]
     fn path_language_retains_dates_numbers_and_aliases() {
         let (components, _) = render(
-            "path: ({$DATE | year} \"-\" {$disk_number} \"-\" {$tracknumber} \"-\" {$tracktotal} \"-\" {$movementtotal})",
+            "path: ({$date | year} \"-\" {$disk_number} \"-\" {$track_number} \"-\" {$track_total} \"-\" {$movement_total})",
             &[
                 (ItemKey::RecordingDate, "2024-03-10"),
                 (ItemKey::Year, "1999"),
@@ -205,11 +238,11 @@ mod path_template_tests {
 
     #[test]
     fn path_language_presence_and_malformed_numbers() {
-        assert_eq!(render(r#"path: ([$tracknumber? {$tracknumber}] [!$artist? "missing"] )"#,
+        assert_eq!(render(r#"path: ([$track_number? {$track_number}] [!$artist? "missing"] )"#,
             &[(ItemKey::TrackNumber, "0"), (ItemKey::TrackArtist, " ")]).0, ["0missing"]);
         for value in ["bad", "3/bad", "3/12/15", "18446744073709551616"] {
             assert_eq!(
-                render(r#"path: ({$tracknumber ?? "absent"})"#, &[(
+                render(r#"path: ({$track_number ?? "absent"})"#, &[(
                     ItemKey::TrackNumber,
                     value
                 )])
@@ -226,7 +259,7 @@ mod path_template_tests {
             ["9223372036854775808"]
         );
         assert_eq!(
-            render(r#"path: ({$tracknumber ?? "absent"})"#, &[(
+            render(r#"path: ({$track_number ?? "absent"})"#, &[(
                 ItemKey::TrackNumber,
                 "9223372036854775808"
             )])
@@ -458,7 +491,7 @@ mod path_template_tests {
                 (ItemKey::MovementNumber, "4/5"),
             ],
         ] {
-            assert_eq!(render(r#"path: ({$tracktotal ?? "missing"} "-" {$disctotal ?? "missing"} "-" {$movementtotal ?? "missing"})"#, &values).0, ["12-2-5"]);
+            assert_eq!(render(r#"path: ({$track_total ?? "missing"} "-" {$disc_total ?? "missing"} "-" {$movement_total ?? "missing"})"#, &values).0, ["12-2-5"]);
         }
     }
 }

@@ -140,19 +140,25 @@ path: ({prefix} {$artist} / {$title} {suffix})
 Arguments are bare names; tags start with `$`. Adjacent expressions concatenate,
 with all literal text in double quotes. Whitespace outside strings is ignored.
 `#` starts a comment. Strings support escaped quotes (`\"`) and backslashes
-(`\\`); other escapes are rejected. Tag names and argument names are case
-insensitive. Existing audio tag aliases are supported; unknown tags are errors,
-even in skipped guards. Missing recognized tags are allowed.
+(`\\`); other escapes are rejected. Audio tag names use exact lowercase
+snake_case, such as `album_artist` and
+`track_number`. The explicit aliases are `album`, `artist`, `title`,
+`album_sort`, and `disk_number`; `date` is a computed fallback. Argument names
+remain case insensitive. Unknown tags are errors,
+even in skipped guards. Missing recognized tags are allowed. Templates using
+compact, uppercase, or hyphenated tag names must be migrated. New tag-fix
+history records use canonical names; old records using other spellings cannot
+be replayed. Use `tfmt clear-history` to remove obsolete history.
 
 | Construct | Example | Meaning |
 | --- | --- | --- |
 | Tag interpolation | `{$title}` | Insert a prepared tag value. |
 | Argument interpolation | `{suffix}` | Insert a declared argument. |
-| Fallback | `{$albumartist ?? $artist ?? "Unknown"}` | Select the first present value. |
+| Fallback | `{$album_artist ?? $artist ?? "Unknown"}` | Select the first present value. |
 | Positive guard | `[$album? {$album} /]` | Include content when present. |
 | Negative guard | `[!$album? "Singles" /]` | Include content when missing or empty. |
 | Year extraction | `{$date \| year}` | Extract a four-digit year. |
-| Number padding | `{$tracknumber \| pad(2)}` | Pad displayed text to a minimum width. |
+| Number padding | `{$track_number \| pad(2)}` | Pad displayed text to a minimum width. |
 
 Missing or empty values are absent; numeric zero is present. Guards and
 fallbacks evaluate only selected content. Nest guards for combined presence
@@ -198,9 +204,9 @@ is manual; there is no converter or compatibility mode.
 | Old syntax | New syntax |
 | --- | --- |
 | `{{ artist }}/{{ title }}` | `path: ({$artist} / {$title})` |
-| `{{ albumartist or artist }}` | `{$albumartist ?? $artist}` |
+| `{{ albumartist or artist }}` | `{$album_artist ?? $artist}` |
 | `{% if album %}...{% endif %}` | `[$album? ...]` |
-| `{{ tracknumber \| zero_pad(2) }}` | `{$tracknumber \| pad(2)}` |
+| `{{ tracknumber \| zero_pad(2) }}` | `{$track_number \| pad(2)}` |
 | Frontmatter `name = "Layout"` | `name: "Layout"` |
 | Positional `args[0]` | Declare an argument, then interpolate its bare name. |
 

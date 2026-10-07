@@ -12,7 +12,7 @@ fn definitions_and_forward_argument_references() {
     assert_eq!(template.arguments().len(), 1);
     assert_eq!(template.arguments()[0].kind, ArgKind::String);
     assert_eq!(template.arguments()[0].default.as_deref(), Some(""));
-    assert_eq!(template.tag_references()[0].name, "title");
+    assert_eq!(template.tag_references()[0].name, "TITLE");
 }
 
 #[test]

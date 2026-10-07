@@ -9,6 +9,7 @@ use tfmttools_core::action::{
 };
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
+use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{
@@ -168,7 +169,7 @@ fn tag_value_change(
 
     Some(
         TagValueChange::new(
-            format!("{:?}", item.key()),
+            canonical_tag_name(item.key())?.to_owned(),
             kind,
             value.to_owned(),
             fixed.new_value,
