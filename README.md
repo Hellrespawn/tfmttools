@@ -147,8 +147,9 @@ snake_case, such as `album_artist` and
 remain case insensitive. Unknown tags are errors,
 even in skipped guards. Missing recognized tags are allowed. Templates using
 compact, uppercase, or hyphenated tag names must be migrated. New tag-fix
-history records use canonical names; old records using other spellings cannot
-be replayed. Use `tfmt clear-history` to remove obsolete history.
+history records use canonical names. Historical tag-key spellings are
+automatically migrated when history is loaded, so old tag edits remain
+undoable without changing the current template tag-name rules.
 
 | Construct | Example | Meaning |
 | --- | --- | --- |
@@ -226,7 +227,8 @@ Saved filename references work after the referenced files are migrated.
 Reusing a saved Jinja inline template for a new rename fails with a migration
 hint; select an explicit replacement using `--script` or `--template`.
 Undo and redo still work with old history because they replay stored actions
-without parsing templates. The history file format is unchanged.
+without parsing templates. Loading upgrades the history model in memory;
+a subsequent save writes the current versioned format.
 
 ### Safety
 
@@ -281,6 +283,30 @@ tfmt undo
 tfmt redo
 tfmt clear-history
 ```
+
+History files use schema version 1. Existing unversioned files (version 0)
+are migrated in memory when loaded; `show-history` does not rewrite them or
+create backups. The next normal save writes version 1 and first preserves the
+exact original bytes beside the history file as `<history filename>.v0.bak`.
+An existing backup is reused only when its bytes match the original; a
+collision stops the save without overwriting either file.
+
+Saves write a temporary file in the destination directory and atomically
+replace the history file. Invalid documents, unknown fields/actions/tag keys,
+and invalid or unsupported versions are errors; they are never treated as
+empty history. A failed load stops action execution. A failed save preserves
+the history source, but actions already applied by the command remain applied.
+This does not provide concurrent-writer locking or crash durability.
+
+Migration preserves stored template text and replays stored actions; it does
+not translate old template languages. Reusing old Jinja text for a new rename
+still requires an explicit replacement as described above.
+
+The generated [version 1 JSON Schema](docs/history/schema-v1.json) comes from
+the concrete Rust storage model. Regenerate it with `cargo xtask history-schema`;
+normal core/workspace tests compare it against the checked-in snapshot.
+Published format changes require a version bump, a migration, an updated
+schema, and historical compatibility/replay fixtures.
 
 ### Windows Notes
 

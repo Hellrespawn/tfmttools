@@ -1,0 +1,1 @@
+{"records":[{"id":0,"actions":[{"EditTagValues":{"path":"song.mp3","changes":[{"key":"Title","kind":"Text","old_value":"Old title","new_value":"New title"}]}}],"state":"Applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"Validation":"characters"},"arguments":[],"run_id":"no-encodings"}}]}

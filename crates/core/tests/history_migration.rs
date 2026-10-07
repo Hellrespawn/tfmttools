@@ -1,7 +1,7 @@
 mod support;
 
 use serde_json::{Value, json};
-use tfmttools_core::history::{RecordState, StoredAction};
+use tfmttools_core::history::{Record, RecordState, StoredAction};
 
 fn legacy() -> Value {
     serde_json::from_str(include_str!("fixtures/history/v0-all-variants.json"))
@@ -13,7 +13,7 @@ fn opaque_strings_and_order_survive_migration() {
     let input = legacy();
     let history = support::load(&input).unwrap();
     let records = history.records();
-    assert_eq!(records.iter().map(|r| r.state()).collect::<Vec<_>>(), [
+    assert_eq!(records.iter().map(Record::state).collect::<Vec<_>>(), [
         RecordState::Applied,
         RecordState::Undone,
         RecordState::Redone,
@@ -194,4 +194,26 @@ fn bad_final_superseded_change_rejects_entire_document_with_location() {
     value["records"][3]["actions"] = json!([{"EditTagValues":{"path":"a","changes":[{"key":"TrackArtist","kind":"Text","old_value":"a","new_value":"b"},{"key":"unknown","kind":"Text","old_value":"a","new_value":"b"}]}}]);
     let error = support::load(&value).unwrap_err().to_string();
     assert!(error.contains("records[3].actions[0].changes[1]"), "{error}");
+}
+
+#[test]
+fn current_documents_validate_every_action_without_legacy_aliases() {
+    let current: Value = serde_json::from_str(include_str!(
+        "fixtures/history/v1-all-variants.json"
+    ))
+    .unwrap();
+    for key in ["artist", "TrackArtist", "date", "unknown"] {
+        let mut value = current.clone();
+        value["records"][0]["actions"][5]["changes"][0]["key"] = json!(key);
+        let error = support::load(&value).unwrap_err().to_string();
+        assert!(
+            error.contains("records[0].actions[5]")
+                && error.contains("changes[0]"),
+            "{error}"
+        );
+    }
+    let mut value = current;
+    value["records"][0]["actions"][5]["changes"][0]["old_encoding"] =
+        json!("UTF_8");
+    assert!(support::load(&value).is_err());
 }

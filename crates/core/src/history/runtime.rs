@@ -31,8 +31,10 @@ impl History {
         actions: Vec<Action>,
         metadata: ActionRecordMetadata,
     ) -> Result<()> {
-        let stored: Vec<_> =
-            actions.iter().map(super::StoredAction::from).collect();
+        let stored: Vec<_> = actions
+            .into_iter()
+            .map(|action| super::StoredAction::from(&action))
+            .collect();
         for action in &stored {
             Action::try_from(action)?;
         }

@@ -1,15 +1,16 @@
 mod conversion;
 mod error;
-mod history;
 mod legacy_tag_keys;
 mod migration;
 mod model;
 mod persistence;
+mod runtime;
+mod schema;
 mod stored;
 
 pub use error::{HistoryError, Result};
-pub use history::{History, LoadHistoryResult};
 pub use model::{ActionRecordMetadata, Record, RecordState, TemplateMetadata};
+pub use runtime::{History, LoadHistoryResult};
 
 #[derive(Copy, Clone, Debug)]
 pub enum HistoryMode {
@@ -35,6 +36,7 @@ impl HistoryMode {
     }
 }
 
+pub use schema::history_schema_json;
 pub use stored::{
     CURRENT_SCHEMA_VERSION, StoredAction, StoredHistory, StoredTagValueChange,
     StoredTagValueKind,

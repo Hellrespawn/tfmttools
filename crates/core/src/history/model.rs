@@ -1,9 +1,12 @@
 use chrono::{DateTime, Local};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::StoredAction;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq,
+)]
 pub enum RecordState {
     #[serde(rename = "applied")]
     Applied,
@@ -15,7 +18,7 @@ pub enum RecordState {
     Superseded,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Record {
     #[serde(rename = "id")]
@@ -31,6 +34,7 @@ pub struct Record {
 }
 
 impl Record {
+    #[must_use]
     pub fn new(
         items: Vec<StoredAction>,
         metadata: ActionRecordMetadata,
@@ -44,38 +48,47 @@ impl Record {
         }
     }
 
+    #[must_use]
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &StoredAction> {
         self.actions.iter()
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.actions.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
 
+    #[must_use]
     pub fn id(&self) -> Option<usize> {
         self.id
     }
 
+    #[must_use]
     pub fn id_mut(&mut self) -> &mut Option<usize> {
         &mut self.id
     }
 
+    #[must_use]
     pub fn actions(&self) -> &[StoredAction] {
         &self.actions
     }
 
+    #[must_use]
     pub fn timestamp(&self) -> DateTime<Local> {
         self.timestamp
     }
 
+    #[must_use]
     pub fn metadata(&self) -> &ActionRecordMetadata {
         &self.metadata
     }
 
+    #[must_use]
     pub fn state(&self) -> RecordState {
         self.state
     }
@@ -85,7 +98,7 @@ impl Record {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(tag = "type", deny_unknown_fields)]
 pub enum TemplateMetadata {
     #[serde(rename = "file_or_name")]
@@ -105,7 +118,7 @@ pub enum TemplateMetadata {
     },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ActionRecordMetadata {
     #[serde(rename = "template")]

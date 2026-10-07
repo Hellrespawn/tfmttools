@@ -9,6 +9,7 @@ const HELP: &str = "\
 Usage: cargo xtask <task>
 
 Tasks:
+    history-schema    Regenerate docs/history/schema-v1.json
     check             cargo check --workspace
     completions       Generate shell completions into target/completions
     completions DIR   Generate shell completions into DIR
@@ -16,10 +17,12 @@ Tasks:
     manpage DIR       Generate manpages into DIR
     test              cargo test --workspace --exclude tfmt
                       cargo test -p tfmt --bin tfmt
+                      cargo test -p tfmt --test history_compatibility
                       cargo test -p tfmt --test integration -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
     test-cli          cargo test -p tfmt --bin tfmt
+                      cargo test -p tfmt --test history_compatibility
                       cargo test -p tfmt --test integration -- --nocapture
     test-integration  cargo test -p tfmt --test integration -- --nocapture
     lint              cargo +nightly fmt --all --check
@@ -30,6 +33,8 @@ const TEST_INTEGRATION_ARGS: &[&str] =
     &["test", "-p", "tfmt", "--test", "integration", "--", "--nocapture"];
 const TEST_WORKSPACE_ARGS: &[&str] =
     &["test", "--workspace", "--exclude", "tfmt"];
+const TEST_HISTORY_COMPAT_ARGS: &[&str] =
+    &["test", "-p", "tfmt", "--test", "history_compatibility"];
 const TEST_CLI_BIN_ARGS: &[&str] = &["test", "-p", "tfmt", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
@@ -44,6 +49,7 @@ fn main() -> ExitCode {
     let trailing_args = args.collect::<Vec<_>>();
 
     match task.as_str() {
+        "history-schema" => generate_history_schema(),
         "check" => run_cargo(&["check", "--workspace"]),
         "completions" => generate_completions(&trailing_args),
         "manpage" => generate_manpage(&trailing_args),
@@ -51,12 +57,19 @@ fn main() -> ExitCode {
             run_steps(&[
                 TEST_WORKSPACE_ARGS,
                 TEST_CLI_BIN_ARGS,
+                TEST_HISTORY_COMPAT_ARGS,
                 TEST_INTEGRATION_ARGS,
             ])
         },
         "test-core" => run_cargo(&["test", "-p", "tfmttools-core"]),
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
-        "test-cli" => run_steps(&[TEST_CLI_BIN_ARGS, TEST_INTEGRATION_ARGS]),
+        "test-cli" => {
+            run_steps(&[
+                TEST_CLI_BIN_ARGS,
+                TEST_HISTORY_COMPAT_ARGS,
+                TEST_INTEGRATION_ARGS,
+            ])
+        },
         "test-integration" => {
             run_cargo(&test_args_with_trailing(
                 TEST_INTEGRATION_ARGS,
@@ -221,6 +234,26 @@ fn run_command(mut command: Command, program_name: &str) -> ExitCode {
         },
         Err(error) => {
             eprintln!("failed to run {program_name}: {error}");
+            ExitCode::FAILURE
+        },
+    }
+}
+
+fn generate_history_schema() -> ExitCode {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../docs/history/schema-v1.json");
+    let result = tfmttools_core::history::history_schema_json()
+        .map_err(|error| error.to_string())
+        .and_then(|schema| {
+            std::fs::write(&path, schema).map_err(|error| error.to_string())
+        });
+    match result {
+        Ok(()) => {
+            println!("generated {}", path.display());
+            ExitCode::SUCCESS
+        },
+        Err(error) => {
+            eprintln!("failed to generate history schema: {error}");
             ExitCode::FAILURE
         },
     }

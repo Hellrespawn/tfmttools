@@ -1,0 +1,4 @@
+{"records":[
+ {"id":0,"actions":[{"MakeDir":"stage"},{"MoveFile":{"source":"original.txt","target":"stage/one.txt"}}],"state":"Applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"FileOrName":"name"},"arguments":[],"run_id":"first"}},
+ {"id":1,"actions":[{"CopyFile":{"source":"stage/one.txt","target":"result.txt"}},{"RemoveFile":"stage/one.txt"},{"RemoveDir":"stage"}],"state":"Applied","timestamp":"2026-10-07T12:01:00+02:00","metadata":{"template":{"Script":"{{ title }}"},"arguments":[],"run_id":"second"}}
+]}

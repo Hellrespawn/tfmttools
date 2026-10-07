@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "ActionRecordMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "template": {
+          "$ref": "#/$defs/TemplateMetadata"
+        }
+      },
+      "required": [
+        "template",
+        "arguments",
+        "run_id"
+      ],
+      "type": "object"
+    },
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/StoredAction"
+          },
+          "type": "array"
+        },
+        "id": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "metadata": {
+          "$ref": "#/$defs/ActionRecordMetadata"
+        },
+        "state": {
+          "$ref": "#/$defs/RecordState"
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actions",
+        "state",
+        "timestamp",
+        "metadata"
+      ],
+      "type": "object"
+    },
+    "RecordState": {
+      "enum": [
+        "applied",
+        "undone",
+        "redone",
+        "superseded"
+      ],
+      "type": "string"
+    },
+    "StoredAction": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "type": {
+              "const": "move_file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "source",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "type": {
+              "const": "copy_file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "source",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "remove_file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "make_dir",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "remove_dir",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "changes": {
+              "items": {
+                "$ref": "#/$defs/StoredTagValueChange"
+              },
+              "type": "array"
+            },
+            "path": {
+              "type": "string"
+            },
+            "type": {
+              "const": "edit_tag_values",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "changes"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "StoredTagValueChange": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/StoredTagValueKind"
+        },
+        "new_encoding": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "new_value": {
+          "type": "string"
+        },
+        "old_encoding": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "old_value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "kind",
+        "old_value",
+        "new_value"
+      ],
+      "type": "object"
+    },
+    "StoredTagValueKind": {
+      "enum": [
+        "text",
+        "locator"
+      ],
+      "type": "string"
+    },
+    "TemplateMetadata": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "file_or_name",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "inline_template",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "validation",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The published history document. Runtime state is never serialized here.",
+  "properties": {
+    "records": {
+      "items": {
+        "$ref": "#/$defs/Record"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "records"
+  ],
+  "title": "StoredHistory",
+  "type": "object"
+}

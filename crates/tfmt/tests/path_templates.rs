@@ -2,10 +2,6 @@ use std::process::{Command, Output};
 
 use assert_fs::TempDir;
 use camino::Utf8PathBuf;
-use tfmttools_core::action::Action;
-use tfmttools_core::history::{
-    ActionRecordMetadata, History, TemplateMetadata,
-};
 
 fn root(directory: &TempDir) -> Utf8PathBuf {
     Utf8PathBuf::from_path_buf(directory.path().to_owned()).unwrap()
@@ -28,23 +24,11 @@ fn historical_rename() -> TempDir {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
     std::fs::copy(fixture, root.join("renamed.mp3")).unwrap();
-    let mut history = History::new(root.join("config/tfmt.hist"));
-    history
-        .push(
-            vec![Action::MoveFile {
-                source: root.join("original.mp3"),
-                target: root.join("renamed.mp3"),
-            }],
-            ActionRecordMetadata::new(
-                TemplateMetadata::InlineTemplate {
-                    value: "{{ artist }}/{{ title }}".to_owned(),
-                },
-                Vec::new(),
-                "old-run".to_owned(),
-            ),
-        )
-        .unwrap();
-    history.save().unwrap();
+    std::fs::write(
+        root.join("config/tfmt.hist"),
+        include_str!("../../../tests/fixtures/cli/history/legacy-jinja.json"),
+    )
+    .unwrap();
     directory
 }
 

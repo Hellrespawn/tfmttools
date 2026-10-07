@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{HistoryError, Record, Result};
@@ -6,10 +7,11 @@ use crate::action::Action;
 pub const CURRENT_SCHEMA_VERSION: u64 = 1;
 
 /// The published history document. Runtime state is never serialized here.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StoredHistory {
     #[serde(rename = "schema_version")]
+    #[schemars(schema_with = "super::schema::version_schema")]
     pub schema_version: u64,
     #[serde(rename = "records")]
     pub records: Vec<Record>,
@@ -40,7 +42,7 @@ impl StoredHistory {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", deny_unknown_fields)]
 pub enum StoredAction {
     #[serde(rename = "move_file")]
@@ -81,7 +83,7 @@ pub enum StoredAction {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StoredTagValueChange {
     #[serde(rename = "key")]
@@ -98,7 +100,7 @@ pub struct StoredTagValueChange {
     pub new_encoding: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub enum StoredTagValueKind {
     #[serde(rename = "text")]
     Text,

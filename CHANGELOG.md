@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add concrete schema-version-1 history in core with explicit stored action
+  names, generated JSON Schema, and `cargo xtask history-schema`.
+- Migrate legacy history in memory on load, restoring historical tag-edit
+  undo/redo. The next save preserves exact source bytes in `<filename>.v0.bak`
+  before atomically writing version 1. Matching backups are reused; conflicting
+  backups stop the save. Read-only loads create no backups or rewrites.
+
 - Added an independent `tfmttools-picotmpl` workspace crate implementing the new
   path template language, with a Stef layout example and behavior tests.
 - Added generated shell completions to release archives and Arch packages.
@@ -13,11 +20,16 @@
 
 ### Changed
 
+- Remove the separate history crate; core now owns the concrete history model
+  and persistence. Invalid documents and unsupported schema versions fail
+  before actions execute. Validation fixes now load history before changing
+  tags. Legacy template text remains unchanged and retains reuse restrictions.
+
 - Require canonical lowercase snake_case audio tag names, with explicit aliases
   `album`, `artist`, `title`, `album_sort`, and `disk_number`. Remove generated
-  casing aliases and use canonical names for new tag-fix history. Existing
-  history using old key spellings cannot be replayed; clear it with
-  `tfmt clear-history`. The template library preserves metadata name spelling.
+  casing aliases and use canonical names for new tag-fix history. Historical
+  tag-key spellings are automatically migrated for undo/redo. The template
+  library preserves metadata name spelling.
 
 - Use workspace Cargo lint settings consistently across all crates; remove
   duplicate crate-level Clippy configuration and retain the test harness's
@@ -28,7 +40,7 @@
   numeric overflow and whitespace handling.
 
 - Use template terminology throughout the API, including `Template` and
-  `BoundTemplate`; preserve the `--script` flag and history serialization.
+  `BoundTemplate`; preserve the `--script` flag and legacy history replay.
 
 - Compile and bind only the selected rename template; reject ambiguous
   filename stems and allow selection by explicit file path. Remove the

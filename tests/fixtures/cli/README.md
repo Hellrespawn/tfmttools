@@ -7,6 +7,10 @@ These fixtures drive the `tfmt` integration test harness.
 - `cases/`: JSON test cases discovered by the integration harness.
 - `template/`: templates copied into each test config directory.
 - `audio/`: audio files copied into each test input directory.
+- `history/`: fixed legacy JSON for `crates/tfmt/tests/history_compatibility.rs`
+  and historical template replay tests. Stored paths are relative to each
+  test's temporary working directory; fixtures are not produced by the current
+  serializer.
 - `extra/`: non-audio files copied into `input/extra/`.
 - Reports are generated under `tests/reports/`.
 

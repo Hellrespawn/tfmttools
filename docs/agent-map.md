@@ -51,7 +51,7 @@ Compact map for finding the right code quickly. Prefer crate-local
    `crates/fs/src/action/rename_staging.rs`.
 10. `crates/tfmt/src/commands/rename/finish.rs` handles remaining files,
     optional cleanup, empty-directory removal, and history storage.
-11. History records are saved through `crates/core/src/history/history.rs`;
+11. History records are saved through `crates/core/src/history/runtime.rs`;
     CLI-facing record metadata types live in
     `crates/core/src/history/`.
 
@@ -61,14 +61,14 @@ Compact map for finding the right code quickly. Prefer crate-local
    dispatched from `TFMTSubcommand::run`.
 2. `crates/tfmt/src/commands/undo_redo.rs` loads history from the
    configured history file.
-3. Record selection happens in `crates/core/src/history/history.rs` with
+3. Record selection happens in `crates/core/src/history/runtime.rs` with
    `get_n_records_to_undo` or `get_n_records_to_redo`.
 4. The CLI previews selected records with
    `crates/tfmt/src/history/formatter.rs` and asks for confirmation unless
    confirmation is disabled.
 5. `ActionHandler` in `crates/fs/src/action.rs` applies undo actions in
    reverse record order and redo actions in forward record order.
-6. After a record is applied, `crates/core/src/history/history.rs` updates its
+6. After a record is applied, `crates/core/src/history/runtime.rs` updates its
    state to `Undone` or `Redone`, then saves the history file.
 
 ## Fixture Integration Flow
@@ -143,5 +143,18 @@ Compact map for finding the right code quickly. Prefer crate-local
 2. Check callers in `crates/tfmt/src/commands/show_history.rs` and
    `crates/tfmt/src/commands/undo_redo.rs`.
 3. If record data or state changes, update
-   `crates/core/src/history/model.rs` and `crates/core/src/history/history.rs`.
+   `crates/core/src/history/model.rs` and `crates/core/src/history/runtime.rs`.
 4. Verify with `cargo xtask test-cli`.
+
+## History format changes
+
+History uses the concrete types in `crates/core/src/history/`. Record actions
+are stored actions; CLI recording converts executable actions and replay
+converts them back. The formatter reads stored actions directly. Loading
+migrates legacy JSON and validates every conversion before accepting records;
+saving preserves an exact upgrade backup and replaces history atomically.
+
+For format changes, read
+`docs/superpowers/specs/2026-10-07-history-schema-design.md`, regenerate
+`docs/history/schema-v1.json` with `cargo xtask history-schema`, and run the
+core history tests plus `crates/tfmt/tests/history_compatibility.rs`.

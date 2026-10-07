@@ -17,6 +17,7 @@ debug = []
 tfmttools-picotmpl = { workspace = true }
 camino = { workspace = true }
 lofty = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

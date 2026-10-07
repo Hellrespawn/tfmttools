@@ -1,8 +1,8 @@
 # Core Crate Guidance
 
-This crate owns the pure rename model: rename actions, validation,
-template rendering, audio item metadata, item keys, history data shared
-with other crates, and UTF-8 path helpers.
+This crate owns rename actions, validation, template rendering, audio
+metadata, item keys, UTF-8 path helpers, and concrete history storage.
+History IO lives here; executable filesystem operations live in `fs`.
 
 ## Task Map
 
@@ -20,3 +20,11 @@ with other crates, and UTF-8 path helpers.
 - Core-only changes: `cargo test -p tfmttools-core`.
 - If validation affects CLI behavior, also run
   `cargo test -p tfmt`.
+
+## History compatibility
+
+When changing stored history, read
+`../../docs/superpowers/specs/2026-10-07-history-schema-design.md`.
+Published format changes need a version bump, migration, regenerated schema,
+and fixed historical/replay fixtures. Run `cargo xtask history-schema` to
+regenerate the snapshot; core tests compare it automatically.
