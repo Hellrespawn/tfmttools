@@ -1,6 +1,6 @@
 use color_eyre::Result;
+use tfmttools_core::history::LoadHistoryResult;
 use tfmttools_core::util::FSMode;
-use tfmttools_history::LoadHistoryResult;
 
 use crate::cli::TFMTOptions;
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};

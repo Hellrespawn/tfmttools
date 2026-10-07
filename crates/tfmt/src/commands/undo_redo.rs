@@ -1,8 +1,8 @@
 use color_eyre::Result;
-use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionRecord, ActionRecordMetadata};
+use tfmttools_core::history::{
+    History, HistoryMode, LoadHistoryResult, Record, RecordState,
+};
 use tfmttools_fs::{ActionHandler, FsHandler};
-use tfmttools_history::{History, HistoryMode, LoadHistoryResult, RecordState};
 
 use crate::cli::{ConfirmMode, TFMTOptions};
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
@@ -75,10 +75,10 @@ pub fn undo_redo(
 }
 
 fn get_records(
-    history: &History<Action, ActionRecordMetadata>,
+    history: &History,
     mode: HistoryMode,
     amount: usize,
-) -> Result<Vec<ActionRecord>> {
+) -> Result<Vec<Record>> {
     Ok(match mode {
         HistoryMode::Undo => history.get_n_records_to_undo(amount)?,
         HistoryMode::Redo => history.get_n_records_to_redo(amount)?,
@@ -86,7 +86,7 @@ fn get_records(
 }
 
 fn confirm_undo_redo(
-    records: &[ActionRecord],
+    records: &[Record],
     mode: HistoryMode,
     formatter: &HistoryFormatter,
     preview_list_size: PreviewListSize,
@@ -110,7 +110,7 @@ fn confirm_undo_redo(
 }
 
 fn preview_undo_redo(
-    records: &[ActionRecord],
+    records: &[Record],
     formatter: &HistoryFormatter,
     preview_list_size: PreviewListSize,
 ) -> Result<()> {
@@ -125,8 +125,8 @@ fn preview_undo_redo(
 }
 
 fn perform_undo_redo_actions(
-    history: &mut History<Action, ActionRecordMetadata>,
-    records: Vec<ActionRecord>,
+    history: &mut History,
+    records: Vec<Record>,
     fs_handler: &FsHandler,
     mode: HistoryMode,
     formatter: &HistoryFormatter,

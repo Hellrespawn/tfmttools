@@ -1,7 +1,7 @@
 use clap::{Command, CommandFactory, Parser};
 use color_eyre::Result;
+use tfmttools_core::history::HistoryMode;
 use tfmttools_fs::{FsHandler, verify_directory};
-use tfmttools_history::HistoryMode;
 use tracing::debug;
 
 use super::TFMTOptions;

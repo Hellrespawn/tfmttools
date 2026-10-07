@@ -15,14 +15,13 @@ debug = []
 
 [dependencies]
 tfmttools-picotmpl = { workspace = true }
-tfmttools-history = { path = "../history" }
 camino = { workspace = true }
 lofty = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-
-[dev-dependencies]
+chrono = { workspace = true, features = ["serde"] }
+fs-err = { workspace = true }
 serde_json = { workspace = true }
 
 [lints]

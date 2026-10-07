@@ -1,9 +1,7 @@
 use color_eyre::Result;
-use tfmttools_core::action::Action;
-use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_core::history::{History, LoadHistoryResult};
 use tfmttools_core::util::Utf8PathExt;
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
-use tfmttools_history::{History, LoadHistoryResult};
 use tracing::info;
 
 use super::{RenameExecutionResult, apply, finish, planning, preview};
@@ -14,7 +12,7 @@ pub struct RenameSession<'a> {
     fs_handler: &'a FsHandler,
     app_options: &'a TFMTOptions,
     rename_options: RenameOptions,
-    history: History<Action, ActionRecordMetadata>,
+    history: History,
     load_result: LoadHistoryResult,
 }
 

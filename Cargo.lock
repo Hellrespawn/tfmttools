@@ -1334,7 +1334,6 @@ dependencies = [
  "textwrap",
  "tfmttools-core",
  "tfmttools-fs",
- "tfmttools-history",
  "tfmttools-picotmpl",
  "tfmttools-test-cli",
  "tracing",
@@ -1347,10 +1346,11 @@ name = "tfmttools-core"
 version = "0.24.0"
 dependencies = [
  "camino",
+ "chrono",
+ "fs-err",
  "lofty",
  "serde",
  "serde_json",
- "tfmttools-history",
  "tfmttools-picotmpl",
  "thiserror",
  "tracing",
@@ -1369,19 +1369,6 @@ dependencies = [
  "lofty",
  "serde",
  "tfmttools-core",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "tfmttools-history"
-version = "0.24.0"
-dependencies = [
- "camino",
- "chrono",
- "fs-err",
- "serde",
- "serde_json",
  "thiserror",
  "tracing",
 ]

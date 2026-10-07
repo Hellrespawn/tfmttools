@@ -13,7 +13,6 @@ homepage = "https://github.com/Hellrespawn/tfmttools"
 members = [
     "crates/core",
     "crates/fs",
-    "crates/history",
     "crates/picotmpl",
     "crates/test-cli",
     "crates/test-harness",

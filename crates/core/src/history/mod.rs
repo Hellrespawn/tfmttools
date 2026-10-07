@@ -1,10 +1,10 @@
 mod error;
 mod history;
-mod record;
+mod model;
 
 pub use error::{HistoryError, Result};
 pub use history::{History, LoadHistoryResult};
-pub use record::{Record, RecordState};
+pub use model::{ActionRecordMetadata, Record, RecordState, TemplateMetadata};
 
 #[derive(Copy, Clone, Debug)]
 pub enum HistoryMode {

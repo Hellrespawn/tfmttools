@@ -1,9 +1,9 @@
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
-use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
+use tfmttools_core::history::{
+    ActionRecordMetadata, History, LoadHistoryResult, TemplateMetadata,
+};
 use tfmttools_fs::{FileOrName, discover_templates};
-use tfmttools_history::{History, LoadHistoryResult};
 use tfmttools_picotmpl::{BoundTemplate, Template};
 use tracing::debug;
 
@@ -19,7 +19,7 @@ pub(super) struct ResolvedTemplate {
 
 pub(super) fn resolve_template(
     session: &RenameSession,
-    history: &History<Action, ActionRecordMetadata>,
+    history: &History,
     load_history_result: LoadHistoryResult,
 ) -> Result<ResolvedTemplate> {
     match session.rename_options().template_option() {
@@ -45,7 +45,7 @@ pub(super) fn resolve_template(
 
 fn resolve_previous_template(
     session: &RenameSession,
-    history: &History<Action, ActionRecordMetadata>,
+    history: &History,
     load_history_result: LoadHistoryResult,
 ) -> Result<ResolvedTemplate> {
     if let LoadHistoryResult::Loaded = load_history_result

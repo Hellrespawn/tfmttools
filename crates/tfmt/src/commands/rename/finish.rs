@@ -4,13 +4,12 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::history::ActionRecordMetadata;
+use tfmttools_core::history::{ActionRecordMetadata, History, HistoryError};
 use tfmttools_core::util::{FSMode, Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
     ActionExecutor, FsResult, PathIterator, PathIteratorOptions,
     get_file_checksum, get_longest_common_prefix,
 };
-use tfmttools_history::{History, HistoryError};
 use tracing::{debug, info, trace};
 
 use super::RenameSession;
@@ -344,7 +343,7 @@ fn remove_directories(
 
 pub(crate) fn store_history(
     app_options: &TFMTOptions,
-    history: &mut History<Action, ActionRecordMetadata>,
+    history: &mut History,
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<()> {

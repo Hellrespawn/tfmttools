@@ -3,8 +3,9 @@ use std::process::{Command, Output};
 use assert_fs::TempDir;
 use camino::Utf8PathBuf;
 use tfmttools_core::action::Action;
-use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
-use tfmttools_history::History;
+use tfmttools_core::history::{
+    ActionRecordMetadata, History, TemplateMetadata,
+};
 
 fn root(directory: &TempDir) -> Utf8PathBuf {
     Utf8PathBuf::from_path_buf(directory.path().to_owned()).unwrap()

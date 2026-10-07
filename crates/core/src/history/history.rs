@@ -1,9 +1,12 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace};
 
-use crate::{HistoryError, HistoryMode, Record, RecordState, Result};
+use super::{
+    ActionRecordMetadata, HistoryError, HistoryMode, Record, RecordState,
+    Result,
+};
+use crate::action::Action;
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -12,25 +15,14 @@ pub enum LoadHistoryResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(
-    bound = "A: Serialize + DeserializeOwned, M: Serialize + DeserializeOwned"
-)]
-pub struct History<A, M>
-where
-    A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
-    M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
-{
+pub struct History {
     #[serde(skip)]
     path: Utf8PathBuf,
 
-    records: Vec<Record<A, M>>,
+    records: Vec<Record>,
 }
 
-impl<A, M> History<A, M>
-where
-    A: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
-    M: std::fmt::Debug + Serialize + DeserializeOwned + Clone,
-{
+impl History {
     #[must_use]
     pub fn new(path: Utf8PathBuf) -> Self {
         Self { path, records: Vec::new() }
@@ -108,7 +100,11 @@ where
         result
     }
 
-    pub fn push(&mut self, actions: Vec<A>, metadata: M) -> Result<()> {
+    pub fn push(
+        &mut self,
+        actions: Vec<Action>,
+        metadata: ActionRecordMetadata,
+    ) -> Result<()> {
         let mut new_record = Record::new(actions, metadata);
 
         *new_record.id_mut() = Some(self.records.len());
@@ -126,43 +122,37 @@ where
         Ok(())
     }
 
-    pub fn get_previous_record(&self) -> Result<Option<Record<A, M>>> {
+    pub fn get_previous_record(&self) -> Result<Option<Record>> {
         Ok(self.records.last().cloned())
     }
 
     pub fn get_records_to_undo(
         &self,
         amount: Option<usize>,
-    ) -> Result<Vec<Record<A, M>>> {
+    ) -> Result<Vec<Record>> {
         Ok(self.collect_records(HistoryMode::Undo, amount))
     }
 
     pub fn get_records_to_redo(
         &self,
         amount: Option<usize>,
-    ) -> Result<Vec<Record<A, M>>> {
+    ) -> Result<Vec<Record>> {
         Ok(self.collect_records(HistoryMode::Redo, amount))
     }
 
-    pub fn get_n_records_to_undo(
-        &self,
-        amount: usize,
-    ) -> Result<Vec<Record<A, M>>> {
+    pub fn get_n_records_to_undo(&self, amount: usize) -> Result<Vec<Record>> {
         self.get_records_to_undo(Some(amount))
     }
 
-    pub fn get_n_records_to_redo(
-        &self,
-        amount: usize,
-    ) -> Result<Vec<Record<A, M>>> {
+    pub fn get_n_records_to_redo(&self, amount: usize) -> Result<Vec<Record>> {
         self.get_records_to_redo(Some(amount))
     }
 
-    pub fn get_all_records_to_undo(&self) -> Result<Vec<Record<A, M>>> {
+    pub fn get_all_records_to_undo(&self) -> Result<Vec<Record>> {
         self.get_records_to_undo(None)
     }
 
-    pub fn get_all_records_to_redo(&self) -> Result<Vec<Record<A, M>>> {
+    pub fn get_all_records_to_redo(&self) -> Result<Vec<Record>> {
         self.get_records_to_redo(None)
     }
 
@@ -170,8 +160,8 @@ where
         &self,
         mode: HistoryMode,
         amount: Option<usize>,
-    ) -> Vec<Record<A, M>> {
-        let records: Box<dyn Iterator<Item = &Record<A, M>> + '_> = match mode {
+    ) -> Vec<Record> {
+        let records: Box<dyn Iterator<Item = &Record> + '_> = match mode {
             HistoryMode::Undo => {
                 Box::new(self.records.iter().rev().filter(|r| {
                     matches!(
@@ -197,9 +187,9 @@ where
 
     pub fn set_record_state(
         &mut self,
-        mut record: Record<A, M>,
+        mut record: Record,
         state: RecordState,
-    ) -> Result<Record<A, M>> {
+    ) -> Result<Record> {
         if let Some(id) = record.id() {
             let mut found_records = self
                 .records
@@ -242,7 +232,7 @@ where
     }
 
     #[must_use]
-    pub fn records(&self) -> &[Record<A, M>] {
+    pub fn records(&self) -> &[Record] {
         &self.records
     }
 

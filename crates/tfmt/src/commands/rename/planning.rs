@@ -1,13 +1,12 @@
 use color_eyre::Result;
-use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::history::ActionRecordMetadata;
-use tfmttools_history::{History, LoadHistoryResult};
+use tfmttools_core::action::RenameAction;
+use tfmttools_core::history::{History, LoadHistoryResult};
 
 use super::{RenamePlan, RenameSession, discovery, template_resolution};
 
 pub fn create_plan(
     session: &RenameSession,
-    history: &History<Action, ActionRecordMetadata>,
+    history: &History,
     load_history_result: LoadHistoryResult,
 ) -> Result<RenamePlan> {
     let resolved = template_resolution::resolve_template(

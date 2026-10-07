@@ -7,13 +7,12 @@ Compact map for finding the right code quickly. Prefer crate-local
 
 - `crates/tfmt/`: builds the `tfmt` binary, parses CLI flags, dispatches
   commands, owns terminal UI, and coordinates rename/undo/history flows.
-- `crates/core/`: owns pure data and rules: rename actions, validation,
-  templates, audio metadata, item keys, history metadata, and UTF-8 path
-  wrappers.
+- `crates/core/`: owns domain models, persistence, and rules: rename actions, validation,
+  templates, audio metadata, item keys, history, and UTF-8 path wrappers.
 - `crates/fs/`: owns filesystem effects and helpers: action execution,
   rename staging/planning, checksums, template loading, path iteration,
   and direct filesystem operations.
-- `crates/history/`: owns JSON history persistence, record state, record
+- `crates/core/src/history/`: owns JSON history persistence, record state, record
   selection for undo/redo, and save/load error handling.
 - `crates/test-harness/`: owns the fixture-backed CLI integration test
   runner used by `crates/tfmt/tests/integration.rs`.
@@ -52,9 +51,9 @@ Compact map for finding the right code quickly. Prefer crate-local
    `crates/fs/src/action/rename_staging.rs`.
 10. `crates/tfmt/src/commands/rename/finish.rs` handles remaining files,
     optional cleanup, empty-directory removal, and history storage.
-11. History records are saved through `crates/history/src/history.rs`;
+11. History records are saved through `crates/core/src/history/history.rs`;
     CLI-facing record metadata types live in
-    `crates/core/src/history.rs`.
+    `crates/core/src/history/`.
 
 ## Undo/Redo Flow
 
@@ -62,14 +61,14 @@ Compact map for finding the right code quickly. Prefer crate-local
    dispatched from `TFMTSubcommand::run`.
 2. `crates/tfmt/src/commands/undo_redo.rs` loads history from the
    configured history file.
-3. Record selection happens in `crates/history/src/history.rs` with
+3. Record selection happens in `crates/core/src/history/history.rs` with
    `get_n_records_to_undo` or `get_n_records_to_redo`.
 4. The CLI previews selected records with
    `crates/tfmt/src/history/formatter.rs` and asks for confirmation unless
    confirmation is disabled.
 5. `ActionHandler` in `crates/fs/src/action.rs` applies undo actions in
    reverse record order and redo actions in forward record order.
-6. After a record is applied, `crates/history/src/history.rs` updates its
+6. After a record is applied, `crates/core/src/history/history.rs` updates its
    state to `Undone` or `Redone`, then saves the history file.
 
 ## Fixture Integration Flow
@@ -144,5 +143,5 @@ Compact map for finding the right code quickly. Prefer crate-local
 2. Check callers in `crates/tfmt/src/commands/show_history.rs` and
    `crates/tfmt/src/commands/undo_redo.rs`.
 3. If record data or state changes, update
-   `crates/history/src/record.rs` and `crates/history/src/history.rs`.
+   `crates/core/src/history/model.rs` and `crates/core/src/history/history.rs`.
 4. Verify with `cargo xtask test-cli`.

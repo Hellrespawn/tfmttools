@@ -40,7 +40,7 @@ The workspace is split by responsibility:
   processing.
 - `crates/fs/` applies rename plans to the filesystem and provides related file
   handling helpers.
-- `crates/history/` contains the history data model and the concrete
+- `crates/core/src/history/` contains the history data model and the concrete
   serde-backed history storage used by the CLI.
 - [crates/picotmpl/](crates/picotmpl/README.md) implements the new
   path template language as an independent library. Its example is

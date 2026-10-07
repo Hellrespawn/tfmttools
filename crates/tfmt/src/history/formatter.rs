@@ -2,10 +2,7 @@ use std::fmt::Write;
 
 use color_eyre::Result;
 use tfmttools_core::action::Action;
-use tfmttools_core::history::{
-    ActionRecord, ActionRecordMetadata, TemplateMetadata,
-};
-use tfmttools_history::History;
+use tfmttools_core::history::{History, Record, TemplateMetadata};
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -56,10 +53,7 @@ impl HistoryFormatter {
         self
     }
 
-    pub fn format_history(
-        &self,
-        history: &History<Action, ActionRecordMetadata>,
-    ) -> Result<String> {
+    pub fn format_history(&self, history: &History) -> Result<String> {
         let undo = history.get_all_records_to_undo()?;
 
         let undo_string = self.format_records(&undo);
@@ -93,7 +87,7 @@ impl HistoryFormatter {
         }
     }
 
-    pub fn format_records(&self, records: &[ActionRecord]) -> Option<String> {
+    pub fn format_records(&self, records: &[Record]) -> Option<String> {
         if records.is_empty() {
             None
         } else {
@@ -111,7 +105,7 @@ impl HistoryFormatter {
 
     fn format_record_entry(
         &self,
-        record: &ActionRecord,
+        record: &Record,
         index: usize,
         total: usize,
     ) -> String {
@@ -124,7 +118,7 @@ impl HistoryFormatter {
 
     fn format_record_with_prefix(
         &self,
-        record: &ActionRecord,
+        record: &Record,
         prefix: &HistoryPrefix,
         index: usize,
         total: usize,
@@ -148,7 +142,7 @@ impl HistoryFormatter {
         string
     }
 
-    pub fn format_record(&self, record: &ActionRecord) -> String {
+    pub fn format_record(&self, record: &Record) -> String {
         let summary = RecordSummary::from_record(record);
 
         let base_string = format!(
@@ -195,7 +189,7 @@ pub struct RecordSummary {
 }
 
 impl RecordSummary {
-    pub fn from_record(record: &ActionRecord) -> Self {
+    pub fn from_record(record: &Record) -> Self {
         let mut summary = Self {
             run_id: record.metadata().run_id().to_owned(),
             ..Default::default()

@@ -8,7 +8,9 @@ use tfmttools_core::action::{
     Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
 };
 use tfmttools_core::audiofile::AudioFile;
-use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
+use tfmttools_core::history::{
+    ActionRecordMetadata, History, HistoryError, TemplateMetadata,
+};
 use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
@@ -16,7 +18,6 @@ use tfmttools_fs::{
     ActionExecutor, FsError, FsHandler, PathIterator, PathIteratorOptions,
     read_audio_file,
 };
-use tfmttools_history::{History, HistoryError};
 use tracing::{debug, trace};
 
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
@@ -229,7 +230,7 @@ fn report_actions(actions: &[Action], dry_run: bool) {
 
 fn store_history(
     app_options: &TFMTOptions,
-    history: &mut History<Action, ActionRecordMetadata>,
+    history: &mut History,
     actions: Vec<Action>,
     command: &str,
 ) -> Result<()> {

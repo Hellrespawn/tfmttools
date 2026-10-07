@@ -5,7 +5,7 @@
 This repository is a Rust workspace. The CLI entry point lives in
 `crates/tfmt/` and builds the `tfmt` binary from `src/main.rs`. Core
 rename logic is in `crates/core/`, filesystem helpers are in
-`crates/fs/`, and history support is in `crates/history/`. Shared test
+`crates/fs/`, and history support is in `crates/core/src/history/`. Shared test
 utilities for the integration harness live in `crates/test-harness/`.
 Workspace-level integration fixtures and sample report assets live under
 `tests/fixtures/cli/`. Example templates are under `examples/`, and
@@ -20,7 +20,7 @@ notes or design work live under `docs/`.
 - Rename validation: `crates/core/src/action/validation.rs`.
 - Filesystem application and staging:
   `crates/fs/src/action.rs`, `crates/fs/src/action/`.
-- History model and persistence: `crates/history/src/`.
+- History model and persistence: `crates/core/src/history/src/`.
 - CLI integration fixtures:
   `crates/test-harness/src/`, `tests/fixtures/cli/cases/`.
 

@@ -12,7 +12,7 @@ with other crates, and UTF-8 path helpers.
 - Template rendering context and template wrapper: `src/templates/`.
 - Audio metadata model: `src/audiofile.rs`.
 - Item key constants: `src/item_keys.rs`.
-- Shared history types: `src/history.rs`.
+- History model and persistence: `src/history/`.
 - Shared UTF-8 path helpers: `src/util.rs`.
 
 ## Verification
