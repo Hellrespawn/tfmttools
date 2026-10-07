@@ -1251,6 +1251,7 @@ dependencies = [
  "convert_case_extras",
  "lofty",
  "minijinja",
+ "path-template",
  "regex",
  "serde",
  "serde_json",
