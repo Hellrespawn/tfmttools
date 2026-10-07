@@ -132,7 +132,7 @@ path: ({prefix} {$artist} / {$title} {suffix})
 
 Arguments are bare names; tags start with `$`. Adjacent expressions concatenate,
 with all literal text in double quotes. Whitespace outside strings is ignored.
-`#` starts a comment. Strings support escaped quotes (`\\"`) and backslashes
+`#` starts a comment. Strings support escaped quotes (`\"`) and backslashes
 (`\\`); other escapes are rejected. Tag names and argument names are case
 insensitive. Existing audio tag aliases are supported; unknown tags are errors,
 even in skipped guards. Missing recognized tags are allowed.
