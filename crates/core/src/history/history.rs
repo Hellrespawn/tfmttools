@@ -17,12 +17,13 @@ pub struct History {
     pub(super) path: Utf8PathBuf,
 
     pub(super) records: Vec<Record>,
+    pub(super) upgrade_source: Option<Vec<u8>>,
 }
 
 impl History {
     #[must_use]
     pub fn new(path: Utf8PathBuf) -> Self {
-        Self { path, records: Vec::new() }
+        Self { path, records: Vec::new(), upgrade_source: None }
     }
 
     pub fn push(

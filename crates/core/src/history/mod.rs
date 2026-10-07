@@ -1,6 +1,8 @@
 mod conversion;
 mod error;
 mod history;
+mod legacy_tag_keys;
+mod migration;
 mod model;
 mod persistence;
 mod stored;
