@@ -9,7 +9,10 @@ mod path_iterator;
 mod template;
 mod verify;
 
-pub use action::{ActionExecutor, ActionHandler};
+pub use action::{
+    ActionExecutor, ActionHandler, apply_patch, byte_identity,
+    create_patch_pair, write_tag_candidate,
+};
 pub use audiofile::read_audio_file;
 pub use checksum::{get_file_checksum, get_path_checksum};
 pub use error::{FsError, FsResult};

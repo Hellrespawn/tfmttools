@@ -2,6 +2,7 @@ mod conversion;
 mod database;
 mod error;
 mod model;
+mod patch;
 mod persistence;
 mod runtime;
 mod stored;
@@ -35,4 +36,5 @@ impl HistoryMode {
 }
 
 pub use database::history_schema_sql;
+pub use patch::{BinaryPatchPair, ByteIdentity};
 pub use stored::{StoredAction, StoredTagValueChange, StoredTagValueKind};

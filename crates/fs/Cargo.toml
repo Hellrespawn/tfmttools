@@ -12,6 +12,9 @@ version.workspace = true
 
 
 [dependencies]
+qbsdiff = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
 tfmttools-core = { path = "../core" }
 adler2 = { workspace = true }
 camino = { workspace = true }
