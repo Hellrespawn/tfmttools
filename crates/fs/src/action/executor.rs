@@ -9,16 +9,21 @@ use crate::fs_handler::FsHandler;
 
 pub struct ActionExecutor<'a> {
     handler: ActionHandler<'a>,
+    move_mode: MoveMode,
 }
 
 impl<'a> ActionExecutor<'a> {
     #[must_use]
     pub fn new(fs_handler: &'a FsHandler) -> Self {
-        Self { handler: ActionHandler::new(fs_handler) }
+        Self {
+            handler: ActionHandler::new(fs_handler),
+            move_mode: MoveMode::Auto,
+        }
     }
 
     #[must_use]
     pub fn move_mode(mut self, move_mode: MoveMode) -> Self {
+        self.move_mode = move_mode;
         self.handler = self.handler.move_mode(move_mode);
         self
     }
@@ -45,6 +50,37 @@ impl<'a> ActionExecutor<'a> {
                 },
             }
         })
+    }
+
+    pub fn plan_actions(
+        &self,
+        rename_actions: Vec<RenameAction>,
+    ) -> FsResult<Vec<Action>> {
+        let mut result = Vec::new();
+        for planned in Self::plan_rename_actions(rename_actions) {
+            let action = match planned {
+                PlannedAction::Action(action) => action,
+                PlannedAction::Rename(rename) => {
+                    Action::move_from_rename_action(&rename)
+                },
+            };
+            if let Action::MoveFile { source, target } = &action {
+                if matches!(self.move_mode, MoveMode::AlwaysCopy)
+                    || super::recorded_execution::crosses_devices(
+                        source, target,
+                    )?
+                {
+                    result.push(Action::CopyFile {
+                        source: source.clone(),
+                        target: target.clone(),
+                    });
+                    result.push(Action::RemoveFile(source.clone()));
+                    continue;
+                }
+            }
+            result.push(action);
+        }
+        Ok(result)
     }
 
     fn plan_rename_actions(

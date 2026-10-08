@@ -54,6 +54,7 @@ pub enum RecoveryDescriptor {
         target: String,
         identity: ByteIdentity,
         remove_source: bool,
+        candidate: String,
     },
     Remove {
         path: String,
@@ -270,7 +271,7 @@ impl History {
                 "Prepared action differs from saved plan".into(),
             ));
         }
-        validate_prepared(&entry)?;
+        validate_prepared(&entry, operation.kind)?;
         let action_position = if operation.kind == OperationKind::Undo {
             plan.len() - 1 - position
         } else {
@@ -514,7 +515,10 @@ fn read_patch(
     .transpose()
 }
 
-fn validate_prepared(entry: &PreparedAction) -> Result<()> {
+fn validate_prepared(
+    entry: &PreparedAction,
+    kind: OperationKind,
+) -> Result<()> {
     database::validate_action(&entry.action)?;
     match (&entry.action, &entry.recovery, &entry.patches) {
         (
@@ -530,6 +534,11 @@ fn validate_prepared(entry: &PreparedAction) -> Result<()> {
             Some(pair),
         ) => {
             validate_patch(pair)?;
+            let (input, output) = if kind == OperationKind::Undo {
+                (&pair.after, &pair.before)
+            } else {
+                (&pair.before, &pair.after)
+            };
             if path != recovery_path
                 || resolved.is_empty()
                 || candidate.is_empty()
@@ -537,8 +546,8 @@ fn validate_prepared(entry: &PreparedAction) -> Result<()> {
                 || resolved == candidate
                 || resolved == retained
                 || candidate == retained
-                || !((before == &pair.before && after == &pair.after)
-                    || (before == &pair.after && after == &pair.before))
+                || before != input
+                || after != output
             {
                 return Err(HistoryError::LoadError(
                     "Invalid tag recovery descriptor".into(),
@@ -555,7 +564,52 @@ fn validate_prepared(entry: &PreparedAction) -> Result<()> {
                 "Unexpected patches on filesystem action".into(),
             ));
         },
-        _ => {},
+        (
+            StoredAction::MoveFile { source, target },
+            RecoveryDescriptor::Move {
+                source: actual_source,
+                target: actual_target,
+                ..
+            },
+            None,
+        )
+        | (
+            StoredAction::CopyFile { source, target },
+            RecoveryDescriptor::Copy {
+                source: actual_source,
+                target: actual_target,
+                ..
+            },
+            None,
+        ) => {
+            let (source, target) = if kind == OperationKind::Undo {
+                (target, source)
+            } else {
+                (source, target)
+            };
+            if source != actual_source || target != actual_target {
+                return Err(HistoryError::LoadError(
+                    "Recovery move/copy paths differ from action".into(),
+                ));
+            }
+        },
+        (
+            StoredAction::RemoveFile { path },
+            RecoveryDescriptor::Remove { path: actual_path, .. },
+            None,
+        ) if kind != OperationKind::Undo && path == actual_path => {},
+        (StoredAction::RemoveFile { .. }, RecoveryDescriptor::Noop, None)
+            if kind == OperationKind::Undo => {},
+        (
+            StoredAction::MakeDir { path } | StoredAction::RemoveDir { path },
+            RecoveryDescriptor::Directory { path: actual_path, .. },
+            None,
+        ) if path == actual_path => {},
+        _ => {
+            return Err(HistoryError::LoadError(
+                "Recovery descriptor differs from action".into(),
+            ));
+        },
     }
     Ok(())
 }
@@ -626,7 +680,7 @@ pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
                 recovery: decode(&p.get::<_, String>(2)?)?,
                 patches: read_patch(c, record_id, action_position)?,
             };
-            validate_prepared(&prepared)?;
+            validate_prepared(&prepared, kind)?;
             let completed = p.get::<_, i64>(3)? == 1;
             let cleaned = p.get::<_, i64>(4)? == 1;
             if cleaned && (!completed || !finalized) {

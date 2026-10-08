@@ -213,7 +213,7 @@ pub fn cleanup_prepared(entry: &PreparedAction) -> FsResult<()> {
         after,
     } = &entry.recovery
     else {
-        return Ok(());
+        return super::recorded_execution::cleanup_copy(entry);
     };
     let resolved = Utf8Path::new(resolved);
     let candidate = Utf8Path::new(candidate);
@@ -244,7 +244,7 @@ pub fn discard_prepared(entry: &PreparedAction) -> FsResult<()> {
         after,
     } = &entry.recovery
     else {
-        return Ok(());
+        return super::recorded_execution::cleanup_copy(entry);
     };
     let resolved = Utf8Path::new(resolved);
     let candidate = Utf8Path::new(candidate);

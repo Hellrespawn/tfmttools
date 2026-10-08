@@ -22,4 +22,5 @@ pub use file_switch::{
     cleanup_prepared, discard_prepared, install_prepared, prepare_tag_edit,
     prepare_tag_replay, recover_prepared,
 };
+pub use recorded_execution::prepare_action;
 pub use tag_edit::write_tag_candidate;
