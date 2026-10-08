@@ -1,7 +1,8 @@
 # Concrete History Format and Legacy Migration
 
 **Date:** 2026-10-07
-**Status:** Proposed; implementation requires review.
+**Status:** Superseded for storage and replay by
+[SQLite history and exact replay](2026-10-08-sqlite-exact-replay-design.md).
 
 ## Goal
 

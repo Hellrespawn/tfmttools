@@ -62,7 +62,7 @@ fn verifies_locator_and_id3_encoding_changes() {
         Utf8PathBuf::from_path_buf(dir.path().join("candidate.mp3")).unwrap();
     std::fs::copy("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3", &path)
         .unwrap();
-    let mut file = lofty::read_from_path(&path).unwrap();
+    let file = lofty::read_from_path(&path).unwrap();
     let title = file
         .primary_tag()
         .unwrap()

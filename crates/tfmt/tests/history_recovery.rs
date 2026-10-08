@@ -34,7 +34,7 @@ fn run(dir: &TempDir, args: &[&str]) -> Output {
         .output()
         .unwrap()
 }
-fn success(out: Output) {
+fn success(out: &Output) {
     assert!(
         out.status.success(),
         "{}\n{}",
@@ -56,13 +56,13 @@ fn tag_fix_undo_redo_restores_complete_recorded_bytes_and_rejects_changed_files(
     let dir = setup();
     let path = dir.path().join("song.mp3");
     let before = std::fs::read(&path).unwrap();
-    success(run(&dir, &["validate", "characters", "--fix"]));
+    success(&run(&dir, &["validate", "characters", "--fix"]));
     let after = std::fs::read(&path).unwrap();
     assert_ne!(before, after);
-    success(run(&dir, &["undo"]));
+    success(&run(&dir, &["undo"]));
     assert_eq!(std::fs::read(&path).unwrap(), before);
     assert_eq!(state(&dir), RecordState::Undone);
-    success(run(&dir, &["redo"]));
+    success(&run(&dir, &["redo"]));
     assert_eq!(std::fs::read(&path).unwrap(), after);
     assert_eq!(state(&dir), RecordState::Redone);
     std::fs::write(&path, b"external edit").unwrap();
@@ -80,7 +80,7 @@ fn dry_run_tag_fix_leaves_audio_and_history_untouched() {
     let dir = setup();
     let path = dir.path().join("song.mp3");
     let before = std::fs::read(&path).unwrap();
-    success(run(&dir, &["--dry-run", "validate", "characters", "--fix"]));
+    success(&run(&dir, &["--dry-run", "validate", "characters", "--fix"]));
     assert_eq!(std::fs::read(path).unwrap(), before);
     assert!(!dir.path().join("config/tfmt.hist").exists());
 }
@@ -125,9 +125,9 @@ fn recovers_each_durable_switch_boundary_and_reports_pending_work_read_only() {
                 )),
             )
             .unwrap();
-        h.set_operation_plan(id, vec![StoredAction::from(&action)]).unwrap();
+        h.set_operation_plan(id, &[StoredAction::from(&action)]).unwrap();
         let entry = prepare_tag_edit(&path, &changes).unwrap();
-        h.append_prepared(id, entry.clone()).unwrap();
+        h.append_prepared(id, &entry).unwrap();
         let RecoveryDescriptor::FileSwitch {
             resolved,
             retained,
@@ -162,7 +162,7 @@ fn recovers_each_durable_switch_boundary_and_reports_pending_work_read_only() {
         );
         assert_eq!(std::fs::read(&history_path).unwrap(), before_db);
         assert!(!run(&dir, &["clear-history"]).status.success());
-        success(run(&dir, &["validate", "characters", "--fix"]));
+        success(&run(&dir, &["validate", "characters", "--fix"]));
         assert_eq!(std::fs::read(&path).unwrap(), after, "stage {stage}");
         let h = History::open_read_only(history_path).unwrap();
         assert!(h.pending_operations().unwrap().is_empty());
@@ -183,7 +183,7 @@ fn already_utf16_id3_fix_is_a_noop() {
     )));
     tag.save_to_path(&path, WriteOptions::default()).unwrap();
     let before = std::fs::read(&path).unwrap();
-    success(run(&dir, &["validate", "id3-encoding", "--fix"]));
+    success(&run(&dir, &["validate", "id3-encoding", "--fix"]));
     assert_eq!(std::fs::read(path).unwrap(), before);
     assert!(!dir.path().join("config/tfmt.hist").exists());
 }

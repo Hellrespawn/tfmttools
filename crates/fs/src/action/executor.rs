@@ -64,19 +64,18 @@ impl<'a> ActionExecutor<'a> {
                     Action::move_from_rename_action(&rename)
                 },
             };
-            if let Action::MoveFile { source, target } = &action {
-                if matches!(self.move_mode, MoveMode::AlwaysCopy)
+            if let Action::MoveFile { source, target } = &action
+                && (matches!(self.move_mode, MoveMode::AlwaysCopy)
                     || super::recorded_execution::crosses_devices(
                         source, target,
-                    )?
-                {
-                    result.push(Action::CopyFile {
-                        source: source.clone(),
-                        target: target.clone(),
-                    });
-                    result.push(Action::RemoveFile(source.clone()));
-                    continue;
-                }
+                    )?)
+            {
+                result.push(Action::CopyFile {
+                    source: source.clone(),
+                    target: target.clone(),
+                });
+                result.push(Action::RemoveFile(source.clone()));
+                continue;
             }
             result.push(action);
         }

@@ -62,6 +62,7 @@ impl FsHandler {
         Self { fs_mode }
     }
 
+    #[must_use]
     pub fn is_dry_run(&self) -> bool {
         matches!(self.fs_mode, FSMode::DryRun)
     }

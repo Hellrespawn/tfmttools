@@ -90,7 +90,7 @@ fn symlink_is_preserved_hard_links_and_redirected_symlinks_are_rejected() {
     let (dir, path, change) = fixture();
     let link = Utf8PathBuf::from_path_buf(dir.path().join("link.mp3")).unwrap();
     std::os::unix::fs::symlink("audio.mp3", &link).unwrap();
-    let entry = prepare_tag_edit(&link, &[change.clone()]).unwrap();
+    let entry = prepare_tag_edit(&link, std::slice::from_ref(&change)).unwrap();
     install_prepared(&entry).unwrap();
     cleanup_prepared(&entry).unwrap();
     assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
@@ -106,7 +106,7 @@ fn symlink_is_preserved_hard_links_and_redirected_symlinks_are_rejected() {
         title.into(),
         "next".into(),
     );
-    let entry = prepare_tag_edit(&link, &[change.clone()]).unwrap();
+    let entry = prepare_tag_edit(&link, std::slice::from_ref(&change)).unwrap();
     std::fs::remove_file(&link).unwrap();
     std::os::unix::fs::symlink("elsewhere.mp3", &link).unwrap();
     assert!(install_prepared(&entry).is_err());

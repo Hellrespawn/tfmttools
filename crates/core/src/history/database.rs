@@ -14,6 +14,7 @@ pub(super) const APPLICATION_ID: i64 = 0x5446_4d54;
 pub(super) const VERSION: i64 = 1;
 const SCHEMA: &str = include_str!("schema-v1.sql");
 
+#[must_use]
 pub fn history_schema_sql() -> &'static str {
     SCHEMA
 }

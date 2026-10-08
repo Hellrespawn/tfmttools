@@ -49,7 +49,7 @@ pub(crate) fn execute_recorded(
     recover_pending(history, fs)?;
     let id =
         history.begin_operation(OperationKind::Apply, None, Some(metadata))?;
-    if let Err(error) = history.set_operation_plan(id, plan) {
+    if let Err(error) = history.set_operation_plan(id, &plan) {
         history.cancel_unstarted(id)?;
         return Err(error.into());
     }
@@ -69,12 +69,12 @@ pub(crate) fn replay_record(
         HistoryMode::Undo => OperationKind::Undo,
         HistoryMode::Redo => OperationKind::Redo,
     };
-    let plan = match direction {
+    let plan: Vec<_> = match direction {
         HistoryMode::Undo => record.iter().rev().cloned().collect(),
         HistoryMode::Redo => record.iter().cloned().collect(),
     };
     let id = history.begin_operation(kind, record.id(), None)?;
-    if let Err(error) = history.set_operation_plan(id, plan) {
+    if let Err(error) = history.set_operation_plan(id, &plan) {
         history.cancel_unstarted(id)?;
         return Err(error.into());
     }
@@ -150,7 +150,7 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
                 },
                 _ => prepare_action(&executable, operation.kind)?,
             };
-            if let Err(error) = history.append_prepared(id, entry.clone()) {
+            if let Err(error) = history.append_prepared(id, &entry) {
                 // A failed commit can be ambiguous: never discard a candidate if
                 // the journal may already refer to it.
                 if history.pending_operations().is_ok_and(|ops| {
@@ -388,10 +388,10 @@ mod tests {
         let id = h
             .begin_operation(OperationKind::Apply, None, Some(metadata()))
             .unwrap();
-        h.set_operation_plan(id, vec![StoredAction::from(&action)]).unwrap();
+        h.set_operation_plan(id, &[StoredAction::from(&action)]).unwrap();
         let Action::EditTagValues { changes, .. } = &action else { panic!() };
         let entry = prepare_tag_edit(&path, changes).unwrap();
-        h.append_prepared(id, entry.clone()).unwrap();
+        h.append_prepared(id, &entry).unwrap();
         install_prepared(&entry).unwrap();
         let RecoveryDescriptor::FileSwitch { retained, .. } = &entry.recovery
         else {

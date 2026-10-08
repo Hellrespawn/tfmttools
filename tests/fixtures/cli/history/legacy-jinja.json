@@ -1,1 +1,0 @@
-{"records":[{"id":0,"actions":[{"MoveFile":{"source":"original.mp3","target":"renamed.mp3"}}],"state":"Applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"Script":"{{ artist }}/{{ title }}"},"arguments":[],"run_id":"old-run"}}]}

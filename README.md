@@ -41,7 +41,7 @@ The workspace is split by responsibility:
 - `crates/fs/` applies rename plans to the filesystem and provides related file
   handling helpers.
 - `crates/core/src/history/` contains the history data model and the concrete
-  serde-backed history storage used by the CLI.
+  SQLite history storage and recovery journal used by the CLI.
 - [crates/picotmpl/](crates/picotmpl/README.md) implements the new
   path template language as an independent library. Its example is
   `examples/stef.tfmt`; the CLI uses this library for all templates.
@@ -83,8 +83,8 @@ See also the "examples"-folder.
 
 ### History locking
 
-Commands that load or change history hold an exclusive lock for the whole
-history session. If another command is using the same history, tfmt exits
+Commands that change history hold an exclusive lock for the whole
+history session. `show-history` and dry runs use read-only database access. If another command is using the same history, tfmt exits
 with an error immediately. Validation fixes acquire the lock before changing
 audio files.
 
@@ -161,9 +161,8 @@ snake_case, such as `album_artist` and
 remain case insensitive. Unknown tags are errors,
 even in skipped guards. Missing recognized tags are allowed. Templates using
 compact, uppercase, or hyphenated tag names must be migrated. New tag-fix
-history records use canonical names. Historical tag-key spellings are
-automatically migrated when history is loaded, so old tag edits remain
-undoable without changing the current template tag-name rules.
+history records use canonical names. Old JSON histories are unsupported and
+are never imported; move them aside explicitly to start a new SQLite history.
 
 | Construct | Example | Meaning |
 | --- | --- | --- |
@@ -240,9 +239,8 @@ comparisons, loops, includes, and arbitrary functions are unsupported.
 Saved filename references work after the referenced files are migrated.
 Reusing a saved Jinja inline template for a new rename fails with a migration
 hint; select an explicit replacement using `--script` or `--template`.
-Undo and redo still work with old history because they replay stored actions
-without parsing templates. Loading upgrades the history model in memory;
-a subsequent save writes the current versioned format.
+Undo and redo replay actions stored in supported SQLite histories without
+parsing templates. Old JSON histories are rejected without importing them.
 
 ### Safety
 
@@ -301,33 +299,51 @@ tfmt redo
 tfmt clear-history
 ```
 
-History files use schema version 1. Existing unversioned files (version 0)
-are migrated in memory when loaded; `show-history` does not rewrite them or
-create backups. The next normal save writes version 1 and first preserves the
-exact original bytes beside the history file as `<history filename>.v0.bak`.
-An existing backup is reused only when it is a regular file and its bytes
-match the original; a
-collision is checked before rename, validation-fix, and undo/redo actions; it
-stops the command without changing files or overwriting either history file.
+History uses a versioned SQLite database at `<configuration directory>/tfmt.hist`.
+Old JSON histories are rejected without importing or rewriting them. Move an old
+history aside explicitly if you want to start a fresh database; it cannot supply
+exact-byte undo/redo patches. Invalid databases, foreign application identifiers,
+and unsupported schema versions stop commands before applying new actions.
 
-Saves write a temporary file in the destination directory and atomically
-replace the history file. History symlinks remain intact: saves replace the
-referent and put upgrade backups beside that file. Invalid documents, unknown fields/actions/tag keys,
-and invalid or unsupported versions are errors; they are never treated as
-empty history. A failed load stops action execution. A failed save preserves
-the history source, but actions already applied by the command remain applied.
-The session lock excludes cooperating concurrent writers. Atomic replacement
-does not provide a crash-durability guarantee.
+Records preserve IDs, ordering, timestamps, template metadata, and replay states.
+SQLite uses STRICT tables, enforced foreign keys, rollback journaling, and
+`synchronous=EXTRA` to make recovery intent and binary patches durable before
+file changes. Database commits and filesystem changes remain separate operations.
 
-Migration preserves stored template text and replays stored actions; it does
-not translate old template languages. Reusing old Jinja text for a new rename
-still requires an explicit replacement as described above.
+Tag fixes edit and verify a candidate beside the audio file. Before switching,
+tfmt saves forward and reverse binary patches and a pending operation. It then
+moves the original aside, installs the candidate, and finalizes history before
+deleting the retained original. This uses no additional backup copy. The portable
+switch briefly leaves the original pathname absent. Audio symlinks retain their
+links while the target is edited; hard-linked audio files are rejected. Audio
+replacement currently requires Unix hard-link checks, and preserves permissions
+but does not promise to preserve ACLs or extended attributes.
 
-The generated [version 1 JSON Schema](docs/history/schema-v1.json) comes from
-the concrete Rust storage model. Regenerate it with `cargo xtask history-schema`;
-normal core/workspace tests compare it against the checked-in snapshot.
-Published format changes require a version bump, a migration, an updated
-schema, and historical compatibility/replay fixtures.
+Tag-edit undo/redo checks the expected complete file bytes and applies the
+recorded patch to a candidate. It restores exact recorded bytes, including tag
+layout and encodings. If the file has changed since the operation, replay fails
+without overwriting it. New files and restored candidates are verified before
+installation; raw tag serialization is never used for undo/redo.
+
+Mutating commands recover interrupted operations before planning new work.
+`show-history` reports pending recovery without changing audio or the database;
+`clear-history` refuses pending recovery work. Recovery inspects saved progress,
+paths, and hashes. Unexpected file states stop recovery and retain the candidate
+and original for inspection. Do not delete recovery files while work is pending.
+Dry runs neither recover pending work nor write history or audio files.
+
+Rename and cleanup actions are recorded in order, including staging moves and
+copy/remove steps. Cleanup confirmation happens before file changes, and the
+configuration and bin directories are protected from cleanup. A run is finalized
+only after its actions complete; replay finalizes each record separately. The
+session lock excludes cooperating writers but cannot prevent arbitrary external
+programs from changing files during a switch.
+
+The generated [version 1 SQL schema](docs/history/schema-v1.sql) describes the
+SQLite contract. Regenerate it with `cargo xtask history-schema`; core tests
+compare it against the checked-in snapshot. Published database format changes
+require a version bump, migration, updated schema, and compatibility/replay tests.
+Stored template text remains unchanged; reuse restrictions still apply.
 
 ### Windows Notes
 

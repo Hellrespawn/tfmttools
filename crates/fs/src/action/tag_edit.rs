@@ -10,6 +10,7 @@ use tfmttools_core::item_keys::parse_item_key;
 
 use crate::error::{FsError, FsResult};
 
+#[allow(clippy::too_many_lines)] // Verify every requested value and native encoding before install.
 pub fn write_tag_candidate(
     path: &camino::Utf8Path,
     changes: &[TagValueChange],
@@ -171,28 +172,28 @@ fn tag_with_encoding_changes(
     // Lofty's generic ID3 conversion reads URL values as text even though
     // parsing produces Locator values. Preserve them through native frames.
     for item in tag.items() {
-        if let Some(value) = item.value().locator() {
-            if let Some(id) = item.key().map_key(TagType::Id3v2) {
-                if id == "WXXX" {
-                    id3v2_tag.insert(Frame::UserUrl(ExtendedUrlFrame::new(
-                        TextEncoding::UTF8,
-                        item.description().to_owned(),
-                        value.to_owned(),
-                    )));
-                } else if id.starts_with('W') && id.len() == 4 {
-                    let frame_id = FrameId::new(id)
-                        .map_err(|e| FsError::Recovery(e.to_string()))?;
-                    id3v2_tag.insert(Frame::Url(UrlLinkFrame::new(
-                        frame_id,
-                        value.to_owned(),
-                    )));
-                } else {
-                    return Err(FsError::Recovery(
-                        "Unsupported ID3 locator mapping".into(),
-                    ));
-                }
-                encoding_changed = true;
+        if let Some(value) = item.value().locator()
+            && let Some(id) = item.key().map_key(TagType::Id3v2)
+        {
+            if id == "WXXX" {
+                id3v2_tag.insert(Frame::UserUrl(ExtendedUrlFrame::new(
+                    TextEncoding::UTF8,
+                    item.description().to_owned(),
+                    value.to_owned(),
+                )));
+            } else if id.starts_with('W') && id.len() == 4 {
+                let frame_id = FrameId::new(id)
+                    .map_err(|e| FsError::Recovery(e.to_string()))?;
+                id3v2_tag.insert(Frame::Url(UrlLinkFrame::new(
+                    frame_id,
+                    value.to_owned(),
+                )));
+            } else {
+                return Err(FsError::Recovery(
+                    "Unsupported ID3 locator mapping".into(),
+                ));
             }
+            encoding_changed = true;
         }
     }
 

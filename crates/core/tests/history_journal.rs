@@ -18,7 +18,7 @@ fn committed_intent_survives_reopen_and_finalizes_only_after_actions() {
     let id = h
         .begin_operation(OperationKind::Apply, None, Some(metadata()))
         .unwrap();
-    h.set_operation_plan(id, vec![StoredAction::from(&Action::MakeDir(
+    h.set_operation_plan(id, &[StoredAction::from(&Action::MakeDir(
         "dir".into(),
     ))])
     .unwrap();
@@ -36,7 +36,7 @@ fn committed_intent_survives_reopen_and_finalizes_only_after_actions() {
         },
         patches: None,
     };
-    h.append_prepared(id, entry).unwrap();
+    h.append_prepared(id, &entry).unwrap();
     drop(h);
     let mut h = History::new(path);
     h.load().unwrap();
@@ -62,14 +62,14 @@ fn replay_finalization_updates_state_and_new_run_supersedes_redo() {
     h.push(vec![], metadata()).unwrap();
     h.save().unwrap();
     let id = h.begin_operation(OperationKind::Undo, Some(0), None).unwrap();
-    h.set_operation_plan(id, vec![]).unwrap();
+    h.set_operation_plan(id, &[]).unwrap();
     h.finish_operation(id).unwrap();
     assert_eq!(h.records()[0].state(), RecordState::Undone);
     assert!(h.begin_operation(OperationKind::Undo, Some(0), None).is_err());
     let id = h
         .begin_operation(OperationKind::Apply, None, Some(metadata()))
         .unwrap();
-    h.set_operation_plan(id, vec![]).unwrap();
+    h.set_operation_plan(id, &[]).unwrap();
     h.finish_operation(id).unwrap();
     assert_eq!(h.records()[0].state(), RecordState::Superseded);
     assert_eq!(h.records()[1].state(), RecordState::Applied);
@@ -85,8 +85,8 @@ fn failed_finalization_preserves_committed_progress_and_retries() {
         .begin_operation(OperationKind::Apply, None, Some(metadata()))
         .unwrap();
     let action = StoredAction::from(&Action::MakeDir("dir".into()));
-    h.set_operation_plan(id, vec![action.clone()]).unwrap();
-    h.append_prepared(id, PreparedAction {
+    h.set_operation_plan(id, std::slice::from_ref(&action)).unwrap();
+    h.append_prepared(id, &PreparedAction {
         action,
         recovery: RecoveryDescriptor::Directory {
             path: "dir".into(),
@@ -133,8 +133,8 @@ fn patch_blobs_and_descriptors_survive_reopen() {
     let id = h
         .begin_operation(OperationKind::Apply, None, Some(metadata()))
         .unwrap();
-    h.set_operation_plan(id, vec![action.clone()]).unwrap();
-    h.append_prepared(id, PreparedAction {
+    h.set_operation_plan(id, std::slice::from_ref(&action)).unwrap();
+    h.append_prepared(id, &PreparedAction {
         action,
         recovery: RecoveryDescriptor::FileSwitch {
             path: "audio.mp3".into(),

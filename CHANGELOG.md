@@ -4,13 +4,17 @@
 
 ### Added
 
-- Add concrete schema-version-1 history in core with explicit stored action
-  names, generated JSON Schema, and `cargo xtask history-schema`.
-- Migrate legacy history in memory on load, restoring historical tag-edit
-  undo/redo. The next save preserves exact source bytes in `<filename>.v0.bak`
-  before atomically writing version 1. Matching backups are reused; conflicting
-  backups stop commands before applying actions. Read-only loads create no
-  backups or rewrites. Atomic saves follow history symlinks and preserve them.
+- Add versioned, validated SQLite history using `rusqlite` and
+  `rusqlite_migration`, with STRICT tables, foreign keys, rollback journaling,
+  and `synchronous=EXTRA`. Keep record IDs, ordering, metadata, and replay states.
+  `cargo xtask history-schema` now generates the SQL schema snapshot.
+- Add forward/reverse `qbsdiff` binary patches for tag edits. Undo/redo restores
+  exact recorded bytes and rejects files changed since the recorded operation.
+- Write tag edits to verified candidates and save patches before switching.
+  Retain the original through durable finalization without an extra backup copy.
+- Journal ordered filesystem effects and recover interrupted operations before
+  new mutations. Read-only history display reports pending work; clear-history
+  refuses it. Dry runs do not write or recover files.
 - Lock history sessions using a persistent sibling lock file. Report
   contention immediately, and acquire the lock before applying tag fixes.
 
@@ -23,8 +27,15 @@
 
 ### Changed
 
+- Plan cleanup confirmation before filesystem effects and protect configuration
+  and bin directories. Prepare copies in synced candidates for recovery.
+- Read native ID3 encodings when planning fixes and verifying candidates; preserve
+  ID3 locator frames through native conversion.
+- Preserve audio symlinks during edits and reject hard-linked audio replacement.
+  Audio replacement currently requires Unix hard-link checks.
+
 - Remove the separate history crate; core now owns the concrete history model
-  and persistence. Invalid documents and unsupported schema versions fail
+  and persistence. Invalid databases and unsupported schema versions fail
   before actions execute. Validation fixes now load history before changing
   tags. Legacy template text remains unchanged and retains reuse restrictions.
 - Raise the minimum supported Rust version to 1.91.0 and use the standard
@@ -35,7 +46,7 @@
 - Require canonical lowercase snake_case audio tag names, with explicit aliases
   `album`, `artist`, `title`, `album_sort`, and `disk_number`. Remove generated
   casing aliases and use canonical names for new tag-fix history. Historical
-  tag-key spellings are automatically migrated for undo/redo. The template
+  JSON histories are rejected without importing or rewriting them. The template
   library preserves metadata name spelling.
 
 - Use workspace Cargo lint settings consistently across all crates; remove
@@ -47,7 +58,7 @@
   numeric overflow and whitespace handling.
 
 - Use template terminology throughout the API, including `Template` and
-  `BoundTemplate`; preserve the `--script` flag and legacy history replay.
+  `BoundTemplate`; preserve the `--script` flag and stored-action replay in supported databases.
 
 - Compile and bind only the selected rename template; reject ambiguous
   filename stems and allow selection by explicit file path. Remove the
@@ -60,7 +71,8 @@
   the filename artist prefix when the track artist is missing or empty.
 - Validate all string/path arguments and defaults against forbidden filename
   characters instead of sanitizing them; preserve accepted argument whitespace.
-- Preserve legacy history undo/redo; saved Jinja templates require an explicit
+- Reject old JSON history without import; move it aside explicitly to start new
+  history. Saved Jinja text in supported databases requires an explicit
   replacement when reused for a new rename.
 - Resolve relative rename input directories before scanning and compare canonical
   paths during cleanup so renamed targets survive alternate path spellings.

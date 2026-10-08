@@ -6,6 +6,7 @@ use tfmttools_core::history::{BinaryPatchPair, ByteIdentity, HistoryMode};
 
 use crate::error::{FsError, FsResult};
 
+#[must_use]
 pub fn byte_identity(bytes: &[u8]) -> ByteIdentity {
     ByteIdentity {
         length: bytes.len() as u64,

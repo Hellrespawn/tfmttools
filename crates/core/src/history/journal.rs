@@ -220,9 +220,9 @@ impl History {
     pub fn set_operation_plan(
         &mut self,
         id: OperationId,
-        plan: Vec<StoredAction>,
+        plan: &[StoredAction],
     ) -> Result<()> {
-        for action in &plan {
+        for action in plan {
             database::validate_action(action)?;
         }
         let operation = self.operation(id)?;
@@ -272,7 +272,7 @@ impl History {
     pub fn append_prepared(
         &mut self,
         id: OperationId,
-        entry: PreparedAction,
+        entry: &PreparedAction,
     ) -> Result<usize> {
         let operation = self.operation(id)?;
         let plan = operation.plan.as_ref().ok_or_else(|| {
@@ -294,7 +294,7 @@ impl History {
                 "Prepared action differs from saved plan".into(),
             ));
         }
-        validate_prepared(&entry, operation.kind)?;
+        validate_prepared(entry, operation.kind)?;
         let action_position = if operation.kind == OperationKind::Undo {
             plan.len() - 1 - position
         } else {
@@ -637,6 +637,7 @@ fn validate_prepared(
     Ok(())
 }
 
+#[allow(clippy::too_many_lines)] // Validate the complete journal snapshot together.
 pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
     let mut s = c.prepare(
         "SELECT id,record_id,kind,finalized,plan FROM operations ORDER BY id",

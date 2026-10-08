@@ -117,7 +117,7 @@ fn fix_characters(
         history,
         fs_handler,
         app_options,
-        actions,
+        &actions,
         "validate characters --fix",
     )
 }
@@ -149,7 +149,7 @@ fn fix_id3_encoding(
         history,
         fs_handler,
         app_options,
-        actions,
+        &actions,
         "validate id3-encoding --fix",
     )
 }
@@ -218,7 +218,7 @@ fn apply_and_store_fix(
     history: Option<&mut History>,
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
-    actions: Vec<Action>,
+    actions: &[Action],
     command: &str,
 ) -> Result<()> {
     if actions.is_empty() {
@@ -227,7 +227,7 @@ fn apply_and_store_fix(
     }
 
     if matches!(app_options.fs_mode(), FSMode::DryRun) {
-        report_actions(&actions, true);
+        report_actions(actions, true);
         return Ok(());
     }
 
@@ -241,10 +241,10 @@ fn apply_and_store_fix(
     crate::history::execution::execute_recorded(
         history,
         fs_handler,
-        actions.clone(),
+        actions.to_vec(),
         metadata,
     )?;
-    report_actions(&actions, false);
+    report_actions(actions, false);
     println!("Saved run #{} to history.", app_options.run_id());
 
     Ok(())

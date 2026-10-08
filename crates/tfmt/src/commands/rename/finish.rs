@@ -308,10 +308,7 @@ fn execute_cleanup(
     )?;
     let mut actions = move_files(session, rename_actions)?;
 
-    actions.extend(remove_directories(
-        session,
-        cleanup_plan.directories_to_remove,
-    )?);
+    actions.extend(remove_directories(cleanup_plan.directories_to_remove));
 
     Ok(actions)
 }
@@ -344,14 +341,10 @@ fn move_files(
     Ok(executor.plan_actions(rename_actions)?)
 }
 
-fn remove_directories(
-    session: &RenameSession,
-    directories: Vec<Utf8Directory>,
-) -> Result<Vec<Action>> {
-    let _ = session;
-    Ok(directories
+fn remove_directories(directories: Vec<Utf8Directory>) -> Vec<Action> {
+    directories
         .into_iter()
         .rev()
         .map(|directory| Action::RemoveDir(directory.into_path_buf()))
-        .collect())
+        .collect()
 }
