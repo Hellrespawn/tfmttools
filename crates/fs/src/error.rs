@@ -19,7 +19,13 @@ pub enum FsError {
     FileTooLargeError(Utf8PathBuf),
 
     #[error("Error while reading file: {0}\n{1}")]
-    Lofty(Utf8PathBuf, lofty::error::LoftyError),
+    Lofty(Utf8PathBuf, #[source] lofty::error::FileParseError),
+
+    #[error("Error while writing file: {0}\n{1}")]
+    LoftyFileWrite(Utf8PathBuf, #[source] lofty::error::FileEncodingError),
+
+    #[error("Error while writing tag: {0}\n{1}")]
+    LoftyTagWrite(Utf8PathBuf, #[source] lofty::error::FileEncodingError),
 
     #[error(transparent)]
     Io(#[from] std::io::Error),

@@ -487,7 +487,8 @@ fn raw_id3v2_text_encoding(path: &Utf8Path, id: &str) -> Option<String> {
         let next_offset = content_offset.checked_add(frame_size)?;
 
         if frame_id == id && content_offset < end {
-            let encoding = TextEncoding::from_u8(bytes[content_offset])?;
+            let encoding =
+                TextEncoding::try_from(bytes[content_offset]).ok()?;
             return Some(text_encoding_name(encoding).to_owned());
         }
 

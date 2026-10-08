@@ -25,6 +25,7 @@
   and persistence. Invalid documents and unsupported schema versions fail
   before actions execute. Validation fixes now load history before changing
   tags. Legacy template text remains unchanged and retains reuse restrictions.
+- Update Lofty to 0.25.4 and preserve error causes for audio reads and writes.
 
 - Require canonical lowercase snake_case audio tag names, with explicit aliases
   `album`, `artist`, `title`, `album_sort`, and `disk_number`. Remove generated

@@ -251,6 +251,9 @@ Rename operations are not fully transactional. If an unexpected filesystem
 error occurs after some files have moved, use `tfmt undo` to revert completed
 recorded actions where possible.
 
+Audio read and write errors include the affected path and preserve the
+underlying cause in diagnostic error chains.
+
 ### Filename Sanitization
 
 Interpolated tag values are sanitized before rendering final paths:

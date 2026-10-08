@@ -158,12 +158,12 @@ fn apply_tag_changes(
 
     tagged_file
         .save_to_path(path, WriteOptions::default())
-        .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
+        .map_err(|err| FsError::LoftyFileWrite(path.to_owned(), err))?;
 
     if let Some(id3v2_tag) = id3v2_tag_with_encoding_changes {
         id3v2_tag
             .save_to_path(path, WriteOptions::default())
-            .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
+            .map_err(|err| FsError::LoftyTagWrite(path.to_owned(), err))?;
     }
 
     Ok(())

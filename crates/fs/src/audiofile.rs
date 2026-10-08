@@ -26,9 +26,15 @@ mod tests {
         let temp_dir = TempDir::new()?;
         let path = Utf8PathBuf::try_from(temp_dir.path().join("missing.mp3"))?;
 
-        let error = read_audio_file(path).unwrap_err();
+        let error = read_audio_file(path.clone()).unwrap_err();
 
-        assert!(matches!(error, FsError::Lofty(_, _)));
+        assert!(
+            matches!(&error, FsError::Lofty(error_path, _) if error_path == &path)
+        );
+        let source = std::error::Error::source(&error).unwrap();
+        let io_error =
+            source.source().unwrap().downcast_ref::<std::io::Error>().unwrap();
+        assert_eq!(io_error.kind(), std::io::ErrorKind::NotFound);
 
         Ok(())
     }
