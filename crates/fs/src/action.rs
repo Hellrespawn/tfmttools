@@ -1,6 +1,8 @@
 mod binary_patch;
 mod executor;
+mod file_switch;
 mod handler;
+mod recorded_execution;
 mod rename_cycles;
 mod rename_planner;
 mod rename_staging;
@@ -16,4 +18,8 @@ enum PlannedAction {
 }
 
 pub use binary_patch::{apply_patch, byte_identity, create_patch_pair};
+pub use file_switch::{
+    cleanup_prepared, discard_prepared, install_prepared, prepare_tag_edit,
+    prepare_tag_replay, recover_prepared,
+};
 pub use tag_edit::write_tag_candidate;
