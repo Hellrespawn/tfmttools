@@ -19,8 +19,8 @@ enum PlannedAction {
 
 pub use binary_patch::{apply_patch, byte_identity, create_patch_pair};
 pub use file_switch::{
-    cleanup_prepared, discard_prepared, install_prepared, prepare_tag_edit,
-    prepare_tag_replay, recover_prepared,
+    cleanup_completed_artifacts, cleanup_prepared, discard_prepared,
+    install_prepared, prepare_tag_edit, prepare_tag_replay, recover_prepared,
 };
 pub use recorded_execution::prepare_action;
 pub use tag_edit::write_tag_candidate;

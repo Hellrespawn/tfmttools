@@ -364,3 +364,44 @@ pub(super) fn conflict(path: &Utf8Path) -> FsError {
         "Unexpected file state at {path}; retained files require inspection"
     ))
 }
+
+/// Delete verified recovery artifacts only after the coordinator has validated
+/// the final state of the entire operation and committed finalization.
+pub fn cleanup_completed_artifacts(entry: &PreparedAction) -> FsResult<()> {
+    if let RecoveryDescriptor::FileSwitch {
+        resolved,
+        candidate,
+        retained,
+        before,
+        after,
+        ..
+    } = &entry.recovery
+    {
+        let resolved = Utf8Path::new(resolved);
+        let candidate = Utf8Path::new(candidate);
+        let retained = Utf8Path::new(retained);
+        if candidate.parent() != resolved.parent()
+            || retained.parent() != resolved.parent()
+            || !candidate
+                .file_name()
+                .is_some_and(|n| n.starts_with(".tfmt-candidate-"))
+            || !retained
+                .file_name()
+                .is_some_and(|n| n.starts_with(".tfmt-original-"))
+        {
+            return Err(conflict(retained));
+        }
+        for (path, expected) in [(retained, before), (candidate, after)] {
+            if let Some(actual) = identity_if_regular(path)? {
+                if &actual != expected {
+                    return Err(conflict(path));
+                }
+                fs_err::remove_file(path)?;
+                sync_parent(path)?;
+            }
+        }
+        Ok(())
+    } else {
+        super::recorded_execution::cleanup_copy(entry)
+    }
+}

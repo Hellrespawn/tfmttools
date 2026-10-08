@@ -107,6 +107,29 @@ fn index(value: i64) -> Result<usize> {
 }
 
 impl History {
+    pub fn cancel_unstarted(&mut self, id: OperationId) -> Result<()> {
+        let operation = self.operation(id)?;
+        if operation.finalized || !operation.entries.is_empty() {
+            return Err(HistoryError::MutError(
+                "Cannot discard an operation with recorded effects".into(),
+            ));
+        }
+        let connection = self.connection.as_mut().unwrap();
+        let transaction = connection.transaction()?;
+        transaction.execute("DELETE FROM operations WHERE id=?1", [id.0])?;
+        if operation.kind == OperationKind::Apply {
+            transaction.execute("DELETE FROM actions WHERE record_id=?1", [
+                number(operation.record_id)?,
+            ])?;
+            transaction.execute(
+                "DELETE FROM records WHERE id=?1 AND finalized=0",
+                [number(operation.record_id)?],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
     pub fn begin_operation(
         &mut self,
         kind: OperationKind,

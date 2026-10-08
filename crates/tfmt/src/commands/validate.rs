@@ -1,22 +1,22 @@
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use lofty::TextEncoding;
+use lofty::file::AudioFile as LoftyAudioFile;
 use lofty::id3::v2::{Frame, Id3v2Tag};
-use lofty::tag::{ItemKey, Tag, TagItem, TagType};
+use lofty::tag::{ItemKey, TagItem, TagType};
 use tfmttools_core::action::{
     Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
 };
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, HistoryError, TemplateMetadata,
+    ActionRecordMetadata, History, TemplateMetadata,
 };
 use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{
-    ActionExecutor, FsError, FsHandler, PathIterator, PathIteratorOptions,
-    read_audio_file,
+    FsError, FsHandler, PathIterator, PathIteratorOptions, read_audio_file,
 };
 use tracing::{debug, trace};
 
@@ -36,6 +36,16 @@ pub fn validate(
         bail!("--fix requires a validation type.");
     }
 
+    let mut history = if validate_args.fix
+        && !matches!(app_options.fs_mode(), FSMode::DryRun)
+    {
+        let (mut history, _) = load_history(&app_options.history_file_path()?)?;
+        crate::history::execution::recover_pending(&mut history, fs_handler)?;
+        Some(history)
+    } else {
+        None
+    };
+
     let file_paths = gather_file_paths(app_options, &validate_options);
 
     debug!("Read {} files.", file_paths.len());
@@ -51,14 +61,24 @@ pub fn validate(
             Ok(())
         },
         (Some(ValidateType::Characters), true) => {
-            fix_characters(fs_handler, app_options, file_paths)
+            fix_characters(
+                fs_handler,
+                app_options,
+                file_paths,
+                history.as_mut(),
+            )
         },
         (Some(ValidateType::Id3Encoding), false) => {
             check(app_options, file_paths, ValidationScope::Id3Encoding);
             Ok(())
         },
         (Some(ValidateType::Id3Encoding), true) => {
-            fix_id3_encoding(fs_handler, app_options, file_paths)
+            fix_id3_encoding(
+                fs_handler,
+                app_options,
+                file_paths,
+                history.as_mut(),
+            )
         },
     }
 }
@@ -81,6 +101,7 @@ fn fix_characters(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
+    history: Option<&mut History>,
 ) -> Result<()> {
     let actions = create_fix_actions(app_options, file_paths, |_, _, value| {
         let fixed = sanitize_tag_value(value);
@@ -93,6 +114,7 @@ fn fix_characters(
     });
 
     apply_and_store_fix(
+        history,
         fs_handler,
         app_options,
         actions,
@@ -104,18 +126,27 @@ fn fix_id3_encoding(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
+    history: Option<&mut History>,
 ) -> Result<()> {
     let file_paths = file_paths
         .into_iter()
         .filter(|path| path.extension() == Some("mp3"))
         .collect::<Vec<_>>();
+    let native_tags: std::collections::HashMap<_, _> = file_paths
+        .iter()
+        .filter_map(|path| {
+            native_id3v2_tag(path).map(|tag| (path.clone(), tag))
+        })
+        .collect();
     let actions =
-        create_fix_actions(app_options, file_paths, |tag, item, value| {
-            let source_encoding = lofty_id3v2_text_encoding(tag, item.key())?;
+        create_fix_actions(app_options, file_paths, |path, item, value| {
+            let source_encoding =
+                lofty_id3v2_text_encoding(native_tags.get(path)?, item.key())?;
             rewrite_id3_text_as_utf16(value, source_encoding)
         });
 
     apply_and_store_fix(
+        history,
         fs_handler,
         app_options,
         actions,
@@ -126,7 +157,7 @@ fn fix_id3_encoding(
 fn create_fix_actions(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    fix_value: impl Fn(&Tag, &TagItem, &str) -> Option<FieldFix>,
+    fix_value: impl Fn(&Utf8Path, &TagItem, &str) -> Option<FieldFix>,
 ) -> Vec<Action> {
     let bar = ProgressBar::bar(
         app_options.display_mode(),
@@ -144,9 +175,7 @@ fn create_fix_actions(
             let changes = audio_file
                 .tag()
                 .items()
-                .filter_map(|item| {
-                    tag_value_change(audio_file.tag(), item, &fix_value)
-                })
+                .filter_map(|item| tag_value_change(&path, item, &fix_value))
                 .collect::<Vec<_>>();
 
             if !changes.is_empty() {
@@ -161,12 +190,12 @@ fn create_fix_actions(
 }
 
 fn tag_value_change(
-    tag: &Tag,
+    path: &Utf8Path,
     item: &TagItem,
-    fix_value: &impl Fn(&Tag, &TagItem, &str) -> Option<FieldFix>,
+    fix_value: &impl Fn(&Utf8Path, &TagItem, &str) -> Option<FieldFix>,
 ) -> Option<TagValueChange> {
     let (kind, value) = tag_item_value(item)?;
-    let fixed = fix_value(tag, item, value)?;
+    let fixed = fix_value(path, item, value)?;
 
     Some(
         TagValueChange::new(
@@ -186,6 +215,7 @@ fn tag_item_value(item: &TagItem) -> Option<(TagValueKind, &str)> {
 }
 
 fn apply_and_store_fix(
+    history: Option<&mut History>,
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     actions: Vec<Action>,
@@ -201,12 +231,21 @@ fn apply_and_store_fix(
         return Ok(());
     }
 
-    let (mut history, _) = load_history(&app_options.history_file_path()?)?;
-    history.prepare_save()?;
-    let applied_actions =
-        ActionExecutor::new(fs_handler).apply_actions(actions)?;
-    report_actions(&applied_actions, false);
-    store_history(app_options, &mut history, applied_actions, command)?;
+    let history =
+        history.expect("Writable validation holds the history session");
+    let metadata = ActionRecordMetadata::new(
+        TemplateMetadata::Validation { value: command.to_owned() },
+        Vec::new(),
+        app_options.run_id().to_owned(),
+    );
+    crate::history::execution::execute_recorded(
+        history,
+        fs_handler,
+        actions.clone(),
+        metadata,
+    )?;
+    report_actions(&actions, false);
+    println!("Saved run #{} to history.", app_options.run_id());
 
     Ok(())
 }
@@ -227,33 +266,6 @@ fn report_actions(actions: &[Action], dry_run: bool) {
             }
         }
     }
-}
-
-fn store_history(
-    app_options: &TFMTOptions,
-    history: &mut History,
-    actions: Vec<Action>,
-    command: &str,
-) -> Result<()> {
-    let metadata = ActionRecordMetadata::new(
-        TemplateMetadata::Validation { value: command.to_owned() },
-        Vec::new(),
-        app_options.run_id().to_owned(),
-    );
-
-    history.push(actions, metadata)?;
-
-    match history.save() {
-        Err(err @ HistoryError::SaveErrorWithBackup { .. }) => {
-            eprintln!("{err}");
-        },
-        result => {
-            result?;
-            println!("Saved run #{} to history.", app_options.run_id());
-        },
-    }
-
-    Ok(())
 }
 
 fn gather_file_paths(
@@ -373,13 +385,15 @@ fn validate_tag_values(audio_file: &AudioFile) -> Vec<TagValueIssue> {
 }
 
 fn validate_id3_encoding(audio_file: &AudioFile) -> Vec<Id3EncodingIssue> {
+    let Some(native_tag) = native_id3v2_tag(audio_file.file().as_path()) else {
+        return Vec::new();
+    };
     audio_file
         .tag()
         .items()
         .filter_map(|item| {
             let (_, value) = tag_item_value(item)?;
-            let encoding =
-                lofty_id3v2_text_encoding(audio_file.tag(), item.key())?;
+            let encoding = lofty_id3v2_text_encoding(&native_tag, item.key())?;
 
             should_rewrite_id3_text_as_utf16(value, encoding).then(|| {
                 Id3EncodingIssue {
@@ -427,12 +441,26 @@ fn rewrite_id3_text_as_utf16(
     })
 }
 
+fn native_id3v2_tag(path: &Utf8Path) -> Option<Id3v2Tag> {
+    if path.extension() != Some("mp3") {
+        return None;
+    }
+    let mut file = std::fs::File::open(path).ok()?;
+    lofty::mpeg::MpegFile::read_from(
+        &mut file,
+        lofty::config::ParseOptions::new().read_properties(false),
+    )
+    .ok()?
+    .id3v2()
+    .cloned()
+}
+
 fn lofty_id3v2_text_encoding(
-    tag: &Tag,
+    tag: &Id3v2Tag,
     item_key: ItemKey,
 ) -> Option<TextEncoding> {
     let id = item_key.map_key(TagType::Id3v2)?;
-    let id3v2_tag = Id3v2Tag::from(tag.clone());
+    let id3v2_tag = tag.clone();
 
     id3v2_tag.into_iter().find_map(|frame| {
         match frame {

@@ -2,7 +2,6 @@ use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::{MoveMode, Utf8PathExt};
 use tracing::trace;
 
-use super::tag_edit::{TagChangeDirection, apply_tag_changes};
 use crate::error::FsResult;
 use crate::fs_handler::{FsHandler, MoveFileResult};
 
@@ -85,8 +84,10 @@ impl<'a> ActionHandler<'a> {
             Action::RemoveDir(path) => {
                 self.fs_handler.create_dir(path)?;
             },
-            Action::EditTagValues { path, changes } => {
-                apply_tag_changes(path, changes, TagChangeDirection::Backward)?;
+            Action::EditTagValues { .. } => {
+                return Err(crate::error::FsError::Recovery(
+                    "Tag replay requires recorded binary patches".into(),
+                ));
             },
         }
 
@@ -117,8 +118,10 @@ impl<'a> ActionHandler<'a> {
             Action::RemoveDir(path) => {
                 self.fs_handler.remove_dir(path)?;
             },
-            Action::EditTagValues { path, changes } => {
-                apply_tag_changes(path, changes, TagChangeDirection::Forward)?;
+            Action::EditTagValues { .. } => {
+                return Err(crate::error::FsError::Recovery(
+                    "Tag edits require a journaled candidate switch".into(),
+                ));
             },
         }
 

@@ -4,8 +4,7 @@ use camino::Utf8Path;
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::history::{ActionRecordMetadata, History, HistoryError};
-use tfmttools_core::util::{FSMode, Utf8Directory, Utf8File, Utf8PathExt};
+use tfmttools_core::util::{Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
     ActionExecutor, FsResult, PathIterator, PathIteratorOptions,
     get_file_checksum, get_longest_common_prefix,
@@ -13,7 +12,6 @@ use tfmttools_fs::{
 use tracing::{debug, info, trace};
 
 use super::RenameSession;
-use crate::cli::TFMTOptions;
 use crate::ui::{PreviewList, current_dir_utf8};
 
 const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
@@ -134,6 +132,15 @@ fn discover_remaining_items(
     );
 
     let remaining = PathIterator::new(&options)
+        .filter(|result| {
+            result.as_ref().map_or(true, |path| {
+                !path.starts_with(
+                    session.app_options().config_directory().as_path(),
+                ) && !path.starts_with(
+                    session.rename_options().bin_directory().as_path(),
+                )
+            })
+        })
         .map(|result| {
             result.and_then(|path| {
                 let canonical = path.canonicalize_utf8()?;
@@ -164,7 +171,13 @@ fn protected_cleanup_paths(
             applied_actions
                 .iter()
                 .filter(|action| action.is_rename_action())
-                .map(|action| action.target().to_owned()),
+                .flat_map(|action| {
+                    action
+                        .source()
+                        .into_iter()
+                        .chain(std::iter::once(action.target()))
+                })
+                .map(camino::Utf8Path::to_owned),
         )
         .map(|path| {
             match path.canonicalize_utf8() {
@@ -328,40 +341,17 @@ fn move_files(
     let executor = ActionExecutor::new(session.fs_handler())
         .move_mode(session.rename_options().move_mode());
 
-    Ok(executor
-        .apply_rename_actions(rename_actions)
-        .collect::<FsResult<_>>()?)
+    Ok(executor.plan_actions(rename_actions)?)
 }
 
 fn remove_directories(
     session: &RenameSession,
     directories: Vec<Utf8Directory>,
 ) -> Result<Vec<Action>> {
-    Ok(ActionExecutor::new(session.fs_handler())
-        .remove_directories(directories)?)
-}
-
-pub(crate) fn store_history(
-    app_options: &TFMTOptions,
-    history: &mut History,
-    actions: Vec<Action>,
-    metadata: ActionRecordMetadata,
-) -> Result<()> {
-    if matches!(app_options.fs_mode(), FSMode::DryRun) {
-        Ok(())
-    } else {
-        history.push(actions, metadata)?;
-
-        match history.save() {
-            Err(err @ HistoryError::SaveErrorWithBackup { .. }) => {
-                eprintln!("{err}");
-            },
-            result => {
-                result?;
-                println!("Saved run #{} to history.", app_options.run_id());
-            },
-        }
-
-        Ok(())
-    }
+    let _ = session;
+    Ok(directories
+        .into_iter()
+        .rev()
+        .map(|directory| Action::RemoveDir(directory.into_path_buf()))
+        .collect())
 }

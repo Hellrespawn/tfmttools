@@ -1623,6 +1623,7 @@ dependencies = [
  "indicatif",
  "itertools",
  "lofty",
+ "rusqlite",
  "serde_json",
  "textwrap",
  "tfmttools-core",

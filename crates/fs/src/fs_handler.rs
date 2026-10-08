@@ -62,6 +62,10 @@ impl FsHandler {
         Self { fs_mode }
     }
 
+    pub fn is_dry_run(&self) -> bool {
+        matches!(self.fs_mode, FSMode::DryRun)
+    }
+
     pub fn write<P, C>(&self, path: P, contents: C) -> std::io::Result<()>
     where
         P: AsRef<Path>,

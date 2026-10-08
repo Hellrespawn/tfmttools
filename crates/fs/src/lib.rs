@@ -11,9 +11,9 @@ mod verify;
 
 pub use action::{
     ActionExecutor, ActionHandler, apply_patch, byte_identity,
-    cleanup_prepared, create_patch_pair, discard_prepared, install_prepared,
-    prepare_action, prepare_tag_edit, prepare_tag_replay, recover_prepared,
-    write_tag_candidate,
+    cleanup_completed_artifacts, cleanup_prepared, create_patch_pair,
+    discard_prepared, install_prepared, prepare_action, prepare_tag_edit,
+    prepare_tag_replay, recover_prepared, write_tag_candidate,
 };
 pub use audiofile::read_audio_file;
 pub use checksum::{get_file_checksum, get_path_checksum};

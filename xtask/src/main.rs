@@ -16,13 +16,13 @@ Tasks:
     manpage           Generate manpages into target/man
     manpage DIR       Generate manpages into DIR
     test              cargo test --workspace --exclude tfmt
-                      cargo test -p tfmt --bin tfmt
-                      cargo test -p tfmt --test history_compatibility
+                      cargo test -p tfmt --lib --bin tfmt
+                      cargo test -p tfmt --test history_compatibility --test history_recovery --test path_templates
                       cargo test -p tfmt --test integration -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
-    test-cli          cargo test -p tfmt --bin tfmt
-                      cargo test -p tfmt --test history_compatibility
+    test-cli          cargo test -p tfmt --lib --bin tfmt
+                      cargo test -p tfmt --test history_compatibility --test history_recovery --test path_templates
                       cargo test -p tfmt --test integration -- --nocapture
     test-integration  cargo test -p tfmt --test integration -- --nocapture
     lint              cargo +nightly fmt --all --check
@@ -33,9 +33,19 @@ const TEST_INTEGRATION_ARGS: &[&str] =
     &["test", "-p", "tfmt", "--test", "integration", "--", "--nocapture"];
 const TEST_WORKSPACE_ARGS: &[&str] =
     &["test", "--workspace", "--exclude", "tfmt"];
-const TEST_HISTORY_COMPAT_ARGS: &[&str] =
-    &["test", "-p", "tfmt", "--test", "history_compatibility"];
-const TEST_CLI_BIN_ARGS: &[&str] = &["test", "-p", "tfmt", "--bin", "tfmt"];
+const TEST_HISTORY_COMPAT_ARGS: &[&str] = &[
+    "test",
+    "-p",
+    "tfmt",
+    "--test",
+    "history_compatibility",
+    "--test",
+    "history_recovery",
+    "--test",
+    "path_templates",
+];
+const TEST_CLI_BIN_ARGS: &[&str] =
+    &["test", "-p", "tfmt", "--lib", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];

@@ -6,7 +6,7 @@ use tracing::info;
 
 use super::{RenameExecutionResult, apply, finish, planning, preview};
 use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
-use crate::history::load_history;
+use crate::history::load_history_for_mode;
 
 pub struct RenameSession<'a> {
     fs_handler: &'a FsHandler,
@@ -25,8 +25,12 @@ impl<'a> RenameSession<'a> {
         let rename_options =
             RenameOptions::try_from((rename_args, app_options))?;
 
-        let (history, load_result) =
-            load_history(&app_options.history_file_path()?)?;
+        let (mut history, load_result) = load_history_for_mode(
+            &app_options.history_file_path()?,
+            app_options.fs_mode(),
+        )?;
+
+        crate::history::execution::recover_pending(&mut history, fs_handler)?;
 
         Ok(Self {
             fs_handler,
@@ -64,7 +68,7 @@ impl<'a> RenameSession<'a> {
             preview::preview(&self, &plan)?;
         }
 
-        let execution = apply::execute(&self, &self.history, plan)?;
+        let execution = apply::execute(&self, plan)?;
         self.finish(execution)
     }
 
@@ -80,12 +84,21 @@ impl<'a> RenameSession<'a> {
                     actions,
                     &unchanged_files,
                 )?;
-                finish::store_history(
-                    self.app_options,
+                crate::history::execution::execute_recorded(
                     &mut self.history,
+                    self.fs_handler,
                     actions,
                     metadata,
                 )?;
+                if !matches!(
+                    self.app_options.fs_mode(),
+                    tfmttools_core::util::FSMode::DryRun
+                ) {
+                    println!(
+                        "Saved run #{} to history.",
+                        self.app_options.run_id()
+                    );
+                }
             },
             RenameExecutionResult::NothingToRename(_unchanged_paths) => {
                 let msg = "There are no audio files to rename.";

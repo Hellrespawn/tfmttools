@@ -1,12 +1,11 @@
 use color_eyre::Result;
-use tfmttools_core::action::Action;
 use tfmttools_core::history::{
-    History, HistoryMode, LoadHistoryResult, Record, RecordState,
+    History, HistoryMode, LoadHistoryResult, Record,
 };
-use tfmttools_fs::{ActionHandler, FsHandler};
+use tfmttools_fs::FsHandler;
 
 use crate::cli::{ConfirmMode, TFMTOptions};
-use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
+use crate::history::{HistoryFormatter, HistoryPrefix, load_history_for_mode};
 use crate::ui::{ConfirmationPrompt, ItemName, PreviewList, PreviewListSize};
 
 pub fn undo_redo(
@@ -20,8 +19,12 @@ pub fn undo_redo(
         HistoryMode::Redo => "redo",
     };
 
-    let (mut history, load_history_result) =
-        load_history(&app_options.history_file_path()?)?;
+    let (mut history, load_history_result) = load_history_for_mode(
+        &app_options.history_file_path()?,
+        app_options.fs_mode(),
+    )?;
+
+    crate::history::execution::recover_pending(&mut history, fs_handler)?;
 
     match load_history_result {
         LoadHistoryResult::New => {
@@ -56,7 +59,6 @@ pub fn undo_redo(
                 )?;
 
                 if confirmation {
-                    history.prepare_save()?;
                     perform_undo_redo_actions(
                         &mut history,
                         records,
@@ -64,8 +66,6 @@ pub fn undo_redo(
                         mode,
                         &formatter,
                     )?;
-
-                    history.save()?;
                 } else {
                     println!("Aborting!");
                 }
@@ -133,8 +133,6 @@ fn perform_undo_redo_actions(
     mode: HistoryMode,
     formatter: &HistoryFormatter,
 ) -> Result<()> {
-    let action_handler = ActionHandler::new(fs_handler);
-
     for record in records {
         println!(
             "{}ing {}...",
@@ -142,27 +140,9 @@ fn perform_undo_redo_actions(
             formatter.format_record(&record)
         );
 
-        match mode {
-            HistoryMode::Undo => {
-                for action in record.iter().rev() {
-                    action_handler.undo(&Action::try_from(action)?)?;
-                }
-            },
-            HistoryMode::Redo => {
-                for action in record.iter() {
-                    action_handler.redo(&Action::try_from(action)?)?;
-                }
-            },
-        }
-
-        match mode {
-            HistoryMode::Undo => {
-                history.set_record_state(record, RecordState::Undone)?;
-            },
-            HistoryMode::Redo => {
-                history.set_record_state(record, RecordState::Redone)?;
-            },
-        }
+        crate::history::execution::replay_record(
+            history, fs_handler, &record, mode,
+        )?;
 
         println!("Done.");
     }

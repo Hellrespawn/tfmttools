@@ -14,20 +14,6 @@ pub fn write_tag_candidate(
     path: &camino::Utf8Path,
     changes: &[TagValueChange],
 ) -> FsResult {
-    apply_tag_changes(path, changes, TagChangeDirection::Forward)
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum TagChangeDirection {
-    Forward,
-    Backward,
-}
-
-pub(super) fn apply_tag_changes(
-    path: &camino::Utf8Path,
-    changes: &[TagValueChange],
-    direction: TagChangeDirection,
-) -> FsResult {
     let mut tagged_file = lofty::read_from_path(path)
         .map_err(|err| FsError::Lofty(path.to_owned(), err))?;
     let tag = tagged_file.primary_tag_mut().ok_or_else(|| {
@@ -36,10 +22,7 @@ pub(super) fn apply_tag_changes(
 
     for change in changes {
         let key = parse_item_key(change.key())?;
-        let expected = match direction {
-            TagChangeDirection::Forward => change.old_value(),
-            TagChangeDirection::Backward => change.new_value(),
-        };
+        let expected = change.old_value();
         if !tag
             .items()
             .any(|item| tag_item_matches(item, key, change.kind(), expected))
@@ -51,10 +34,10 @@ pub(super) fn apply_tag_changes(
         }
     }
     for change in changes {
-        apply_tag_change(tag, change, direction)?;
+        apply_tag_change(tag, change)?;
     }
     let id3v2_tag_with_encoding_changes =
-        tag_with_encoding_changes(tag, changes, direction)?;
+        tag_with_encoding_changes(tag, changes)?;
 
     tagged_file
         .save_to_path(path, WriteOptions::default())
@@ -73,14 +56,7 @@ pub(super) fn apply_tag_changes(
     })?;
     for change in changes {
         let key = parse_item_key(change.key())?;
-        let (value, encoding) = match direction {
-            TagChangeDirection::Forward => {
-                (change.new_value(), change.new_encoding())
-            },
-            TagChangeDirection::Backward => {
-                (change.old_value(), change.old_encoding())
-            },
-        };
+        let (value, encoding) = (change.new_value(), change.new_encoding());
         if !written_tag
             .items()
             .any(|item| tag_item_matches(item, key, change.kind(), value))
@@ -165,15 +141,9 @@ pub(super) fn apply_tag_changes(
 fn apply_tag_change(
     tag: &mut lofty::tag::Tag,
     change: &TagValueChange,
-    direction: TagChangeDirection,
 ) -> FsResult {
     let key = parse_item_key(change.key())?;
-    let (from, to) = match direction {
-        TagChangeDirection::Forward => (change.old_value(), change.new_value()),
-        TagChangeDirection::Backward => {
-            (change.new_value(), change.old_value())
-        },
-    };
+    let (from, to) = (change.old_value(), change.new_value());
     let mut replacements = tag
         .take_filter(key, |item| {
             tag_item_matches(item, key, change.kind(), from)
@@ -191,7 +161,6 @@ fn apply_tag_change(
 fn tag_with_encoding_changes(
     tag: &lofty::tag::Tag,
     changes: &[TagValueChange],
-    direction: TagChangeDirection,
 ) -> FsResult<Option<Id3v2Tag>> {
     if tag.tag_type() != TagType::Id3v2 {
         return Ok(None);
@@ -228,10 +197,7 @@ fn tag_with_encoding_changes(
     }
 
     for change in changes {
-        let Some(encoding) = (match direction {
-            TagChangeDirection::Forward => change.new_encoding(),
-            TagChangeDirection::Backward => change.old_encoding(),
-        }) else {
+        let Some(encoding) = change.new_encoding() else {
             continue;
         };
         let Some(encoding) = text_encoding_from_name(encoding) else {

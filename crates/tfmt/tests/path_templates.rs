@@ -25,11 +25,25 @@ fn historical_rename() -> TempDir {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
     std::fs::copy(fixture, root.join("renamed.mp3")).unwrap();
-    std::fs::write(
-        root.join("config/tfmt.hist"),
-        include_str!("../../../tests/fixtures/cli/history/legacy-jinja.json"),
-    )
-    .unwrap();
+    let mut history = History::new(root.join("config/tfmt.hist"));
+    history.load().unwrap();
+    history
+        .push(
+            vec![tfmttools_core::action::Action::MoveFile {
+                source: root.join("original.mp3"),
+                target: root.join("renamed.mp3"),
+            }],
+            tfmttools_core::history::ActionRecordMetadata::new(
+                tfmttools_core::history::TemplateMetadata::InlineTemplate {
+                    value: "{{ artist }}/{{ title }}".into(),
+                },
+                vec![],
+                "old-run".into(),
+            ),
+        )
+        .unwrap();
+    history.save().unwrap();
+    drop(history);
     directory
 }
 

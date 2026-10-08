@@ -11,6 +11,12 @@ pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
 
     let (mut history, load_history_result) = load_history(path)?;
 
+    if !history.pending_operations()?.is_empty() {
+        color_eyre::eyre::bail!(
+            "History has pending recovery work; refusing to clear it"
+        );
+    }
+
     if matches!(load_history_result, LoadHistoryResult::New) {
         println!("There is no history file to clear.");
     } else {

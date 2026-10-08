@@ -1,3 +1,4 @@
+pub(crate) mod execution;
 mod formatter;
 
 use color_eyre::Result;
@@ -21,4 +22,20 @@ pub fn load_history(path: &Utf8File) -> Result<(History, LoadHistoryResult)> {
     }
 
     Ok((history, result))
+}
+
+pub(crate) fn load_history_for_mode(
+    path: &Utf8File,
+    mode: tfmttools_core::util::FSMode,
+) -> Result<(History, LoadHistoryResult)> {
+    if matches!(mode, tfmttools_core::util::FSMode::DryRun) {
+        let result = if path.as_path().exists() {
+            LoadHistoryResult::Loaded
+        } else {
+            LoadHistoryResult::New
+        };
+        Ok((History::open_read_only(path.as_path().to_owned())?, result))
+    } else {
+        load_history(path)
+    }
 }
