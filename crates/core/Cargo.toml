@@ -14,6 +14,8 @@ version.workspace = true
 debug = []
 
 [dependencies]
+rusqlite = { workspace = true }
+rusqlite_migration = { workspace = true }
 tfmttools-picotmpl = { workspace = true }
 camino = { workspace = true }
 lofty = { workspace = true }

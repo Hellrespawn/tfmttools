@@ -1,47 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::{HistoryError, Record, Result};
-use crate::action::Action;
-
-pub const CURRENT_SCHEMA_VERSION: u64 = 1;
-
-/// The published history document. Runtime state is never serialized here.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct StoredHistory {
-    #[serde(rename = "schema_version")]
-    #[schemars(schema_with = "super::schema::version_schema")]
-    pub schema_version: u64,
-    #[serde(rename = "records")]
-    pub records: Vec<Record>,
-}
-
-impl StoredHistory {
-    pub(super) fn current(records: Vec<Record>) -> Self {
-        Self { schema_version: CURRENT_SCHEMA_VERSION, records }
-    }
-
-    pub(super) fn validate(&self) -> Result<()> {
-        if self.schema_version != CURRENT_SCHEMA_VERSION {
-            return Err(HistoryError::LoadError(format!(
-                "Unsupported history schema version {}",
-                self.schema_version
-            )));
-        }
-        for (record_index, record) in self.records.iter().enumerate() {
-            for (action_index, action) in record.iter().enumerate() {
-                Action::try_from(action).map_err(|error| {
-                    HistoryError::LoadError(format!(
-                        "records[{record_index}].actions[{action_index}]: {error}"
-                    ))
-                })?;
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", deny_unknown_fields)]
 pub enum StoredAction {

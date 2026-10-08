@@ -105,24 +105,4 @@ fn state_updates_require_unique_saved_id() {
             .to_string()
             .contains("Unable to find")
     );
-    history.push(vec![], metadata()).unwrap();
-    let mut duplicate = history.records()[1].clone();
-    *duplicate.id_mut() = Some(0);
-    // A duplicate loaded ID is covered through persistence below; mutation
-    // itself must reject ambiguous saved IDs rather than changing one silently.
-    let doc = r#"{"schema_version":1,"records":[{"id":0,"actions":[],"state":"applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"type":"inline_template","value":"text"},"arguments":[],"run_id":"a"}},{"id":0,"actions":[],"state":"applied","timestamp":"2026-10-07T12:00:00+02:00","metadata":{"template":{"type":"inline_template","value":"text"},"arguments":[],"run_id":"b"}}]}"#;
-    let path = std::env::temp_dir()
-        .join(format!("tfmt-duplicate-{}.json", std::process::id()));
-    std::fs::write(&path, doc).unwrap();
-    let mut loaded =
-        History::new(Utf8PathBuf::from_path_buf(path.clone()).unwrap());
-    loaded.load().unwrap();
-    assert!(
-        loaded
-            .set_record_state(duplicate, RecordState::Undone)
-            .unwrap_err()
-            .to_string()
-            .contains("multiple")
-    );
-    std::fs::remove_file(path).unwrap();
 }

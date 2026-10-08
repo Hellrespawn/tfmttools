@@ -1,11 +1,9 @@
 mod conversion;
+mod database;
 mod error;
-mod legacy_tag_keys;
-mod migration;
 mod model;
 mod persistence;
 mod runtime;
-mod schema;
 mod stored;
 
 pub use error::{HistoryError, Result};
@@ -36,8 +34,5 @@ impl HistoryMode {
     }
 }
 
-pub use schema::history_schema_json;
-pub use stored::{
-    CURRENT_SCHEMA_VERSION, StoredAction, StoredHistory, StoredTagValueChange,
-    StoredTagValueKind,
-};
+pub use database::history_schema_sql;
+pub use stored::{StoredAction, StoredTagValueChange, StoredTagValueKind};

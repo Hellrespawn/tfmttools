@@ -5,6 +5,9 @@ pub type Result<T = (), E = HistoryError> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 pub enum HistoryError {
+    #[error("History database error: {0}")]
+    Database(#[from] rusqlite::Error),
+
     #[error("Another tfmt command is using this history: {0}")]
     Locked(Utf8PathBuf),
 

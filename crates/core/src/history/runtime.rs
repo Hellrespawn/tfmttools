@@ -21,7 +21,8 @@ pub struct History {
     pub(super) lock_file: Option<File>,
 
     pub(super) records: Vec<Record>,
-    pub(super) upgrade_source: Option<Vec<u8>>,
+    pub(super) connection: Option<rusqlite::Connection>,
+    pub(super) read_only: bool,
 }
 
 impl History {
@@ -31,7 +32,8 @@ impl History {
             path,
             lock_file: None,
             records: Vec::new(),
-            upgrade_source: None,
+            connection: None,
+            read_only: false,
         }
     }
 
@@ -55,7 +57,7 @@ impl History {
 
         let undone_records = self.get_all_records_to_redo()?;
 
-        undone_records.into_iter().try_for_each(|record| {
+        undone_records.into_iter().try_for_each(|record| -> Result<()> {
             self.set_record_state(record, RecordState::Superseded)?;
 
             Ok(())
@@ -163,6 +165,19 @@ impl History {
 
     pub fn remove(&mut self) -> Result<()> {
         self.lock_history()?;
+        if let Some(connection) = &self.connection {
+            let pending: i64 = connection.query_row(
+                "SELECT count(*) FROM operations",
+                [],
+                |row| row.get(0),
+            )?;
+            if pending != 0 {
+                return Err(HistoryError::RemoveError(
+                    "History has pending recovery work".into(),
+                ));
+            }
+        }
+        self.connection.take();
         self.records.clear();
         fs_err::remove_file(&self.path)
             .map_err(|err| HistoryError::RemoveError(err.to_string()))?;

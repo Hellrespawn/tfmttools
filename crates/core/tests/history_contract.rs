@@ -1,9 +1,15 @@
 use serde_json::{Value, json};
 use tfmttools_core::action::{Action, TagValueChange, TagValueKind};
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, StoredAction, StoredHistory,
-    TemplateMetadata,
+    ActionRecordMetadata, History, Record, StoredAction, TemplateMetadata,
 };
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredHistory {
+    schema_version: u64,
+    records: Vec<Record>,
+}
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/history/v1-all-variants.json"))

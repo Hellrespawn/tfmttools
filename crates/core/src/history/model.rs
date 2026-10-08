@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local};
+use chrono::{DateTime, FixedOffset, Local};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct Record {
     #[serde(rename = "state")]
     state: RecordState,
     #[serde(rename = "timestamp")]
-    timestamp: DateTime<Local>,
+    timestamp: DateTime<FixedOffset>,
     #[serde(rename = "metadata")]
     metadata: ActionRecordMetadata,
 }
@@ -43,9 +43,19 @@ impl Record {
             id: None,
             actions: items,
             state: RecordState::Applied,
-            timestamp: Local::now(),
+            timestamp: Local::now().fixed_offset(),
             metadata,
         }
+    }
+
+    pub(super) fn from_storage(
+        id: usize,
+        actions: Vec<StoredAction>,
+        state: RecordState,
+        timestamp: DateTime<FixedOffset>,
+        metadata: ActionRecordMetadata,
+    ) -> Self {
+        Self { id: Some(id), actions, state, timestamp, metadata }
     }
 
     #[must_use]
@@ -79,7 +89,7 @@ impl Record {
     }
 
     #[must_use]
-    pub fn timestamp(&self) -> DateTime<Local> {
+    pub fn timestamp(&self) -> DateTime<FixedOffset> {
         self.timestamp
     }
 
