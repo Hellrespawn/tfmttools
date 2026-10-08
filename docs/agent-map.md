@@ -51,7 +51,7 @@ Compact map for finding the right code quickly. Prefer crate-local
    `crates/fs/src/action/rename_staging.rs`.
 10. `crates/tfmt/src/commands/rename/finish.rs` handles remaining files,
     optional cleanup, empty-directory removal, and history storage.
-11. History records are saved through `crates/core/src/history/runtime.rs`;
+11. History records are saved through `crates/core/src/history/persistence.rs`;
     CLI-facing record metadata types live in
     `crates/core/src/history/`.
 
@@ -69,7 +69,8 @@ Compact map for finding the right code quickly. Prefer crate-local
 5. `ActionHandler` in `crates/fs/src/action.rs` applies undo actions in
    reverse record order and redo actions in forward record order.
 6. After a record is applied, `crates/core/src/history/runtime.rs` updates its
-   state to `Undone` or `Redone`, then saves the history file.
+   state to `Undone` or `Redone`. The command then saves the history file
+   through `crates/core/src/history/persistence.rs`.
 
 ## Fixture Integration Flow
 
