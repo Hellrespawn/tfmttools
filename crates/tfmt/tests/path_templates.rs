@@ -2,6 +2,7 @@ use std::process::{Command, Output};
 
 use assert_fs::TempDir;
 use camino::Utf8PathBuf;
+use tfmttools_core::history::History;
 
 fn root(directory: &TempDir) -> Utf8PathBuf {
     Utf8PathBuf::from_path_buf(directory.path().to_owned()).unwrap()
@@ -30,6 +31,67 @@ fn historical_rename() -> TempDir {
     )
     .unwrap();
     directory
+}
+
+fn historical_rename_session() -> (TempDir, History) {
+    let directory = historical_rename();
+    let mut history = History::new(root(&directory).join("config/tfmt.hist"));
+    history.load().unwrap();
+    (directory, history)
+}
+
+#[test]
+fn history_lock_blocks_commands_in_other_processes_and_releases_on_drop() {
+    let (directory, history) = historical_rename_session();
+    let before = std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
+
+    for arguments in
+        [vec!["rename", "--script", "path: ({$title})"], vec!["undo"], vec![
+            "clear-history",
+        ]]
+    {
+        let output = run(&directory, &arguments);
+        assert!(!output.status.success(), "{arguments:?}");
+        let message = String::from_utf8_lossy(&output.stderr);
+        assert!(message.contains("using this history"), "{message}");
+    }
+    assert_eq!(
+        std::fs::read(root(&directory).join("renamed.mp3")).unwrap(),
+        before
+    );
+    assert!(root(&directory).join("config/tfmt.hist").is_file());
+
+    drop(history);
+    let output = run(&directory, &["undo"]);
+    assert!(output.status.success(), "{output:?}");
+    assert!(root(&directory).join("original.mp3").is_file());
+}
+
+#[test]
+fn history_contention_prevents_tag_fixes() {
+    let directory = TempDir::new().unwrap();
+    let path = root(&directory).join("input.mp3");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../tests/fixtures/cli/audio/Lindemann - Ich Weiß Es Nicht.mp3",
+    );
+    std::fs::copy(fixture, &path).unwrap();
+    let before = std::fs::read(&path).unwrap();
+    let mut history: History =
+        History::new(root(&directory).join("config/tfmt.hist"));
+    history.load().unwrap();
+
+    let output = run(&directory, &["validate", "id3-encoding", "--fix"]);
+    assert!(!output.status.success());
+    let message = String::from_utf8_lossy(&output.stderr);
+    assert!(message.contains("using this history"), "{message}");
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.contains("Updated"), "{stdout}");
+
+    drop(history);
+    let output = run(&directory, &["validate", "id3-encoding", "--fix"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_ne!(std::fs::read(&path).unwrap(), before);
 }
 
 #[test]

@@ -196,17 +196,16 @@ fn apply_and_store_fix(
         return Ok(());
     }
 
-    let (mut history, _) = load_history(&app_options.history_file_path()?)?;
-
-    report_actions(&actions, matches!(app_options.fs_mode(), FSMode::DryRun));
-
     if matches!(app_options.fs_mode(), FSMode::DryRun) {
+        report_actions(&actions, true);
         return Ok(());
     }
 
+    let (mut history, _) = load_history(&app_options.history_file_path()?)?;
     history.prepare_save()?;
     let applied_actions =
         ActionExecutor::new(fs_handler).apply_actions(actions)?;
+    report_actions(&applied_actions, false);
     store_history(app_options, &mut history, applied_actions, command)?;
 
     Ok(())

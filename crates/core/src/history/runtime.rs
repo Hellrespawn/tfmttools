@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use camino::Utf8PathBuf;
 
 use super::{
@@ -15,6 +17,8 @@ pub enum LoadHistoryResult {
 #[derive(Debug)]
 pub struct History {
     pub(super) path: Utf8PathBuf,
+    // Retain the handle for the complete load/change/save session.
+    pub(super) lock_file: Option<File>,
 
     pub(super) records: Vec<Record>,
     pub(super) upgrade_source: Option<Vec<u8>>,
@@ -23,7 +27,12 @@ pub struct History {
 impl History {
     #[must_use]
     pub fn new(path: Utf8PathBuf) -> Self {
-        Self { path, records: Vec::new(), upgrade_source: None }
+        Self {
+            path,
+            lock_file: None,
+            records: Vec::new(),
+            upgrade_source: None,
+        }
     }
 
     pub fn push(
@@ -153,6 +162,7 @@ impl History {
     }
 
     pub fn remove(&mut self) -> Result<()> {
+        self.lock_history()?;
         self.records.clear();
         fs_err::remove_file(&self.path)
             .map_err(|err| HistoryError::RemoveError(err.to_string()))?;

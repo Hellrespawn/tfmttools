@@ -173,7 +173,8 @@ fn new_history_creates_nested_parents_and_saves_relative_filenames() {
             .unwrap()["schema_version"],
         1
     );
-    std::fs::remove_file(relative).unwrap();
+    std::fs::remove_file(&relative).unwrap();
+    std::fs::remove_file(format!("{relative}.lock")).unwrap();
 }
 
 #[cfg(unix)]
@@ -198,7 +199,7 @@ fn preparation_follows_symlink_chain_without_writing_or_creating_backups() {
     );
     history.load().unwrap();
     history.prepare_save().unwrap();
-    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 3);
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 4);
     assert_eq!(std::fs::read(&destination).unwrap(), LEGACY);
     let backup = directory.path().join("source.hist.v0.bak");
     std::fs::write(&backup, b"conflict").unwrap();

@@ -11,6 +11,8 @@
   before atomically writing version 1. Matching backups are reused; conflicting
   backups stop commands before applying actions. Read-only loads create no
   backups or rewrites. Atomic saves follow history symlinks and preserve them.
+- Lock history sessions using a persistent sibling lock file. Report
+  contention immediately, and acquire the lock before applying tag fixes.
 
 - Added an independent `tfmttools-picotmpl` workspace crate implementing the new
   path template language, with a Stef layout example and behavior tests.

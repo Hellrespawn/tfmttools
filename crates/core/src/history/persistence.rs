@@ -1,3 +1,4 @@
+use std::fs::{File, TryLockError};
 use std::io::Write;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -7,9 +8,51 @@ use tracing::debug;
 use super::{History, HistoryError, LoadHistoryResult, Result, StoredHistory};
 
 impl History {
+    fn ensure_locked(&mut self, path: &Utf8Path) -> Result<()> {
+        if self.lock_file.is_some() {
+            return Ok(());
+        }
+
+        let lock_path = Utf8PathBuf::from(format!("{path}.lock"));
+        let acquire = || -> std::io::Result<File> {
+            if let Some(parent) = lock_path.parent()
+                && !parent.as_str().is_empty()
+            {
+                fs_err::create_dir_all(parent)?;
+            }
+            File::options()
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&lock_path)
+        };
+        let file = acquire().map_err(|source| {
+            HistoryError::LockError { path: lock_path.clone(), source }
+        })?;
+
+        match file.try_lock() {
+            Ok(()) => {
+                self.lock_file = Some(file);
+                Ok(())
+            },
+            Err(TryLockError::WouldBlock) => {
+                Err(HistoryError::Locked(self.path.clone()))
+            },
+            Err(TryLockError::Error(source)) => {
+                Err(HistoryError::LockError { path: lock_path, source })
+            },
+        }
+    }
+
+    pub(super) fn lock_history(&mut self) -> Result<()> {
+        let path = resolve_history_path(&self.path)?;
+        self.ensure_locked(&path)
+    }
+
     pub fn load(&mut self) -> Result<LoadHistoryResult> {
         let path = resolve_history_path(&self.path)
             .map_err(|error| HistoryError::LoadError(error.to_string()))?;
+        self.ensure_locked(&path)?;
         if path.exists() && !path.is_file() {
             return Err(HistoryError::LoadError(format!(
                 "{path} exists but is not a file."
@@ -50,6 +93,7 @@ impl History {
     }
 
     pub fn save(&mut self) -> Result<()> {
+        self.lock_history()?;
         // Prepare and validate everything before creating any output file.
         let stored = StoredHistory::current(self.records.clone());
         stored
@@ -264,7 +308,7 @@ mod tests {
         assert_eq!(fs_err::read(&path).unwrap(), source);
         assert_eq!(fs_err::read(format!("{path}.v0.bak")).unwrap(), source);
         assert!(history.upgrade_source.is_some());
-        assert_eq!(fs_err::read_dir(directory.path()).unwrap().count(), 2);
+        assert_eq!(fs_err::read_dir(directory.path()).unwrap().count(), 3);
         history.save().unwrap();
         assert!(history.upgrade_source.is_none());
         assert!(decode_history(&fs_err::read(path).unwrap()).is_ok());

@@ -81,6 +81,20 @@ tfmt --simple --yes rename -t examples/stef.tfmt
 
 See also the "examples"-folder.
 
+### History locking
+
+Commands that load or change history hold an exclusive lock for the whole
+history session. If another command is using the same history, tfmt exits
+with an error immediately. Validation fixes acquire the lock before changing
+audio files.
+
+The lock is stored in a persistent sibling file: for example, `tfmt.hist`
+uses `tfmt.hist.lock`. Leave this file in place; its existence does not mean
+that a command is running. The operating system releases the lock when the
+session's file handle closes, including when the command exits with an error.
+History symlinks use the referent's sibling lock file, so commands accessing
+the same history through different links still exclude one another.
+
 ### Validate
 
 `tfmt validate` checks audio files and tags without modifying files. It runs
@@ -302,7 +316,8 @@ referent and put upgrade backups beside that file. Invalid documents, unknown fi
 and invalid or unsupported versions are errors; they are never treated as
 empty history. A failed load stops action execution. A failed save preserves
 the history source, but actions already applied by the command remain applied.
-This does not provide concurrent-writer locking or crash durability.
+The session lock excludes cooperating concurrent writers. Atomic replacement
+does not provide a crash-durability guarantee.
 
 Migration preserves stored template text and replays stored actions; it does
 not translate old template languages. Reusing old Jinja text for a new rename
