@@ -4,7 +4,7 @@ authors = ["Stef Korporaal <stef@skorporaal.com>"]
 description = "Rename audio files according to their tags using path templates."
 edition = "2024"
 license = "BSD-3-Clause"
-rust-version = "1.89.0"
+rust-version = "1.91.0"
 repository = "https://github.com/Hellrespawn/tfmttools"
 homepage = "https://github.com/Hellrespawn/tfmttools"
 

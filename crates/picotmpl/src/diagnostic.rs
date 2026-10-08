@@ -30,10 +30,7 @@ impl Diagnostic {
     /// Return a one based line and character column, rather than byte column.
     #[must_use]
     pub fn line_column(&self, source: &str) -> (usize, usize) {
-        let mut start = self.span.start.min(source.len());
-        while !source.is_char_boundary(start) {
-            start -= 1;
-        }
+        let start = source.floor_char_boundary(self.span.start);
         let before = &source[..start];
         let line = before.bytes().filter(|&byte| byte == b'\n').count() + 1;
         let column =

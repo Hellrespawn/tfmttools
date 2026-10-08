@@ -91,7 +91,7 @@ Recent commits use short, imperative subjects such as `Add option to specify tem
 
 ## Contributor Notes
 
-The workspace MSRV is Rust 1.89.0 (`edition = "2024"`). If you touch
+The workspace MSRV is Rust 1.91.0 (`edition = "2024"`). If you touch
 templates or reports, check `examples/`, fixture report expectations, and
 the shared report viewer assets under `crates/test-harness/assets/report/`
 so sample output and test reporting stay aligned.

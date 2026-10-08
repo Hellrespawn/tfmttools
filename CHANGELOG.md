@@ -25,6 +25,9 @@
   and persistence. Invalid documents and unsupported schema versions fail
   before actions execute. Validation fixes now load history before changing
   tags. Legacy template text remains unchanged and retains reuse restrictions.
+- Raise the minimum supported Rust version to 1.91.0 and use the standard
+  UTF-8 boundary function for template diagnostic positions.
+
 - Update Lofty to 0.25.4 and preserve error causes for audio reads and writes.
 
 - Require canonical lowercase snake_case audio tag names, with explicit aliases
