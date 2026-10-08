@@ -20,3 +20,7 @@ test-conf
 __pycache__
 
 .codex
+
+# Isolated development and subagent scratch artifacts
+/.worktrees/
+/.superpowers/
