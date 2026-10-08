@@ -220,6 +220,9 @@ pub(super) fn save_records(
         }
         for action in record.iter() {
             validate_action(action)?;
+            if matches!(action, StoredAction::EditTagValues { .. }) {
+                return Err(HistoryError::SaveError("Tag edits must be recorded with patches through the operation journal".into()));
+            }
         }
     }
     let transaction = connection.transaction()?;

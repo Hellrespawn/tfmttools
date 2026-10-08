@@ -69,3 +69,12 @@ fn preserves_recorded_timestamp_offset() {
         "2026-01-01T00:00:00+05:30"
     );
 }
+
+#[test]
+fn read_only_history_cannot_remove_database() {
+    let dir = TempDir::new().unwrap();
+    let path = database(&dir);
+    let mut h = History::open_read_only(path.clone()).unwrap();
+    assert!(h.remove().is_err());
+    assert!(path.exists());
+}

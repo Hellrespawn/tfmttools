@@ -58,6 +58,7 @@ impl History {
         inspect_header(&path)?;
         let connection = database::open(&path, self.read_only, false)?;
         database::read_records(&connection, false)?;
+        super::journal::validate_patches(&connection)?;
         let records = database::read_records(&connection, true)?;
         self.connection = Some(connection);
         self.records = records;
@@ -103,6 +104,11 @@ impl History {
     pub fn save(&mut self) -> Result<()> {
         self.prepare_save()?;
         self.ensure_connection()?;
+        if !self.pending_operations()?.is_empty() {
+            return Err(HistoryError::SaveError(
+                "History has pending recovery work".into(),
+            ));
+        }
         database::save_records(self.connection.as_mut().unwrap(), &self.records)
     }
 }

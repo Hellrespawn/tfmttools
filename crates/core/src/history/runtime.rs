@@ -51,7 +51,13 @@ impl History {
         }
         let mut new_record = Record::new(stored, metadata);
 
-        *new_record.id_mut() = Some(self.records.len());
+        *new_record.id_mut() = Some(
+            self.records
+                .iter()
+                .filter_map(Record::id)
+                .max()
+                .map_or(0, |id| id + 1),
+        );
 
         self.records.push(new_record);
 
@@ -164,6 +170,9 @@ impl History {
     }
 
     pub fn remove(&mut self) -> Result<()> {
+        if self.read_only {
+            return Err(HistoryError::RemoveError("Read-only history".into()));
+        }
         self.lock_history()?;
         if let Some(connection) = &self.connection {
             let pending: i64 = connection.query_row(
