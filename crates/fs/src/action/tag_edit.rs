@@ -1,7 +1,9 @@
 use lofty::TextEncoding;
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile as LoftyAudioFile, TaggedFileExt};
-use lofty::id3::v2::{Frame, Id3v2Tag};
+use lofty::id3::v2::{
+    ExtendedUrlFrame, Frame, FrameId, Id3v2Tag, UrlLinkFrame,
+};
 use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{TagValueChange, TagValueKind};
 use tfmttools_core::item_keys::parse_item_key;
@@ -92,7 +94,34 @@ pub(super) fn apply_tag_changes(
             let id = key.map_key(TagType::Id3v2).ok_or_else(|| {
                 FsError::Recovery("Requested encoding has no ID3 frame".into())
             })?;
-            let frames = Id3v2Tag::from(written_tag.clone());
+            let mut file = std::fs::File::open(path)?;
+            let options = lofty::config::ParseOptions::new();
+            let frames = match written.file_type() {
+                lofty::file::FileType::Mpeg => {
+                    lofty::mpeg::MpegFile::read_from(&mut file, options)
+                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
+                        .id3v2()
+                        .cloned()
+                },
+                lofty::file::FileType::Wav => {
+                    lofty::iff::wav::WavFile::read_from(&mut file, options)
+                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
+                        .id3v2()
+                        .cloned()
+                },
+                lofty::file::FileType::Aiff => {
+                    lofty::iff::aiff::AiffFile::read_from(&mut file, options)
+                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
+                        .id3v2()
+                        .cloned()
+                },
+                _ => None,
+            }
+            .ok_or_else(|| {
+                FsError::Recovery(
+                    "Cannot verify native ID3 encoding for this format".into(),
+                )
+            })?;
             let expected =
                 text_encoding_from_name(encoding).ok_or_else(|| {
                     FsError::Recovery("Unknown requested encoding".into())
@@ -170,6 +199,33 @@ fn tag_with_encoding_changes(
 
     let mut id3v2_tag = Id3v2Tag::from(tag.clone());
     let mut encoding_changed = false;
+    // Lofty's generic ID3 conversion reads URL values as text even though
+    // parsing produces Locator values. Preserve them through native frames.
+    for item in tag.items() {
+        if let Some(value) = item.value().locator() {
+            if let Some(id) = item.key().map_key(TagType::Id3v2) {
+                if id == "WXXX" {
+                    id3v2_tag.insert(Frame::UserUrl(ExtendedUrlFrame::new(
+                        TextEncoding::UTF8,
+                        item.description().to_owned(),
+                        value.to_owned(),
+                    )));
+                } else if id.starts_with('W') && id.len() == 4 {
+                    let frame_id = FrameId::new(id)
+                        .map_err(|e| FsError::Recovery(e.to_string()))?;
+                    id3v2_tag.insert(Frame::Url(UrlLinkFrame::new(
+                        frame_id,
+                        value.to_owned(),
+                    )));
+                } else {
+                    return Err(FsError::Recovery(
+                        "Unsupported ID3 locator mapping".into(),
+                    ));
+                }
+                encoding_changed = true;
+            }
+        }
+    }
 
     for change in changes {
         let Some(encoding) = (match direction {

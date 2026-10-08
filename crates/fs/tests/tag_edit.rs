@@ -56,17 +56,13 @@ fn verifies_written_text_and_rejects_missing_source() {
 fn verifies_locator_and_id3_encoding_changes() {
     use lofty::config::WriteOptions;
     use lofty::file::AudioFile as _;
-    use lofty::tag::{ItemValue, TagExt, TagItem};
+    use lofty::tag::TagExt;
     let dir = tempfile::tempdir().unwrap();
     let path =
         Utf8PathBuf::from_path_buf(dir.path().join("candidate.mp3")).unwrap();
     std::fs::copy("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3", &path)
         .unwrap();
     let mut file = lofty::read_from_path(&path).unwrap();
-    file.primary_tag_mut().unwrap().push(TagItem::new(
-        ItemKey::AudioFileUrl,
-        ItemValue::Locator("https://old.example".into()),
-    ));
     let title = file
         .primary_tag()
         .unwrap()
@@ -74,6 +70,15 @@ fn verifies_locator_and_id3_encoding_changes() {
         .unwrap()
         .to_owned();
     file.save_to_path(&path, WriteOptions::default()).unwrap();
+    let mut native =
+        lofty::id3::v2::Id3v2Tag::from(file.primary_tag().unwrap().clone());
+    native.insert(lofty::id3::v2::Frame::Url(
+        lofty::id3::v2::UrlLinkFrame::new(
+            lofty::id3::v2::FrameId::new("WOAF").unwrap(),
+            "https://old.example",
+        ),
+    ));
+    native.save_to_path(&path, WriteOptions::default()).unwrap();
     write_tag_candidate(&path, &[
         TagValueChange::new(
             "track_title".into(),
