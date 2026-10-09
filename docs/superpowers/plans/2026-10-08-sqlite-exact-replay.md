@@ -87,30 +87,30 @@ while adding `History::open_read_only(path: Utf8PathBuf) -> Result<Self>`.
 Expose `history_schema_sql() -> &'static str`. Use bundled SQLite with rusqlite
 and a compatible rusqlite_migration release verified against MSRV before pinning.
 
-- [ ] Write database tests: saving then reopening preserves record values and
+- [x] Write database tests: saving then reopening preserves record values and
   order; header is `SQLite format 3\0`; effective journal mode is `delete`,
   synchronous is `3`, and foreign_keys is `1` on each writable connection.
   Old JSON bytes remain identical after rejection. Wrong application ID,
   future version, malformed timestamps/actions, duplicate IDs/positions,
   non-BLOB patch columns, and FK violations fail without replacing live records.
   Read-only opening leaves bytes unchanged and performs no migrations/optimize.
-- [ ] Run `cargo test -p tfmttools-core --test history_persistence`; confirm
+- [x] Run `cargo test -p tfmttools-core --test history_persistence`; confirm
   failures reflect JSON persistence or missing database APIs.
-- [ ] Implement database schema using migration-managed user_version. Reserve
+- [x] Implement database schema using migration-managed user_version. Reserve
   application_id `0x54464d54` (TFMT). Create STRICT records/actions/patches/
   operations/progress tables, explicit ordering columns, constraints, indexes,
   and transactional validation. Configure/verify PRAGMAs before transactions.
   Initialize only missing databases; do not claim unidentified existing ones.
   Preserve locking and history symlink resolution. Read-only open validates
   the current schema; reports an upgrade requirement for older versions.
-- [ ] Replace JSON migration/schema tests and snapshot with SQL contract checks.
+- [x] Replace JSON migration/schema tests and snapshot with SQL contract checks.
   Retire `StoredHistory`, JSON migration, legacy key mapping, and obsolete
   backup errors when their consumers are removed. Keep strict action payload
   serialization inside SQL. Avoid whole-history rewrites as the final write API.
   Add best-effort optimize on writable close, with version-aware analysis_limit.
-- [ ] Run `cargo xtask test-core` and `cargo xtask history-schema`; expect tests
+- [x] Run `cargo xtask test-core` and `cargo xtask history-schema`; expect tests
   passing and stable `docs/history/schema-v1.sql` output on regeneration.
-- [ ] Commit as `Replace JSON history with validated SQLite storage`.
+- [x] Commit as `Replace JSON history with validated SQLite storage`.
 
 ## Task 2: Generate and verify reversible binary patches
 
@@ -126,21 +126,21 @@ BSDIFF40 representation and verify the actual library format before accepting it
 `write_tag_candidate(path: &Utf8Path, changes: &[TagValueChange]) -> FsResult`
 mutates only the supplied candidate, rereads and verifies requested outcomes.
 
-- [ ] Write tests asserting forward output equals all edited bytes and reverse
+- [x] Write tests asserting forward output equals all edited bytes and reverse
   output equals all original bytes for empty, arbitrary binary, and real audio
   inputs. Assert stale input, wrong lengths/digests, unknown format, corrupt and
   truncated patches return errors. Tag candidate tests assert requested text,
   locator, and supported encoding changes; missing source matches fail.
-- [ ] Run `cargo test -p tfmttools-fs --test binary_patch`; expect missing API
+- [x] Run `cargo test -p tfmttools-fs --test binary_patch`; expect missing API
   failures before implementation.
-- [ ] Implement patch generation with qbsdiff and SHA-256 identities; verify
+- [x] Implement patch generation with qbsdiff and SHA-256 identities; verify
   both complete round trips before returning a pair. Bound reconstruction by
   recorded target length and reject output mismatch. Extract Lofty helpers out
   of handler, preserving descriptions/languages and verifying final encodings.
   Leave initial editing and replay entry points distinct; raw tag serialization
   is never an undo/redo fallback.
-- [ ] Run `cargo xtask test-fs`; expect passing binary and audio tests.
-- [ ] Commit as `Add verified reversible binary patches for tag edits`.
+- [x] Run `cargo xtask test-fs`; expect passing binary and audio tests.
+- [x] Commit as `Add verified reversible binary patches for tag edits`.
 
 ## Task 3: Persist pending operations and progress transactionally
 
@@ -156,20 +156,20 @@ position: usize) -> Result<()>`; `finish_operation(id: OperationId)
 -> Result<()>`; `pending_operations(&self) -> Result<Vec<PendingOperation>>`.
 Each mutation commits before returning and refreshes live state only on success.
 
-- [ ] Write tests: committed intent and patch BLOBs survive reopen; progress is
+- [x] Write tests: committed intent and patch BLOBs survive reopen; progress is
   ordered and completion idempotent; invalid record/direction/position and a
   second conflicting pending operation fail. Incomplete operations cannot
   finalize; finalizing apply supersedes undone records only on success;
   finalizing undo/redo changes only the selected record. Inject commit failures
   and assert last committed progress/state/patches remain available.
-- [ ] Run `cargo test -p tfmttools-core --test history_journal`; expect missing
+- [x] Run `cargo test -p tfmttools-core --test history_journal`; expect missing
   journal methods before implementation.
-- [ ] Implement the shared types, SQL inserts/updates, validation, and atomic
+- [x] Implement the shared types, SQL inserts/updates, validation, and atomic
   finalization. Keep journals after finalization until cleanup is acknowledged.
   `remove` refuses unresolved work and closes SQLite before unlinking. Prevent
   the transitional push/save API from bypassing journal invariants for tag edits.
-- [ ] Run `cargo xtask test-core`; expect passing journal/state tests.
-- [ ] Commit as `Journal history operations and action progress`.
+- [x] Run `cargo xtask test-core`; expect passing journal/state tests.
+- [x] Commit as `Journal history operations and action progress`.
 
 ## Task 4: Prepare, switch, and recover audio files safely
 
@@ -185,22 +185,22 @@ pair: &BinaryPatchPair, direction: HistoryMode) -> FsResult<PreparedAction>`;
 Preparation owns candidate files until descriptors can be committed; failures
 before commitment clean up only files created by that preparation.
 
-- [ ] Write tests: candidate editing preserves original bytes; persisted
+- [x] Write tests: candidate editing preserves original bytes; persisted
   descriptor can resume after interruption before/after each rename; failed
   candidate install restores original; completed switch retains original until
   cleanup. Permissions survive; symlink remains; hard-linked inputs fail.
   Colliding candidate/retained paths and redirected symlinks preserve unrelated
   data. Ambiguous external changes stop without deleting either recovery file.
-- [ ] Run `cargo test -p tfmttools-fs --test file_switch`; expect missing APIs.
-- [ ] Implement sibling candidate and retained-path exclusive reservation,
+- [x] Run `cargo test -p tfmttools-fs --test file_switch`; expect missing APIs.
+- [x] Implement sibling candidate and retained-path exclusive reservation,
   source identity recheck, file/directory sync, staged original retention and
   candidate installation. Recover by expected paths and hashes, not by progress
   flags alone; never overwrite an unexpected file. Recheck resolved identity.
   Keep originals on post-switch errors. Only clean up verified owned paths after
   the coordinator has durably finalized. Reject unsupported hard-link checks
   on platforms where safety cannot be established.
-- [ ] Run `cargo xtask test-fs`; expect all switch boundary tests passing.
-- [ ] Commit as `Switch audio candidates with recoverable original retention`.
+- [x] Run `cargo xtask test-fs`; expect all switch boundary tests passing.
+- [x] Commit as `Switch audio candidates with recoverable original retention`.
 
 ## Task 5: Make ordered rename and cleanup effects recoverable
 
@@ -213,21 +213,21 @@ execution, including staging and directory creation. `prepare_action(action:
 &Action, direction: OperationKind) -> FsResult<PreparedAction>` prepares non-tag
 preconditions; Task 4 install/recover/cleanup dispatch extends to these variants.
 
-- [ ] Write tests: planned swap/chain/case-only rename retains exact order;
+- [x] Write tests: planned swap/chain/case-only rename retains exact order;
   copy/remove plans resume between copy and removal; interrupted staging moves
   resume once; directory creation/removal distinguishes already-completed state
   from conflicts. External target changes reject recovery and remain intact.
   Undo/redo preserves existing copy/remove semantics and action order.
-- [ ] Run `cargo test -p tfmttools-fs --test recorded_execution`; expect failures
+- [x] Run `cargo test -p tfmttools-fs --test recorded_execution`; expect failures
   against the execution-only iterator.
-- [ ] Expose concrete planning separately from effects. Prepare identity and
+- [x] Expose concrete planning separately from effects. Prepare identity and
   existence descriptors per action immediately before journal append, preserving
   dependencies between actions. Implement idempotent reconciliation with
   checksums for files and safe directory checks. Unsupported ambiguous cases
   stop with actionable recovery paths. Dry-run planning must not reserve files.
-- [ ] Run `cargo xtask test-fs`; expect existing cycle tests and recovery tests
+- [x] Run `cargo xtask test-fs`; expect existing cycle tests and recovery tests
   passing, including forced-copy behavior.
-- [ ] Commit as `Record recoverable rename and cleanup progress`.
+- [x] Commit as `Record recoverable rename and cleanup progress`.
 
 ## Task 6: Coordinate commands through durable operations
 
@@ -243,7 +243,7 @@ fs: &FsHandler, actions: Vec<Action>, metadata: ActionRecordMetadata)
 fs: &FsHandler, record: &Record, direction: HistoryMode)
 -> color_eyre::Result<Record>`. The coordinator uses Tasks 2–5 and honors FSMode.
 
-- [ ] Write CLI tests: validate/edit, undo, redo compare complete fixture bytes;
+- [x] Write CLI tests: validate/edit, undo, redo compare complete fixture bytes;
   external mutation rejects replay; sequential same-path edits replay correctly;
   mixed rename/tag operations preserve ordered paths and states. Interrupt after
   intent, original retention, installation, progress commit, finalization, and
@@ -251,18 +251,18 @@ fs: &FsHandler, record: &Record, direction: HistoryMode)
   Inject database failure after installation and assert original retention.
   Dry runs leave audio/database untouched. Old JSON errors before effects;
   show-history reports pending work read-only; clear-history refuses it.
-- [ ] Run `cargo test -p tfmt --test history_recovery`; expect failures against
+- [x] Run `cargo test -p tfmt --test history_recovery`; expect failures against
   current post-effects history saves and Lofty replay.
-- [ ] Route validate/rename/replay through journal-before-effect orchestration.
+- [x] Route validate/rename/replay through journal-before-effect orchestration.
   Recover before creating plans dependent on filesystem state, except dry runs.
   Finalize replay per record. Integrate cleanup into the same ordered operation;
   avoid holding conflicting Rust borrows between session and mutable history.
   Read-only show opens read-only; reports pending operations without recovery.
   Remove direct unrecorded tag-edit routes and obsolete prepare_save/save callers.
   Preserve history previews, run metadata and command confirmation behavior.
-- [ ] Run `cargo xtask test-cli` and `cargo xtask test-integration`; expect
+- [x] Run `cargo xtask test-cli` and `cargo xtask test-integration`; expect
   exact-byte replay and all existing rename/validation fixtures passing.
-- [ ] Commit as `Coordinate file edits and replay with durable history`.
+- [x] Commit as `Coordinate file edits and replay with durable history`.
 
 ## Task 7: Document the contract and run final verification
 
@@ -272,19 +272,19 @@ xtask help/schema command; remaining obsolete JSON fixtures and schema assets.
 **Interfaces:** The final history-schema command generates deterministic SQL;
 the supported replay contract is the approved spec, reflected in user docs.
 
-- [ ] Update user docs: SQLite history, unsupported JSON handling without import,
+- [x] Update user docs: SQLite history, unsupported JSON handling without import,
   exact replay/stale rejection, temporary original retention, pending recovery,
   staged-rename visibility gap, symlink/hard-link behavior and clear-history rules.
   Remove obsolete automatic JSON migration advice and JSON schema references.
   Preserve intentional historical rejection fixtures; remove redundant assets.
-- [ ] Regenerate the SQL snapshot and run its contract test. Ensure repeated
+- [x] Regenerate the SQL snapshot and run its contract test. Ensure repeated
   generation is unchanged and all public migration/settings invariants are
   exercised by Tasks 1 and 3.
-- [ ] Run `cargo +nightly fmt --all`, `cargo test --workspace`,
+- [x] Run `cargo +nightly fmt --all`, `cargo test --workspace`,
   `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`.
   Resolve failures and actionable warnings; record actual results before claiming
   completion. Review diffs for unrecorded filesystem mutations and cleanup paths.
-- [ ] Commit as `Document SQLite history and exact byte replay`.
+- [x] Commit as `Document SQLite history and exact byte replay`.
 
 ## Plan self-review
 

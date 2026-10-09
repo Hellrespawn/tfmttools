@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use tfmttools_core::action::Action;
@@ -109,6 +109,14 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
     if !operation.finalized {
         for entry in &operation.entries {
             if !entry.completed {
+                // Recovery may already have changed this entry's own paths.
+                // Its descriptor validates those states; all other completed
+                // effects must still hold before any destructive resumption.
+                let mut expected = expected_states(&operation)?;
+                for path in mutation_paths(&entry.prepared.recovery) {
+                    expected.remove(&path_key(path)?);
+                }
+                verify_expected(&expected)?;
                 recover_prepared(&entry.prepared)?;
                 history.complete_action(id, entry.position)?;
             }
@@ -119,7 +127,7 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
             plan.iter().enumerate().skip(operation.entries.len())
         {
             // Earlier effects establish the preconditions for dependent actions.
-            verify_expected(&expected_states(&pending(history, id)?))?;
+            verify_expected(&expected_states(&pending(history, id)?)?)?;
             let executable = Action::try_from(action)?;
             let entry = match &executable {
                 Action::EditTagValues { path, changes }
@@ -167,7 +175,7 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
         }
     }
     operation = pending(history, id)?;
-    verify_expected(&expected_states(&operation))?;
+    verify_expected(&expected_states(&operation)?)?;
     let record = history.finish_operation(id)?;
     for entry in &operation.entries {
         if !entry.cleaned {
@@ -183,20 +191,22 @@ enum Expected {
     File(Option<ByteIdentity>),
     Directory(bool),
 }
-fn expected_states(operation: &PendingOperation) -> BTreeMap<String, Expected> {
+fn expected_states(
+    operation: &PendingOperation,
+) -> Result<BTreeMap<String, Expected>> {
     let mut expected = BTreeMap::new();
     for entry in operation.entries.iter().filter(|e| e.completed) {
         match &entry.prepared.recovery {
             RecoveryDescriptor::FileSwitch { resolved, after, .. } => {
                 expected.insert(
-                    resolved.clone(),
+                    path_key(resolved)?,
                     Expected::File(Some(after.clone())),
                 );
             },
             RecoveryDescriptor::Move { source, target, identity } => {
-                expected.insert(source.clone(), Expected::File(None));
+                expected.insert(path_key(source)?, Expected::File(None));
                 expected.insert(
-                    target.clone(),
+                    path_key(target)?,
                     Expected::File(Some(identity.clone())),
                 );
             },
@@ -208,7 +218,7 @@ fn expected_states(operation: &PendingOperation) -> BTreeMap<String, Expected> {
                 ..
             } => {
                 expected.insert(
-                    source.clone(),
+                    path_key(source)?,
                     Expected::File(if *remove_source {
                         None
                     } else {
@@ -216,22 +226,106 @@ fn expected_states(operation: &PendingOperation) -> BTreeMap<String, Expected> {
                     }),
                 );
                 expected.insert(
-                    target.clone(),
+                    path_key(target)?,
                     Expected::File(Some(identity.clone())),
                 );
             },
             RecoveryDescriptor::Remove { path, .. } => {
-                expected.insert(path.clone(), Expected::File(None));
+                expected.insert(path_key(path)?, Expected::File(None));
             },
             RecoveryDescriptor::Directory { path, after_exists, .. } => {
-                expected
-                    .insert(path.clone(), Expected::Directory(*after_exists));
+                expected.insert(
+                    path_key(path)?,
+                    Expected::Directory(*after_exists),
+                );
             },
             RecoveryDescriptor::Noop => {},
         }
     }
-    expected
+    Ok(expected)
 }
+// Resolve parent aliases even when a later action has removed the file or
+// directory. Keep the final component: non-tag actions operate on that entry.
+fn path_key(path: &str) -> Result<String> {
+    let path = Utf8Path::new(path);
+    let absolute = if path.is_absolute() {
+        path.to_owned()
+    } else {
+        Utf8PathBuf::try_from(std::env::current_dir()?)?.join(path)
+    };
+    let mut ancestor = absolute.parent().unwrap_or(&absolute).to_owned();
+    let mut suffix = vec![];
+    if let Some(name) = absolute.file_name() {
+        suffix.push(name.to_owned());
+    }
+    let canonical = loop {
+        match std::fs::canonicalize(&ancestor) {
+            Ok(path) => break Utf8PathBuf::try_from(path)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                // Do not silently bypass a dangling parent symlink.
+                if std::fs::symlink_metadata(&ancestor).is_ok() {
+                    return Err(error.into());
+                }
+                suffix.push(ancestor.file_name().ok_or(error)?.to_owned());
+                ancestor = ancestor
+                    .parent()
+                    .ok_or_else(|| {
+                        color_eyre::eyre::eyre!(
+                            "Cannot resolve operation path {absolute}"
+                        )
+                    })?
+                    .to_owned();
+            },
+            Err(error) => return Err(error.into()),
+        }
+    };
+    let mut resolved = canonical;
+    for part in suffix.into_iter().rev() {
+        resolved.push(part);
+    }
+    // A case-insensitive filesystem can expose an existing entry through a
+    // different spelling. Use its directory-entry name, while preserving
+    // distinct case-sensitive entries (including hard links).
+    if let Some(name) = resolved.file_name()
+        && std::fs::symlink_metadata(&resolved).is_ok()
+    {
+        let parent = resolved.parent().unwrap();
+        let names = std::fs::read_dir(parent)?
+            .map(|entry| entry.map(|entry| entry.file_name()))
+            .collect::<std::io::Result<Vec<_>>>()?;
+        if !names.iter().any(|entry| entry == name) {
+            let mut aliases = names.iter().filter(|entry| {
+                entry
+                    .to_str()
+                    .is_some_and(|entry| entry.eq_ignore_ascii_case(name))
+            });
+            if let Some(alias) = aliases.next()
+                && aliases.next().is_none()
+            {
+                resolved = parent.join(alias.to_str().unwrap());
+            }
+        }
+    }
+    Ok(resolved.into_string())
+}
+
+fn mutation_paths(recovery: &RecoveryDescriptor) -> Vec<&str> {
+    match recovery {
+        RecoveryDescriptor::FileSwitch { resolved, .. } => vec![resolved],
+        RecoveryDescriptor::Move { source, target, .. } => vec![source, target],
+        RecoveryDescriptor::Copy { source, target, remove_source, .. } => {
+            if *remove_source {
+                vec![source, target]
+            } else {
+                vec![target]
+            }
+        },
+        RecoveryDescriptor::Remove { path, .. }
+        | RecoveryDescriptor::Directory { path, .. } => vec![path],
+        RecoveryDescriptor::Noop => vec![],
+    }
+}
+
 fn verify_expected(expected: &BTreeMap<String, Expected>) -> Result<()> {
     for (path, state) in expected {
         match state {
@@ -409,5 +503,175 @@ mod tests {
         recover_pending(&mut h, &FsHandler::new(FSMode::Default)).unwrap();
         assert!(!std::path::Path::new(retained).exists());
         assert!(h.pending_operations().unwrap().is_empty());
+    }
+    #[test]
+    fn dotted_path_edits_and_rename_replay_without_alias_conflicts() {
+        let dir = TempDir::new().unwrap();
+        let path = audio(&dir);
+        let dotted =
+            Utf8PathBuf::try_from(dir.path().join(".").join("song.mp3"))
+                .unwrap();
+        let target =
+            Utf8PathBuf::try_from(dir.path().join("moved.mp3")).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let fs = FsHandler::new(FSMode::Default);
+        let mut h = History::new(
+            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+        );
+        h.load().unwrap();
+        let record = execute_recorded(
+            &mut h,
+            &fs,
+            vec![edit(&dotted, "Nemo", "Changed"), Action::MoveFile {
+                source: dotted.clone(),
+                target: target.clone(),
+            }],
+            metadata(),
+        )
+        .unwrap();
+        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
+        assert!(target.is_file());
+        assert!(h.pending_operations().unwrap().is_empty());
+    }
+
+    #[test]
+    fn recovery_preserves_original_when_completed_copy_is_changed_or_missing() {
+        for damage in ["changed", "missing", "already removed"] {
+            let dir = TempDir::new().unwrap();
+            let source =
+                Utf8PathBuf::try_from(dir.path().join("source")).unwrap();
+            let target =
+                Utf8PathBuf::try_from(dir.path().join("target")).unwrap();
+            let history_path =
+                Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap();
+            std::fs::write(&source, b"only original").unwrap();
+            let copy = Action::CopyFile {
+                source: source.clone(),
+                target: target.clone(),
+            };
+            let remove = Action::RemoveFile(source.clone());
+            let mut h = History::new(history_path.clone());
+            h.load().unwrap();
+            let id = h
+                .begin_operation(OperationKind::Apply, None, Some(metadata()))
+                .unwrap();
+            h.set_operation_plan(id, &[
+                StoredAction::from(&copy),
+                StoredAction::from(&remove),
+            ])
+            .unwrap();
+            let entry = prepare_action(&copy, OperationKind::Apply).unwrap();
+            h.append_prepared(id, &entry).unwrap();
+            install_prepared(&entry).unwrap();
+            h.complete_action(id, 0).unwrap();
+            let entry = prepare_action(&remove, OperationKind::Apply).unwrap();
+            h.append_prepared(id, &entry).unwrap();
+            match damage {
+                "changed" => {
+                    std::fs::write(&target, b"external change").unwrap();
+                },
+                "missing" => std::fs::remove_file(&target).unwrap(),
+                _ => install_prepared(&entry).unwrap(),
+            }
+            drop(h);
+            let mut h = History::new(history_path);
+            h.load().unwrap();
+            let result =
+                recover_pending(&mut h, &FsHandler::new(FSMode::Default));
+            if damage == "already removed" {
+                result.unwrap();
+                assert!(!source.exists());
+                assert_eq!(std::fs::read(&target).unwrap(), b"only original");
+            } else {
+                assert!(result.is_err());
+                assert_eq!(std::fs::read(&source).unwrap(), b"only original");
+                assert!(
+                    !h.pending_operations().unwrap()[0].entries[1].completed
+                );
+            }
+        }
+    }
+    #[cfg(unix)]
+    #[test]
+    fn parent_symlink_edit_and_rename_share_expected_identity() {
+        let dir = TempDir::new().unwrap();
+        let path = audio(&dir);
+        let link = dir.path().join("alias");
+        std::os::unix::fs::symlink(dir.path(), &link).unwrap();
+        let alias = Utf8PathBuf::try_from(link.join("song.mp3")).unwrap();
+        let target =
+            Utf8PathBuf::try_from(dir.path().join("moved.mp3")).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let fs = FsHandler::new(FSMode::Default);
+        let mut h = History::new(
+            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+        );
+        h.load().unwrap();
+        let record = execute_recorded(
+            &mut h,
+            &fs,
+            vec![edit(&alias, "Nemo", "Changed"), Action::MoveFile {
+                source: alias,
+                target: target.clone(),
+            }],
+            metadata(),
+        )
+        .unwrap();
+        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
+        assert!(target.exists());
+    }
+
+    #[test]
+    fn case_only_move_uses_one_identity_when_filesystem_folds_case() {
+        let dir = TempDir::new().unwrap();
+        let source =
+            Utf8PathBuf::try_from(dir.path().join("Original")).unwrap();
+        let target =
+            Utf8PathBuf::try_from(dir.path().join("original")).unwrap();
+        std::fs::write(&source, b"bytes").unwrap();
+        if !target.exists() {
+            return;
+        } // This host has case-sensitive names.
+        let fs = FsHandler::new(FSMode::Default);
+        let mut h = History::new(
+            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+        );
+        h.load().unwrap();
+        let record = execute_recorded(
+            &mut h,
+            &fs,
+            vec![Action::MoveFile {
+                source: source.clone(),
+                target: target.clone(),
+            }],
+            metadata(),
+        )
+        .unwrap();
+        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
+        assert_eq!(std::fs::read(target).unwrap(), b"bytes");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn distinct_case_sensitive_hard_links_keep_separate_expected_keys() {
+        let dir = TempDir::new().unwrap();
+        let source =
+            Utf8PathBuf::try_from(dir.path().join("Original")).unwrap();
+        let target =
+            Utf8PathBuf::try_from(dir.path().join("original")).unwrap();
+        std::fs::write(&source, b"bytes").unwrap();
+        if target.exists() {
+            return;
+        }
+        std::fs::hard_link(&source, &target).unwrap();
+        assert_ne!(
+            path_key(source.as_str()).unwrap(),
+            path_key(target.as_str()).unwrap()
+        );
     }
 }

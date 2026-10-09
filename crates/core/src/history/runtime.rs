@@ -186,10 +186,19 @@ impl History {
                 ));
             }
         }
+        let path = if let Some(connection) = &self.connection {
+            Utf8PathBuf::from(connection.path().ok_or_else(|| {
+                HistoryError::RemoveError(
+                    "History database path unavailable".into(),
+                )
+            })?)
+        } else {
+            super::persistence::resolve_history_path(&self.path)?
+        };
         self.connection.take();
-        self.records.clear();
-        fs_err::remove_file(&self.path)
+        fs_err::remove_file(&path)
             .map_err(|err| HistoryError::RemoveError(err.to_string()))?;
+        self.records.clear();
         Ok(())
     }
 

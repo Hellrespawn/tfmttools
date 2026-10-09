@@ -172,3 +172,91 @@ fn patch_blobs_and_descriptors_survive_reopen() {
     h.finish_operation(id).unwrap();
     h.complete_cleanup(id, 0).unwrap();
 }
+
+#[test]
+fn rejects_recovery_descriptors_that_reverse_action_semantics() {
+    let dir = TempDir::new().unwrap();
+    let path = Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap();
+    let mut h = History::new(path);
+    h.load().unwrap();
+    for (action, recovery) in [
+        (
+            StoredAction::from(&Action::CopyFile {
+                source: "source".into(),
+                target: "target".into(),
+            }),
+            RecoveryDescriptor::Copy {
+                source: "source".into(),
+                target: "target".into(),
+                identity: ByteIdentity { length: 3, sha256: [1; 32] },
+                remove_source: true,
+                candidate: ".tfmt-copy-test".into(),
+            },
+        ),
+        (
+            StoredAction::from(&Action::MakeDir("dir".into())),
+            RecoveryDescriptor::Directory {
+                path: "dir".into(),
+                before_exists: true,
+                after_exists: false,
+            },
+        ),
+        (
+            StoredAction::from(&Action::RemoveDir("dir".into())),
+            RecoveryDescriptor::Directory {
+                path: "dir".into(),
+                before_exists: false,
+                after_exists: true,
+            },
+        ),
+    ] {
+        let id = h
+            .begin_operation(OperationKind::Apply, None, Some(metadata()))
+            .unwrap();
+        h.set_operation_plan(id, std::slice::from_ref(&action)).unwrap();
+        assert!(
+            h.append_prepared(id, &PreparedAction {
+                action,
+                recovery,
+                patches: None
+            })
+            .is_err()
+        );
+        h.cancel_unstarted(id).unwrap();
+    }
+}
+
+#[test]
+fn rejects_tampered_recovery_effects_on_reopen_without_writing() {
+    let dir = TempDir::new().unwrap();
+    let path = Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap();
+    let mut h = History::new(path.clone());
+    h.load().unwrap();
+    let action = StoredAction::from(&Action::CopyFile {
+        source: "source".into(),
+        target: "target".into(),
+    });
+    let id = h
+        .begin_operation(OperationKind::Apply, None, Some(metadata()))
+        .unwrap();
+    h.set_operation_plan(id, std::slice::from_ref(&action)).unwrap();
+    h.append_prepared(id, &PreparedAction {
+        action,
+        recovery: RecoveryDescriptor::Copy {
+            source: "source".into(),
+            target: "target".into(),
+            identity: ByteIdentity { length: 3, sha256: [1; 32] },
+            remove_source: false,
+            candidate: ".tfmt-copy-test".into(),
+        },
+        patches: None,
+    })
+    .unwrap();
+    drop(h);
+    let c = rusqlite::Connection::open(&path).unwrap();
+    c.execute("UPDATE progress SET recovery=json_set(recovery,'$.remove_source',json('true'))", []).unwrap();
+    drop(c);
+    let before = std::fs::read(&path).unwrap();
+    assert!(History::open_read_only(path.clone()).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+}

@@ -148,3 +148,26 @@ fn preserves_original_permissions() {
         0o640
     );
 }
+
+#[test]
+fn identical_patch_bytes_switch_and_recover_without_losing_original() {
+    let (_dir, path, change) = fixture();
+    let bytes = std::fs::read(&path).unwrap();
+    let pair = tfmttools_fs::create_patch_pair(&bytes, &bytes).unwrap();
+    let action = tfmttools_core::history::StoredAction::from(
+        &tfmttools_core::action::Action::EditTagValues {
+            path: path.clone(),
+            changes: vec![change],
+        },
+    );
+    let entry = prepare_tag_replay(&action, &pair, HistoryMode::Redo).unwrap();
+    install_prepared(&entry).unwrap();
+    recover_prepared(&entry).unwrap();
+    let RecoveryDescriptor::FileSwitch { retained, .. } = &entry.recovery
+    else {
+        panic!()
+    };
+    assert_eq!(std::fs::read(retained).unwrap(), bytes);
+    cleanup_prepared(&entry).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+}

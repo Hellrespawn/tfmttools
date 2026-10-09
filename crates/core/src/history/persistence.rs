@@ -154,7 +154,7 @@ fn parent(path: &Utf8Path) -> &Utf8Path {
 
 // Follow the final-component link chain, including relative and dangling
 // targets, so atomic replacement updates the history file rather than its link.
-fn resolve_history_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
+pub(super) fn resolve_history_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
     let mut destination = path.to_owned();
     for _ in 0..40 {
         match fs_err::symlink_metadata(&destination) {

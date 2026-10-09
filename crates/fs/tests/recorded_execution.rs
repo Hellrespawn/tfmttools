@@ -85,3 +85,30 @@ fn directory_recovery_preserves_unexpected_contents() {
     assert!(install_prepared(&undo).is_err());
     assert!(p.join("external").exists());
 }
+
+#[test]
+fn standalone_copy_undo_preserves_existing_original_and_redo_restores_copy() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "source");
+    let target = path(&dir, "target");
+    std::fs::write(&source, b"original").unwrap();
+    let action =
+        Action::CopyFile { source: source.clone(), target: target.clone() };
+    let entry = prepare_action(&action, OperationKind::Apply).unwrap();
+    install_prepared(&entry).unwrap();
+    cleanup_prepared(&entry).unwrap();
+    std::fs::write(&source, b"external").unwrap();
+    assert!(prepare_action(&action, OperationKind::Undo).is_err());
+    assert_eq!(std::fs::read(&source).unwrap(), b"external");
+    assert_eq!(std::fs::read(&target).unwrap(), b"original");
+    std::fs::write(&source, b"original").unwrap();
+    let undo = prepare_action(&action, OperationKind::Undo).unwrap();
+    install_prepared(&undo).unwrap();
+    cleanup_prepared(&undo).unwrap();
+    assert_eq!(std::fs::read(&source).unwrap(), b"original");
+    assert!(!target.exists());
+    let redo = prepare_action(&action, OperationKind::Redo).unwrap();
+    install_prepared(&redo).unwrap();
+    cleanup_prepared(&redo).unwrap();
+    assert_eq!(std::fs::read(&target).unwrap(), b"original");
+}

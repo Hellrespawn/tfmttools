@@ -151,7 +151,11 @@ pub fn recover_prepared(entry: &PreparedAction) -> FsResult<()> {
     let current = identity_if_regular(resolved)?;
     let original = identity_if_regular(retained)?;
     let prepared = identity_if_regular(candidate)?;
-    if current.as_ref() == Some(after) {
+    if current.as_ref() == Some(after)
+        && !(before == after
+            && original.as_ref().is_some_and(|identity| identity.length == 0)
+            && prepared.as_ref() == Some(after))
+    {
         if original.as_ref().is_some_and(|identity| identity != before) {
             return Err(conflict(retained));
         }

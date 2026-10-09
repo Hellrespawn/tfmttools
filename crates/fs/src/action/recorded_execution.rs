@@ -37,7 +37,9 @@ pub fn prepare_action(
                 if undo { (target, source) } else { (source, target) };
             let identity =
                 identity_if_regular(source)?.ok_or_else(|| conflict(source))?;
-            if identity_if_regular(target)?.is_some() {
+            if let Some(existing) = identity_if_regular(target)?
+                && (!undo || existing != identity)
+            {
                 return Err(conflict(target));
             }
             let mut candidate =

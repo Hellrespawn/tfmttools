@@ -108,3 +108,22 @@ fn symlink_and_direct_history_paths_share_the_same_lock() {
     drop(first);
     second.load().unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn clearing_history_through_symlink_preserves_link_and_removes_database() {
+    let directory = TempDir::new().unwrap();
+    let target =
+        Utf8PathBuf::try_from(directory.path().join("history.hist")).unwrap();
+    let link =
+        Utf8PathBuf::try_from(directory.path().join("alias.hist")).unwrap();
+    std::os::unix::fs::symlink("history.hist", &link).unwrap();
+    let mut history = History::new(link.clone());
+    history.load().unwrap();
+    history.save().unwrap();
+    history.remove().unwrap();
+    assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+    assert!(!target.exists());
+    history.save().unwrap();
+    assert!(target.is_file());
+}

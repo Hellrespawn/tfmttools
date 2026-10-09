@@ -538,11 +538,48 @@ fn read_patch(
     .transpose()
 }
 
+fn validate_copy_direction(
+    recovery: &RecoveryDescriptor,
+    kind: OperationKind,
+) -> Result<()> {
+    if let RecoveryDescriptor::Copy { remove_source, .. } = recovery
+        && *remove_source != (kind == OperationKind::Undo)
+    {
+        return Err(HistoryError::LoadError(
+            "Recovery copy removal differs from action direction".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_directory_direction(
+    action: &StoredAction,
+    kind: OperationKind,
+    before_exists: bool,
+    after_exists: bool,
+) -> Result<()> {
+    let creates = matches!(action, StoredAction::MakeDir { .. })
+        != (kind == OperationKind::Undo);
+    // Removing a nonempty directory is an intentional no-op. Creation
+    // always leaves a directory; removal cannot create one.
+    if (creates && !after_exists)
+        || (!creates && !before_exists && after_exists)
+    {
+        return Err(HistoryError::LoadError(
+            "Recovery directory transition differs from action direction"
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)] // Keep exhaustive action/descriptor matching together.
 fn validate_prepared(
     entry: &PreparedAction,
     kind: OperationKind,
 ) -> Result<()> {
     database::validate_action(&entry.action)?;
+    validate_copy_direction(&entry.recovery, kind)?;
     match (&entry.action, &entry.recovery, &entry.patches) {
         (
             StoredAction::EditTagValues { path, .. },
@@ -625,9 +662,20 @@ fn validate_prepared(
             if kind == OperationKind::Undo => {},
         (
             StoredAction::MakeDir { path } | StoredAction::RemoveDir { path },
-            RecoveryDescriptor::Directory { path: actual_path, .. },
+            RecoveryDescriptor::Directory {
+                path: actual_path,
+                before_exists,
+                after_exists,
+            },
             None,
-        ) if path == actual_path => {},
+        ) if path == actual_path => {
+            validate_directory_direction(
+                &entry.action,
+                kind,
+                *before_exists,
+                *after_exists,
+            )?;
+        },
         _ => {
             return Err(HistoryError::LoadError(
                 "Recovery descriptor differs from action".into(),
