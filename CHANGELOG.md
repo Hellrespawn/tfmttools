@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Parse path templates with pest, preserving syntax and improving expected-construct diagnostics.
+
 ### Added
 
 - Add versioned, validated SQLite history using `rusqlite` and

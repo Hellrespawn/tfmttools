@@ -1,348 +1,342 @@
-use std::mem::discriminant;
+use pest::Parser;
+use pest::error::InputLocation;
+use pest::iterators::Pair;
+use pest_derive::Parser;
 
 use crate::ast::{Alternative, Expression, Formatter, Reference};
-use crate::lexer::{Kind, Token, lex};
 use crate::template::Compiled;
 use crate::{
     ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, Metadata, Span, TagReference,
 };
 
+#[derive(Parser)]
+#[grammar = "grammar.pest"]
+struct Syntax;
+
+type Node<'a> = Pair<'a, Rule>;
+
+fn span(node: &Node<'_>) -> Span {
+    Span { start: node.as_span().start(), end: node.as_span().end() }
+}
+
+fn text(node: &Node<'_>) -> String {
+    let raw = node.as_str();
+    let mut chars = raw[1..raw.len() - 1].chars();
+    let mut result = String::new();
+    while let Some(character) = chars.next() {
+        result.push(if character == '\\' {
+            chars.next().unwrap()
+        } else {
+            character
+        });
+    }
+    result
+}
+
 pub(crate) fn parse(
     source: &str,
     policy: ArgumentPolicy,
 ) -> Result<Compiled, Diagnostic> {
-    let mut parser =
-        Parser { tokens: lex(source)?, index: 0, references: Vec::new() };
+    let document = Syntax::parse(Rule::document, source)
+        .map_err(|error| {
+            let start = match error.location {
+                InputLocation::Pos(p) | InputLocation::Span((p, _)) => p,
+            };
+            let end = source[start..]
+                .chars()
+                .next()
+                .map_or(start, |c| start + c.len_utf8());
+            let message = error
+                .renamed_rules(|rule| {
+                    match rule {
+                        Rule::name => "an identifier",
+                        Rule::tag => "a '$tag' reference",
+                        Rule::quoted => "a quoted string",
+                        Rule::separator => "'/'",
+                        Rule::interpolation => "an interpolation '{...}'",
+                        Rule::guard => "a guard '[reference? ...]'",
+                        Rule::sequence => "a path sequence '(...)'",
+                        Rule::argument => "an argument declaration",
+                        Rule::definition => "a definition 'name: value'",
+                        Rule::formatter => {
+                            "a formatter '| year' or '| pad(width)'"
+                        },
+                        Rule::width | Rule::number => {
+                            "a nonnegative padding width"
+                        },
+                        Rule::EOI => "end of template",
+                        _ => "valid template syntax",
+                    }
+                    .to_owned()
+                })
+                .variant
+                .message()
+                .into_owned();
+            let message = if source.trim_start().starts_with(['{', '+']) {
+                format!(
+                    "{message}; migrate Jinja/frontmatter templates manually"
+                )
+            } else {
+                message
+            };
+            Diagnostic::new(message, Span { start, end })
+        })?
+        .next()
+        .unwrap();
     let mut metadata = Metadata::default();
-    let mut arguments = Vec::<ArgSpec>::new();
+    let mut arguments: Vec<ArgSpec> = Vec::new();
     let mut path = None;
     let mut path_span = Span::default();
-    while !parser.at(&Kind::End) {
-        let definition = parser.take();
-        let Kind::Name(name) = &definition.kind else {
-            return Err(Diagnostic::new(
-                "Expected a definition; migrate Jinja/frontmatter templates manually",
-                definition.span,
-            ));
-        };
-        if name == "arg" {
-            let argument = parser.argument(definition.span.start)?;
-            if arguments.iter().any(|existing| existing.name == argument.name) {
-                return Err(Diagnostic::new(
-                    "Duplicate argument",
-                    argument.span,
-                ));
-            }
-            arguments.push(argument);
-            continue;
-        }
-        parser.expect(&Kind::Colon, "Expected ':' after definition name")?;
-        match name.as_str() {
-            "name" | "description" => {
-                let slot = if name == "name" {
-                    &mut metadata.name
-                } else {
-                    &mut metadata.description
-                };
-                if slot.is_some() {
+    let mut builder = Builder { references: Vec::new() };
+    for node in document.into_inner() {
+        let location = span(&node);
+        match node.as_rule() {
+            Rule::argument => {
+                let argument = argument(node)?;
+                if arguments.iter().any(|a| a.name == argument.name) {
                     return Err(Diagnostic::new(
-                        "Duplicate definition",
-                        definition.span,
+                        "Duplicate argument",
+                        argument.span,
                     ));
                 }
-                *slot = Some(parser.text()?);
+                arguments.push(argument);
             },
-            "path" => {
-                if path.is_some() {
-                    return Err(Diagnostic::new(
-                        "Duplicate path definition",
-                        definition.span,
-                    ));
+            Rule::definition => {
+                let mut parts = node.into_inner();
+                let name = parts.next().unwrap();
+                let value = parts.next().unwrap();
+                match name.as_str().to_ascii_lowercase().as_str() {
+                    "path" => {
+                        if path.is_some() {
+                            return Err(Diagnostic::new(
+                                "Duplicate path definition",
+                                span(&name),
+                            ));
+                        }
+                        if value.as_rule() != Rule::sequence {
+                            return Err(Diagnostic::new(
+                                "Expected '(' after 'path:'",
+                                span(&value),
+                            ));
+                        }
+                        path_span = location;
+                        path =
+                            Some(builder.sequence(value.into_inner(), true)?);
+                    },
+                    "name" | "description" => {
+                        let slot = if name.as_str().eq_ignore_ascii_case("name")
+                        {
+                            &mut metadata.name
+                        } else {
+                            &mut metadata.description
+                        };
+                        if slot.is_some() {
+                            return Err(Diagnostic::new(
+                                "Duplicate definition",
+                                span(&name),
+                            ));
+                        }
+                        if value.as_rule() != Rule::quoted {
+                            return Err(Diagnostic::new(
+                                "Expected a quoted string",
+                                span(&value),
+                            ));
+                        }
+                        *slot = Some(text(&value));
+                    },
+                    _ => {
+                        return Err(Diagnostic::new(
+                            "Unknown definition",
+                            span(&name),
+                        ));
+                    },
                 }
-                parser
-                    .expect(&Kind::OpenParen, "Expected '(' after 'path:'")?;
-                path = Some(parser.sequence(&Kind::CloseParen)?);
-                path_span = Span {
-                    start: definition.span.start,
-                    end: parser.previous_span().end,
-                };
             },
-            _ => {
-                return Err(Diagnostic::new(
-                    "Unknown definition",
-                    definition.span,
-                ));
-            },
+            Rule::EOI => {},
+            _ => unreachable!(),
         }
     }
     let path = path.ok_or_else(|| {
-        Diagnostic::new("Missing path definition", parser.current().span)
+        Diagnostic::new("Missing path definition", Span {
+            start: source.len(),
+            end: source.len(),
+        })
     })?;
     Ok(Compiled {
         source: source.to_owned(),
         metadata,
         arguments,
-        references: parser.references,
+        references: builder.references,
         path,
         span: path_span,
         policy,
     })
 }
 
-struct Parser {
-    tokens: Vec<Token>,
-    index: usize,
-    references: Vec<TagReference>,
-}
-
-impl Parser {
-    fn current(&self) -> &Token {
-        &self.tokens[self.index]
-    }
-
-    fn previous_span(&self) -> Span {
-        self.tokens[self.index.saturating_sub(1)].span
-    }
-
-    fn at(&self, kind: &Kind) -> bool {
-        discriminant(&self.current().kind) == discriminant(kind)
-    }
-
-    fn take(&mut self) -> Token {
-        let token = self.current().clone();
-        if !self.at(&Kind::End) {
-            self.index += 1;
-        }
-        token
-    }
-
-    fn consume(&mut self, kind: &Kind) -> bool {
-        if self.at(kind) {
-            self.take();
-            true
-        } else {
-            false
-        }
-    }
-
-    fn expect(
-        &mut self,
-        kind: &Kind,
-        message: &str,
-    ) -> Result<Token, Diagnostic> {
-        if self.at(kind) {
-            Ok(self.take())
-        } else {
-            Err(Diagnostic::new(message, self.current().span))
-        }
-    }
-
-    fn name(&mut self) -> Result<String, Diagnostic> {
-        let token =
-            self.expect(&Kind::Name(String::new()), "Expected an identifier")?;
-        let Kind::Name(name) = token.kind else { unreachable!() };
-        Ok(name)
-    }
-
-    fn text(&mut self) -> Result<String, Diagnostic> {
-        let token = self
-            .expect(&Kind::Text(String::new()), "Expected a quoted string")?;
-        let Kind::Text(text) = token.kind else { unreachable!() };
-        Ok(text)
-    }
-
-    fn argument(&mut self, start: usize) -> Result<ArgSpec, Diagnostic> {
-        let name = self.name()?;
-        self.expect(&Kind::Colon, "Expected ':' after argument name")?;
-        let kind_span = self.current().span;
-        let kind = match self.name()?.as_str() {
-            "string" => ArgKind::String,
-            "int" => ArgKind::Int,
-            "path" => ArgKind::Path,
-            _ => {
-                return Err(Diagnostic::new(
-                    "Unknown argument type",
-                    kind_span,
-                ));
-            },
-        };
-        let mut default = None;
-        let mut description = None;
-        if self.consume(&Kind::OpenParen) {
-            while !self.consume(&Kind::CloseParen) {
-                let setting_span = self.current().span;
-                let setting = self.name()?;
-                self.expect(&Kind::Colon, "Expected ':' after option name")?;
-                let slot = match setting.as_str() {
-                    "default" => &mut default,
-                    "description" => &mut description,
-                    _ => {
-                        return Err(Diagnostic::new(
-                            "Unknown argument option",
-                            setting_span,
-                        ));
-                    },
-                };
-                if slot.is_some() {
-                    return Err(Diagnostic::new(
-                        "Duplicate argument option",
-                        setting_span,
-                    ));
-                }
-                *slot = Some(self.text()?);
-                if !self.consume(&Kind::Comma) {
-                    self.expect(
-                        &Kind::CloseParen,
-                        "Expected ',' or ')' after option",
-                    )?;
-                    break;
-                }
-            }
-        }
-        Ok(ArgSpec {
-            name,
-            kind,
-            default,
-            description,
-            span: Span { start, end: self.previous_span().end },
-        })
-    }
-
-    fn reference(&mut self) -> Result<Reference, Diagnostic> {
-        let token = self.take();
-        let (name, tag) = match token.kind {
-            Kind::Name(name) => (name, false),
-            Kind::Tag(name) => (name, true),
-            _ => {
-                return Err(Diagnostic::new(
-                    "Expected an argument or '$tag' reference",
-                    token.span,
-                ));
-            },
-        };
-        if tag {
-            self.references
-                .push(TagReference { name: name.clone(), span: token.span });
-        }
-        Ok(Reference { name, tag, span: token.span })
-    }
-
-    fn literal(&mut self) -> Result<String, Diagnostic> {
-        let span = self.current().span;
-        let text = self.text()?;
-        if text.contains(['/', '\\']) {
-            return Err(Diagnostic::new(
-                "Use a bare '/' for path separators",
-                span,
-            ));
-        }
-        Ok(text)
-    }
-
-    fn sequence(
-        &mut self,
-        closing: &Kind,
-    ) -> Result<Vec<Expression>, Diagnostic> {
-        let mut expressions = Vec::new();
-        while !self.consume(closing) {
-            let span = self.current().span;
-            let expression = match &self.current().kind {
-                Kind::Text(_) => Expression::Literal(self.literal()?, span),
-                Kind::Slash => {
-                    self.take();
-                    if matches!(closing, Kind::CloseParen)
-                        && expressions.is_empty()
-                    {
-                        Expression::Root
-                    } else {
-                        Expression::Separator(span)
-                    }
-                },
-                Kind::OpenBrace => {
-                    self.take();
-                    self.interpolation(span.start)?
-                },
-                Kind::OpenBracket => {
-                    self.take();
-                    let negative = self.consume(&Kind::Bang);
-                    let reference = self.reference()?;
-                    self.expect(
-                        &Kind::Question,
-                        "Expected '?' after guard reference",
-                    )?;
-                    let contents = self.sequence(&Kind::CloseBracket)?;
-                    Expression::Guard { reference, negative, contents }
-                },
+fn argument(node: Node<'_>) -> Result<ArgSpec, Diagnostic> {
+    let mut location = span(&node);
+    let mut parts = node.into_inner();
+    parts.next(); // arg keyword
+    let name = parts.next().unwrap().as_str().to_ascii_lowercase();
+    let kind = parts.next().unwrap();
+    location.end = kind.as_span().end();
+    let kind = match kind.as_str().to_ascii_lowercase().as_str() {
+        "string" => ArgKind::String,
+        "int" => ArgKind::Int,
+        "path" => ArgKind::Path,
+        _ => return Err(Diagnostic::new("Unknown argument type", span(&kind))),
+    };
+    let mut default = None;
+    let mut description = None;
+    if let Some(settings) = parts.next() {
+        location.end = settings.as_span().end();
+        for setting in settings.into_inner() {
+            let mut parts = setting.into_inner();
+            let name = parts.next().unwrap();
+            let slot = match name.as_str().to_ascii_lowercase().as_str() {
+                "default" => &mut default,
+                "description" => &mut description,
                 _ => {
                     return Err(Diagnostic::new(
-                        "Expected a quoted literal, interpolation, guard, or '/'",
-                        span,
+                        "Unknown argument option",
+                        span(&name),
                     ));
                 },
             };
-            expressions.push(expression);
+            if slot.is_some() {
+                return Err(Diagnostic::new(
+                    "Duplicate argument option",
+                    span(&name),
+                ));
+            }
+            *slot = Some(text(&parts.next().unwrap()));
         }
-        Ok(expressions)
+    }
+    Ok(ArgSpec { name, kind, default, description, span: location })
+}
+
+struct Builder {
+    references: Vec<TagReference>,
+}
+
+impl Builder {
+    fn reference(&mut self, node: Node<'_>) -> Reference {
+        let tag = node.as_rule() == Rule::tag;
+        let name = if tag {
+            node.as_str()[1..].to_owned()
+        } else {
+            node.as_str().to_ascii_lowercase()
+        };
+        let location = span(&node);
+        if tag {
+            self.references
+                .push(TagReference { name: name.clone(), span: location });
+        }
+        Reference { name, tag, span: location }
+    }
+
+    fn literal(node: &Node<'_>) -> Result<String, Diagnostic> {
+        let value = text(node);
+        if value.contains(['/', '\\']) {
+            return Err(Diagnostic::new(
+                "Use a bare '/' for path separators",
+                span(node),
+            ));
+        }
+        Ok(value)
+    }
+
+    fn sequence<'a>(
+        &mut self,
+        nodes: impl Iterator<Item = Node<'a>>,
+        root: bool,
+    ) -> Result<Vec<Expression>, Diagnostic> {
+        let mut result = Vec::new();
+        for node in nodes {
+            let location = span(&node);
+            result.push(match node.as_rule() {
+                Rule::quoted => {
+                    Expression::Literal(Self::literal(&node)?, location)
+                },
+                Rule::separator if root && result.is_empty() => {
+                    Expression::Root
+                },
+                Rule::separator => Expression::Separator(location),
+                Rule::interpolation => self.interpolation(node)?,
+                Rule::guard => {
+                    let mut parts = node.into_inner().peekable();
+                    let negative =
+                        parts.peek().unwrap().as_rule() == Rule::negative;
+                    if negative {
+                        parts.next();
+                    }
+                    let reference = self.reference(parts.next().unwrap());
+                    Expression::Guard {
+                        reference,
+                        negative,
+                        contents: self.sequence(parts, false)?,
+                    }
+                },
+                _ => unreachable!(),
+            });
+        }
+        Ok(result)
     }
 
     fn interpolation(
         &mut self,
-        start: usize,
+        node: Node<'_>,
     ) -> Result<Expression, Diagnostic> {
+        let location = span(&node);
         let mut alternatives = Vec::new();
-        loop {
-            let alternative = if self.at(&Kind::Text(String::new())) {
-                Alternative::Literal(self.literal()?)
-            } else {
-                Alternative::Reference(self.reference()?)
-            };
-            alternatives.push(alternative);
-            if !self.consume(&Kind::Fallback) {
-                break;
+        let mut formatters = Vec::new();
+        for node in node.into_inner() {
+            match node.as_rule() {
+                Rule::quoted => {
+                    alternatives
+                        .push(Alternative::Literal(Self::literal(&node)?))
+                },
+                Rule::tag | Rule::name => {
+                    alternatives
+                        .push(Alternative::Reference(self.reference(node)))
+                },
+                Rule::formatter => formatters.push(formatter(node)?),
+                _ => unreachable!(),
             }
         }
-        let mut formatters = Vec::new();
-        while self.consume(&Kind::Pipe) {
-            let span = self.current().span;
-            let formatter = match self.name()?.as_str() {
-                "year" => Formatter::Year(span),
-                "pad" => {
-                    self.expect(&Kind::OpenParen, "Expected '(' after pad")?;
-                    let width_token = self.expect(
-                        &Kind::Number(String::new()),
-                        "Expected a nonnegative padding width",
-                    )?;
-                    let Kind::Number(width) = width_token.kind else {
-                        unreachable!()
-                    };
-                    let width = width.parse::<usize>().map_err(|_| {
-                        Diagnostic::new(
-                            "Invalid padding width",
-                            width_token.span,
-                        )
-                    })?;
-                    if width > 1024 {
-                        return Err(Diagnostic::new(
-                            "Padding width exceeds maximum of 1024",
-                            width_token.span,
-                        ));
-                    }
-                    self.expect(
-                        &Kind::CloseParen,
-                        "Expected ')' after padding width",
-                    )?;
-                    Formatter::Pad(width)
-                },
-                _ => return Err(Diagnostic::new("Unknown formatter", span)),
-            };
-            formatters.push(formatter);
-        }
-        let close =
-            self.expect(&Kind::CloseBrace, "Expected '}' after interpolation")?;
         Ok(Expression::Interpolation {
             alternatives,
             formatters,
-            span: Span { start, end: close.span.end },
+            span: location,
         })
+    }
+}
+
+fn formatter(node: Node<'_>) -> Result<Formatter, Diagnostic> {
+    let mut parts = node.into_inner();
+    let name = parts.next().unwrap();
+    let width = parts.next();
+    match (name.as_str().to_ascii_lowercase().as_str(), width) {
+        ("year", None) => Ok(Formatter::Year(span(&name))),
+        ("pad", Some(width)) => {
+            let number = width.into_inner().next().unwrap();
+            let width = number.as_str().parse::<usize>().map_err(|_| {
+                Diagnostic::new("Invalid padding width", span(&number))
+            })?;
+            if width > 1024 {
+                return Err(Diagnostic::new(
+                    "Padding width exceeds maximum of 1024",
+                    span(&number),
+                ));
+            }
+            Ok(Formatter::Pad(width))
+        },
+        ("year" | "pad", _) => {
+            Err(Diagnostic::new(
+                "Expected 'year' or 'pad(nonnegative width)'",
+                span(&name),
+            ))
+        },
+        _ => Err(Diagnostic::new("Unknown formatter", span(&name))),
     }
 }

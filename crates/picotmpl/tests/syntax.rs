@@ -174,3 +174,25 @@ fn padding_width_is_bounded() {
     assert!(compile("path: ({$track | pad(1024)})").is_ok());
     assert!(compile("path: ({$track | pad(1025)})").is_err());
 }
+
+#[test]
+fn lexical_boundaries_and_full_document_consumption() {
+    for source in [
+        "pa th: (\"x\")",
+        "path: ({$ title})",
+        "path: ({$track | pad(1 2)})",
+        "path: (\"x\") trailing",
+        "arg prefix: string(default: \"x\", DEFAULT: \"y\") path: ({prefix})",
+    ] {
+        assert!(compile(source).is_err(), "{source}");
+    }
+    let template = compile("NAME: \"Été\"\u{2003}arg PREFIX: string(default: \"x\",) path: ({prefix} {$custom-tag})").unwrap();
+    assert_eq!(template.metadata().name.as_deref(), Some("Été"));
+    assert_eq!(template.arguments()[0].name, "prefix");
+    assert_eq!(template.tag_references()[0].name, "custom-tag");
+    let source = "name: \"é\"\npath: (";
+    let error = compile(source).unwrap_err();
+    assert_eq!(error.span.start, source.len());
+    assert_eq!(error.span.end, source.len());
+    assert_eq!(error.line_column(source), (2, 8));
+}

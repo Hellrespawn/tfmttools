@@ -1,0 +1,26 @@
+// Match Rust char::is_whitespace, including non-ASCII separators.
+WHITESPACE = _{ '\u{0009}'..'\u{000d}' | " " | "\u{0085}" | "\u{00a0}" | "\u{1680}" | '\u{2000}'..'\u{200a}' | "\u{2028}" | "\u{2029}" | "\u{202f}" | "\u{205f}" | "\u{3000}" }
+COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
+name_start = _{ ASCII_ALPHA | "_" }
+name_tail = _{ ASCII_ALPHANUMERIC | "_" }
+name = @{ name_start ~ name_tail* }
+tag = @{ "$" ~ name_start ~ (name_tail | "-")* }
+quoted = @{ "\"" ~ ("\\\"" | "\\\\" | !("\"" | "\\") ~ ANY)* ~ "\"" }
+number = @{ "-"? ~ ASCII_DIGIT* }
+
+document = { SOI ~ (argument | definition)* ~ EOI }
+argument = { arg_keyword ~ name ~ ":" ~ name ~ settings? }
+arg_keyword = @{ ^"arg" ~ !name_tail }
+settings = { "(" ~ (setting ~ ("," ~ setting)* ~ ","?)? ~ ")" }
+setting = { name ~ ":" ~ quoted }
+definition = { name ~ ":" ~ (sequence | quoted) }
+sequence = { "(" ~ expression* ~ ")" }
+expression = _{ quoted | separator | interpolation | guard }
+separator = { "/" }
+guard = { "[" ~ negative? ~ reference ~ "?" ~ expression* ~ "]" }
+negative = { "!" }
+reference = _{ tag | name }
+interpolation = { "{" ~ reference_or_literal ~ ("??" ~ reference_or_literal)* ~ formatter* ~ "}" }
+reference_or_literal = _{ tag | name | quoted }
+formatter = { "|" ~ name ~ width? }
+width = { "(" ~ number ~ ")" }

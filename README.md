@@ -382,3 +382,6 @@ Stored template text remains unchanged; reuse restrictions still apply.
 Windows support is best-effort. Windows binaries are not release artifacts for
 this release, and Windows-specific filesystem behavior is not a compatibility
 promise.
+
+Template syntax is parsed with pest. Diagnostics identify the source location
+and expected language constructs; template syntax is unchanged.

@@ -48,6 +48,8 @@ qbsdiff = "1.4.4"
 sha2 = "0.10.9"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
 rusqlite_migration = "=2.3.0"
+pest = "2.8"
+pest_derive = "2.8"
 regex = "1.12.3"
 schemars = { version = "1.0", features = ["chrono04"] }
 serde = { version = "1.0.228", features = ["derive"] }
