@@ -17,6 +17,7 @@ pub struct History {
     pub(super) lock_file: Option<File>,
 
     pub(super) records: Vec<Record>,
+    pub(super) cache_usable: bool,
     pub(super) connection: Option<rusqlite::Connection>,
     pub(super) read_only: bool,
 }
@@ -28,13 +29,39 @@ impl History {
             path,
             lock_file: None,
             records: Vec::new(),
+            cache_usable: true,
             connection: None,
             read_only: false,
         }
     }
 
+    /// Check the cache boundary before fallible reporting or mutation.
+    /// After a failed commit/load, call `load` successfully or discard the session.
+    pub fn ensure_usable(&self) -> Result<()> {
+        if self.cache_usable {
+            Ok(())
+        } else {
+            Err(HistoryError::LoadError(
+                "History session requires a successful reload".into(),
+            ))
+        }
+    }
+
+    pub(super) fn publish_records(&mut self, records: Vec<Record>) {
+        for record in records {
+            let id = record.id().expect("Stored record has an ID");
+            match self.records.binary_search_by_key(&id, |r| {
+                r.id().expect("Stored record has an ID")
+            }) {
+                Ok(position) => self.records[position] = record,
+                Err(position) => self.records.insert(position, record),
+            }
+        }
+    }
+
     #[must_use]
     pub fn previous_record(&self) -> Option<&Record> {
+        self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         self.records.last()
     }
 
@@ -44,6 +71,7 @@ impl History {
         mode: HistoryMode,
         limit: Option<usize>,
     ) -> Vec<&Record> {
+        self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         let limit = limit.unwrap_or(usize::MAX);
         match mode {
             HistoryMode::Undo => {
@@ -65,6 +93,7 @@ impl History {
     }
 
     pub fn remove(&mut self) -> Result<()> {
+        self.ensure_usable()?;
         if self.read_only {
             return Err(HistoryError::RemoveError("Read-only history".into()));
         }
@@ -99,11 +128,13 @@ impl History {
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
+        self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         self.records.is_empty()
     }
 
     #[must_use]
     pub fn records(&self) -> &[Record] {
+        self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         &self.records
     }
 }

@@ -27,6 +27,7 @@ impl ExecutionContext {
 }
 
 pub(crate) fn interruption_report(history: &History) -> Result<Option<String>> {
+    history.ensure_usable()?;
     let Some(a) = history.current_attempt()? else {
         return Ok(history.open_run()?.map(|(_,rid,kind)|format!("Interrupted run {rid} ({kind:?}) has no unconfirmed action. History contains the confirmed actions only. A writable invocation will close it as partial; no remaining actions will run.")));
     };
@@ -139,6 +140,7 @@ fn finish_run(
     match result {
         Ok(()) => Ok(history.close_run(run, true)?),
         Err(error) => {
+            history.load().wrap_err_with(|| format!("Original execution error: {error:#}; could not reload committed history; inspect history on the next invocation"))?;
             // Read committed database state; never infer the result from files.
             // If reading fails, leave the durable run/attempt untouched.
             match history.current_attempt() {
@@ -371,6 +373,9 @@ mod failure_tests {
             )
             .is_err()
         );
+        assert!(h.ensure_usable().is_err());
+        db.execute_batch("DROP TRIGGER fail_confirmation").unwrap();
+        h.load().unwrap();
         let a = h.current_attempt().unwrap().unwrap();
         assert_eq!(
             std::fs::read(a.details.paths.last().unwrap()).unwrap(),
@@ -378,7 +383,6 @@ mod failure_tests {
         );
         assert_ne!(std::fs::read(&path).unwrap(), before);
         assert_eq!(h.records().last().unwrap().applied_count(), 0);
-        db.execute_batch("DROP TRIGGER fail_confirmation").unwrap();
         h.resolve_attempt(a.id, AttemptOutcome::Applied).unwrap();
         assert_eq!(h.records().last().unwrap().applied_count(), 1);
         assert_eq!(

@@ -131,6 +131,11 @@ fn validate_integrity(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static DECODED_IDS: std::cell::RefCell<Option<Vec<i64>>> = const { std::cell::RefCell::new(None) };
+}
+
 pub(super) fn read_records(connection: &Connection) -> Result<Vec<Record>> {
     let mut statement = connection.prepare("SELECT id,state,timestamp,metadata,complete,applied_count,redo_allowed FROM records ORDER BY id")?;
     let mut rows = statement.query([])?;
@@ -156,6 +161,12 @@ pub(super) fn read_record(
 
 fn read_record_row(connection: &Connection, row: &Row<'_>) -> Result<Record> {
     let id: i64 = row.get(0)?;
+    #[cfg(test)]
+    DECODED_IDS.with_borrow_mut(|ids| {
+        if let Some(ids) = ids {
+            ids.push(id);
+        }
+    });
     if id < 0 {
         return Err(HistoryError::LoadError("Negative record identity".into()));
     }

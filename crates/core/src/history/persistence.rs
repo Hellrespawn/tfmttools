@@ -48,11 +48,15 @@ impl History {
     }
 
     pub fn load(&mut self) -> Result<LoadHistoryResult> {
+        self.cache_usable = false;
+        self.connection.take();
         let path = resolve_history_path(&self.path)?;
         if !self.read_only {
             self.ensure_locked(&path)?;
         }
         if !path.exists() {
+            self.records.clear();
+            self.cache_usable = true;
             return Ok(LoadHistoryResult::New);
         }
         inspect_header(&path)?;
@@ -65,6 +69,7 @@ impl History {
         transaction.commit()?;
         self.connection = Some(connection);
         self.records = records;
+        self.cache_usable = true;
         Ok(LoadHistoryResult::Loaded)
     }
 
@@ -76,19 +81,20 @@ impl History {
     }
 
     pub(super) fn ensure_connection(&mut self) -> Result<()> {
+        self.ensure_usable()?;
         if self.read_only {
             return Err(HistoryError::SaveError("Read-only history".into()));
         }
         self.lock_history()?;
         if self.connection.is_none() {
             let path = resolve_history_path(&self.path)?;
-            let new = !path.exists();
-            if !new {
-                inspect_header(&path)?;
+            if path.exists() {
+                self.load()?;
+            } else {
+                fs_err::create_dir_all(parent(&path))
+                    .map_err(|e| HistoryError::SaveError(e.to_string()))?;
+                self.connection = Some(database::open(&path, false, true)?);
             }
-            fs_err::create_dir_all(parent(&path))
-                .map_err(|e| HistoryError::SaveError(e.to_string()))?;
-            self.connection = Some(database::open(&path, false, new)?);
         }
         Ok(())
     }
