@@ -35,8 +35,9 @@
   outcome inference, automatic rollback, and durable cleanup tracking.
 - Keep tag backups private to tag replacement; cleanup errors leave the action
   confirmed and report leftover paths. Preserve destination collision checks.
-- Migrate completed SQLite v1 histories to v2 while preserving records and
-  patches; refuse migration of pending v1 work until resolved with that version.
+- Define a single initial SQLite schema for incremental history. Remove
+  the specific v2 migration for the undeployed recovery schema; retain the
+  migration framework for future published changes.
 - Plan cleanup confirmation before filesystem effects and protect configuration
   and bin directories. Verify and sync copies before associated source deletion.
 - Read native ID3 encodings when planning fixes and verifying candidates; preserve

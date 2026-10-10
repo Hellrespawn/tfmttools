@@ -252,11 +252,14 @@ STRICT tables, foreign keys, validated payloads, database identity, and existing
 connection durability settings. Never keep a SQLite transaction open across
 filesystem effects.
 
-Use a schema-version migration if the existing format has been published.
-Preserve completed history and binary patches. Do not silently discard existing
-pending operations or reinterpret them as completed. Refuse migration when old
-pending work exists, with instructions to resolve it using the compatible
-version first. Regenerate schema snapshots when implementing the change.
+The SQLite schema has not been deployed. Replace the initial schema directly;
+there is no historical SQLite compatibility or migration requirement for this
+change. Keep one current schema source and generated snapshot, database identity,
+and schema validation. Remove the old recovery tables from that source rather
+than creating and dropping them through a v2 migration. Retain the
+`rusqlite_migration` framework with the initial schema as its sole migration;
+it owns transactional initialization and `user_version`. Existing experimental
+databases with a different schema are rejected without modification.
 
 ## Removed guarantees and mechanisms
 
@@ -287,7 +290,8 @@ Implementation tests must cover:
 - Tag-original retention until durable confirmation and cleanup-only errors.
 - Partial undo/redo cursors, resolution direction, and correct record selection.
 - Read-only reporting, dry runs, unresolved-attempt mutation blocking, and locks.
-- Completed-history migration and refusal to migrate old pending operations.
+- Transactional initial-schema creation, read-only reopening, and rejection of
+  databases with unexpected versions or schema structure.
 
 The implementation review must also verify that the old recovery protocol has
 been removed, shared execution does not infer filesystem outcomes, tag-backup

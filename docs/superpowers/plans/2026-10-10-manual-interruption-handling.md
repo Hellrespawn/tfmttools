@@ -41,8 +41,8 @@ existing binary-patch and CLI fixture infrastructure.
   including staging moves (Tasks 1 and 3).
 - Backup cleanup failure must leave its action confirmed and produce an accurate
   leftover-path notice, without cleanup journal state (Tasks 2 and 3).
-- Historical v1 pending operations must prevent migration before any database
-  modification; completed records and patches must survive (Task 1).
+- Schema creation must be transactional; existing databases with unexpected
+  versions or structure must be rejected without writes (Task 1).
 
 ## File responsibilities
 
@@ -50,8 +50,8 @@ existing binary-patch and CLI fixture infrastructure.
   attempt/confirmation/resolution; retain patch validation without recovery data.
 - Modify core `model.rs`, `runtime.rs`, `database.rs`, `persistence.rs`, and
   `mod.rs`: partial records, replay cursor, selection, validation, exports.
-- Add `crates/core/src/history/schema-v2.sql`: migration from completed v1
-  history; preserve `schema-v1.sql` as the historical migration source.
+- Replace `crates/core/src/history/schema-v1.sql` directly: one initial schema
+  for confirmed actions, open runs, attempts, and patches. No v2 migration; retain the migration framework.
 - Replace fs `recorded_execution.rs` with `prepared_execution.rs`: one-shot
   non-tag execution, preparation ownership, and reporting details.
 - Simplify fs `file_switch.rs`: one-shot tag replacement and local backup
@@ -64,7 +64,7 @@ existing binary-patch and CLI fixture infrastructure.
   clear-history command flows to report/block unresolved attempts uniformly.
 - Replace recovery-specific tests; retain byte replay and validation coverage.
 
-### Task 1: Incremental history and schema migration
+### Task 1: Incremental history and initial schema
 
 **Files:** Core history files above; `crates/core/tests/history_journal.rs`
 (replace with `history_attempts.rs`), `history_operations.rs`, `history_schema.rs`,
@@ -105,16 +105,16 @@ fn close_abandoned_run(&mut self) -> Result<Option<Record>>;
   increments it; unconfirmed attempts do neither. Resolution respects direction.
   Partial undo selects the same record before earlier records; a new confirmed
   action supersedes redo, but an empty abandoned run does not.
-- [x] Add failing migration/transaction tests: completed v1 IDs, timestamps,
-  actions, patches, and states survive; pending v1 operations reject migration
-  without writes; failed confirmation leaves a marker or a committed completion,
-  never half of each. A future schema remains rejected.
+- [x] Add initial-schema/transaction tests: new databases use version 1 and
+  reopen read-only; malformed schemas and future versions are rejected without
+  writes. Failed confirmation leaves a marker or a committed completion, never
+  half of each.
 - [x] Run `cargo xtask test-core`; confirm new assertions fail before implementation.
-- [x] Implement the interfaces and version-2 migration. Store one open run,
-  at most one attempt, record completeness/redo eligibility, and applied cursor.
-  Migrate undone records with cursor zero and applied/redone records with cursor
-  at action count. Validate old schema/pending work before migration. Reject old
-  read-only opens with a clear writable-migration requirement rather than mutating.
+- [x] Implement the interfaces and initial schema. Store one open run, at most
+  one attempt, record completeness/redo eligibility, and applied cursor.
+  Retain rusqlite_migration for transactional initialization and version tracking,
+  with only the initial schema registered. Remove specific v2 migration and
+  compatibility scaffolding for the undeployed schema.
 - [x] Replace journal exports and validation dependencies. Delete durable plans,
   recovery descriptors, completed/cleaned progress, and old journal mutation
   methods. Preserve payload/patch integrity and stale attempt-ID rejection.
@@ -229,18 +229,18 @@ message; normal dry-run commands remain read-only. No implicit resolution prompt
 **Files:** README, CHANGELOG, `crates/core/AGENTS.md`, history docs/schema
 snapshots, `xtask/src/main.rs`, and relevant CLI fixtures/report expectations.
 
-**Interfaces:** Schema snapshot generation exposes the current v2 schema while
-retaining v1 migration input. Public help documents explicit resolution and the
+**Interfaces:** Schema snapshot generation exposes the single initial schema.
+Public help documents explicit resolution and the
 manual filesystem repair contract.
 
 - [x] Update user documentation with partial-run undo, redo restrictions,
   interruption reports, tag backups, and history-only resolution examples.
   Update crate guidance using writing-for-agents instructions at execution time.
 - [x] Run `cargo xtask history-schema`; update versioned snapshots and schema
-  tests to compare v2. Check fixture/report expectations affected by display.
+  tests to compare the current source. Check fixture/report expectations affected by display.
 - [x] Search for `recover_pending`, `recover_prepared`, `RecoveryDescriptor`,
   `set_operation_plan`, `complete_cleanup`, and expected-state reconstruction.
-  Remove obsolete production code and tests; historical specs/migrations remain.
+  Remove obsolete production code and tests; historical design documents remain.
 - [x] Review the resulting diff for one attempt-and-confirm flow, local tag
   backups, no generic recovery replacement, and no stored remaining plan.
 - [x] Run `cargo test --workspace`,
@@ -273,8 +273,11 @@ eligibility rule are explicit review points before implementation.
 - Copies write to a newly created destination directly. Partial copies therefore
   remain at a reported path; no random copy candidate or cleanup protocol is
   needed. Destination verification and synchronization still precede deletion.
-- The generated v2 SQL snapshot is the executable historical v1 plus v2
-  migration sequence, avoiding a second maintained copy of the complete schema.
+- User clarification: the SQLite schema has not been deployed. Collapse it into
+  one initial version-1 schema and remove the specific v2 migration and historical
+  compatibility tests. Keep rusqlite_migration, its validation test, and version
+  tracking for future changes, as clarified by the user. Align the snapshot and
+  retain identity/version/structure rejection.
 - Independent final review found the unreported-copy-candidate issue. The direct
   destination implementation replaces it; a subprocess file-size-limit test
   observed the failure before the fix and verifies interruption artifacts after.

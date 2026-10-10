@@ -26,14 +26,13 @@ History IO lives here; executable filesystem operations live in `fs`.
 When changing stored history, read
 `../../docs/superpowers/specs/2026-10-10-manual-interruption-handling-design.md`
 and its referenced patch/storage contract.
-Published format changes need a version bump, migration, regenerated schema,
-and fixed historical/replay fixtures. Run `cargo xtask history-schema` to
+The SQLite schema has not been deployed: edit the initial schema directly.
+Future published format changes need explicit compatibility handling. Run `cargo xtask history-schema` to
 regenerate the snapshot; core tests compare it automatically.
 
 SQLite migrations own `user_version`; keep `application_id` and strict validation.
-Use `journal_mode=DELETE`, `synchronous=EXTRA`, and `foreign_keys=ON`. The
-The v1 source plus `src/history/schema-v2.sql` generate
-`docs/history/schema-v2.sql`; retain v1 as historical migration input.
+Use `journal_mode=DELETE`, `synchronous=EXTRA`, and `foreign_keys=ON`.
+`src/history/schema-v1.sql` generates `docs/history/schema-v1.sql`.
 Current attempts are reporting data for explicit history-only resolution.
 Keep filesystem outcome inference and automatic recovery out of core.
 Do not import old JSON histories or persist tag actions without binary patches.

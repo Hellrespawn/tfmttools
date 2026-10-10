@@ -119,7 +119,7 @@ impl History {
                     [],
                     |r| r.get(0),
                 )?;
-                tx.execute("INSERT INTO records(id,position,state,timestamp,metadata,finalized,applied_count,redo_allowed) VALUES(?1,?2,'applied',?3,?4,0,0,1)", params![id,pos,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
+                tx.execute("INSERT INTO records(id,position,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,?2,'applied',?3,?4,0,0,1)", params![id,pos,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
                 index(id)?
             },
             OperationKind::Undo | OperationKind::Redo => {
@@ -242,7 +242,7 @@ impl History {
         }
         if kind == OperationKind::Apply {
             tx.execute(
-                "UPDATE records SET finalized=?2,redo_allowed=?2 WHERE id=?1",
+                "UPDATE records SET complete=?2,redo_allowed=?2 WHERE id=?1",
                 params![number(rid)?, complete],
             )?;
         }
@@ -299,7 +299,7 @@ impl History {
                 tx.execute("DELETE FROM attempts WHERE id=?1", [id.0])?;
             },
         }
-        tx.execute("UPDATE records SET redo_allowed=0,finalized=CASE WHEN ?2='apply' THEN 0 ELSE finalized END WHERE id=?1",params![number(a.record_id)?,a.kind.name()])?;
+        tx.execute("UPDATE records SET redo_allowed=0,complete=CASE WHEN ?2='apply' THEN 0 ELSE complete END WHERE id=?1",params![number(a.record_id)?,a.kind.name()])?;
         tx.execute("DELETE FROM runs WHERE id=?1", [a.run_id.0])?;
         let record = database::read_record(&tx, a.record_id)?.record;
         tx.commit()?;

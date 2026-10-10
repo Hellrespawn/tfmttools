@@ -356,11 +356,8 @@ tfmt does not scan for or automatically delete orphan artifacts.
 Unresolved attempts block new file mutations, undo, redo, and clear-history.
 `show-history` and dry runs can report unresolved history without changing it.
 A writable invocation closes a marker-free interrupted run as partial and
-reports its confirmed actions, without executing file operations. Completed
-version-1 databases migrate on a writable invocation; pending version-1 work
-must be resolved with the compatible tfmt version first. Read-only commands ask
-for a writable migration when necessary. Invalid databases remain errors;
-manual resolution does not repair database corruption.
+reports its confirmed actions, without executing file operations. Invalid
+databases remain errors; manual resolution does not repair database corruption.
 
 File actions require regular files. Move destinations must be absent or a
 verified case-only alias of the source; distinct hard links are rejected.
@@ -368,7 +365,7 @@ Copies are verified and synced before associated source deletion. The session
 lock excludes cooperating writers but cannot prevent arbitrary external
 programs from changing files. Dry runs write neither history nor audio.
 
-The generated [version 2 SQL schema](docs/history/schema-v2.sql) describes the
+The generated [version 1 SQL schema](docs/history/schema-v1.sql) describes the
 SQLite contract. Regenerate it with `cargo xtask history-schema`; core tests
 compare it against the checked-in snapshot. Published database format changes
 require a version bump, migration, updated schema, and compatibility/replay tests.

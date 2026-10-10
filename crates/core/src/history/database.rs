@@ -11,16 +11,22 @@ use super::{
 use crate::action::Action;
 
 pub(super) const APPLICATION_ID: i64 = 0x5446_4d54;
-pub(super) const VERSION: i64 = 2;
+pub(super) const VERSION: i64 = 1;
 const SCHEMA: &str = include_str!("schema-v1.sql");
 
 #[must_use]
 pub fn history_schema_sql() -> &'static str {
-    concat!(include_str!("schema-v1.sql"), "\n", include_str!("schema-v2.sql"))
+    SCHEMA
 }
 
 fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(SCHEMA), M::up(include_str!("schema-v2.sql"))])
+    Migrations::new(vec![M::up(SCHEMA)])
+}
+
+fn initialize(connection: &mut Connection) -> Result<()> {
+    migrations()
+        .to_latest(connection)
+        .map_err(|error| HistoryError::SaveError(error.to_string()))
 }
 
 pub(super) fn open(
@@ -48,51 +54,12 @@ pub(super) fn open(
         let version: i64 =
             connection
                 .pragma_query_value(None, "user_version", |row| row.get(0))?;
-        if version > VERSION {
+        if version != VERSION {
             return Err(HistoryError::LoadError(format!(
                 "Unsupported history database version {version}"
             )));
         }
-        if version == 1 {
-            let mut expected = Connection::open_in_memory()?;
-            Migrations::new(vec![M::up(SCHEMA)])
-                .to_latest(&mut expected)
-                .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-            if schema_objects(&connection)? != schema_objects(&expected)? {
-                return Err(HistoryError::LoadError("History database schema differs from the versioned contract".into()));
-            }
-            let pending: i64 = connection.query_row(
-                "SELECT count(*) FROM operations",
-                [],
-                |r| r.get(0),
-            )?;
-            let unfinished: i64 = connection.query_row(
-                "SELECT count(*) FROM records WHERE finalized=0",
-                [],
-                |r| r.get(0),
-            )?;
-            if pending != 0 || unfinished != 0 {
-                return Err(HistoryError::LoadError("Resolve pending work with the compatible tfmt version before migration".into()));
-            }
-            validate_integrity(&connection)?;
-            let records = read_records_query(
-                &connection,
-                "SELECT id,position,state,timestamp,metadata,finalized,CASE WHEN state IN ('undone','superseded') THEN 0 ELSE (SELECT count(*) FROM actions WHERE record_id=records.id) END,1 FROM records ORDER BY position",
-            )?;
-            super::attempt::validate_patches(&connection, &records)?;
-            if read_only {
-                return Err(HistoryError::LoadError(
-                    "History requires a writable invocation to migrate".into(),
-                ));
-            }
-        } else if version != VERSION {
-            return Err(HistoryError::LoadError(
-                "Unsupported history database version".into(),
-            ));
-        }
-        if version == VERSION {
-            validate_schema(&connection)?;
-        }
+        validate_schema(&connection)?;
     }
     connection.pragma_update(None, "foreign_keys", "ON")?;
     let keys: i64 =
@@ -118,10 +85,8 @@ pub(super) fn open(
             ));
         }
     }
-    if !read_only {
-        migrations()
-            .to_latest(&mut connection)
-            .map_err(|e| HistoryError::SaveError(e.to_string()))?;
+    if new {
+        initialize(&mut connection)?;
         validate_schema(&connection)?;
     }
     Ok(connection)
@@ -136,9 +101,7 @@ fn schema_objects(connection: &Connection) -> Result<BTreeMap<String, String>> {
 
 pub(super) fn validate_schema(connection: &Connection) -> Result<()> {
     let mut expected = Connection::open_in_memory()?;
-    migrations()
-        .to_latest(&mut expected)
-        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    initialize(&mut expected)?;
     if schema_objects(connection)? != schema_objects(&expected)? {
         return Err(HistoryError::LoadError(
             "History database schema differs from the versioned contract"
@@ -175,16 +138,7 @@ pub(super) struct DatabaseRecord {
 pub(super) fn read_records(
     connection: &Connection,
 ) -> Result<Vec<DatabaseRecord>> {
-    read_records_query(
-        connection,
-        "SELECT id,position,state,timestamp,metadata,finalized,applied_count,redo_allowed FROM records ORDER BY position",
-    )
-}
-fn read_records_query(
-    connection: &Connection,
-    sql: &str,
-) -> Result<Vec<DatabaseRecord>> {
-    let mut statement = connection.prepare(sql)?;
+    let mut statement = connection.prepare("SELECT id,position,state,timestamp,metadata,complete,applied_count,redo_allowed FROM records ORDER BY position")?;
     let mut rows = statement.query([])?;
     let mut records = Vec::new();
     while let Some(row) = rows.next()? {
@@ -198,7 +152,7 @@ pub(super) fn read_record(
 ) -> Result<DatabaseRecord> {
     let id = i64::try_from(id)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized, applied_count, redo_allowed FROM records WHERE id=?1")?;
+    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, complete, applied_count, redo_allowed FROM records WHERE id=?1")?;
     let mut rows = statement.query([id])?;
     let row = rows.next()?.ok_or_else(|| {
         HistoryError::LoadError("Pending record missing".into())
@@ -316,7 +270,7 @@ mod tests {
                     .unwrap(),
                 1
             );
-            assert!(connection.execute("INSERT INTO records(id,position,state,timestamp,metadata,finalized) VALUES('bad',0,'applied','bad','{}',1)", []).is_err());
+            assert!(connection.execute("INSERT INTO records(id,position,state,timestamp,metadata,complete) VALUES('bad',0,'applied','bad','{}',1)", []).is_err());
             assert!(connection.execute("INSERT INTO actions(record_id,position,payload) VALUES(42,0,'{}')", []).is_err());
         }
     }

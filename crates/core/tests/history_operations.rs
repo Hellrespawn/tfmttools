@@ -110,7 +110,7 @@ fn ids_follow_existing_record_count() {
 }
 
 #[test]
-fn replay_requires_an_existing_finalized_record() {
+fn replay_requires_an_existing_complete_record() {
     let (_directory, mut history) = history();
     support::history::apply(
         &mut history,

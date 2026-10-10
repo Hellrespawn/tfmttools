@@ -154,42 +154,6 @@ fn partial_undo_remains_selectable_and_failed_replay_disables_redo() {
     assert!(h.get_all_records_to_redo().unwrap().is_empty());
 }
 #[test]
-fn migration_preserves_completed_v1_and_refuses_pending_v1_without_writes() {
-    for pending in [false, true] {
-        let (dir, mut h) = setup();
-        let path = dir.path().join("history");
-        let c = rusqlite::Connection::open(&path).unwrap();
-        c.execute_batch(include_str!("../src/history/schema-v1.sql")).unwrap();
-        c.pragma_update(None, "user_version", 1).unwrap();
-        let metadata =
-            serde_json::to_string(&support::history::metadata("old")).unwrap();
-        c.execute("INSERT INTO records VALUES(7,0,'applied','2026-01-01T00:00:00+05:30',?1,1)",[metadata]).unwrap();
-        c.execute("INSERT INTO actions VALUES(7,0,?1)", [
-            serde_json::to_string(&action("a")).unwrap(),
-        ])
-        .unwrap();
-        if pending {
-            c.execute("INSERT INTO operations VALUES(1,7,'undo',0,'[]')", [])
-                .unwrap();
-        }
-        drop(c);
-        let before = std::fs::read(&path).unwrap();
-        if pending {
-            assert!(h.load().unwrap_err().to_string().contains("compatible"));
-            assert_eq!(std::fs::read(path).unwrap(), before);
-        } else {
-            h.load().unwrap();
-            assert_eq!(h.records()[0].id(), Some(7));
-            assert_eq!(h.records()[0].applied_count(), 1);
-            assert!(h.records()[0].is_complete());
-            assert_eq!(
-                h.records()[0].timestamp().to_rfc3339(),
-                "2026-01-01T00:00:00+05:30"
-            );
-        }
-    }
-}
-#[test]
 fn loading_rejects_attempt_that_disagrees_with_record_cursor() {
     let (dir, mut h) = setup();
     let run = h
@@ -206,20 +170,6 @@ fn loading_rejects_attempt_that_disagrees_with_record_cursor() {
     c.execute("UPDATE attempts SET action_position=3", []).unwrap();
     drop(c);
     assert!(History::new(path).load().is_err());
-}
-#[test]
-fn invalid_v1_payload_is_rejected_before_migration_writes() {
-    let (dir, mut h) = setup();
-    let path = dir.path().join("history");
-    let c = rusqlite::Connection::open(&path).unwrap();
-    c.execute_batch(include_str!("../src/history/schema-v1.sql")).unwrap();
-    c.pragma_update(None, "user_version", 1).unwrap();
-    c.execute("INSERT INTO records VALUES(0,0,'applied','invalid','{}',1)", [])
-        .unwrap();
-    drop(c);
-    let before = std::fs::read(&path).unwrap();
-    assert!(h.load().is_err());
-    assert_eq!(std::fs::read(path).unwrap(), before);
 }
 #[test]
 fn resolving_unknown_attempt_does_not_create_history() {

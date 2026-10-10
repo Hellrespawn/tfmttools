@@ -9,7 +9,7 @@ const HELP: &str = "\
 Usage: cargo xtask <task>
 
 Tasks:
-    history-schema    Regenerate docs/history/schema-v2.sql
+    history-schema    Regenerate docs/history/schema-v1.sql
     check             cargo check --workspace
     completions       Generate shell completions into target/completions
     completions DIR   Generate shell completions into DIR
@@ -251,7 +251,7 @@ fn run_command(mut command: Command, program_name: &str) -> ExitCode {
 
 fn generate_history_schema() -> ExitCode {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../docs/history/schema-v2.sql");
+        .join("../docs/history/schema-v1.sql");
     let result =
         std::fs::write(&path, tfmttools_core::history::history_schema_sql())
             .map_err(|error| error.to_string());

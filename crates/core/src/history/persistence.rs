@@ -57,7 +57,7 @@ impl History {
         }
         inspect_header(&path)?;
         let connection = database::open(&path, self.read_only, false)?;
-        // Validate one consistent snapshot, including unfinalized records.
+        // Validate one consistent snapshot, including uncomplete records.
         let transaction = connection.unchecked_transaction()?;
         let records = database::read_records(&transaction)?;
         super::attempt::validate_patches(&transaction, &records)?;
