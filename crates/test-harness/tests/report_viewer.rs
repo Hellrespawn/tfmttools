@@ -173,17 +173,3 @@ fn temp_report_dir() -> Utf8PathBuf {
     fs_err::create_dir_all(&dir).unwrap();
     dir
 }
-
-#[test]
-fn snapshot_failure_marks_a_successful_command_failed_without_trimming_output()
-{
-    let mut output = successful_output();
-    output.stdout = b"  output\n".to_vec();
-    let command = CommandOutcome::new(Vec::new(), &output)
-        .with_snapshot_failures(vec!["stdout differs".to_owned()]);
-    assert!(!command.passed());
-    assert_eq!(command.exit_code, Some(0));
-    assert_eq!(command.stdout, "  output\n");
-    let value = serde_json::to_value(command).unwrap();
-    assert_eq!(value["snapshot_failures"][0], "stdout differs");
-}

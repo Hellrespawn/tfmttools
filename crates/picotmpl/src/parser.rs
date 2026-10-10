@@ -33,54 +33,48 @@ fn text(node: &Node<'_>) -> String {
     result
 }
 
+fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
+    let start = match error.location {
+        InputLocation::Pos(p) | InputLocation::Span((p, _)) => p,
+    };
+    let end =
+        source[start..].chars().next().map_or(start, |c| start + c.len_utf8());
+    let message = error
+        .renamed_rules(|rule| {
+            match rule {
+                Rule::name => "an identifier",
+                Rule::tag => "a '$tag' reference",
+                Rule::quoted => "a quoted string",
+                Rule::separator => "'/'",
+                Rule::interpolation => "an interpolation '{...}'",
+                Rule::guard => "a guard '[reference? ...]'",
+                Rule::sequence => "a path sequence '(...)'",
+                Rule::argument => "an argument declaration",
+                Rule::definition => "a definition 'name: value'",
+                Rule::formatter => "a formatter '| year' or '| pad(width)'",
+                Rule::width | Rule::number => "a nonnegative padding width",
+                Rule::EOI => "end of template",
+                _ => "valid template syntax",
+            }
+            .to_owned()
+        })
+        .variant
+        .message()
+        .into_owned();
+    let message = if source.trim_start().starts_with(['{', '+']) {
+        format!("{message}; migrate Jinja/frontmatter templates manually")
+    } else {
+        message
+    };
+    Diagnostic::new(message, Span { start, end })
+}
+
 pub(crate) fn parse(
     source: &str,
     policy: ArgumentPolicy,
 ) -> Result<Compiled, Diagnostic> {
     let document = Syntax::parse(Rule::document, source)
-        .map_err(|error| {
-            let start = match error.location {
-                InputLocation::Pos(p) | InputLocation::Span((p, _)) => p,
-            };
-            let end = source[start..]
-                .chars()
-                .next()
-                .map_or(start, |c| start + c.len_utf8());
-            let message = error
-                .renamed_rules(|rule| {
-                    match rule {
-                        Rule::name => "an identifier",
-                        Rule::tag => "a '$tag' reference",
-                        Rule::quoted => "a quoted string",
-                        Rule::separator => "'/'",
-                        Rule::interpolation => "an interpolation '{...}'",
-                        Rule::guard => "a guard '[reference? ...]'",
-                        Rule::sequence => "a path sequence '(...)'",
-                        Rule::argument => "an argument declaration",
-                        Rule::definition => "a definition 'name: value'",
-                        Rule::formatter => {
-                            "a formatter '| year' or '| pad(width)'"
-                        },
-                        Rule::width | Rule::number => {
-                            "a nonnegative padding width"
-                        },
-                        Rule::EOI => "end of template",
-                        _ => "valid template syntax",
-                    }
-                    .to_owned()
-                })
-                .variant
-                .message()
-                .into_owned();
-            let message = if source.trim_start().starts_with(['{', '+']) {
-                format!(
-                    "{message}; migrate Jinja/frontmatter templates manually"
-                )
-            } else {
-                message
-            };
-            Diagnostic::new(message, Span { start, end })
-        })?
+        .map_err(|error| syntax_error(source, error))?
         .next()
         .unwrap();
     let mut metadata = Metadata::default();
@@ -220,14 +214,14 @@ struct Builder {
 }
 
 impl Builder {
-    fn reference(&mut self, node: Node<'_>) -> Reference {
+    fn reference(&mut self, node: &Node<'_>) -> Reference {
         let tag = node.as_rule() == Rule::tag;
         let name = if tag {
             node.as_str()[1..].to_owned()
         } else {
             node.as_str().to_ascii_lowercase()
         };
-        let location = span(&node);
+        let location = span(node);
         if tag {
             self.references
                 .push(TagReference { name: name.clone(), span: location });
@@ -270,7 +264,7 @@ impl Builder {
                     if negative {
                         parts.next();
                     }
-                    let reference = self.reference(parts.next().unwrap());
+                    let reference = self.reference(&parts.next().unwrap());
                     Expression::Guard {
                         reference,
                         negative,
@@ -294,11 +288,11 @@ impl Builder {
             match node.as_rule() {
                 Rule::quoted => {
                     alternatives
-                        .push(Alternative::Literal(Self::literal(&node)?))
+                        .push(Alternative::Literal(Self::literal(&node)?));
                 },
                 Rule::tag | Rule::name => {
                     alternatives
-                        .push(Alternative::Reference(self.reference(node)))
+                        .push(Alternative::Reference(self.reference(&node)));
                 },
                 Rule::formatter => formatters.push(formatter(node)?),
                 _ => unreachable!(),

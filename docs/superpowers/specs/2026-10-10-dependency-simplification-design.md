@@ -1,7 +1,9 @@
 # Simplify parsing, CLI testing, and confirmation prompts
 
-Status: proposed. This document specifies a migration to pest, snapbox,
-and dialoguer; it does not authorize or implement the migration.
+Status: evaluated and selectively implemented. The post-implementation
+gate retained pest and rejected snapbox/dialoguer; see the
+[completed review](2026-10-10-dependency-simplification-review.md).
+The migration requirements below record the evaluated design.
 
 ## Purpose and scope
 

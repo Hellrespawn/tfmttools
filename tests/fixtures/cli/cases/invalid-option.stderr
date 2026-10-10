@@ -1,5 +1,0 @@
-error: unexpected argument '--not-an-option' found
-
-Usage: tfmt --config-directory <CUSTOM_CONFIG_DIRECTORY> <COMMAND>
-
-For more information, try '--help'.

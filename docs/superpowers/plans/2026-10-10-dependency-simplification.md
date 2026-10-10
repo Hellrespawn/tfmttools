@@ -15,6 +15,17 @@ libtest-mimic, existing audio verification and report viewer.
 
 **Spec:** [Dependency simplification design](../specs/2026-10-10-dependency-simplification-design.md).
 
+## Execution outcome
+
+Executed inline in a managed worktree on branch `dependency-simplification`.
+Pest retained (`32d6260`, followed by lint cleanup); snapbox trial
+(`2cf25c7`) removed after failing the simplification gate; dialoguer trial
+removed after PTY compatibility and maintainability assessment. The
+[completed review](../specs/2026-10-10-dependency-simplification-review.md)
+records final checks, measurements and all three verdicts. Checklist items
+below describe the original trial paths; rejected paths are superseded by
+these acceptance decisions. All final tests ran serially at user request.
+
 ## Global constraints
 
 - Keep Rust 1.91.0 and edition 2024.

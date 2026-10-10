@@ -15,7 +15,7 @@ tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
 tfmttools-test-harness = { path = "../test-harness" }
 
-snapbox = { workspace = true }
+assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
 camino = { workspace = true }
 chrono = { workspace = true }
@@ -26,6 +26,3 @@ lofty = { workspace = true }
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true

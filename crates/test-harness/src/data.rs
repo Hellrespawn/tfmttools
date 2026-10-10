@@ -95,8 +95,6 @@ impl Expectation {
 #[serde(deny_unknown_fields)]
 pub struct TestData {
     command: Option<String>,
-    stdout: Option<Utf8PathBuf>,
-    stderr: Option<Utf8PathBuf>,
     #[serde(default, alias = "expected-exit-code")]
     expected_exit_code: Option<i32>,
     expectations: Option<String>,
@@ -105,14 +103,6 @@ pub struct TestData {
 }
 
 impl TestData {
-    pub fn stdout(&self) -> Option<&Utf8Path> {
-        self.stdout.as_deref()
-    }
-
-    pub fn stderr(&self) -> Option<&Utf8Path> {
-        self.stderr.as_deref()
-    }
-
     pub fn command(&self) -> Option<&String> {
         self.command.as_ref()
     }
@@ -127,21 +117,5 @@ impl TestData {
 
     pub fn previous_expectations(&self) -> Option<&String> {
         self.previous_expectations.as_ref()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn output_snapshots_are_optional_case_relative_paths() {
-        let old: TestData =
-            serde_json::from_str(r#"{"command":"--help"}"#).unwrap();
-        assert!(old.stdout().is_none());
-        assert!(old.stderr().is_none());
-        let new: TestData = serde_json::from_str(r#"{"command":"--help","stdout":"help.stdout","stderr":"empty.stderr"}"#).unwrap();
-        assert_eq!(new.stdout(), Some(Utf8Path::new("help.stdout")));
-        assert_eq!(new.stderr(), Some(Utf8Path::new("empty.stderr")));
     }
 }
