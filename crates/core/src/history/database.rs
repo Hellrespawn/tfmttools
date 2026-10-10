@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use camino::Utf8Path;
-use rusqlite::{Connection, OpenFlags, params};
+use rusqlite::{Connection, OpenFlags, Row};
 use rusqlite_migration::{M, Migrations};
 
 use super::{
@@ -88,8 +88,8 @@ pub(super) fn open(
         migrations()
             .to_latest(&mut connection)
             .map_err(|e| HistoryError::SaveError(e.to_string()))?;
+        validate_schema(&connection)?;
     }
-    validate_schema(&connection)?;
     Ok(connection)
 }
 
@@ -131,74 +131,108 @@ pub(super) fn validate_schema(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn state_name(state: RecordState) -> &'static str {
-    match state {
-        RecordState::Applied => "applied",
-        RecordState::Undone => "undone",
-        RecordState::Redone => "redone",
-        RecordState::Superseded => "superseded",
-    }
+pub(super) struct DatabaseRecord {
+    pub record: Record,
+    pub finalized: bool,
 }
 
 pub(super) fn read_records(
     connection: &Connection,
     finalized_only: bool,
-) -> Result<Vec<Record>> {
-    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata FROM records WHERE finalized=1 OR ?1=0 ORDER BY position")?;
+) -> Result<Vec<DatabaseRecord>> {
+    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized FROM records WHERE finalized=1 OR ?1=0 ORDER BY position")?;
     let mut rows = statement.query([i64::from(finalized_only)])?;
     let mut records = Vec::new();
     while let Some(row) = rows.next()? {
-        let id: i64 = row.get(0)?;
-        let position: i64 = row.get(1)?;
-        if id < 0 || position < 0 {
-            return Err(HistoryError::LoadError(
-                "Negative record identity".into(),
-            ));
-        }
-        let state: String = row.get(2)?;
-        let state = match state.as_str() {
-            "applied" => RecordState::Applied,
-            "undone" => RecordState::Undone,
-            "redone" => RecordState::Redone,
-            "superseded" => RecordState::Superseded,
-            _ => {
-                return Err(HistoryError::LoadError(
-                    "Unknown record state".into(),
-                ));
-            },
-        };
-        let timestamp: String = row.get(3)?;
-        let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp)
-            .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-        let metadata: String = row.get(4)?;
-        let metadata: ActionRecordMetadata = serde_json::from_str(&metadata)
-            .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-        let mut actions_statement = connection.prepare("SELECT position, payload FROM actions WHERE record_id=?1 ORDER BY position")?;
-        let mut action_rows = actions_statement.query([id])?;
-        let mut actions = Vec::new();
-        while let Some(action_row) = action_rows.next()? {
-            let action_position: i64 = action_row.get(0)?;
-            if usize::try_from(action_position).ok() != Some(actions.len()) {
-                return Err(HistoryError::LoadError(
-                    "Noncontiguous action ordering".into(),
-                ));
-            }
-            let payload: String = action_row.get(1)?;
-            let action: StoredAction = serde_json::from_str(&payload)
-                .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-            validate_action(&action)?;
-            actions.push(action);
-        }
-        records.push(Record::from_storage(
-            usize::try_from(id)
-                .map_err(|e| HistoryError::LoadError(e.to_string()))?,
-            actions,
-            state,
-            timestamp,
-            metadata,
-        ));
+        records.push(read_record_row(connection, row)?);
     }
     Ok(records)
+}
+
+pub(super) fn read_record(
+    connection: &Connection,
+    id: usize,
+) -> Result<DatabaseRecord> {
+    let id = i64::try_from(id)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized FROM records WHERE id=?1")?;
+    let mut rows = statement.query([id])?;
+    let row = rows.next()?.ok_or_else(|| {
+        HistoryError::LoadError("Pending record missing".into())
+    })?;
+    read_record_row(connection, row)
+}
+
+fn read_record_row(
+    connection: &Connection,
+    row: &Row<'_>,
+) -> Result<DatabaseRecord> {
+    let id: i64 = row.get(0)?;
+    let position: i64 = row.get(1)?;
+    if id < 0 || position < 0 {
+        return Err(HistoryError::LoadError("Negative record identity".into()));
+    }
+    let state: String = row.get(2)?;
+    let state = match state.as_str() {
+        "applied" => RecordState::Applied,
+        "undone" => RecordState::Undone,
+        "redone" => RecordState::Redone,
+        "superseded" => RecordState::Superseded,
+        _ => {
+            return Err(HistoryError::LoadError("Unknown record state".into()));
+        },
+    };
+    let timestamp: String = row.get(3)?;
+    let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let metadata: String = row.get(4)?;
+    let metadata: ActionRecordMetadata = serde_json::from_str(&metadata)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let mut actions_statement = connection.prepare("SELECT position, payload FROM actions WHERE record_id=?1 ORDER BY position")?;
+    let mut action_rows = actions_statement.query([id])?;
+    let mut actions = Vec::new();
+    while let Some(action_row) = action_rows.next()? {
+        let action_position: i64 = action_row.get(0)?;
+        if usize::try_from(action_position).ok() != Some(actions.len()) {
+            return Err(HistoryError::LoadError(
+                "Noncontiguous action ordering".into(),
+            ));
+        }
+        let payload: String = action_row.get(1)?;
+        let action: StoredAction = serde_json::from_str(&payload)
+            .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+        validate_action(&action)?;
+        actions.push(action);
+    }
+    let record = Record::from_storage(
+        usize::try_from(id)
+            .map_err(|e| HistoryError::LoadError(e.to_string()))?,
+        actions,
+        state,
+        timestamp,
+        metadata,
+    );
+    Ok(DatabaseRecord { record, finalized: row.get::<_, i64>(5)? == 1 })
+}
+
+pub(super) fn read_action(
+    connection: &Connection,
+    record_id: usize,
+    position: usize,
+) -> Result<StoredAction> {
+    let record_id = i64::try_from(record_id)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let position = i64::try_from(position)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let payload: String = connection.query_row(
+        "SELECT payload FROM actions WHERE record_id=?1 AND position=?2",
+        rusqlite::params![record_id, position],
+        |row| row.get(0),
+    )?;
+    let action = serde_json::from_str(&payload)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    validate_action(&action)?;
+    Ok(action)
 }
 
 pub(super) fn validate_action(action: &StoredAction) -> Result<()> {
@@ -208,34 +242,6 @@ pub(super) fn validate_action(action: &StoredAction) -> Result<()> {
     {
         return Err(HistoryError::LoadError("Empty action path".into()));
     }
-    Ok(())
-}
-
-pub(super) fn save_records(
-    connection: &mut Connection,
-    records: &[Record],
-) -> Result<()> {
-    for record in records {
-        if record.id().is_none() {
-            return Err(HistoryError::SaveError("Unsaved record ID".into()));
-        }
-        for action in record.iter() {
-            validate_action(action)?;
-            if matches!(action, StoredAction::EditTagValues { .. }) {
-                return Err(HistoryError::SaveError("Tag edits must be recorded with patches through the operation journal".into()));
-            }
-        }
-    }
-    let transaction = connection.transaction()?;
-    for (position, record) in records.iter().enumerate() {
-        let id = i64::try_from(record.id().unwrap())
-            .map_err(|e| HistoryError::SaveError(e.to_string()))?;
-        transaction.execute("INSERT INTO records(id,position,state,timestamp,metadata,finalized) VALUES(?1,?2,?3,?4,?5,1) ON CONFLICT(id) DO UPDATE SET state=excluded.state", params![id, i64::try_from(position).map_err(|e| HistoryError::SaveError(e.to_string()))?, state_name(record.state()), record.timestamp().to_rfc3339(), serde_json::to_string(record.metadata()).map_err(|e| HistoryError::SaveError(e.to_string()))?])?;
-        for (index, action) in record.iter().enumerate() {
-            transaction.execute("INSERT INTO actions(record_id,position,payload) VALUES(?1,?2,?3) ON CONFLICT(record_id,position) DO NOTHING", params![id,i64::try_from(index).map_err(|e| HistoryError::SaveError(e.to_string()))?,serde_json::to_string(action).map_err(|e| HistoryError::SaveError(e.to_string()))?])?;
-        }
-    }
-    transaction.commit()?;
     Ok(())
 }
 

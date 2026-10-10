@@ -1,3 +1,5 @@
+mod support;
+
 use camino::Utf8PathBuf;
 use tempfile::TempDir;
 use tfmttools_core::action::Action;
@@ -43,7 +45,10 @@ fn committed_intent_survives_reopen_and_finalizes_only_after_actions() {
     assert!(h.records().is_empty());
     assert_eq!(h.pending_operations().unwrap().len(), 1);
     assert!(h.remove().is_err());
-    assert!(h.save().is_err());
+    assert!(
+        h.begin_operation(OperationKind::Apply, None, Some(metadata()))
+            .is_err()
+    );
     h.complete_action(id, 0).unwrap();
     h.complete_action(id, 0).unwrap();
     let record = h.finish_operation(id).unwrap();
@@ -59,8 +64,7 @@ fn replay_finalization_updates_state_and_new_run_supersedes_redo() {
     let path = Utf8PathBuf::from_path_buf(dir.path().join("h.hist")).unwrap();
     let mut h = History::new(path);
     h.load().unwrap();
-    h.push(vec![], metadata()).unwrap();
-    h.save().unwrap();
+    support::history::apply(&mut h, vec![], metadata());
     let id = h.begin_operation(OperationKind::Undo, Some(0), None).unwrap();
     h.set_operation_plan(id, &[]).unwrap();
     h.finish_operation(id).unwrap();

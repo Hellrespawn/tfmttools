@@ -24,25 +24,42 @@ fn historical_rename() -> TempDir {
     std::fs::create_dir(root.join("config")).unwrap();
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
-    std::fs::copy(fixture, root.join("renamed.mp3")).unwrap();
+    std::fs::copy(fixture, root.join("original.mp3")).unwrap();
     let mut history = History::new(root.join("config/tfmt.hist"));
     history.load().unwrap();
-    history
-        .push(
-            vec![tfmttools_core::action::Action::MoveFile {
-                source: root.join("original.mp3"),
-                target: root.join("renamed.mp3"),
-            }],
-            tfmttools_core::history::ActionRecordMetadata::new(
+    let action = tfmttools_core::action::Action::MoveFile {
+        source: root.join("original.mp3"),
+        target: root.join("renamed.mp3"),
+    };
+    let id = history
+        .begin_operation(
+            tfmttools_core::history::OperationKind::Apply,
+            None,
+            Some(tfmttools_core::history::ActionRecordMetadata::new(
                 tfmttools_core::history::TemplateMetadata::InlineTemplate {
                     value: "{{ artist }}/{{ title }}".into(),
                 },
                 vec![],
                 "old-run".into(),
-            ),
+            )),
         )
         .unwrap();
-    history.save().unwrap();
+    history
+        .set_operation_plan(id, &[tfmttools_core::history::StoredAction::from(
+            &action,
+        )])
+        .unwrap();
+    let prepared = tfmttools_fs::prepare_action(
+        &action,
+        tfmttools_core::history::OperationKind::Apply,
+    )
+    .unwrap();
+    history.append_prepared(id, &prepared).unwrap();
+    tfmttools_fs::install_prepared(&prepared).unwrap();
+    history.complete_action(id, 0).unwrap();
+    history.finish_operation(id).unwrap();
+    tfmttools_fs::cleanup_completed_artifacts(&prepared).unwrap();
+    history.complete_cleanup(id, 0).unwrap();
     drop(history);
     directory
 }

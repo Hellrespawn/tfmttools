@@ -57,9 +57,16 @@ impl History {
         }
         inspect_header(&path)?;
         let connection = database::open(&path, self.read_only, false)?;
-        database::read_records(&connection, false)?;
-        super::journal::validate_patches(&connection)?;
-        let records = database::read_records(&connection, true)?;
+        // Validate one consistent snapshot, including unfinalized records.
+        let transaction = connection.unchecked_transaction()?;
+        let records = database::read_records(&transaction, false)?;
+        super::journal::validate_patches(&transaction, &records)?;
+        transaction.commit()?;
+        let records = records
+            .into_iter()
+            .filter(|r| r.finalized)
+            .map(|r| r.record)
+            .collect();
         self.connection = Some(connection);
         self.records = records;
         Ok(LoadHistoryResult::Loaded)
@@ -70,17 +77,6 @@ impl History {
         history.read_only = true;
         history.load()?;
         Ok(history)
-    }
-
-    pub fn prepare_save(&self) -> Result<()> {
-        if self.read_only {
-            return Err(HistoryError::SaveError("Read-only history".into()));
-        }
-        let path = resolve_history_path(&self.path)?;
-        if path.exists() {
-            inspect_header(&path)?;
-        }
-        Ok(())
     }
 
     pub(super) fn ensure_connection(&mut self) -> Result<()> {
@@ -99,17 +95,6 @@ impl History {
             self.connection = Some(database::open(&path, false, new)?);
         }
         Ok(())
-    }
-
-    pub fn save(&mut self) -> Result<()> {
-        self.prepare_save()?;
-        self.ensure_connection()?;
-        if !self.pending_operations()?.is_empty() {
-            return Err(HistoryError::SaveError(
-                "History has pending recovery work".into(),
-            ));
-        }
-        database::save_records(self.connection.as_mut().unwrap(), &self.records)
     }
 }
 
@@ -153,7 +138,7 @@ fn parent(path: &Utf8Path) -> &Utf8Path {
 }
 
 // Follow the final-component link chain, including relative and dangling
-// targets, so atomic replacement updates the history file rather than its link.
+// targets, so database access and its session lock use the same referent.
 pub(super) fn resolve_history_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
     let mut destination = path.to_owned();
     for _ in 0..40 {

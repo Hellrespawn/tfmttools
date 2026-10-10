@@ -27,6 +27,12 @@
 
 ### Changed
 
+- Consolidate history mutations in the operation journal, validate one consistent
+  database snapshot, and avoid reloading recorded patches for progress updates.
+- Retry directory synchronization during recovery and artifact cleanup, including
+  cleanup after a later action removed the artifact directory. Reject distinct
+  hard links masquerading as case-only move destinations during preparation.
+
 - Plan cleanup confirmation before filesystem effects and protect configuration
   and bin directories. Prepare copies in synced candidates for recovery.
 - Read native ID3 encodings when planning fixes and verifying candidates; preserve

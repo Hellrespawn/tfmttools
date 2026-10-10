@@ -1,10 +1,17 @@
+mod support;
+
 use camino::Utf8PathBuf;
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, Record, RecordState, TemplateMetadata,
+    ActionRecordMetadata, History, OperationKind, Record, RecordState,
+    TemplateMetadata,
 };
 
-fn history() -> History {
-    History::new(Utf8PathBuf::from("unused.hist"))
+fn history() -> (tempfile::TempDir, History) {
+    let directory = tempfile::tempdir().unwrap();
+    let history = History::new(
+        Utf8PathBuf::try_from(directory.path().join("h.hist")).unwrap(),
+    );
+    (directory, history)
 }
 
 fn metadata() -> ActionRecordMetadata {
@@ -21,21 +28,14 @@ fn ids(records: &[Record]) -> Vec<Option<usize>> {
 
 #[test]
 fn undo_is_reverse_and_redo_is_forward() {
-    let mut history = history();
+    let (_directory, mut history) = history();
     for _ in 0..4 {
-        history.push(vec![], metadata()).unwrap();
+        support::history::apply(&mut history, vec![], metadata());
     }
-    for index in [0, 2] {
-        history
-            .set_record_state(
-                history.records()[index].clone(),
-                RecordState::Undone,
-            )
-            .unwrap();
+    for index in [0, 2, 3] {
+        support::history::replay(&mut history, index, OperationKind::Undo);
     }
-    history
-        .set_record_state(history.records()[3].clone(), RecordState::Redone)
-        .unwrap();
+    support::history::replay(&mut history, 3, OperationKind::Redo);
     assert_eq!(ids(&history.get_all_records_to_undo().unwrap()), vec![
         Some(3),
         Some(1)
@@ -51,18 +51,15 @@ fn undo_is_reverse_and_redo_is_forward() {
 }
 
 #[test]
-fn push_supersedes_only_undone_records() {
-    let mut history = history();
+fn apply_supersedes_only_undone_records() {
+    let (_directory, mut history) = history();
     for _ in 0..3 {
-        history.push(vec![], metadata()).unwrap();
+        support::history::apply(&mut history, vec![], metadata());
     }
-    history
-        .set_record_state(history.records()[0].clone(), RecordState::Undone)
-        .unwrap();
-    history
-        .set_record_state(history.records()[1].clone(), RecordState::Redone)
-        .unwrap();
-    history.push(vec![], metadata()).unwrap();
+    support::history::replay(&mut history, 0, OperationKind::Undo);
+    support::history::replay(&mut history, 1, OperationKind::Undo);
+    support::history::replay(&mut history, 1, OperationKind::Redo);
+    support::history::apply(&mut history, vec![], metadata());
     assert_eq!(
         history.records().iter().map(Record::state).collect::<Vec<_>>(),
         vec![
@@ -76,33 +73,20 @@ fn push_supersedes_only_undone_records() {
 
 #[test]
 fn ids_follow_existing_record_count() {
-    let mut history = history();
-    history.push(vec![], metadata()).unwrap();
-    history.push(vec![], metadata()).unwrap();
+    let (_directory, mut history) = history();
+    support::history::apply(&mut history, vec![], metadata());
+    support::history::apply(&mut history, vec![], metadata());
     assert_eq!(ids(history.records()), vec![Some(0), Some(1)]);
 }
 
 #[test]
-fn state_updates_require_unique_saved_id() {
-    let mut history = history();
-    history.push(vec![], metadata()).unwrap();
-    let record = history.records()[0].clone();
-    let mut unsaved = record.clone();
-    *unsaved.id_mut() = None;
+fn replay_requires_an_existing_finalized_record() {
+    let (_directory, mut history) = history();
+    support::history::apply(&mut history, vec![], metadata());
+    assert!(history.begin_operation(OperationKind::Undo, None, None).is_err());
     assert!(
-        history
-            .set_record_state(unsaved, RecordState::Undone)
-            .unwrap_err()
-            .to_string()
-            .contains("unsaved")
+        history.begin_operation(OperationKind::Undo, Some(8), None).is_err()
     );
-    let mut missing = record;
-    *missing.id_mut() = Some(8);
-    assert!(
-        history
-            .set_record_state(missing, RecordState::Undone)
-            .unwrap_err()
-            .to_string()
-            .contains("Unable to find")
-    );
+    assert!(history.pending_operations().unwrap().is_empty());
+    assert_eq!(history.records()[0].state(), RecordState::Applied);
 }

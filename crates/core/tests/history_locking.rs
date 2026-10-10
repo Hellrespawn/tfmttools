@@ -1,8 +1,8 @@
+mod support;
+
 use camino::Utf8PathBuf;
 use tempfile::TempDir;
-use tfmttools_core::history::{
-    ActionRecordMetadata, History, TemplateMetadata,
-};
+use tfmttools_core::history::History;
 
 type TestHistory = History;
 
@@ -22,17 +22,11 @@ fn loaded_history_excludes_other_sessions_until_dropped() {
     let mut second = TestHistory::new(path);
     assert!(second.load().is_err());
 
-    first
-        .push(
-            vec![],
-            ActionRecordMetadata::new(
-                TemplateMetadata::Validation { value: "test".into() },
-                vec![],
-                "first".into(),
-            ),
-        )
-        .unwrap();
-    first.save().unwrap();
+    support::history::apply(
+        &mut first,
+        vec![],
+        support::history::metadata("first"),
+    );
     assert!(second.load().is_err());
     drop(first);
 
@@ -47,7 +41,11 @@ fn removing_history_keeps_other_sessions_excluded() {
     let path = history_path(&directory);
     let mut first = TestHistory::new(path.clone());
     first.load().unwrap();
-    first.save().unwrap();
+    support::history::apply(
+        &mut first,
+        vec![],
+        support::history::metadata("first"),
+    );
     first.remove().unwrap();
     assert!(!path.exists());
 
@@ -81,11 +79,15 @@ fn load_error_releases_lock_when_session_drops() {
 }
 
 #[test]
-fn saving_new_history_acquires_lock() {
+fn recording_new_history_acquires_lock() {
     let directory = TempDir::new().unwrap();
     let path = history_path(&directory);
     let mut first = TestHistory::new(path.clone());
-    first.save().unwrap();
+    support::history::apply(
+        &mut first,
+        vec![],
+        support::history::metadata("first"),
+    );
     let mut second = TestHistory::new(path);
     assert!(second.load().is_err());
 }
@@ -103,7 +105,11 @@ fn symlink_and_direct_history_paths_share_the_same_lock() {
     first.load().unwrap();
     let mut second = History::new(target);
     assert!(second.load().is_err());
-    first.save().unwrap();
+    support::history::apply(
+        &mut first,
+        vec![],
+        support::history::metadata("first"),
+    );
     assert!(second.load().is_err());
     drop(first);
     second.load().unwrap();
@@ -120,10 +126,18 @@ fn clearing_history_through_symlink_preserves_link_and_removes_database() {
     std::os::unix::fs::symlink("history.hist", &link).unwrap();
     let mut history = History::new(link.clone());
     history.load().unwrap();
-    history.save().unwrap();
+    support::history::apply(
+        &mut history,
+        vec![],
+        support::history::metadata("test"),
+    );
     history.remove().unwrap();
     assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
     assert!(!target.exists());
-    history.save().unwrap();
+    support::history::apply(
+        &mut history,
+        vec![],
+        support::history::metadata("test"),
+    );
     assert!(target.is_file());
 }

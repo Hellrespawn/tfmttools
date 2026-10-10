@@ -162,7 +162,7 @@ pub fn recover_prepared(entry: &PreparedAction) -> FsResult<()> {
         if prepared.as_ref().is_some_and(|identity| identity != after) {
             return Err(conflict(candidate));
         }
-        return Ok(());
+        return sync_parent(resolved);
     }
     if prepared.as_ref() != Some(after) {
         return Err(conflict(candidate));
@@ -363,6 +363,32 @@ pub(super) fn sync_parent(path: &Utf8Path) -> FsResult<()> {
     }
     Ok(())
 }
+
+// Later actions may remove an artifact's now-empty directory. Sync its
+// surviving ancestor to make that absence durable before recording cleanup.
+pub(super) fn sync_cleanup_parent(path: &Utf8Path) -> FsResult<()> {
+    let mut entry = path.to_owned();
+    loop {
+        match sync_parent(&entry) {
+            Ok(()) => return Ok(()),
+            Err(FsError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                let directory = entry.parent().ok_or_else(|| conflict(path))?;
+                match fs_err::symlink_metadata(directory) {
+                    Err(missing)
+                        if missing.kind() == std::io::ErrorKind::NotFound =>
+                    {
+                        entry = directory.to_owned();
+                    },
+                    // Never bypass a dangling link or another inspection error.
+                    _ => return Err(error.into()),
+                }
+            },
+            Err(error) => return Err(error),
+        }
+    }
+}
 pub(super) fn conflict(path: &Utf8Path) -> FsError {
     FsError::Recovery(format!(
         "Unexpected file state at {path}; retained files require inspection"
@@ -401,10 +427,11 @@ pub fn cleanup_completed_artifacts(entry: &PreparedAction) -> FsResult<()> {
                     return Err(conflict(path));
                 }
                 fs_err::remove_file(path)?;
-                sync_parent(path)?;
             }
         }
-        Ok(())
+        // Retry a directory sync even if an earlier cleanup already removed
+        // the artifacts but stopped before recording durable completion.
+        sync_cleanup_parent(resolved)
     } else {
         super::recorded_execution::cleanup_copy(entry)
     }

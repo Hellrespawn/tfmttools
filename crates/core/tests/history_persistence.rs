@@ -1,8 +1,11 @@
+mod support;
+
 use camino::Utf8PathBuf;
 use tempfile::TempDir;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, RecordState, TemplateMetadata,
+    ActionRecordMetadata, History, OperationKind, StoredAction,
+    TemplateMetadata,
 };
 
 fn metadata(run: &str) -> ActionRecordMetadata {
@@ -20,17 +23,16 @@ fn saves_sqlite_and_preserves_order_metadata_and_replay_states() {
         Utf8PathBuf::from_path_buf(dir.path().join("tfmt.hist")).unwrap();
     let mut h = History::new(path.clone());
     h.load().unwrap();
-    h.push(
+    support::history::apply(
+        &mut h,
         vec![
-            Action::MakeDir("first".into()),
-            Action::RemoveDir("second".into()),
+            StoredAction::from(&Action::MakeDir("first".into())),
+            StoredAction::from(&Action::RemoveDir("second".into())),
         ],
         metadata("a"),
-    )
-    .unwrap();
-    h.push(vec![], metadata("b")).unwrap();
-    h.set_record_state(h.records()[0].clone(), RecordState::Undone).unwrap();
-    h.save().unwrap();
+    );
+    support::history::apply(&mut h, vec![], metadata("b"));
+    support::history::replay(&mut h, 0, OperationKind::Undo);
     let expected = serde_json::to_value(h.records()).unwrap();
     drop(h);
     assert!(std::fs::read(&path).unwrap().starts_with(b"SQLite format 3\0"));
@@ -58,7 +60,14 @@ fn rejects_json_without_importing_or_rewriting() {
             "{error}"
         );
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
-        assert!(h.save().is_err());
+        assert!(
+            h.begin_operation(
+                OperationKind::Apply,
+                None,
+                Some(metadata("rejected"))
+            )
+            .is_err()
+        );
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
     }
 }

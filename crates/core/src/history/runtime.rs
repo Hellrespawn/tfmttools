@@ -2,11 +2,7 @@ use std::fs::File;
 
 use camino::Utf8PathBuf;
 
-use super::{
-    ActionRecordMetadata, HistoryError, HistoryMode, Record, RecordState,
-    Result,
-};
-use crate::action::Action;
+use super::{HistoryError, HistoryMode, Record, RecordState, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -17,7 +13,7 @@ pub enum LoadHistoryResult {
 #[derive(Debug)]
 pub struct History {
     pub(super) path: Utf8PathBuf,
-    // Retain the handle for the complete load/change/save session.
+    // Retain the handle for the complete history session.
     pub(super) lock_file: Option<File>,
 
     pub(super) records: Vec<Record>,
@@ -35,41 +31,6 @@ impl History {
             connection: None,
             read_only: false,
         }
-    }
-
-    pub fn push(
-        &mut self,
-        actions: Vec<Action>,
-        metadata: ActionRecordMetadata,
-    ) -> Result<()> {
-        let stored: Vec<_> = actions
-            .into_iter()
-            .map(|action| super::StoredAction::from(&action))
-            .collect();
-        for action in &stored {
-            Action::try_from(action)?;
-        }
-        let mut new_record = Record::new(stored, metadata);
-
-        *new_record.id_mut() = Some(
-            self.records
-                .iter()
-                .filter_map(Record::id)
-                .max()
-                .map_or(0, |id| id + 1),
-        );
-
-        self.records.push(new_record);
-
-        let undone_records = self.get_all_records_to_redo()?;
-
-        undone_records.into_iter().try_for_each(|record| -> Result<()> {
-            self.set_record_state(record, RecordState::Superseded)?;
-
-            Ok(())
-        })?;
-
-        Ok(())
     }
 
     pub fn get_previous_record(&self) -> Result<Option<Record>> {
@@ -132,40 +93,6 @@ impl History {
         match amount {
             Some(amount) => records.take(amount).cloned().collect(),
             None => records.cloned().collect(),
-        }
-    }
-
-    pub fn set_record_state(
-        &mut self,
-        mut record: Record,
-        state: RecordState,
-    ) -> Result<Record> {
-        if let Some(id) = record.id() {
-            let mut found_records = self
-                .records
-                .iter_mut()
-                .filter(|r| r.id().is_some_and(|r_id| r_id == id));
-
-            let Some(found_record) = found_records.next() else {
-                return Err(HistoryError::MutError(format!(
-                    "Unable to find saved record with id {id}"
-                )));
-            };
-
-            if found_records.next().is_some() {
-                Err(HistoryError::MutError(format!(
-                    "Found multiple saved records with id {id}"
-                )))
-            } else {
-                record.set_state(state);
-                found_record.set_state(state);
-
-                Ok(record)
-            }
-        } else {
-            Err(HistoryError::MutError(
-                "Unable to set the state of unsaved record.".to_owned(),
-            ))
         }
     }
 

@@ -7,7 +7,7 @@ pub struct ByteIdentity {
     pub sha256: [u8; 32],
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BinaryPatchPair {
     pub format: String,

@@ -329,7 +329,11 @@ Mutating commands recover interrupted operations before planning new work.
 `show-history` reports pending recovery without changing audio or the database;
 `clear-history` refuses pending recovery work. Recovery inspects saved progress,
 paths, and hashes. Unexpected file states stop recovery and retain the candidate
-and original for inspection. Do not delete recovery files while work is pending.
+and original for inspection. Recovery retries directory synchronization before
+acknowledging file changes or artifact cleanup. File actions require regular files;
+move destinations must be absent or a verified case-only alias of the source.
+Distinct hard links at the destination are rejected before recording the move.
+Do not delete recovery files while work is pending.
 Dry runs neither recover pending work nor write history or audio files.
 
 Rename and cleanup actions are recorded in order, including staging moves and

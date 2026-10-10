@@ -106,10 +106,21 @@ fn index(value: i64) -> Result<usize> {
     usize::try_from(value).map_err(|e| HistoryError::LoadError(e.to_string()))
 }
 
+// Mutation preconditions need counts and flags, not reconstructed recovery
+// entries or patch blobs. Full snapshots are reserved for load and recovery.
+struct OperationState {
+    record_id: usize,
+    kind: OperationKind,
+    finalized: bool,
+    planned: Option<usize>,
+    prepared: usize,
+    unfinished: bool,
+}
+
 impl History {
     pub fn cancel_unstarted(&mut self, id: OperationId) -> Result<()> {
-        let operation = self.operation(id)?;
-        if operation.finalized || !operation.entries.is_empty() {
+        let operation = self.operation_state(id)?;
+        if operation.finalized || operation.prepared != 0 {
             return Err(HistoryError::MutError(
                 "Cannot discard an operation with recorded effects".into(),
             ));
@@ -225,8 +236,8 @@ impl History {
         for action in plan {
             database::validate_action(action)?;
         }
-        let operation = self.operation(id)?;
-        if operation.plan.is_some() {
+        let operation = self.operation_state(id)?;
+        if operation.planned.is_some() {
             return Err(HistoryError::MutError(
                 "Operation plan is already saved".into(),
             ));
@@ -245,17 +256,15 @@ impl History {
                 )?;
             }
         } else {
-            let records = database::read_records(&transaction, true)?;
-            let record = records
-                .iter()
-                .find(|r| r.id() == Some(operation.record_id))
-                .unwrap();
+            let record =
+                database::read_record(&transaction, operation.record_id)?
+                    .record;
             let expected: Vec<_> = if operation.kind == OperationKind::Undo {
                 record.iter().rev().cloned().collect()
             } else {
                 record.iter().cloned().collect()
             };
-            if encode(&plan)? != encode(&expected)? {
+            if plan != expected {
                 return Err(HistoryError::MutError(
                     "Replay plan differs from recorded actions".into(),
                 ));
@@ -274,32 +283,39 @@ impl History {
         id: OperationId,
         entry: &PreparedAction,
     ) -> Result<usize> {
-        let operation = self.operation(id)?;
-        let plan = operation.plan.as_ref().ok_or_else(|| {
+        let operation = self.operation_state(id)?;
+        let planned = operation.planned.ok_or_else(|| {
             HistoryError::MutError(
                 "Save the operation plan before preparing effects".into(),
             )
         })?;
-        let position = operation.entries.len();
-        if operation.finalized || operation.entries.iter().any(|e| !e.completed)
-        {
+        let position = operation.prepared;
+        if operation.finalized || operation.unfinished {
             return Err(HistoryError::MutError(
                 "Previous action still requires recovery".into(),
             ));
         }
-        if plan.get(position).map(encode).transpose()?
-            != Some(encode(&entry.action)?)
-        {
+        if position >= planned {
+            return Err(HistoryError::MutError(
+                "Progress outside operation plan".into(),
+            ));
+        }
+        let action_position = if operation.kind == OperationKind::Undo {
+            planned - 1 - position
+        } else {
+            position
+        };
+        let expected = database::read_action(
+            self.connection()?,
+            operation.record_id,
+            action_position,
+        )?;
+        if entry.action != expected {
             return Err(HistoryError::MutError(
                 "Prepared action differs from saved plan".into(),
             ));
         }
         validate_prepared(entry, operation.kind)?;
-        let action_position = if operation.kind == OperationKind::Undo {
-            plan.len() - 1 - position
-        } else {
-            position
-        };
         let connection = self.connection.as_mut().unwrap();
         let transaction = connection.transaction()?;
         if operation.kind == OperationKind::Apply {
@@ -319,7 +335,7 @@ impl History {
                             "Recorded patches missing".into(),
                         )
                     })?;
-            if encode(pair)? != encode(&saved)? {
+            if pair != &saved {
                 return Err(HistoryError::MutError(
                     "Replay patches differ from recorded patches".into(),
                 ));
@@ -343,24 +359,25 @@ impl History {
         id: OperationId,
         position: usize,
     ) -> Result<()> {
-        let operation = self.operation(id)?;
-        if !operation.entries.iter().any(|e| e.position == position) {
+        let changed = self.connection()?.execute(
+            "UPDATE progress SET completed=1
+             WHERE operation_id=?1 AND position=?2",
+            params![id.0, number(position)?],
+        )?;
+        if changed != 1 {
             return Err(HistoryError::MutError(
                 "Unknown action position".into(),
             ));
         }
-        self.connection.as_ref().unwrap().execute("UPDATE progress SET completed=1 WHERE operation_id=?1 AND position=?2",params![id.0,number(position)?])?;
         Ok(())
     }
 
     pub fn finish_operation(&mut self, id: OperationId) -> Result<Record> {
-        let operation = self.operation(id)?;
-        let plan = operation.plan.as_ref().ok_or_else(|| {
+        let operation = self.operation_state(id)?;
+        let planned = operation.planned.ok_or_else(|| {
             HistoryError::MutError("Operation plan is missing".into())
         })?;
-        if operation.entries.len() != plan.len()
-            || operation.entries.iter().any(|e| !e.completed)
-        {
+        if operation.prepared != planned || operation.unfinished {
             return Err(HistoryError::MutError(
                 "Operation has unfinished actions".into(),
             ));
@@ -394,7 +411,10 @@ impl History {
                     id.0,
                 ])?;
         }
-        let records = database::read_records(&transaction, true)?;
+        let records: Vec<_> = database::read_records(&transaction, true)?
+            .into_iter()
+            .map(|r| r.record)
+            .collect();
         let record = records
             .iter()
             .find(|r| r.id() == Some(operation.record_id))
@@ -402,7 +422,7 @@ impl History {
             .ok_or_else(|| {
                 HistoryError::MutError("Operation record missing".into())
             })?;
-        if operation.entries.is_empty() {
+        if operation.prepared == 0 {
             transaction
                 .execute("DELETE FROM operations WHERE id=?1", [id.0])?;
         }
@@ -416,20 +436,21 @@ impl History {
         id: OperationId,
         position: usize,
     ) -> Result<()> {
-        let operation = self.operation(id)?;
-        if !operation.finalized
-            || !operation
-                .entries
-                .iter()
-                .any(|e| e.position == position && e.completed)
-        {
+        let connection = self.connection.as_mut().ok_or_else(|| {
+            HistoryError::MutError("Unknown pending operation".into())
+        })?;
+        let transaction = connection.transaction()?;
+        let changed = transaction.execute(
+            "UPDATE progress SET cleaned=1
+             WHERE operation_id=?1 AND position=?2 AND completed=1
+               AND EXISTS(SELECT 1 FROM operations WHERE id=?1 AND finalized=1)",
+            params![id.0, number(position)?],
+        )?;
+        if changed != 1 {
             return Err(HistoryError::MutError(
                 "Cleanup requires durable finalization".into(),
             ));
         }
-        let connection = self.connection.as_mut().unwrap();
-        let transaction = connection.transaction()?;
-        transaction.execute("UPDATE progress SET cleaned=1 WHERE operation_id=?1 AND position=?2",params![id.0,number(position)?])?;
         let remaining: i64 = transaction.query_row(
             "SELECT count(*) FROM progress WHERE operation_id=?1 AND cleaned=0",
             [id.0],
@@ -445,15 +466,57 @@ impl History {
 
     pub fn pending_operations(&self) -> Result<Vec<PendingOperation>> {
         match &self.connection {
-            Some(c) => read_pending(c),
+            Some(c) => {
+                let transaction = c.unchecked_transaction()?;
+                let pending = read_pending(&transaction, None)?;
+                transaction.commit()?;
+                Ok(pending)
+            },
             None => Ok(vec![]),
         }
     }
 
-    fn operation(&self, id: OperationId) -> Result<PendingOperation> {
-        self.pending_operations()?.into_iter().find(|o| o.id == id).ok_or_else(
-            || HistoryError::MutError("Unknown pending operation".into()),
-        )
+    fn connection(&self) -> Result<&Connection> {
+        self.connection.as_ref().ok_or_else(|| {
+            HistoryError::MutError("Unknown pending operation".into())
+        })
+    }
+
+    fn operation_state(&self, id: OperationId) -> Result<OperationState> {
+        let (record_id, kind, finalized, planned, prepared, unfinished) = self
+            .connection()?
+            .query_row(
+                "SELECT record_id, kind, finalized,
+                        CASE WHEN json_type(plan)='array'
+                             THEN json_array_length(plan) END,
+                        (SELECT count(*) FROM progress WHERE operation_id=?1),
+                        EXISTS(SELECT 1 FROM progress
+                               WHERE operation_id=?1 AND completed=0)
+                 FROM operations WHERE id=?1",
+                [id.0],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, bool>(2)?,
+                        row.get::<_, Option<i64>>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, bool>(5)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or_else(|| {
+                HistoryError::MutError("Unknown pending operation".into())
+            })?;
+        Ok(OperationState {
+            record_id: index(record_id)?,
+            kind: OperationKind::parse(&kind)?,
+            finalized,
+            planned: planned.map(index).transpose()?,
+            prepared: index(prepared)?,
+            unfinished,
+        })
     }
 
     pub fn patches(
@@ -686,7 +749,10 @@ fn validate_prepared(
 }
 
 #[allow(clippy::too_many_lines)] // Validate the complete journal snapshot together.
-pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
+fn read_pending(
+    c: &Connection,
+    records: Option<&[database::DatabaseRecord]>,
+) -> Result<Vec<PendingOperation>> {
     let mut s = c.prepare(
         "SELECT id,record_id,kind,finalized,plan FROM operations ORDER BY id",
     )?;
@@ -698,12 +764,19 @@ pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
         let kind = OperationKind::parse(&r.get::<_, String>(2)?)?;
         let finalized = r.get::<_, i64>(3)? == 1;
         let plan: Option<Vec<StoredAction>> = decode(&r.get::<_, String>(4)?)?;
-        let record = database::read_records(c, false)?
-            .into_iter()
-            .find(|r| r.id() == Some(record_id))
-            .ok_or_else(|| {
-                HistoryError::LoadError("Pending record missing".into())
-            })?;
+        let loaded;
+        let record = if let Some(records) = records {
+            &records
+                .iter()
+                .find(|r| r.record.id() == Some(record_id))
+                .ok_or_else(|| {
+                    HistoryError::LoadError("Pending record missing".into())
+                })?
+                .record
+        } else {
+            loaded = database::read_record(c, record_id)?;
+            &loaded.record
+        };
         if let Some(plan) = &plan {
             for action in plan {
                 database::validate_action(action)?;
@@ -713,7 +786,7 @@ pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
             } else {
                 record.iter().cloned().collect()
             };
-            if encode(plan)? != encode(&expected)? {
+            if plan != &expected {
                 return Err(HistoryError::LoadError(
                     "Pending plan differs from recorded actions".into(),
                 ));
@@ -792,18 +865,16 @@ pub(super) fn read_pending(c: &Connection) -> Result<Vec<PendingOperation>> {
     Ok(result)
 }
 
-pub(super) fn validate_patches(c: &Connection) -> Result<()> {
-    let records = database::read_records(c, false)?;
-    for record in records {
-        let finalized: i64 = c.query_row(
-            "SELECT finalized FROM records WHERE id=?1",
-            [number(record.id().unwrap())?],
-            |r| r.get(0),
-        )?;
+pub(super) fn validate_patches(
+    c: &Connection,
+    records: &[database::DatabaseRecord],
+) -> Result<()> {
+    for stored in records {
+        let record = &stored.record;
         for (position, action) in record.iter().enumerate() {
             let pair = read_patch(c, record.id().unwrap(), position)?;
             if matches!(action, StoredAction::EditTagValues { .. }) {
-                if finalized == 1 && pair.is_none() {
+                if stored.finalized && pair.is_none() {
                     return Err(HistoryError::LoadError(
                         "Finalized tag action has no binary patches".into(),
                     ));
@@ -815,6 +886,6 @@ pub(super) fn validate_patches(c: &Connection) -> Result<()> {
             }
         }
     }
-    read_pending(c)?;
+    read_pending(c, Some(records))?;
     Ok(())
 }

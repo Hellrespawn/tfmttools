@@ -6,7 +6,8 @@ use color_eyre::eyre::bail;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{
     ActionRecordMetadata, ByteIdentity, History, HistoryMode, OperationId,
-    OperationKind, PendingOperation, Record, RecoveryDescriptor, StoredAction,
+    OperationKind, PendingEntry, PendingOperation, Record, RecoveryDescriptor,
+    StoredAction,
 };
 use tfmttools_fs::{
     FsHandler, byte_identity, cleanup_completed_artifacts, discard_prepared,
@@ -107,7 +108,8 @@ fn pending(history: &History, id: OperationId) -> Result<PendingOperation> {
 fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
     let mut operation = pending(history, id)?;
     if !operation.finalized {
-        for entry in &operation.entries {
+        for index in 0..operation.entries.len() {
+            let entry = &operation.entries[index];
             if !entry.completed {
                 // Recovery may already have changed this entry's own paths.
                 // Its descriptor validates those states; all other completed
@@ -119,16 +121,20 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
                 verify_expected(&expected)?;
                 recover_prepared(&entry.prepared)?;
                 history.complete_action(id, entry.position)?;
+                operation.entries[index].completed = true;
             }
         }
-        operation = pending(history, id)?;
-        let plan = operation.plan.as_ref().unwrap();
-        for (position, action) in
-            plan.iter().enumerate().skip(operation.entries.len())
-        {
+        while operation.entries.len() < operation.plan.as_ref().unwrap().len() {
+            let position = operation.entries.len();
+            let action = operation.plan.as_ref().unwrap()[position].clone();
+            let action_position = if operation.kind == OperationKind::Undo {
+                operation.plan.as_ref().unwrap().len() - 1 - position
+            } else {
+                position
+            };
             // Earlier effects establish the preconditions for dependent actions.
-            verify_expected(&expected_states(&pending(history, id)?)?)?;
-            let executable = Action::try_from(action)?;
+            verify_expected(&expected_states(&operation)?)?;
+            let executable = Action::try_from(&action)?;
             let entry = match &executable {
                 Action::EditTagValues { path, changes }
                     if operation.kind == OperationKind::Apply =>
@@ -136,12 +142,6 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
                     prepare_tag_edit(path, changes)?
                 },
                 Action::EditTagValues { .. } => {
-                    let action_position =
-                        if operation.kind == OperationKind::Undo {
-                            plan.len() - 1 - position
-                        } else {
-                            position
-                        };
                     let pair = history
                         .patches(operation.record_id, action_position)?
                         .ok_or_else(|| {
@@ -154,7 +154,7 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
                     } else {
                         HistoryMode::Redo
                     };
-                    prepare_tag_replay(action, &pair, direction)?
+                    prepare_tag_replay(&action, &pair, direction)?
                 },
                 _ => prepare_action(&executable, operation.kind)?,
             };
@@ -172,9 +172,15 @@ fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
             }
             install_prepared(&entry)?;
             history.complete_action(id, position)?;
+            operation.entries.push(PendingEntry {
+                position,
+                action_position,
+                prepared: entry,
+                completed: true,
+                cleaned: false,
+            });
         }
     }
-    operation = pending(history, id)?;
     verify_expected(&expected_states(&operation)?)?;
     let record = history.finish_operation(id)?;
     for entry in &operation.entries {
@@ -428,6 +434,46 @@ mod tests {
                 to.into(),
             )],
         }
+    }
+    #[test]
+    fn copy_artifact_cleanup_survives_later_parent_directory_removal() {
+        let dir = TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(dir.path().to_owned()).unwrap();
+        let parent = root.join("nested");
+        let source = parent.join("source");
+        let target = parent.join("target");
+        let moved = root.join("moved");
+        std::fs::create_dir(&parent).unwrap();
+        std::fs::write(&source, b"original").unwrap();
+        let fs = FsHandler::new(FSMode::Default);
+        let mut history = History::new(root.join("h.hist"));
+        history.load().unwrap();
+        let record = execute_recorded(
+            &mut history,
+            &fs,
+            vec![
+                Action::CopyFile {
+                    source: source.clone(),
+                    target: target.clone(),
+                },
+                Action::MoveFile { source: target, target: moved.clone() },
+                Action::RemoveFile(source.clone()),
+                Action::RemoveDir(parent.clone()),
+            ],
+            metadata(),
+        )
+        .unwrap();
+        assert!(!parent.exists());
+        assert_eq!(std::fs::read(&moved).unwrap(), b"original");
+        assert!(history.pending_operations().unwrap().is_empty());
+        let record =
+            replay_record(&mut history, &fs, &record, HistoryMode::Undo)
+                .unwrap();
+        assert_eq!(std::fs::read(&source).unwrap(), b"original");
+        replay_record(&mut history, &fs, &record, HistoryMode::Redo).unwrap();
+        assert!(!parent.exists());
+        assert_eq!(std::fs::read(moved).unwrap(), b"original");
+        assert!(history.pending_operations().unwrap().is_empty());
     }
     #[test]
     fn sequential_edits_and_rename_replay_all_bytes_in_order() {

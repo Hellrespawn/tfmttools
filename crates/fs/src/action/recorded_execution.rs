@@ -7,7 +7,9 @@ use tfmttools_core::history::{
     OperationKind, PreparedAction, RecoveryDescriptor, StoredAction,
 };
 
-use super::file_switch::{conflict, identity_if_regular, sync_parent};
+use super::file_switch::{
+    conflict, identity_if_regular, sync_cleanup_parent, sync_parent,
+};
 use crate::error::{FsError, FsResult};
 
 pub fn prepare_action(
@@ -118,7 +120,8 @@ pub(super) fn recover_filesystem(entry: &PreparedAction) -> FsResult<()> {
             let from = identity_if_regular(source)?;
             let to = identity_if_regular(target)?;
             if from.is_none() && to.as_ref() == Some(identity) {
-                return Ok(());
+                sync_parent(source)?;
+                return sync_parent(target);
             }
             if from.as_ref() != Some(identity) {
                 return Err(conflict(source));
@@ -161,10 +164,14 @@ pub(super) fn recover_filesystem(entry: &PreparedAction) -> FsResult<()> {
                     return Err(conflict(source));
                 }
                 fs_err::rename(candidate, target)?;
-                sync_parent(target)?;
             }
+            // A visible target may be an interrupted rename whose directory
+            // sync never completed. Retry it before acknowledging progress.
+            sync_parent(target)?;
             if *remove_source && identity_if_regular(source)?.is_some() {
                 fs_err::remove_file(source)?;
+            }
+            if *remove_source {
                 sync_parent(source)?;
             }
         },
@@ -175,14 +182,14 @@ pub(super) fn recover_filesystem(entry: &PreparedAction) -> FsResult<()> {
                     return Err(conflict(path));
                 }
                 fs_err::remove_file(path)?;
-                sync_parent(path)?;
             }
+            sync_parent(path)?;
         },
         RecoveryDescriptor::Directory { path, before_exists, after_exists } => {
             let path = Utf8Path::new(path);
             let actual = directory_exists(path)?;
             if actual == *after_exists {
-                return Ok(());
+                return sync_parent(path);
             }
             if actual != *before_exists {
                 return Err(conflict(path));
@@ -214,8 +221,8 @@ pub(super) fn cleanup_copy(entry: &PreparedAction) -> FsResult<()> {
                 return Err(conflict(candidate));
             }
             fs_err::remove_file(candidate)?;
-            sync_parent(candidate)?;
         }
+        sync_cleanup_parent(candidate)?;
     }
     Ok(())
 }
@@ -247,6 +254,20 @@ fn same_case_alias(source: &Utf8Path, target: &Utf8Path) -> FsResult<bool> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
+        let source_name = source.file_name().unwrap();
+        let target_name = target.file_name().unwrap();
+        if source_name != target_name {
+            let names = fs_err::read_dir(source.parent().unwrap())?
+                .map(|entry| entry.map(|entry| entry.file_name()))
+                .collect::<std::io::Result<Vec<_>>>()?;
+            // Two directory entries can share an inode through hard links.
+            // Only a single entry reached with different casing is an alias.
+            if names.iter().any(|name| name == source_name)
+                && names.iter().any(|name| name == target_name)
+            {
+                return Ok(false);
+            }
+        }
         let a = fs_err::metadata(source)?;
         let b = fs_err::metadata(target)?;
         Ok(a.dev() == b.dev() && a.ino() == b.ino())

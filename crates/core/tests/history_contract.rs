@@ -1,7 +1,8 @@
 use serde_json::{Value, json};
 use tfmttools_core::action::{Action, TagValueChange, TagValueKind};
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, Record, StoredAction, TemplateMetadata,
+    ActionRecordMetadata, History, OperationKind, Record, StoredAction,
+    TemplateMetadata,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -142,7 +143,10 @@ fn decoder_rejects_legacy_or_malformed_discriminators_and_payloads() {
 
 #[test]
 fn invalid_recording_does_not_mutate_history() {
-    let mut history = History::new("unused.hist".into());
+    let dir = tempfile::tempdir().unwrap();
+    let mut history = History::new(
+        camino::Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+    );
     let action = Action::EditTagValues {
         path: "a".into(),
         changes: vec![TagValueChange::new(
@@ -152,17 +156,21 @@ fn invalid_recording_does_not_mutate_history() {
             "b".into(),
         )],
     };
+    let id = history
+        .begin_operation(
+            OperationKind::Apply,
+            None,
+            Some(ActionRecordMetadata::new(
+                TemplateMetadata::Validation { value: "characters".into() },
+                vec![],
+                "test".into(),
+            )),
+        )
+        .unwrap();
     assert!(
-        history
-            .push(
-                vec![action],
-                ActionRecordMetadata::new(
-                    TemplateMetadata::Validation { value: "characters".into() },
-                    vec![],
-                    "test".into()
-                )
-            )
-            .is_err()
+        history.set_operation_plan(id, &[StoredAction::from(&action)]).is_err()
     );
+    history.cancel_unstarted(id).unwrap();
+    assert!(history.pending_operations().unwrap().is_empty());
     assert!(history.is_empty());
 }

@@ -79,11 +79,6 @@ impl Record {
     }
 
     #[must_use]
-    pub fn id_mut(&mut self) -> &mut Option<usize> {
-        &mut self.id
-    }
-
-    #[must_use]
     pub fn actions(&self) -> &[StoredAction] {
         &self.actions
     }
@@ -101,10 +96,6 @@ impl Record {
     #[must_use]
     pub fn state(&self) -> RecordState {
         self.state
-    }
-
-    pub fn set_state(&mut self, state: RecordState) {
-        self.state = state;
     }
 }
 

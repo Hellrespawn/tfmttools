@@ -112,3 +112,84 @@ fn standalone_copy_undo_preserves_existing_original_and_redo_restores_copy() {
     cleanup_prepared(&redo).unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), b"original");
 }
+
+#[cfg(unix)]
+#[test]
+fn move_preparation_rejects_distinct_case_sensitive_hard_links() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "Original");
+    let target = path(&dir, "original");
+    std::fs::write(&source, b"original").unwrap();
+    if target.exists() {
+        return; // This test requires distinct case-sensitive names.
+    }
+    std::fs::hard_link(&source, &target).unwrap();
+    let action =
+        Action::MoveFile { source: source.clone(), target: target.clone() };
+    assert!(prepare_action(&action, OperationKind::Apply).is_err());
+    assert_eq!(std::fs::read(source).unwrap(), b"original");
+    assert_eq!(std::fs::read(target).unwrap(), b"original");
+}
+
+#[cfg(unix)]
+#[test]
+fn resumed_move_requires_both_parent_directories_to_be_synced() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = path(&dir, "source-dir");
+    std::fs::create_dir(&parent).unwrap();
+    let source = parent.join("source");
+    let target = path(&dir, "target");
+    std::fs::write(&source, b"original").unwrap();
+    let entry = prepare_action(
+        &Action::MoveFile { source: source.clone(), target: target.clone() },
+        OperationKind::Apply,
+    )
+    .unwrap();
+    // Simulate a rename before its parent directory sync and journal completion.
+    std::fs::rename(source, &target).unwrap();
+    std::fs::remove_dir(parent).unwrap();
+    assert!(recover_prepared(&entry).is_err());
+    assert_eq!(std::fs::read(target).unwrap(), b"original");
+}
+
+#[cfg(unix)]
+#[test]
+fn resumed_copy_cleanup_rejects_replaced_parent_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = path(&dir, "target-dir");
+    std::fs::create_dir(&parent).unwrap();
+    let source = path(&dir, "source");
+    std::fs::write(&source, b"original").unwrap();
+    let entry = prepare_action(
+        &Action::CopyFile { source, target: parent.join("target") },
+        OperationKind::Apply,
+    )
+    .unwrap();
+    let tfmttools_core::history::RecoveryDescriptor::Copy { candidate, .. } =
+        &entry.recovery
+    else {
+        panic!()
+    };
+    std::fs::remove_file(candidate).unwrap();
+    std::fs::remove_dir(&parent).unwrap();
+    std::os::unix::fs::symlink("missing", &parent).unwrap();
+    assert!(cleanup_prepared(&entry).is_err());
+}
+
+#[test]
+fn file_action_preparation_rejects_directories_before_creating_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "source");
+    let target = path(&dir, "target");
+    std::fs::create_dir(&source).unwrap();
+    for action in [
+        Action::MoveFile { source: source.clone(), target: target.clone() },
+        Action::CopyFile { source: source.clone(), target: target.clone() },
+        Action::RemoveFile(source.clone()),
+    ] {
+        assert!(prepare_action(&action, OperationKind::Apply).is_err());
+    }
+    assert!(source.is_dir());
+    assert!(!target.exists());
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+}
