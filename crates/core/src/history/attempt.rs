@@ -293,7 +293,6 @@ pub(super) fn read_current_attempt(
     let Some(r) = rows.next()? else { return Ok(None) };
     let id = AttemptId(r.get(0)?);
     let action: StoredAction = decode(&r.get::<_, String>(5)?)?;
-    database::validate_action(&action)?;
     let details: AttemptDetails = decode(&r.get::<_, String>(6)?)?;
     let patches = patch::read_attempt(c, id)?;
     let attempt = CurrentAttempt {
@@ -332,7 +331,12 @@ impl AttemptDetails {
 }
 
 fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
-    database::validate_action(&a.action)?;
+    database::validate_action(&a.action).map_err(|error| {
+        match error {
+            HistoryError::LoadError(message) => HistoryError::MutError(message),
+            other => other,
+        }
+    })?;
     a.details.validate()?;
     let record = database::read_record(c, a.record_id)?;
     if record.next_action_position(a.kind) != Some(a.action_position) {

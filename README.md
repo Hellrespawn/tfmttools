@@ -306,6 +306,9 @@ exact-byte undo/redo patches. Invalid databases, foreign application identifiers
 and unsupported schema versions stop commands before applying new actions.
 
 Records preserve IDs, ordering, timestamps, template metadata, and replay states.
+Record IDs define chronological order. Each record explicitly stores its applied
+count, completeness, and redo eligibility; these values are also required in
+serialized record data. Old JSON record defaults are no longer supported.
 SQLite uses STRICT tables, enforced foreign keys, rollback journaling, and
 `synchronous=EXTRA`. Intent and tag patches are saved before each action; its
 successful completion is committed before the next action starts. Database
@@ -367,7 +370,10 @@ programs from changing files. Dry runs write neither history nor audio.
 
 The generated [version 1 SQL schema](docs/history/schema-v1.sql) describes the
 SQLite contract. Regenerate it with `cargo xtask history-schema`; core tests
-compare it against the checked-in snapshot. Published database format changes
+compare it against the checked-in snapshot. The initial SQLite schema is still
+undeployed and has been simplified; databases from earlier development revisions
+are rejected without rewriting them. Move those aside explicitly to start fresh.
+Published database format changes
 require a version bump, migration, updated schema, and compatibility/replay tests.
 Stored template text remains unchanged; reuse restrictions still apply.
 

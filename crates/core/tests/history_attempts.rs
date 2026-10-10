@@ -209,10 +209,10 @@ fn attempt_details_are_checked_before_insertion_and_when_loaded() {
     for details in [
         AttemptDetails { paths: vec![], instructions: "Inspect".into() },
         AttemptDetails {
-            paths: vec!["".into()],
+            paths: vec![String::new()],
             instructions: "Inspect".into(),
         },
-        AttemptDetails { paths: vec!["a".into()], instructions: "".into() },
+        AttemptDetails { paths: vec!["a".into()], instructions: String::new() },
     ] {
         let (dir, mut h) = setup();
         let run = h
@@ -383,4 +383,32 @@ fn malformed_persisted_patches_are_load_errors_with_identity() {
             }
         }
     }
+}
+
+#[test]
+fn invalid_action_requests_are_mutation_errors() {
+    let (_dir, mut h) = setup();
+    let run = h
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("invalid-path"),
+        })
+        .unwrap();
+    let result = h.begin_attempt(
+        run,
+        0,
+        &action(""),
+        &AttemptDetails {
+            paths: vec!["dir".into()],
+            instructions: "Inspect".into(),
+        },
+        None,
+    );
+    assert!(
+        matches!(
+            result,
+            Err(tfmttools_core::history::HistoryError::MutError(_))
+        ),
+        "{result:?}"
+    );
+    assert!(h.current_attempt().unwrap().is_none());
 }

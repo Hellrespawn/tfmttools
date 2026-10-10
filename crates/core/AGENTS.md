@@ -36,3 +36,11 @@ Use `journal_mode=DELETE`, `synchronous=EXTRA`, and `foreign_keys=ON`.
 Current attempts are reporting data for explicit history-only resolution.
 Keep filesystem outcome inference and automatic recovery out of core.
 Do not import old JSON histories or persist tag actions without binary patches.
+
+Record IDs define chronological order; action positions remain contiguous.
+Progress is explicit: applied count, completeness, and redo eligibility.
+Use typed `RunRequest` inputs and shared record replay predicates. Record queries
+borrow the usable cache; clone only selected records before mutating history.
+Stage affected records within each transaction and publish after commit. A failed
+commit or load invalidates the cache: successfully reload or discard the session
+before accessing records or mutating. Patch persistence lives in `history/patch.rs`.

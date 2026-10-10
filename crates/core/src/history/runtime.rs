@@ -59,12 +59,16 @@ impl History {
         }
     }
 
+    /// # Panics
+    /// Panics if a failed commit or load has not been followed by a successful reload.
     #[must_use]
     pub fn previous_record(&self) -> Option<&Record> {
         self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         self.records.last()
     }
 
+    /// # Panics
+    /// Panics if a failed commit or load has not been followed by a successful reload.
     #[must_use]
     pub fn records_for(
         &self,
@@ -126,12 +130,16 @@ impl History {
         Ok(())
     }
 
+    /// # Panics
+    /// Panics if a failed commit or load has not been followed by a successful reload.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");
         self.records.is_empty()
     }
 
+    /// # Panics
+    /// Panics if a failed commit or load has not been followed by a successful reload.
     #[must_use]
     pub fn records(&self) -> &[Record] {
         self.ensure_usable().expect("Reload history after a failed commit or load before accessing records");

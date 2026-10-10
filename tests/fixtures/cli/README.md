@@ -8,9 +8,11 @@ These fixtures drive the `tfmt` integration test harness.
 - `template/`: templates copied into each test config directory.
 - `audio/`: audio files copied into each test input directory.
 - `history/`: fixed legacy JSON for `crates/tfmt/tests/history_compatibility.rs`
-  and historical template replay tests. Stored paths are relative to each
-  test's temporary working directory; fixtures are not produced by the current
-  serializer.
+  rejection tests. These files remain intentionally unsupported JSON histories;
+  they are not current record-contract examples. Replay and interruption tests
+  construct current SQLite histories in temporary directories. Current record
+  JSON fixtures under `crates/core/tests/fixtures/history/` require explicit
+  applied count, completeness, and redo eligibility.
 - `extra/`: non-audio files copied into `input/extra/`.
 - Reports are generated under `tests/reports/`.
 

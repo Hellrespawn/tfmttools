@@ -30,6 +30,17 @@
 
 ### Changed
 
+- Simplify SQLite history with explicit record progress, typed run requests,
+  borrowed record queries, and shared replay/patch validation. Refresh only
+  affected cached records after each durable confirmation. Require a validated
+  reload after a failed commit before accessing cached history.
+- Order records by ID and remove the redundant position from the undeployed
+  initial schema. Reject earlier development schema shapes without rewriting.
+  Serialized records now require applied count, completeness, and redo eligibility.
+- Release session locks explicitly after closing SQLite, including when a
+  concurrent process temporarily inherits the lock descriptor. Update CLI test
+  shortcuts to run the interruption suite under its current name.
+
 - Replace the recovery journal with one current-attempt marker and a shared
   apply/undo/redo execution flow. Remove remaining-plan persistence, filesystem
   outcome inference, automatic rollback, and durable cleanup tracking.

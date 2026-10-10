@@ -12,8 +12,8 @@ Compact map for finding the right code quickly. Prefer crate-local
 - `crates/fs/`: owns filesystem effects and helpers: action execution,
   rename staging/planning, checksums, template loading, path iteration,
   and direct filesystem operations.
-- `crates/core/src/history/`: owns JSON history persistence, record state, record
-  selection for undo/redo, and save/load error handling.
+- `crates/core/src/history/`: owns validated SQLite storage, explicit record
+  progress, borrowed undo/redo selection, patches, and history-only resolution.
 - `crates/test-harness/`: owns the fixture-backed CLI integration test
   runner used by `crates/tfmt/tests/integration.rs`.
 - `xtask/`: owns repository task shortcuts exposed through
@@ -49,11 +49,11 @@ Compact map for finding the right code quickly. Prefer crate-local
    creation, detects cycles in `crates/fs/src/action/rename_cycles.rs`,
    and stages conflicting renames with
    `crates/fs/src/action/rename_staging.rs`.
-10. `crates/tfmt/src/commands/rename/finish.rs` handles remaining files,
-    optional cleanup, empty-directory removal, and history storage.
-11. History records are saved through `crates/core/src/history/persistence.rs`;
-    CLI-facing record metadata types live in
-    `crates/core/src/history/`.
+10. `crates/tfmt/src/commands/rename/finish.rs` plans remaining-file and
+    directory cleanup before effects.
+11. `crates/tfmt/src/history/execution.rs` coordinates prepared actions and
+    incremental SQLite history. Core `history/attempt.rs` owns transactions;
+    `persistence.rs` opens and validates sessions and `patch.rs` stores patches.
 
 ## Undo/Redo Flow
 
@@ -62,15 +62,16 @@ Compact map for finding the right code quickly. Prefer crate-local
 2. `crates/tfmt/src/commands/undo_redo.rs` loads history from the
    configured history file.
 3. Record selection happens in `crates/core/src/history/runtime.rs` with
-   `get_n_records_to_undo` or `get_n_records_to_redo`.
+   `records_for(mode, limit)`, using shared replay eligibility predicates.
 4. The CLI previews selected records with
    `crates/tfmt/src/history/formatter.rs` and asks for confirmation unless
    confirmation is disabled.
-5. `ActionHandler` in `crates/fs/src/action.rs` applies undo actions in
-   reverse record order and redo actions in forward record order.
-6. After a record is applied, `crates/core/src/history/runtime.rs` updates its
-   state to `Undone` or `Redone`. The command then saves the history file
-   through `crates/core/src/history/persistence.rs`.
+5. `crates/tfmt/src/history/execution.rs` uses typed replay context and the
+   same prepare/intent/execute/confirm/housekeeping loop as apply. Undo proceeds
+   in reverse action order; redo proceeds forward from the applied cursor.
+6. Each action confirmation updates progress and clears intent transactionally
+   in `history/attempt.rs`. Affected cache records publish after commit. Errors
+   require reading committed state; interrupted actions need manual resolution.
 
 ## Fixture Integration Flow
 
@@ -150,12 +151,15 @@ Compact map for finding the right code quickly. Prefer crate-local
 ## History format changes
 
 History uses the concrete types in `crates/core/src/history/`. Record actions
-are stored actions; CLI recording converts executable actions and replay
-converts them back. The formatter reads stored actions directly. Loading
-migrates legacy JSON and validates every conversion before accepting records;
-saving preserves an exact upgrade backup and replaces history atomically.
+and metadata retain strict JSON payloads inside SQLite. Records have explicit
+applied count, completeness, and redo eligibility; IDs define chronological
+order. Legacy JSON databases are rejected without import. The initial SQLite
+schema is undeployed: amend version 1 directly and reject earlier development
+schema shapes without rewriting them.
 
-For format changes, read
-`docs/superpowers/specs/2026-10-07-history-schema-design.md`, regenerate
-`docs/history/schema-v1.json` with `cargo xtask history-schema`, and run the
-core history tests plus `crates/tfmt/tests/history_compatibility.rs`.
+Read `docs/superpowers/specs/2026-10-10-manual-interruption-handling-design.md`
+and `docs/superpowers/specs/2026-10-10-history-simplification-design.md` for the
+current contracts. Regenerate `docs/history/schema-v1.sql` with
+`cargo xtask history-schema`. Run core history tests and CLI compatibility and
+interruption tests. Published format changes require explicit compatibility
+handling. Never infer filesystem outcomes or automatically resume operations.
