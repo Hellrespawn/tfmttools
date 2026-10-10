@@ -63,7 +63,6 @@ impl History {
         super::attempt::validate_patches(&transaction, &records)?;
         super::attempt::read_current_attempt(&transaction)?;
         transaction.commit()?;
-        let records = records.into_iter().map(|r| r.record).collect();
         self.connection = Some(connection);
         self.records = records;
         Ok(LoadHistoryResult::Loaded)

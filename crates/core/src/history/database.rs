@@ -131,14 +131,8 @@ fn validate_integrity(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
-pub(super) struct DatabaseRecord {
-    pub record: Record,
-}
-
-pub(super) fn read_records(
-    connection: &Connection,
-) -> Result<Vec<DatabaseRecord>> {
-    let mut statement = connection.prepare("SELECT id,position,state,timestamp,metadata,complete,applied_count,redo_allowed FROM records ORDER BY position")?;
+pub(super) fn read_records(connection: &Connection) -> Result<Vec<Record>> {
+    let mut statement = connection.prepare("SELECT id,state,timestamp,metadata,complete,applied_count,redo_allowed FROM records ORDER BY id")?;
     let mut rows = statement.query([])?;
     let mut records = Vec::new();
     while let Some(row) = rows.next()? {
@@ -149,10 +143,10 @@ pub(super) fn read_records(
 pub(super) fn read_record(
     connection: &Connection,
     id: usize,
-) -> Result<DatabaseRecord> {
+) -> Result<Record> {
     let id = i64::try_from(id)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, complete, applied_count, redo_allowed FROM records WHERE id=?1")?;
+    let mut statement = connection.prepare("SELECT id, state, timestamp, metadata, complete, applied_count, redo_allowed FROM records WHERE id=?1")?;
     let mut rows = statement.query([id])?;
     let row = rows.next()?.ok_or_else(|| {
         HistoryError::LoadError("Pending record missing".into())
@@ -160,16 +154,12 @@ pub(super) fn read_record(
     read_record_row(connection, row)
 }
 
-fn read_record_row(
-    connection: &Connection,
-    row: &Row<'_>,
-) -> Result<DatabaseRecord> {
+fn read_record_row(connection: &Connection, row: &Row<'_>) -> Result<Record> {
     let id: i64 = row.get(0)?;
-    let position: i64 = row.get(1)?;
-    if id < 0 || position < 0 {
+    if id < 0 {
         return Err(HistoryError::LoadError("Negative record identity".into()));
     }
-    let state: String = row.get(2)?;
+    let state: String = row.get(1)?;
     let state = match state.as_str() {
         "applied" => RecordState::Applied,
         "undone" => RecordState::Undone,
@@ -179,10 +169,10 @@ fn read_record_row(
             return Err(HistoryError::LoadError("Unknown record state".into()));
         },
     };
-    let timestamp: String = row.get(3)?;
+    let timestamp: String = row.get(2)?;
     let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let metadata: String = row.get(4)?;
+    let metadata: String = row.get(3)?;
     let metadata: ActionRecordMetadata = serde_json::from_str(&metadata)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
     let mut actions_statement = connection.prepare("SELECT position, payload FROM actions WHERE record_id=?1 ORDER BY position")?;
@@ -208,12 +198,12 @@ fn read_record_row(
         state,
         timestamp,
         metadata,
-        usize::try_from(row.get::<_, i64>(6)?)
+        usize::try_from(row.get::<_, i64>(5)?)
             .map_err(|e| HistoryError::LoadError(e.to_string()))?,
-        row.get(5)?,
-        row.get(7)?,
+        row.get(4)?,
+        row.get(6)?,
     )?;
-    Ok(DatabaseRecord { record })
+    Ok(record)
 }
 
 pub(super) fn validate_action(action: &StoredAction) -> Result<()> {
@@ -265,7 +255,7 @@ mod tests {
                     .unwrap(),
                 1
             );
-            assert!(connection.execute("INSERT INTO records(id,position,state,timestamp,metadata,complete) VALUES('bad',0,'applied','bad','{}',1)", []).is_err());
+            assert!(connection.execute("INSERT INTO records(id,state,timestamp,metadata,complete) VALUES('bad','applied','bad','{}',1)", []).is_err());
             assert!(connection.execute("INSERT INTO actions(record_id,position,payload) VALUES(42,0,'{}')", []).is_err());
         }
     }

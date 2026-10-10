@@ -1,7 +1,6 @@
 PRAGMA application_id=1413893460;
 CREATE TABLE records (
     id INTEGER PRIMARY KEY CHECK(id >= 0),
-    position INTEGER NOT NULL UNIQUE CHECK(position >= 0),
     state TEXT NOT NULL CHECK(state IN ('applied','undone','redone','superseded')),
     timestamp TEXT NOT NULL,
     metadata TEXT NOT NULL CHECK(json_valid(metadata)),

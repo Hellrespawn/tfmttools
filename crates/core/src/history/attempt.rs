@@ -79,10 +79,7 @@ impl History {
     }
 
     fn refresh(&mut self) -> Result<()> {
-        self.records = database::read_records(self.connection()?)?
-            .into_iter()
-            .map(|r| r.record)
-            .collect();
+        self.records = database::read_records(self.connection()?)?;
         Ok(())
     }
 
@@ -114,18 +111,13 @@ impl History {
                     [],
                     |r| r.get(0),
                 )?;
-                let pos: i64 = tx.query_row(
-                    "SELECT coalesce(max(position)+1,0) FROM records",
-                    [],
-                    |r| r.get(0),
-                )?;
-                tx.execute("INSERT INTO records(id,position,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,?2,'applied',?3,?4,0,0,1)", params![id,pos,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
+                tx.execute("INSERT INTO records(id,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,'applied',?2,?3,0,0,1)", params![id,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
                 index(id)?
             },
             OperationKind::Undo | OperationKind::Redo => {
                 let id = record_id
                     .ok_or_else(|| invalid("Replay requires a record"))?;
-                let record = database::read_record(&tx, id)?.record;
+                let record = database::read_record(&tx, id)?;
                 let eligible = record.next_action_position(kind).is_some();
                 if !eligible {
                     return Err(invalid("Record is not eligible for replay"));
@@ -214,7 +206,7 @@ impl History {
             ])?;
         }
         tx.execute("DELETE FROM runs WHERE id=?1", [id.0])?;
-        let record = database::read_record(&tx, rid)?.record;
+        let record = database::read_record(&tx, rid)?;
         tx.commit()?;
         self.refresh()?;
         Ok(record)
@@ -263,7 +255,7 @@ impl History {
         }
         tx.execute("UPDATE records SET redo_allowed=0,complete=CASE WHEN ?2='apply' THEN 0 ELSE complete END WHERE id=?1",params![number(a.record_id)?,a.kind.name()])?;
         tx.execute("DELETE FROM runs WHERE id=?1", [a.run_id.0])?;
-        let record = database::read_record(&tx, a.record_id)?.record;
+        let record = database::read_record(&tx, a.record_id)?;
         tx.commit()?;
         self.refresh()?;
         Ok(record)
@@ -321,7 +313,7 @@ impl AttemptDetails {
 fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
     database::validate_action(&a.action)?;
     a.details.validate()?;
-    let record = database::read_record(c, a.record_id)?.record;
+    let record = database::read_record(c, a.record_id)?;
     if record.next_action_position(a.kind) != Some(a.action_position) {
         return Err(invalid("Attempt position differs from replay cursor"));
     }
@@ -506,11 +498,11 @@ fn read_patch_query(
 
 pub(super) fn validate_patches(
     c: &Connection,
-    records: &[database::DatabaseRecord],
+    records: &[Record],
 ) -> Result<()> {
     for stored in records {
-        for (position, action) in stored.record.iter().enumerate() {
-            let pair = read_patch(c, stored.record.id().unwrap(), position)?;
+        for (position, action) in stored.iter().enumerate() {
+            let pair = read_patch(c, stored.id().unwrap(), position)?;
             if matches!(action, StoredAction::EditTagValues { .. })
                 != pair.is_some()
             {
