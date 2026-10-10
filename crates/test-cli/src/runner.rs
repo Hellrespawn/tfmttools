@@ -5,7 +5,6 @@ use std::process::{Command as StdCommand, ExitCode};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use assert_cmd::Command;
 use camino::{Utf8Path, Utf8PathBuf};
 use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
@@ -15,6 +14,7 @@ use lofty::TextEncoding;
 use lofty::file::TaggedFileExt;
 use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::tag::{ItemKey, Tag, TagType};
+use snapbox::cmd;
 use tfmttools_core::item_keys::parse_item_key;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
@@ -25,6 +25,7 @@ use tfmttools_test_harness::{
 };
 
 use crate::case::{TestContext, populate_files, remap_initial_files};
+use crate::snapshot::compare_stream;
 
 const TEST_RUN_ID: &str = "run_id";
 const SKIP_PREVIOUS_STEP_FAILED: &str = "previous_step_failed";
@@ -184,6 +185,7 @@ fn run_test_case(
             test_case_data,
             test_data,
             &context,
+            &fixture_dirs.case_dir(),
         )?;
         previous_step_failed = !step_outcome.passed();
         step_outcomes.push(step_outcome);
@@ -207,6 +209,7 @@ fn run_test_step(
     test_case_data: &tfmttools_test_harness::TestCaseData,
     test_data: &tfmttools_test_harness::TestData,
     context: &TestContext,
+    case_dir: &Utf8Path,
 ) -> Result<StepOutcome> {
     let step_started = Instant::now();
     let previous_expectations = test_data
@@ -231,9 +234,7 @@ fn run_test_step(
 
     let command_outcome = test_data
         .command()
-        .map(|command| {
-            run_command(context, command, test_data.expected_exit_code())
-        })
+        .map(|command| run_command(context, command, test_data, case_dir))
         .transpose()?;
 
     let expectations_outcome = verify_expectations(
@@ -253,29 +254,38 @@ fn run_test_step(
 fn run_command(
     context: &TestContext,
     command: &str,
-    expected_exit_code: i32,
+    test_data: &tfmttools_test_harness::TestData,
+    case_dir: &Utf8Path,
 ) -> Result<CommandOutcome> {
-    let mut cmd = Command::cargo_bin("tfmt").unwrap();
-    cmd.current_dir(context.work_dir_path());
-
-    cmd.arg("--config-directory");
-    cmd.arg(context.config_work_dir());
-    cmd.arg("--run-id");
-    cmd.arg(TEST_RUN_ID);
-
-    for arg in command.split_whitespace() {
-        cmd.arg(arg);
+    let mut command_builder = StdCommand::new(cmd::cargo_bin("tfmt"));
+    command_builder.current_dir(context.work_dir_path());
+    command_builder.arg("--config-directory").arg(context.config_work_dir());
+    command_builder.arg("--run-id").arg(TEST_RUN_ID);
+    command_builder.args(command.split_whitespace());
+    let arguments = command_builder
+        .get_args()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    let output = cmd::Command::from_std(command_builder).output()?;
+    let mut failures = Vec::new();
+    for (stream, actual, expected) in [
+        ("stdout", output.stdout.as_slice(), test_data.stdout()),
+        ("stderr", output.stderr.as_slice(), test_data.stderr()),
+    ] {
+        if let Some(expected) = expected {
+            if let Err(error) =
+                compare_stream(actual, &case_dir.join(expected), context)
+            {
+                failures.push(format!("{stream}: {error}"));
+            }
+        }
     }
-
-    let output = cmd.output()?;
-    let arguments =
-        cmd.get_args().map(|arg| arg.to_string_lossy().to_string()).collect();
-
     Ok(CommandOutcome::with_expected_exit_code(
         arguments,
         &output,
-        expected_exit_code,
-    ))
+        test_data.expected_exit_code(),
+    )
+    .with_snapshot_failures(failures))
 }
 
 fn verify_expectations(
@@ -564,4 +574,89 @@ fn git_output(args: &[&str]) -> Option<String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     (!stdout.is_empty()).then_some(stdout)
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use tfmttools_test_harness::{Status, TestCaseData};
+
+    use super::*;
+
+    #[test]
+    fn snapshot_failure_skips_steps_retains_work_and_writes_report() {
+        let directory = assert_fs::TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(directory.path().to_owned()).unwrap();
+        let cases = root.join("cases");
+        fs_err::create_dir_all(&cases).unwrap();
+        // Use real audio/template setup, but keep deliberately failing cases
+        // out of normal fixture discovery.
+        let real = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/cli");
+        for name in ["audio", "extra", "template"] {
+            tfmttools_test_harness::copy_files(
+                real.join(name),
+                &root.join(name),
+            )
+            .unwrap();
+        }
+        for expected in ["wrong.stdout", "missing.stdout"] {
+            fs_err::write(cases.join("wrong.stdout"), "incorrect output")
+                .unwrap();
+            let path = cases.join("negative.case.json");
+            fs_err::write(&path, format!(r#"{{"description":"negative test","expectations":{{}},"tests":{{"first":{{"command":"--help","stdout":"{expected}"}},"next":{{"command":"--help"}}}}}}"#)).unwrap();
+            let case = run_test_case(
+                "negative".to_owned(),
+                &TestCaseData::from_file(&path).unwrap(),
+                &FixtureDirs::new(root.clone()),
+            )
+            .unwrap();
+            assert_eq!(case.status, Status::Failed);
+            assert_eq!(case.steps[1].status, Status::Skipped);
+            let command = case.steps[0].command_outcome.as_ref().unwrap();
+            assert_eq!(command.exit_code, Some(0));
+            assert!(!command.snapshot_failures.is_empty());
+            assert!(command.stdout.ends_with('\n'));
+            let work = serde_json::to_value(&case).unwrap()["cli"]["work_dir"]
+                .as_str()
+                .unwrap()
+                .to_owned();
+            assert!(std::path::Path::new(&work).is_dir());
+            let report = ReportEnvelope::new(
+                Runner::Cli,
+                "test".into(),
+                "test".into(),
+                0,
+                Vec::new(),
+                ReportFilters::default(),
+                BTreeMap::new(),
+                None,
+                vec![case],
+                None,
+                SourceMetadata::default(),
+                RunnerDetails::Cli(CliRunDetails::default()),
+            );
+            write_report(&root.join("report"), report).unwrap();
+            let json =
+                fs_err::read_to_string(root.join("report/cli-test.json"))
+                    .unwrap();
+            assert!(json.contains("snapshot_failures"));
+            assert!(root.join("report/cli-test.html").exists());
+            fs_err::remove_dir_all(work).unwrap();
+        }
+    }
+
+    #[test]
+    fn command_status_and_optional_streams_are_independent() {
+        let context = TestContext::new().unwrap();
+        let root = context.work_dir_path();
+        let path = root.join("case.json");
+        fs_err::write(&path, r#"{"description":"nonzero","expectations":{},"tests":{"bad":{"command":"--not-an-option","expected-exit-code":2}}}"#).unwrap();
+        let data = TestCaseData::from_file(&path).unwrap();
+        let step = &data.tests()["bad"];
+        let result =
+            run_command(&context, step.command().unwrap(), step, &root)
+                .unwrap();
+        assert!(result.passed());
+        assert_eq!(result.exit_code, Some(2));
+    }
 }

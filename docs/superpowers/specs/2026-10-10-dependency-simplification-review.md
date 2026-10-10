@@ -27,9 +27,28 @@ permanent public syntax/render tests remain. Pest resolved to 2.9.3
 (MSRV 1.83), with its std/memchr defaults and derive; clean build/binary
 cost measurements and final verification are recorded below when complete.
 
-## Snapbox
+## Snapbox: provisional, reassess in combined review
 
-Pending implementation and assessment.
+The old harness only checked numeric status and audio/filesystem results.
+Snapbox adds optional stdout/stderr expectations, newline/path normalization,
+exact temporary-root redactions, fallible diffs and explicit update support.
+The command path remains a standard command builder passed to snapbox once;
+all output is captured once. Assertions feed structured report outcomes.
+A maintainer adds an expectation by naming a neighboring text snapshot;
+there is no custom diff/normalization/snapshot updater to maintain.
+
+This adds functionality and application glue rather than reducing the
+existing code's size: schema, report model/viewer and stream adapters must
+be counted. The combined gate must distinguish this benefit from genuine
+simplification of the original status-only harness. Snapbox 1.2.2 requires
+Rust 1.85; defaults disabled, cmd and diff enabled. assert_cmd is removed
+from test-cli and the resolved graph where unused; assert_fs remains.
+
+Verified failure reporting, step skipping, retained work directories,
+missing/empty/absent snapshots, meaningful whitespace/path mismatches,
+normalization, expected exit 2, update opt-in and CI no-write policy.
+The existing report schema remains version 1 with optional failure details
+and old report compatibility.
 
 ## Dialoguer
 

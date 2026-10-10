@@ -1,0 +1,28 @@
+Rename audio files according to their tags using path templates.
+
+Usage: tfmt [OPTIONS] <COMMAND>
+
+Commands:
+  clear-history    Clear the rename history
+  resolve-history  Resolve the last attempted action in history after manual file repair
+  show-history     Show a summary of the rename history
+  list-templates   Show a summary of template in the current and application directory
+  rename           Use a template to rename audio files according to their tags
+  validate         Validate audio files and their tags
+  undo             Undo actions
+  redo             Redo actions
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+  -c, --config-directory <CUSTOM_CONFIG_DIRECTORY>
+          Sets a custom configuration directory. Defaults to '~/.tfmt'
+  -d, --dry-run
+          Don't actually perform actions
+      --simple
+          Don't display progress bars
+  -n, --no-confirm
+          Skips confirmation prompt. Suitable for non-interactive use
+  -h, --help
+          Print help
+  -V, --version
+          Print version

@@ -1,0 +1,22 @@
+{
+  "description": "Representative CLI output snapshots",
+  "expectations": {},
+  "tests": {
+    "help": {
+      "command": "--help",
+      "stdout": "help.stdout",
+      "stderr": "empty.stderr"
+    },
+    "error": {
+      "command": "--not-an-option",
+      "expected-exit-code": 2,
+      "stdout": "empty.stdout",
+      "stderr": "invalid-option.stderr"
+    },
+    "preview": {
+      "command": "--simple --dry-run rename -t simple_input",
+      "stdout": "rename-preview.stdout",
+      "stderr": "empty.stderr"
+    }
+  }
+}

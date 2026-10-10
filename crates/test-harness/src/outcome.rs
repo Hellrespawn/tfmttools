@@ -360,12 +360,23 @@ pub struct CommandOutcome {
     pub status: Status,
     pub exit_code: Option<i32>,
     pub expected_exit_code: Option<i32>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub snapshot_failures: Vec<String>,
     pub stdout: String,
     pub stderr: String,
     pub duration_ms: Option<u128>,
 }
 
 impl CommandOutcome {
+    #[must_use]
+    pub fn with_snapshot_failures(mut self, failures: Vec<String>) -> Self {
+        if !failures.is_empty() {
+            self.status = Status::Failed;
+        }
+        self.snapshot_failures = failures;
+        self
+    }
+
     pub fn new(arguments: Vec<String>, output: &Output) -> Self {
         Self::with_expected_exit_code(arguments, output, 0)
     }
@@ -381,14 +392,15 @@ impl CommandOutcome {
         } else {
             Status::Failed
         };
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
 
         Self {
             arguments,
             status,
             exit_code,
             expected_exit_code: Some(expected_exit_code),
+            snapshot_failures: Vec::new(),
             stdout,
             stderr,
             duration_ms: None,
@@ -405,6 +417,7 @@ impl CommandOutcome {
             status: Status::TimedOut,
             exit_code: None,
             expected_exit_code: None,
+            snapshot_failures: Vec::new(),
             stdout: stdout.into(),
             stderr: stderr.into(),
             duration_ms: None,

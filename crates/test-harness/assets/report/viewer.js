@@ -278,6 +278,9 @@ function expectationFailureSummary(expectations) {
 function commandFailureSummary(command) {
     if (!command || command.status === "passed") return null;
 
+    if (command.snapshot_failures?.length) {
+        return { label: "Output snapshot failed", message: command.snapshot_failures[0] };
+    }
     const exit = command.exit_code == null ? "signal" : command.exit_code;
     const expected =
         command.expected_exit_code == null
@@ -385,6 +388,7 @@ function CommandOutcome({ command }) {
                 <code>${commandLine(command.arguments)}</code>
                 <${Status} status=${command.status} />
             </div>
+            <${OutputBlock} title="snapshot failures" value=${command.snapshot_failures?.join("\n\n")} />
             <${OutputBlock} title="stdout" value=${command.stdout} />
             <${OutputBlock} title="stderr" value=${command.stderr} />
         </section>

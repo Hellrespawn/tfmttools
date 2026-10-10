@@ -166,3 +166,25 @@ so mappings may swap two files without overwriting the source of a later
 copy. This occurs before the first expectation check. The staged swap case
 starts with the two tracks under one another's names and uses ordinary tag
 interpolation to restore them, exercising staging and undo/redo.
+
+### Output snapshots
+
+Steps may name `stdout` and `stderr` text snapshots relative to the case
+JSON's directory. Omitted fields leave that stream unchecked; an empty
+file requires empty output. For example:
+
+```json
+{"command": "--help", "stdout": "help.stdout", "stderr": "empty.stderr"}
+```
+
+Comparisons use snapbox's newline/path normalization and exact temporary
+root redactions (`[WORK]`, `[CONFIG]`). Use these placeholders only for the
+run's temporary directories. Reports retain untrimmed captured output and
+show snapshot failures separately from exit-code mismatches.
+
+Create snapshot files first, then update explicitly with
+`TFMT_SNAPSHOTS=overwrite cargo test -p tfmt --test integration -- --test-threads=1`.
+Review the resulting diff. Default runs only compare; if `CI` is set,
+updates are disabled even when requested. Missing snapshot files fail the
+case and dependent steps skip. Audio/checksum/encoding expectations remain
+independent of output snapshots.
