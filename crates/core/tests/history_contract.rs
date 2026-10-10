@@ -185,3 +185,24 @@ fn invalid_recording_does_not_mutate_history() {
     assert!(history.current_attempt().unwrap().is_none());
     assert!(history.records().iter().all(Record::is_empty));
 }
+
+#[test]
+fn record_progress_is_required_and_preview_is_explicit() {
+    let preview = Record::new(
+        vec![StoredAction::MakeDir { path: "preview".into() }],
+        ActionRecordMetadata::new(
+            TemplateMetadata::Validation { value: "test".into() },
+            vec![],
+            "preview".into(),
+        ),
+    );
+    let value = serde_json::to_value(&preview).unwrap();
+    assert_eq!(value["applied_count"], 1);
+    assert_eq!(value["complete"], true);
+    assert_eq!(value["redo_allowed"], true);
+    for field in ["applied_count", "complete", "redo_allowed"] {
+        let mut missing = value.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        assert!(serde_json::from_value::<Record>(missing).is_err(), "{field}");
+    }
+}

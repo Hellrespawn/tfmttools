@@ -183,3 +183,35 @@ fn resolving_unknown_attempt_does_not_create_history() {
     );
     assert!(!dir.path().join("history").exists());
 }
+
+#[test]
+fn attempt_details_are_checked_before_insertion_and_when_loaded() {
+    for details in [
+        AttemptDetails { paths: vec![], instructions: "Inspect".into() },
+        AttemptDetails {
+            paths: vec!["".into()],
+            instructions: "Inspect".into(),
+        },
+        AttemptDetails { paths: vec!["a".into()], instructions: "".into() },
+    ] {
+        let (dir, mut h) = setup();
+        let run = h
+            .begin_run(
+                OperationKind::Apply,
+                None,
+                Some(support::history::metadata("details")),
+            )
+            .unwrap();
+        assert!(h.begin_attempt(run, 0, &action("a"), &details, None).is_err());
+        assert!(h.current_attempt().unwrap().is_none());
+        attempt(&mut h, run, 0, "a");
+        let db =
+            rusqlite::Connection::open(dir.path().join("history")).unwrap();
+        db.execute("UPDATE attempts SET details=?1", [serde_json::to_string(
+            &details,
+        )
+        .unwrap()])
+            .unwrap();
+        assert!(h.load().is_err());
+    }
+}

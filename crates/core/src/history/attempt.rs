@@ -126,15 +126,7 @@ impl History {
                 let id = record_id
                     .ok_or_else(|| invalid("Replay requires a record"))?;
                 let record = database::read_record(&tx, id)?.record;
-                let eligible = match kind {
-                    OperationKind::Undo => record.applied_count() > 0,
-                    OperationKind::Redo => {
-                        record.redo_allowed()
-                            && record.applied_count() < record.len()
-                            && record.state() != super::RecordState::Superseded
-                    },
-                    OperationKind::Apply => unreachable!(),
-                };
+                let eligible = record.next_action_position(kind).is_some();
                 if !eligible {
                     return Err(invalid("Record is not eligible for replay"));
                 }
@@ -160,49 +152,19 @@ impl History {
         patches: Option<&BinaryPatchPair>,
     ) -> Result<AttemptId> {
         self.ensure_connection()?;
-        database::validate_action(action)?;
-        if details.paths.is_empty()
-            || details.paths.iter().any(String::is_empty)
-            || details.instructions.is_empty()
-        {
-            return Err(invalid(
-                "Attempt requires paths and inspection instructions",
-            ));
-        }
         let tx = self.connection.as_mut().unwrap().transaction()?;
         let (rid, kind) = run_info(&tx, run)?;
-        let record = database::read_record(&tx, rid)?.record;
-        let expected = match kind {
-            OperationKind::Apply => record.len(),
-            OperationKind::Undo => {
-                record
-                    .applied_count()
-                    .checked_sub(1)
-                    .ok_or_else(|| invalid("Nothing to undo"))?
-            },
-            OperationKind::Redo => record.applied_count(),
+        let prospective = CurrentAttempt {
+            id: AttemptId(0),
+            run_id: run,
+            record_id: rid,
+            kind,
+            action_position,
+            action: action.clone(),
+            details: details.clone(),
+            patches: patches.cloned(),
         };
-        if action_position != expected {
-            return Err(invalid("Attempt position differs from replay cursor"));
-        }
-        if kind != OperationKind::Apply
-            && record.actions().get(expected) != Some(action)
-        {
-            return Err(invalid("Replay action differs from history"));
-        }
-        if matches!(action, StoredAction::EditTagValues { .. })
-            != patches.is_some()
-        {
-            return Err(invalid("Tag actions require binary patches only"));
-        }
-        if let Some(pair) = patches {
-            validate_patch(pair)?;
-            if kind != OperationKind::Apply
-                && read_patch(&tx, rid, expected)?.as_ref() != Some(pair)
-            {
-                return Err(invalid("Replay patches differ from history"));
-            }
-        }
+        validate_attempt(&tx, &prospective)?;
         tx.execute("INSERT INTO attempts(run_id,action_position,payload,details) VALUES(?1,?2,?3,?4)", params![run.0,number(action_position)?,encode(action)?,encode(details)?])?;
         let id = AttemptId(tx.last_insert_rowid());
         if let Some(pair) = patches {
@@ -328,10 +290,6 @@ pub(super) fn read_current_attempt(
     database::validate_action(&action)?;
     let details: AttemptDetails = decode(&r.get::<_, String>(6)?)?;
     let patches = read_attempt_patch(c, id)?;
-    if matches!(action, StoredAction::EditTagValues { .. }) != patches.is_some()
-    {
-        return Err(invalid("Attempt patch data differs from action"));
-    }
     let attempt = CurrentAttempt {
         id,
         run_id: RunId(r.get(1)?),
@@ -346,21 +304,34 @@ pub(super) fn read_current_attempt(
     Ok(Some(attempt))
 }
 
+impl AttemptDetails {
+    fn validate(&self) -> Result<()> {
+        if self.paths.is_empty()
+            || self.paths.iter().any(String::is_empty)
+            || self.instructions.is_empty()
+        {
+            return Err(invalid(
+                "Attempt requires paths and inspection instructions",
+            ));
+        }
+        Ok(())
+    }
+}
+
 fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
+    database::validate_action(&a.action)?;
+    a.details.validate()?;
     let record = database::read_record(c, a.record_id)?.record;
-    let expected = match a.kind {
-        OperationKind::Apply => Some(record.len()),
-        OperationKind::Undo => record.applied_count().checked_sub(1),
-        OperationKind::Redo => Some(record.applied_count()),
-    };
-    if expected != Some(a.action_position)
-        || a.details.paths.is_empty()
-        || a.details.paths.iter().any(String::is_empty)
-        || a.details.instructions.is_empty()
+    if record.next_action_position(a.kind) != Some(a.action_position) {
+        return Err(invalid("Attempt position differs from replay cursor"));
+    }
+    if matches!(a.action, StoredAction::EditTagValues { .. })
+        != a.patches.is_some()
     {
-        return Err(invalid(
-            "Invalid attempted action position or reporting details",
-        ));
+        return Err(invalid("Tag actions require binary patches only"));
+    }
+    if let Some(pair) = &a.patches {
+        validate_patch(pair)?;
     }
     if a.kind != OperationKind::Apply
         && (record.actions().get(a.action_position) != Some(&a.action)

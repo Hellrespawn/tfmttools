@@ -2,7 +2,7 @@ use std::fs::File;
 
 use camino::Utf8PathBuf;
 
-use super::{HistoryError, HistoryMode, Record, RecordState, Result};
+use super::{HistoryError, HistoryMode, Record, Result};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -74,16 +74,10 @@ impl History {
     ) -> Vec<Record> {
         let records: Box<dyn Iterator<Item = &Record> + '_> = match mode {
             HistoryMode::Undo => {
-                Box::new(
-                    self.records.iter().rev().filter(|r| r.applied_count() > 0),
-                )
+                Box::new(self.records.iter().rev().filter(|r| r.can_undo()))
             },
             HistoryMode::Redo => {
-                Box::new(self.records.iter().filter(|r| {
-                    r.redo_allowed()
-                        && r.applied_count() < r.len()
-                        && r.state() != RecordState::Superseded
-                }))
+                Box::new(self.records.iter().filter(|r| r.can_redo()))
             },
         };
 

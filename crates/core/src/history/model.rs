@@ -2,7 +2,7 @@ use chrono::{DateTime, FixedOffset, Local};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::StoredAction;
+use super::{HistoryError, OperationKind, Result, StoredAction};
 
 #[derive(
     Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq,
@@ -31,12 +31,9 @@ pub struct Record {
     timestamp: DateTime<FixedOffset>,
     #[serde(rename = "metadata")]
     metadata: ActionRecordMetadata,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    applied_count: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    complete: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    redo_allowed: Option<bool>,
+    applied_count: usize,
+    complete: bool,
+    redo_allowed: bool,
 }
 
 impl Record {
@@ -47,68 +44,83 @@ impl Record {
     ) -> Self {
         Self {
             id: None,
+            applied_count: items.len(),
             actions: items,
             state: RecordState::Applied,
             timestamp: Local::now().fixed_offset(),
             metadata,
-            applied_count: None,
-            complete: None,
-            redo_allowed: None,
+            complete: true,
+            redo_allowed: true,
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn from_storage(
         id: usize,
         actions: Vec<StoredAction>,
         state: RecordState,
         timestamp: DateTime<FixedOffset>,
         metadata: ActionRecordMetadata,
-    ) -> Self {
-        Self {
+        applied_count: usize,
+        complete: bool,
+        redo_allowed: bool,
+    ) -> Result<Self> {
+        if applied_count > actions.len()
+            || (matches!(state, RecordState::Undone | RecordState::Superseded)
+                && applied_count != 0)
+        {
+            return Err(HistoryError::LoadError(
+                "Invalid replay cursor".into(),
+            ));
+        }
+        Ok(Self {
             id: Some(id),
             actions,
             state,
             timestamp,
             metadata,
-            applied_count: None,
-            complete: None,
-            redo_allowed: None,
-        }
-    }
-
-    pub(super) fn set_progress(
-        &mut self,
-        applied: usize,
-        complete: bool,
-        redo: bool,
-    ) {
-        self.applied_count = Some(applied);
-        self.complete = Some(complete);
-        self.redo_allowed = Some(redo);
-    }
-
-    #[must_use]
-    pub fn applied_count(&self) -> usize {
-        self.applied_count.unwrap_or_else(|| {
-            if matches!(
-                self.state,
-                RecordState::Undone | RecordState::Superseded
-            ) {
-                0
-            } else {
-                self.len()
-            }
+            applied_count,
+            complete,
+            redo_allowed,
         })
     }
 
     #[must_use]
+    pub fn applied_count(&self) -> usize {
+        self.applied_count
+    }
+
+    #[must_use]
     pub fn is_complete(&self) -> bool {
-        self.complete.unwrap_or(true)
+        self.complete
     }
 
     #[must_use]
     pub fn redo_allowed(&self) -> bool {
-        self.redo_allowed.unwrap_or(true)
+        self.redo_allowed
+    }
+
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        self.applied_count > 0
+    }
+
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        self.redo_allowed
+            && self.applied_count < self.len()
+            && self.state != RecordState::Superseded
+    }
+
+    #[must_use]
+    pub fn next_action_position(&self, kind: OperationKind) -> Option<usize> {
+        match kind {
+            OperationKind::Apply => Some(self.len()),
+            OperationKind::Undo => self.applied_count.checked_sub(1),
+            OperationKind::Redo => {
+                self.can_redo().then_some(self.applied_count)
+            },
+        }
     }
 
     #[must_use]

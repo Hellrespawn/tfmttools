@@ -201,23 +201,18 @@ fn read_record_row(
         validate_action(&action)?;
         actions.push(action);
     }
-    let mut record = Record::from_storage(
+    let record = Record::from_storage(
         usize::try_from(id)
             .map_err(|e| HistoryError::LoadError(e.to_string()))?,
         actions,
         state,
         timestamp,
         metadata,
-    );
-    let applied = usize::try_from(row.get::<_, i64>(6)?)
-        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    if applied > record.len()
-        || (matches!(state, RecordState::Undone | RecordState::Superseded)
-            && applied != 0)
-    {
-        return Err(HistoryError::LoadError("Invalid replay cursor".into()));
-    }
-    record.set_progress(applied, row.get(5)?, row.get(7)?);
+        usize::try_from(row.get::<_, i64>(6)?)
+            .map_err(|e| HistoryError::LoadError(e.to_string()))?,
+        row.get(5)?,
+        row.get(7)?,
+    )?;
     Ok(DatabaseRecord { record })
 }
 
