@@ -74,19 +74,16 @@ impl History {
     ) -> Vec<Record> {
         let records: Box<dyn Iterator<Item = &Record> + '_> = match mode {
             HistoryMode::Undo => {
-                Box::new(self.records.iter().rev().filter(|r| {
-                    matches!(
-                        r.state(),
-                        RecordState::Applied | RecordState::Redone
-                    )
-                }))
+                Box::new(
+                    self.records.iter().rev().filter(|r| r.applied_count() > 0),
+                )
             },
             HistoryMode::Redo => {
-                Box::new(
-                    self.records
-                        .iter()
-                        .filter(|r| matches!(r.state(), RecordState::Undone)),
-                )
+                Box::new(self.records.iter().filter(|r| {
+                    r.redo_allowed()
+                        && r.applied_count() < r.len()
+                        && r.state() != RecordState::Superseded
+                }))
             },
         };
 
@@ -103,13 +100,13 @@ impl History {
         self.lock_history()?;
         if let Some(connection) = &self.connection {
             let pending: i64 = connection.query_row(
-                "SELECT count(*) FROM operations",
+                "SELECT count(*) FROM attempts",
                 [],
                 |row| row.get(0),
             )?;
             if pending != 0 {
                 return Err(HistoryError::RemoveError(
-                    "History has pending recovery work".into(),
+                    "History has an unresolved attempt".into(),
                 ));
             }
         }

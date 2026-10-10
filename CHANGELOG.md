@@ -11,10 +11,13 @@
 - Add forward/reverse `qbsdiff` binary patches for tag edits. Undo/redo restores
   exact recorded bytes and rejects files changed since the recorded operation.
 - Write tag edits to verified candidates and save patches before switching.
-  Retain the original through durable finalization without an extra backup copy.
-- Journal ordered filesystem effects and recover interrupted operations before
-  new mutations. Read-only history display reports pending work; clear-history
-  refuses it. Dry runs do not write or recover files.
+  Retain the original until durable action confirmation without an extra backup copy.
+- Record successful actions incrementally and report the last attempted action
+  after errors or interruptions. Add `resolve-history --attempt ID --outcome
+  applied|not-applied` for explicit history-only resolution after manual file
+  repair. Later sessions never resume or reverse interrupted file operations.
+- Keep partial runs undoable and disable their redo. Track partial undo/redo
+  progress and block mutations while an attempted action remains unresolved.
 - Lock history sessions using a persistent sibling lock file. Report
   contention immediately, and acquire the lock before applying tag fixes.
 
@@ -27,14 +30,15 @@
 
 ### Changed
 
-- Consolidate history mutations in the operation journal, validate one consistent
-  database snapshot, and avoid reloading recorded patches for progress updates.
-- Retry directory synchronization during recovery and artifact cleanup, including
-  cleanup after a later action removed the artifact directory. Reject distinct
-  hard links masquerading as case-only move destinations during preparation.
-
+- Replace the recovery journal with one current-attempt marker and a shared
+  apply/undo/redo execution flow. Remove remaining-plan persistence, filesystem
+  outcome inference, automatic rollback, and durable cleanup tracking.
+- Keep tag backups private to tag replacement; cleanup errors leave the action
+  confirmed and report leftover paths. Preserve destination collision checks.
+- Migrate completed SQLite v1 histories to v2 while preserving records and
+  patches; refuse migration of pending v1 work until resolved with that version.
 - Plan cleanup confirmation before filesystem effects and protect configuration
-  and bin directories. Prepare copies in synced candidates for recovery.
+  and bin directories. Verify and sync copies before associated source deletion.
 - Read native ID3 encodings when planning fixes and verifying candidates; preserve
   ID3 locator frames through native conversion.
 - Preserve audio symlinks during edits and reject hard-linked audio replacement.

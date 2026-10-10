@@ -1,18 +1,70 @@
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use tempfile::Builder;
 use tfmttools_core::action::TagValueChange;
 use tfmttools_core::history::{
-    BinaryPatchPair, ByteIdentity, HistoryMode, PreparedAction,
-    RecoveryDescriptor, StoredAction,
+    AttemptDetails, BinaryPatchPair, ByteIdentity, HistoryMode, StoredAction,
 };
 
 use super::binary_patch::{apply_patch, byte_identity, create_patch_pair};
+use super::prepared_execution::{Effect, PreparedAction};
 use super::tag_edit::write_tag_candidate;
 use crate::error::{FsError, FsResult};
 
+pub(super) struct TagSwitch {
+    path: Utf8PathBuf,
+    resolved: Utf8PathBuf,
+    candidate: tempfile::NamedTempFile,
+    retained: tempfile::NamedTempFile,
+    before: ByteIdentity,
+    after: ByteIdentity,
+}
+impl TagSwitch {
+    pub(super) fn execute(&mut self) -> FsResult<()> {
+        if resolve_audio_path(&self.path)? != self.resolved {
+            return Err(conflict(&self.path));
+        }
+        single_link(&self.resolved)?;
+        if identity_if_regular(&self.resolved)?.as_ref() != Some(&self.before)
+            || identity_if_regular(
+                Utf8Path::from_path(self.candidate.path()).unwrap(),
+            )?
+            .as_ref()
+                != Some(&self.after)
+            || identity_if_regular(
+                Utf8Path::from_path(self.retained.path()).unwrap(),
+            )?
+            .is_none_or(|i| i.length != 0)
+        {
+            return Err(conflict(&self.resolved));
+        }
+        fs_err::rename(&self.resolved, self.retained.path())?;
+        sync_parent(&self.resolved)?;
+        // Failure leaves the original in the reported backup. No automatic restore.
+        fs_err::rename(self.candidate.path(), &self.resolved)?;
+        sync_parent(&self.resolved)?;
+        if identity_if_regular(&self.resolved)?.as_ref() != Some(&self.after) {
+            return Err(conflict(&self.resolved));
+        }
+        Ok(())
+    }
+
+    pub(super) fn confirm(&mut self) -> FsResult<()> {
+        let backup = Utf8Path::from_path(self.retained.path()).unwrap();
+        if identity_if_regular(backup)?.as_ref() != Some(&self.before) {
+            return Err(conflict(backup));
+        }
+        fs_err::remove_file(backup)?;
+        sync_parent(&self.resolved)
+    }
+
+    pub(super) fn retain(&mut self) {
+        self.candidate.disable_cleanup(true);
+        self.retained.disable_cleanup(true);
+    }
+}
 pub fn prepare_tag_edit(
     path: &Utf8Path,
     changes: &[TagValueChange],
@@ -27,7 +79,7 @@ pub fn prepare_tag_edit(
     candidate.write_all(&before)?;
     write_tag_candidate(
         Utf8Path::from_path(candidate.path()).ok_or_else(|| {
-            FsError::Recovery("Non-UTF-8 candidate path".into())
+            FsError::Execution("Non-UTF-8 candidate path".into())
         })?,
         changes,
     )?;
@@ -50,9 +102,8 @@ pub fn prepare_tag_edit(
         &resolved,
         candidate,
         action,
-        pair.clone(),
-        pair.before,
-        pair.after,
+        pair,
+        HistoryMode::Redo,
     )
 }
 
@@ -62,7 +113,7 @@ pub fn prepare_tag_replay(
     direction: HistoryMode,
 ) -> FsResult<PreparedAction> {
     let StoredAction::EditTagValues { path, .. } = action else {
-        return Err(FsError::Recovery("Expected a recorded tag edit".into()));
+        return Err(FsError::Execution("Expected a recorded tag edit".into()));
     };
     let path = Utf8Path::new(path);
     let resolved = resolve_audio_path(path)?;
@@ -79,18 +130,14 @@ pub fn prepare_tag_replay(
         fs_err::metadata(&resolved)?.permissions(),
     )?;
     candidate.as_file().sync_all()?;
-    let (before, after) = match direction {
-        HistoryMode::Undo => (pair.after.clone(), pair.before.clone()),
-        HistoryMode::Redo => (pair.before.clone(), pair.after.clone()),
-    };
+
     finish_preparation(
         path,
         &resolved,
         candidate,
         action.clone(),
         pair.clone(),
-        before,
-        after,
+        direction,
     )
 }
 
@@ -100,198 +147,34 @@ fn finish_preparation(
     candidate: tempfile::NamedTempFile,
     action: StoredAction,
     pair: BinaryPatchPair,
-    before: ByteIdentity,
-    after: ByteIdentity,
+    direction: HistoryMode,
 ) -> FsResult<PreparedAction> {
     let retained = Builder::new()
         .prefix(".tfmt-original-")
         .tempfile_in(resolved.parent().unwrap())?;
-    let candidate_path = Utf8PathBuf::try_from(candidate.path().to_owned())?;
-    let retained_path = Utf8PathBuf::try_from(retained.path().to_owned())?;
-    // Sync directory entries before the coordinator can commit their paths.
     sync_parent(resolved)?;
-    let _ = candidate.keep().map_err(|e| e.error)?;
-    if let Err(error) = retained.keep() {
-        let _ = fs_err::remove_file(&candidate_path);
-        return Err(error.error.into());
-    }
-    Ok(PreparedAction {
+    let details = AttemptDetails {
+        paths: vec![path.to_string(),resolved.to_string(),candidate.path().to_string_lossy().into_owned(),retained.path().to_string_lossy().into_owned()],
+        instructions: "Inspect the original path, candidate, and retained backup. Restore the original for not-applied, or finish installing the candidate for applied. Resolve history explicitly, then remove unneeded artifacts manually.".into(),
+    };
+    let (before, after) = match direction {
+        HistoryMode::Undo => (pair.after.clone(), pair.before.clone()),
+        HistoryMode::Redo => (pair.before.clone(), pair.after.clone()),
+    };
+    Ok(PreparedAction::new(
         action,
-        recovery: RecoveryDescriptor::FileSwitch {
-            path: path.to_string(),
-            resolved: resolved.to_string(),
-            candidate: candidate_path.to_string(),
-            retained: retained_path.to_string(),
+        details,
+        Some(pair),
+        Effect::Tag(TagSwitch {
+            path: path.to_owned(),
+            resolved: resolved.to_owned(),
+            candidate,
+            retained,
             before,
             after,
-        },
-        patches: Some(pair),
-    })
+        }),
+    ))
 }
-
-pub fn install_prepared(entry: &PreparedAction) -> FsResult<()> {
-    recover_prepared(entry)
-}
-pub fn recover_prepared(entry: &PreparedAction) -> FsResult<()> {
-    let RecoveryDescriptor::FileSwitch {
-        path,
-        resolved,
-        candidate,
-        retained,
-        before,
-        after,
-    } = &entry.recovery
-    else {
-        return super::recorded_execution::recover_filesystem(entry);
-    };
-    let resolved = Utf8Path::new(resolved);
-    let candidate = Utf8Path::new(candidate);
-    let retained = Utf8Path::new(retained);
-    validate_paths(Utf8Path::new(path), resolved, candidate, retained)?;
-    let current = identity_if_regular(resolved)?;
-    let original = identity_if_regular(retained)?;
-    let prepared = identity_if_regular(candidate)?;
-    if current.as_ref() == Some(after)
-        && !(before == after
-            && original.as_ref().is_some_and(|identity| identity.length == 0)
-            && prepared.as_ref() == Some(after))
-    {
-        if original.as_ref().is_some_and(|identity| identity != before) {
-            return Err(conflict(retained));
-        }
-        if prepared.as_ref().is_some_and(|identity| identity != after) {
-            return Err(conflict(candidate));
-        }
-        return sync_parent(resolved);
-    }
-    if prepared.as_ref() != Some(after) {
-        return Err(conflict(candidate));
-    }
-    if current.as_ref() == Some(before) {
-        single_link(resolved)?;
-        if let Some(identity) = original {
-            if identity.length != 0 {
-                return Err(conflict(retained));
-            }
-        } else {
-            OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(retained)?
-                .sync_all()?;
-        }
-        // Recheck immediately before retention, including the reserved slot.
-        if identity_if_regular(resolved)?.as_ref() != Some(before)
-            || identity_if_regular(retained)?.is_none_or(|i| i.length != 0)
-        {
-            return Err(conflict(resolved));
-        }
-        fs_err::rename(resolved, retained)?;
-        sync_parent(resolved)?;
-    } else if current.is_some() || original.as_ref() != Some(before) {
-        return Err(conflict(resolved));
-    }
-    if let Err(error) = fs_err::rename(candidate, resolved) {
-        if fs_err::symlink_metadata(resolved).is_err()
-            && identity_if_regular(retained)?.as_ref() == Some(before)
-        {
-            fs_err::rename(retained, resolved)?;
-            sync_parent(resolved)?;
-        }
-        return Err(error.into());
-    }
-    sync_parent(resolved)?;
-    if identity_if_regular(resolved)?.as_ref() != Some(after) {
-        return Err(conflict(resolved));
-    }
-    Ok(())
-}
-
-pub fn cleanup_prepared(entry: &PreparedAction) -> FsResult<()> {
-    let RecoveryDescriptor::FileSwitch {
-        path,
-        resolved,
-        candidate,
-        retained,
-        before,
-        after,
-    } = &entry.recovery
-    else {
-        return super::recorded_execution::cleanup_copy(entry);
-    };
-    let resolved = Utf8Path::new(resolved);
-    let candidate = Utf8Path::new(candidate);
-    let retained = Utf8Path::new(retained);
-    validate_paths(Utf8Path::new(path), resolved, candidate, retained)?;
-    if identity_if_regular(resolved)?.as_ref() != Some(after) {
-        return Err(conflict(resolved));
-    }
-    for (path, expected) in [(retained, before), (candidate, after)] {
-        if let Some(identity) = identity_if_regular(path)? {
-            if &identity != expected {
-                return Err(conflict(path));
-            }
-            fs_err::remove_file(path)?;
-        }
-    }
-    sync_parent(resolved)
-}
-
-/// Remove only preparation artifacts when committing intent failed before effects.
-pub fn discard_prepared(entry: &PreparedAction) -> FsResult<()> {
-    let RecoveryDescriptor::FileSwitch {
-        path,
-        resolved,
-        candidate,
-        retained,
-        before,
-        after,
-    } = &entry.recovery
-    else {
-        return super::recorded_execution::cleanup_copy(entry);
-    };
-    let resolved = Utf8Path::new(resolved);
-    let candidate = Utf8Path::new(candidate);
-    let retained = Utf8Path::new(retained);
-    validate_paths(Utf8Path::new(path), resolved, candidate, retained)?;
-    if identity_if_regular(resolved)?.as_ref() != Some(before)
-        || identity_if_regular(retained)?.is_none_or(|i| i.length != 0)
-    {
-        return Err(conflict(resolved));
-    }
-    if identity_if_regular(candidate)?.as_ref() != Some(after) {
-        return Err(conflict(candidate));
-    }
-    fs_err::remove_file(candidate)?;
-    fs_err::remove_file(retained)?;
-    sync_parent(resolved)
-}
-
-fn validate_paths(
-    path: &Utf8Path,
-    resolved: &Utf8Path,
-    candidate: &Utf8Path,
-    retained: &Utf8Path,
-) -> FsResult<()> {
-    if resolve_audio_path(path)? != resolved
-        || !resolved.is_absolute()
-        || candidate.parent() != resolved.parent()
-        || retained.parent() != resolved.parent()
-        || !candidate
-            .file_name()
-            .is_some_and(|n| n.starts_with(".tfmt-candidate-"))
-        || !retained
-            .file_name()
-            .is_some_and(|n| n.starts_with(".tfmt-original-"))
-        || candidate == retained
-    {
-        return Err(FsError::Recovery(
-            "Recovery paths or audio symlink changed; refusing switch".into(),
-        ));
-    }
-    Ok(())
-}
-
 pub(super) fn resolve_audio_path(path: &Utf8Path) -> FsResult<Utf8PathBuf> {
     let mut current = if path.is_absolute() {
         path.to_owned()
@@ -321,7 +204,7 @@ pub(super) fn resolve_audio_path(path: &Utf8Path) -> FsResult<Utf8PathBuf> {
             Err(e) => return Err(e.into()),
         }
     }
-    Err(FsError::Recovery("Too many audio symlink levels".into()))
+    Err(FsError::Execution("Too many audio symlink levels".into()))
 }
 
 pub(super) fn identity_if_regular(
@@ -336,12 +219,12 @@ pub(super) fn identity_if_regular(
         Err(e) => Err(e.into()),
     }
 }
-fn single_link(path: &Utf8Path) -> FsResult<()> {
+pub(super) fn single_link(path: &Utf8Path) -> FsResult<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         if fs_err::metadata(path)?.nlink() != 1 {
-            return Err(FsError::Recovery(format!(
+            return Err(FsError::Execution(format!(
                 "Cannot replace hard-linked audio file: {path}"
             )));
         }
@@ -350,7 +233,7 @@ fn single_link(path: &Utf8Path) -> FsResult<()> {
     #[cfg(not(unix))]
     {
         let _ = path;
-        Err(FsError::Recovery(
+        Err(FsError::Execution(
             "Audio replacement requires a supported hard-link count check"
                 .into(),
         ))
@@ -364,75 +247,8 @@ pub(super) fn sync_parent(path: &Utf8Path) -> FsResult<()> {
     Ok(())
 }
 
-// Later actions may remove an artifact's now-empty directory. Sync its
-// surviving ancestor to make that absence durable before recording cleanup.
-pub(super) fn sync_cleanup_parent(path: &Utf8Path) -> FsResult<()> {
-    let mut entry = path.to_owned();
-    loop {
-        match sync_parent(&entry) {
-            Ok(()) => return Ok(()),
-            Err(FsError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                let directory = entry.parent().ok_or_else(|| conflict(path))?;
-                match fs_err::symlink_metadata(directory) {
-                    Err(missing)
-                        if missing.kind() == std::io::ErrorKind::NotFound =>
-                    {
-                        entry = directory.to_owned();
-                    },
-                    // Never bypass a dangling link or another inspection error.
-                    _ => return Err(error.into()),
-                }
-            },
-            Err(error) => return Err(error),
-        }
-    }
-}
 pub(super) fn conflict(path: &Utf8Path) -> FsError {
-    FsError::Recovery(format!(
-        "Unexpected file state at {path}; retained files require inspection"
+    FsError::Execution(format!(
+        "Unexpected file state at {path}; inspect the reported paths manually"
     ))
-}
-
-/// Delete verified recovery artifacts only after the coordinator has validated
-/// the final state of the entire operation and committed finalization.
-pub fn cleanup_completed_artifacts(entry: &PreparedAction) -> FsResult<()> {
-    if let RecoveryDescriptor::FileSwitch {
-        resolved,
-        candidate,
-        retained,
-        before,
-        after,
-        ..
-    } = &entry.recovery
-    {
-        let resolved = Utf8Path::new(resolved);
-        let candidate = Utf8Path::new(candidate);
-        let retained = Utf8Path::new(retained);
-        if candidate.parent() != resolved.parent()
-            || retained.parent() != resolved.parent()
-            || !candidate
-                .file_name()
-                .is_some_and(|n| n.starts_with(".tfmt-candidate-"))
-            || !retained
-                .file_name()
-                .is_some_and(|n| n.starts_with(".tfmt-original-"))
-        {
-            return Err(conflict(retained));
-        }
-        for (path, expected) in [(retained, before), (candidate, after)] {
-            if let Some(actual) = identity_if_regular(path)? {
-                if &actual != expected {
-                    return Err(conflict(path));
-                }
-                fs_err::remove_file(path)?;
-            }
-        }
-        // Retry a directory sync even if an earlier cleanup already removed
-        // the artifacts but stopped before recording durable completion.
-        sync_cleanup_parent(resolved)
-    } else {
-        super::recorded_execution::cleanup_copy(entry)
-    }
 }

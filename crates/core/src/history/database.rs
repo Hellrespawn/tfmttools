@@ -11,16 +11,16 @@ use super::{
 use crate::action::Action;
 
 pub(super) const APPLICATION_ID: i64 = 0x5446_4d54;
-pub(super) const VERSION: i64 = 1;
+pub(super) const VERSION: i64 = 2;
 const SCHEMA: &str = include_str!("schema-v1.sql");
 
 #[must_use]
 pub fn history_schema_sql() -> &'static str {
-    SCHEMA
+    concat!(include_str!("schema-v1.sql"), "\n", include_str!("schema-v2.sql"))
 }
 
 fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(SCHEMA)])
+    Migrations::new(vec![M::up(SCHEMA), M::up(include_str!("schema-v2.sql"))])
 }
 
 pub(super) fn open(
@@ -53,12 +53,46 @@ pub(super) fn open(
                 "Unsupported history database version {version}"
             )));
         }
-        if version < VERSION {
+        if version == 1 {
+            let mut expected = Connection::open_in_memory()?;
+            Migrations::new(vec![M::up(SCHEMA)])
+                .to_latest(&mut expected)
+                .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+            if schema_objects(&connection)? != schema_objects(&expected)? {
+                return Err(HistoryError::LoadError("History database schema differs from the versioned contract".into()));
+            }
+            let pending: i64 = connection.query_row(
+                "SELECT count(*) FROM operations",
+                [],
+                |r| r.get(0),
+            )?;
+            let unfinished: i64 = connection.query_row(
+                "SELECT count(*) FROM records WHERE finalized=0",
+                [],
+                |r| r.get(0),
+            )?;
+            if pending != 0 || unfinished != 0 {
+                return Err(HistoryError::LoadError("Resolve pending work with the compatible tfmt version before migration".into()));
+            }
+            validate_integrity(&connection)?;
+            let records = read_records_query(
+                &connection,
+                "SELECT id,position,state,timestamp,metadata,finalized,CASE WHEN state IN ('undone','superseded') THEN 0 ELSE (SELECT count(*) FROM actions WHERE record_id=records.id) END,1 FROM records ORDER BY position",
+            )?;
+            super::attempt::validate_patches(&connection, &records)?;
+            if read_only {
+                return Err(HistoryError::LoadError(
+                    "History requires a writable invocation to migrate".into(),
+                ));
+            }
+        } else if version != VERSION {
             return Err(HistoryError::LoadError(
-                "History database requires an unsupported migration".into(),
+                "Unsupported history database version".into(),
             ));
         }
-        validate_schema(&connection)?;
+        if version == VERSION {
+            validate_schema(&connection)?;
+        }
     }
     connection.pragma_update(None, "foreign_keys", "ON")?;
     let keys: i64 =
@@ -84,7 +118,7 @@ pub(super) fn open(
             ));
         }
     }
-    if new {
+    if !read_only {
         migrations()
             .to_latest(&mut connection)
             .map_err(|e| HistoryError::SaveError(e.to_string()))?;
@@ -111,6 +145,9 @@ pub(super) fn validate_schema(connection: &Connection) -> Result<()> {
                 .into(),
         ));
     }
+    validate_integrity(connection)
+}
+fn validate_integrity(connection: &Connection) -> Result<()> {
     let check: String =
         connection.query_row("PRAGMA quick_check", [], |row| row.get(0))?;
     if check != "ok" {
@@ -133,29 +170,35 @@ pub(super) fn validate_schema(connection: &Connection) -> Result<()> {
 
 pub(super) struct DatabaseRecord {
     pub record: Record,
-    pub finalized: bool,
 }
 
 pub(super) fn read_records(
     connection: &Connection,
-    finalized_only: bool,
 ) -> Result<Vec<DatabaseRecord>> {
-    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized FROM records WHERE finalized=1 OR ?1=0 ORDER BY position")?;
-    let mut rows = statement.query([i64::from(finalized_only)])?;
+    read_records_query(
+        connection,
+        "SELECT id,position,state,timestamp,metadata,finalized,applied_count,redo_allowed FROM records ORDER BY position",
+    )
+}
+fn read_records_query(
+    connection: &Connection,
+    sql: &str,
+) -> Result<Vec<DatabaseRecord>> {
+    let mut statement = connection.prepare(sql)?;
+    let mut rows = statement.query([])?;
     let mut records = Vec::new();
     while let Some(row) = rows.next()? {
         records.push(read_record_row(connection, row)?);
     }
     Ok(records)
 }
-
 pub(super) fn read_record(
     connection: &Connection,
     id: usize,
 ) -> Result<DatabaseRecord> {
     let id = i64::try_from(id)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized FROM records WHERE id=?1")?;
+    let mut statement = connection.prepare("SELECT id, position, state, timestamp, metadata, finalized, applied_count, redo_allowed FROM records WHERE id=?1")?;
     let mut rows = statement.query([id])?;
     let row = rows.next()?.ok_or_else(|| {
         HistoryError::LoadError("Pending record missing".into())
@@ -204,7 +247,7 @@ fn read_record_row(
         validate_action(&action)?;
         actions.push(action);
     }
-    let record = Record::from_storage(
+    let mut record = Record::from_storage(
         usize::try_from(id)
             .map_err(|e| HistoryError::LoadError(e.to_string()))?,
         actions,
@@ -212,27 +255,16 @@ fn read_record_row(
         timestamp,
         metadata,
     );
-    Ok(DatabaseRecord { record, finalized: row.get::<_, i64>(5)? == 1 })
-}
-
-pub(super) fn read_action(
-    connection: &Connection,
-    record_id: usize,
-    position: usize,
-) -> Result<StoredAction> {
-    let record_id = i64::try_from(record_id)
+    let applied = usize::try_from(row.get::<_, i64>(6)?)
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let position = i64::try_from(position)
-        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    let payload: String = connection.query_row(
-        "SELECT payload FROM actions WHERE record_id=?1 AND position=?2",
-        rusqlite::params![record_id, position],
-        |row| row.get(0),
-    )?;
-    let action = serde_json::from_str(&payload)
-        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
-    validate_action(&action)?;
-    Ok(action)
+    if applied > record.len()
+        || (matches!(state, RecordState::Undone | RecordState::Superseded)
+            && applied != 0)
+    {
+        return Err(HistoryError::LoadError("Invalid replay cursor".into()));
+    }
+    record.set_progress(applied, row.get(5)?, row.get(7)?);
+    Ok(DatabaseRecord { record })
 }
 
 pub(super) fn validate_action(action: &StoredAction) -> Result<()> {

@@ -16,13 +16,10 @@ pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
 
     let path = app_options.history_file_path()?;
     let history = History::open_read_only(path.as_path().to_owned())?;
-    for operation in history.pending_operations()? {
-        println!(
-            "Pending recovery: operation {} ({:?}), {} recorded actions",
-            operation.id.0,
-            operation.kind,
-            operation.entries.len()
-        );
+    if let Some(report) =
+        crate::history::execution::interruption_report(&history)?
+    {
+        println!("{report}");
     }
     if path.as_path().exists() {
         println!("{}", formatter.format_history(&history)?);

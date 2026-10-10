@@ -32,7 +32,7 @@ pub fn create_patch_pair(
     if apply_patch(before, &pair, HistoryMode::Redo)? != after
         || apply_patch(after, &pair, HistoryMode::Undo)? != before
     {
-        return Err(FsError::Recovery(
+        return Err(FsError::Execution(
             "Binary patches failed exact round-trip verification".into(),
         ));
     }
@@ -45,7 +45,7 @@ pub fn apply_patch(
     direction: HistoryMode,
 ) -> FsResult<Vec<u8>> {
     if pair.format != "bsdiff40-v1" {
-        return Err(FsError::Recovery(
+        return Err(FsError::Execution(
             "Unsupported binary patch format".into(),
         ));
     }
@@ -54,20 +54,20 @@ pub fn apply_patch(
         HistoryMode::Redo => (&pair.before, &pair.after, &pair.forward),
     };
     if &byte_identity(bytes) != expected {
-        return Err(FsError::Recovery(
+        return Err(FsError::Execution(
             "File changed since the recorded operation; refusing replay".into(),
         ));
     }
     let patcher = Bspatch::new(patch)?;
     if patcher.hint_target_size() != output.length {
-        return Err(FsError::Recovery(
+        return Err(FsError::Execution(
             "Patch target length differs from recorded length".into(),
         ));
     }
     let mut writer = BoundedOutput { bytes: Vec::new(), limit: output.length };
     patcher.apply(bytes, &mut writer)?;
     if &byte_identity(&writer.bytes) != output {
-        return Err(FsError::Recovery(
+        return Err(FsError::Execution(
             "Patched bytes differ from recorded result".into(),
         ));
     }

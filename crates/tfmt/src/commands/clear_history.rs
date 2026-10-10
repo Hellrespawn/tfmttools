@@ -3,17 +3,23 @@ use tfmttools_core::history::LoadHistoryResult;
 use tfmttools_core::util::FSMode;
 
 use crate::cli::TFMTOptions;
-use crate::history::{HistoryFormatter, HistoryPrefix, load_history};
+use crate::history::{HistoryFormatter, HistoryPrefix, load_history_for_mode};
 use crate::ui::ConfirmationPrompt;
 
 pub fn clear_history(app_options: &TFMTOptions) -> Result<()> {
     let path = &app_options.history_file_path()?;
 
-    let (mut history, load_history_result) = load_history(path)?;
+    let (mut history, load_history_result) =
+        load_history_for_mode(path, app_options.fs_mode())?;
 
-    if !history.pending_operations()?.is_empty() {
+    if let Some(report) =
+        crate::history::execution::interruption_report(&history)?
+    {
+        println!("{report}");
+    }
+    if history.current_attempt()?.is_some() {
         color_eyre::eyre::bail!(
-            "History has pending recovery work; refusing to clear it"
+            "History has an unresolved attempt; refusing to clear it"
         );
     }
 

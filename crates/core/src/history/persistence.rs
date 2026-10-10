@@ -59,14 +59,11 @@ impl History {
         let connection = database::open(&path, self.read_only, false)?;
         // Validate one consistent snapshot, including unfinalized records.
         let transaction = connection.unchecked_transaction()?;
-        let records = database::read_records(&transaction, false)?;
-        super::journal::validate_patches(&transaction, &records)?;
+        let records = database::read_records(&transaction)?;
+        super::attempt::validate_patches(&transaction, &records)?;
+        super::attempt::read_current_attempt(&transaction)?;
         transaction.commit()?;
-        let records = records
-            .into_iter()
-            .filter(|r| r.finalized)
-            .map(|r| r.record)
-            .collect();
+        let records = records.into_iter().map(|r| r.record).collect();
         self.connection = Some(connection);
         self.records = records;
         Ok(LoadHistoryResult::Loaded)

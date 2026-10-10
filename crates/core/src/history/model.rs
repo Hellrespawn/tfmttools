@@ -31,6 +31,12 @@ pub struct Record {
     timestamp: DateTime<FixedOffset>,
     #[serde(rename = "metadata")]
     metadata: ActionRecordMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    applied_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    complete: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    redo_allowed: Option<bool>,
 }
 
 impl Record {
@@ -45,6 +51,9 @@ impl Record {
             state: RecordState::Applied,
             timestamp: Local::now().fixed_offset(),
             metadata,
+            applied_count: None,
+            complete: None,
+            redo_allowed: None,
         }
     }
 
@@ -55,7 +64,51 @@ impl Record {
         timestamp: DateTime<FixedOffset>,
         metadata: ActionRecordMetadata,
     ) -> Self {
-        Self { id: Some(id), actions, state, timestamp, metadata }
+        Self {
+            id: Some(id),
+            actions,
+            state,
+            timestamp,
+            metadata,
+            applied_count: None,
+            complete: None,
+            redo_allowed: None,
+        }
+    }
+
+    pub(super) fn set_progress(
+        &mut self,
+        applied: usize,
+        complete: bool,
+        redo: bool,
+    ) {
+        self.applied_count = Some(applied);
+        self.complete = Some(complete);
+        self.redo_allowed = Some(redo);
+    }
+
+    #[must_use]
+    pub fn applied_count(&self) -> usize {
+        self.applied_count.unwrap_or_else(|| {
+            if matches!(
+                self.state,
+                RecordState::Undone | RecordState::Superseded
+            ) {
+                0
+            } else {
+                self.len()
+            }
+        })
+    }
+
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.complete.unwrap_or(true)
+    }
+
+    #[must_use]
+    pub fn redo_allowed(&self) -> bool {
+        self.redo_allowed.unwrap_or(true)
     }
 
     #[must_use]

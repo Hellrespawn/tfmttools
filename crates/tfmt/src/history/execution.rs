@@ -1,41 +1,64 @@
-use std::collections::BTreeMap;
-
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use color_eyre::Result;
-use color_eyre::eyre::bail;
+use color_eyre::eyre::{WrapErr, bail};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{
-    ActionRecordMetadata, ByteIdentity, History, HistoryMode, OperationId,
-    OperationKind, PendingEntry, PendingOperation, Record, RecoveryDescriptor,
+    ActionRecordMetadata, History, HistoryMode, OperationKind, Record, RunId,
     StoredAction,
 };
 use tfmttools_fs::{
-    FsHandler, byte_identity, cleanup_completed_artifacts, discard_prepared,
-    install_prepared, prepare_action, prepare_tag_edit, prepare_tag_replay,
-    recover_prepared,
+    FsHandler, PreparedAction, prepare_action, prepare_tag_edit,
+    prepare_tag_replay,
 };
 
-pub(crate) fn recover_pending(
+pub(crate) fn interruption_report(history: &History) -> Result<Option<String>> {
+    let Some(a) = history.current_attempt()? else {
+        return Ok(history.open_run()?.map(|(_,rid,kind)|format!("Interrupted run {rid} ({kind:?}) has no unconfirmed action. History contains the confirmed actions only. A writable invocation will close it as partial; no remaining actions will run.")));
+    };
+    let record = history
+        .records()
+        .iter()
+        .find(|r| r.id() == Some(a.record_id))
+        .ok_or_else(|| color_eyre::eyre::eyre!("Attempt record missing"))?;
+    Ok(Some(format!(
+        "Unresolved attempt {}: {:?} record {} (run {}).\nHistory confirms {} actions; {} currently applied.\nCommand: {:?}\nLast attempted action {}: {:?}\nPaths:\n  {}\n{}\nNo remaining actions will run. Repair the files manually, then run:\n  tfmt resolve-history --attempt {} --outcome <applied|not-applied>\nResolution changes history only; use the same configuration directory.",
+        a.id.0,
+        a.kind,
+        a.record_id,
+        record.metadata().run_id(),
+        record.len(),
+        record.applied_count(),
+        record.metadata().arguments(),
+        a.action_position + 1,
+        a.action,
+        a.details.paths.join("\n  "),
+        a.details.instructions,
+        a.id.0
+    )))
+}
+pub(crate) fn check_interrupted(
     history: &mut History,
     fs: &FsHandler,
 ) -> Result<()> {
-    if fs.is_dry_run() {
-        return Ok(());
+    if let Some(report) = interruption_report(history)? {
+        println!("{report}");
     }
-    for operation in history.pending_operations()? {
-        if operation.plan.is_none() {
-            history.cancel_unstarted(operation.id)?;
-            continue;
+    if !fs.is_dry_run() {
+        if history.current_attempt()?.is_some() {
+            bail!(
+                "Resolve the attempted action before changing files or history"
+            );
         }
-        println!(
-            "Recovering interrupted history operation {}...",
-            operation.id.0
-        );
-        run_operation(history, operation.id)?;
+        if let Some(record) = history.close_abandoned_run()? {
+            println!(
+                "Closed interrupted run {} as partial; {} actions remain applied.",
+                record.id().unwrap(),
+                record.applied_count()
+            );
+        }
     }
     Ok(())
 }
-
 pub(crate) fn execute_recorded(
     history: &mut History,
     fs: &FsHandler,
@@ -43,26 +66,34 @@ pub(crate) fn execute_recorded(
     metadata: ActionRecordMetadata,
 ) -> Result<Record> {
     let actions = absolute_actions(actions)?;
-    let plan: Vec<_> = actions.iter().map(StoredAction::from).collect();
+    check_interrupted(history, fs)?;
     if fs.is_dry_run() {
-        return Ok(Record::new(plan, metadata));
+        return Ok(Record::new(
+            actions.iter().map(StoredAction::from).collect(),
+            metadata,
+        ));
     }
-    recover_pending(history, fs)?;
-    let id =
-        history.begin_operation(OperationKind::Apply, None, Some(metadata))?;
-    if let Err(error) = history.set_operation_plan(id, &plan) {
-        history.cancel_unstarted(id)?;
-        return Err(error.into());
-    }
-    run_or_cancel_unstarted(history, id)
+    let run = history.begin_run(OperationKind::Apply, None, Some(metadata))?;
+    let result = execute_actions(
+        history,
+        run,
+        OperationKind::Apply,
+        actions
+            .into_iter()
+            .enumerate()
+            .map(|(p, a)| (p, StoredAction::from(&a)))
+            .collect(),
+        None,
+    );
+    finish_run(history, run, result)
 }
-
 pub(crate) fn replay_record(
     history: &mut History,
     fs: &FsHandler,
     record: &Record,
     direction: HistoryMode,
 ) -> Result<Record> {
+    check_interrupted(history, fs)?;
     if fs.is_dry_run() {
         return Ok(record.clone());
     }
@@ -70,300 +101,98 @@ pub(crate) fn replay_record(
         HistoryMode::Undo => OperationKind::Undo,
         HistoryMode::Redo => OperationKind::Redo,
     };
-    let plan: Vec<_> = match direction {
-        HistoryMode::Undo => record.iter().rev().cloned().collect(),
-        HistoryMode::Redo => record.iter().cloned().collect(),
+    let positions: Vec<_> = match direction {
+        HistoryMode::Undo => (0..record.applied_count()).rev().collect(),
+        HistoryMode::Redo => (record.applied_count()..record.len()).collect(),
     };
-    let id = history.begin_operation(kind, record.id(), None)?;
-    if let Err(error) = history.set_operation_plan(id, &plan) {
-        history.cancel_unstarted(id)?;
-        return Err(error.into());
-    }
-    run_or_cancel_unstarted(history, id)
-}
-
-fn run_or_cancel_unstarted(
-    history: &mut History,
-    id: OperationId,
-) -> Result<Record> {
-    let result = run_operation(history, id);
-    if result.is_err()
-        && history
-            .pending_operations()?
-            .iter()
-            .any(|o| o.id == id && o.entries.is_empty() && !o.finalized)
-    {
-        history.cancel_unstarted(id)?;
-    }
-    result
-}
-
-fn pending(history: &History, id: OperationId) -> Result<PendingOperation> {
-    history
-        .pending_operations()?
+    let actions = positions
         .into_iter()
-        .find(|o| o.id == id)
-        .ok_or_else(|| color_eyre::eyre::eyre!("Pending operation disappeared"))
+        .map(|p| (p, record.actions()[p].clone()))
+        .collect();
+    let run = history.begin_run(kind, record.id(), None)?;
+    let result = execute_actions(history, run, kind, actions, record.id());
+    finish_run(history, run, result)
 }
-fn run_operation(history: &mut History, id: OperationId) -> Result<Record> {
-    let mut operation = pending(history, id)?;
-    if !operation.finalized {
-        for index in 0..operation.entries.len() {
-            let entry = &operation.entries[index];
-            if !entry.completed {
-                // Recovery may already have changed this entry's own paths.
-                // Its descriptor validates those states; all other completed
-                // effects must still hold before any destructive resumption.
-                let mut expected = expected_states(&operation)?;
-                for path in mutation_paths(&entry.prepared.recovery) {
-                    expected.remove(&path_key(path)?);
-                }
-                verify_expected(&expected)?;
-                recover_prepared(&entry.prepared)?;
-                history.complete_action(id, entry.position)?;
-                operation.entries[index].completed = true;
-            }
-        }
-        while operation.entries.len() < operation.plan.as_ref().unwrap().len() {
-            let position = operation.entries.len();
-            let action = operation.plan.as_ref().unwrap()[position].clone();
-            let action_position = if operation.kind == OperationKind::Undo {
-                operation.plan.as_ref().unwrap().len() - 1 - position
-            } else {
-                position
-            };
-            // Earlier effects establish the preconditions for dependent actions.
-            verify_expected(&expected_states(&operation)?)?;
-            let executable = Action::try_from(&action)?;
-            let entry = match &executable {
-                Action::EditTagValues { path, changes }
-                    if operation.kind == OperationKind::Apply =>
-                {
-                    prepare_tag_edit(path, changes)?
+fn finish_run(
+    history: &mut History,
+    run: RunId,
+    result: Result<()>,
+) -> Result<Record> {
+    match result {
+        Ok(()) => Ok(history.close_run(run, true)?),
+        Err(error) => {
+            // Read committed database state; never infer the result from files.
+            // If reading fails, leave the durable run/attempt untouched.
+            match history.current_attempt() {
+                Ok(Some(_)) => {
+                    if let Ok(Some(report)) = interruption_report(history) {
+                        eprintln!("{report}");
+                    }
                 },
-                Action::EditTagValues { .. } => {
-                    let pair = history
-                        .patches(operation.record_id, action_position)?
-                        .ok_or_else(|| {
-                            color_eyre::eyre::eyre!(
-                                "Recorded binary patches missing"
-                            )
-                        })?;
-                    let direction = if operation.kind == OperationKind::Undo {
-                        HistoryMode::Undo
-                    } else {
-                        HistoryMode::Redo
-                    };
-                    prepare_tag_replay(&action, &pair, direction)?
+                Ok(None) => {
+                    history.close_run(run, false).wrap_err_with(|| {
+                        format!("Original execution error: {error:#}")
+                    })?;
                 },
-                _ => prepare_action(&executable, operation.kind)?,
-            };
-            if let Err(error) = history.append_prepared(id, &entry) {
-                // A failed commit can be ambiguous: never discard a candidate if
-                // the journal may already refer to it.
-                if history.pending_operations().is_ok_and(|ops| {
-                    ops.iter()
-                        .find(|o| o.id == id)
-                        .is_some_and(|o| o.entries.len() == position)
-                }) {
-                    discard_prepared(&entry)?;
-                }
-                return Err(error.into());
+                Err(read_error) => {
+                    return Err(error.wrap_err(format!("Could not read committed attempt: {read_error}; inspect history on the next invocation")));
+                },
             }
-            install_prepared(&entry)?;
-            history.complete_action(id, position)?;
-            operation.entries.push(PendingEntry {
-                position,
-                action_position,
-                prepared: entry,
-                completed: true,
-                cleaned: false,
-            });
-        }
-    }
-    verify_expected(&expected_states(&operation)?)?;
-    let record = history.finish_operation(id)?;
-    for entry in &operation.entries {
-        if !entry.cleaned {
-            cleanup_completed_artifacts(&entry.prepared)?;
-            history.complete_cleanup(id, entry.position)?;
-        }
-    }
-    Ok(record)
-}
-
-#[derive(Clone)]
-enum Expected {
-    File(Option<ByteIdentity>),
-    Directory(bool),
-}
-fn expected_states(
-    operation: &PendingOperation,
-) -> Result<BTreeMap<String, Expected>> {
-    let mut expected = BTreeMap::new();
-    for entry in operation.entries.iter().filter(|e| e.completed) {
-        match &entry.prepared.recovery {
-            RecoveryDescriptor::FileSwitch { resolved, after, .. } => {
-                expected.insert(
-                    path_key(resolved)?,
-                    Expected::File(Some(after.clone())),
-                );
-            },
-            RecoveryDescriptor::Move { source, target, identity } => {
-                expected.insert(path_key(source)?, Expected::File(None));
-                expected.insert(
-                    path_key(target)?,
-                    Expected::File(Some(identity.clone())),
-                );
-            },
-            RecoveryDescriptor::Copy {
-                source,
-                target,
-                identity,
-                remove_source,
-                ..
-            } => {
-                expected.insert(
-                    path_key(source)?,
-                    Expected::File(if *remove_source {
-                        None
-                    } else {
-                        Some(identity.clone())
-                    }),
-                );
-                expected.insert(
-                    path_key(target)?,
-                    Expected::File(Some(identity.clone())),
-                );
-            },
-            RecoveryDescriptor::Remove { path, .. } => {
-                expected.insert(path_key(path)?, Expected::File(None));
-            },
-            RecoveryDescriptor::Directory { path, after_exists, .. } => {
-                expected.insert(
-                    path_key(path)?,
-                    Expected::Directory(*after_exists),
-                );
-            },
-            RecoveryDescriptor::Noop => {},
-        }
-    }
-    Ok(expected)
-}
-// Resolve parent aliases even when a later action has removed the file or
-// directory. Keep the final component: non-tag actions operate on that entry.
-fn path_key(path: &str) -> Result<String> {
-    let path = Utf8Path::new(path);
-    let absolute = if path.is_absolute() {
-        path.to_owned()
-    } else {
-        Utf8PathBuf::try_from(std::env::current_dir()?)?.join(path)
-    };
-    let mut ancestor = absolute.parent().unwrap_or(&absolute).to_owned();
-    let mut suffix = vec![];
-    if let Some(name) = absolute.file_name() {
-        suffix.push(name.to_owned());
-    }
-    let canonical = loop {
-        match std::fs::canonicalize(&ancestor) {
-            Ok(path) => break Utf8PathBuf::try_from(path)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                // Do not silently bypass a dangling parent symlink.
-                if std::fs::symlink_metadata(&ancestor).is_ok() {
-                    return Err(error.into());
-                }
-                suffix.push(ancestor.file_name().ok_or(error)?.to_owned());
-                ancestor = ancestor
-                    .parent()
-                    .ok_or_else(|| {
-                        color_eyre::eyre::eyre!(
-                            "Cannot resolve operation path {absolute}"
-                        )
-                    })?
-                    .to_owned();
-            },
-            Err(error) => return Err(error.into()),
-        }
-    };
-    let mut resolved = canonical;
-    for part in suffix.into_iter().rev() {
-        resolved.push(part);
-    }
-    // A case-insensitive filesystem can expose an existing entry through a
-    // different spelling. Use its directory-entry name, while preserving
-    // distinct case-sensitive entries (including hard links).
-    if let Some(name) = resolved.file_name()
-        && std::fs::symlink_metadata(&resolved).is_ok()
-    {
-        let parent = resolved.parent().unwrap();
-        let names = std::fs::read_dir(parent)?
-            .map(|entry| entry.map(|entry| entry.file_name()))
-            .collect::<std::io::Result<Vec<_>>>()?;
-        if !names.iter().any(|entry| entry == name) {
-            let mut aliases = names.iter().filter(|entry| {
-                entry
-                    .to_str()
-                    .is_some_and(|entry| entry.eq_ignore_ascii_case(name))
-            });
-            if let Some(alias) = aliases.next()
-                && aliases.next().is_none()
-            {
-                resolved = parent.join(alias.to_str().unwrap());
-            }
-        }
-    }
-    Ok(resolved.into_string())
-}
-
-fn mutation_paths(recovery: &RecoveryDescriptor) -> Vec<&str> {
-    match recovery {
-        RecoveryDescriptor::FileSwitch { resolved, .. } => vec![resolved],
-        RecoveryDescriptor::Move { source, target, .. } => vec![source, target],
-        RecoveryDescriptor::Copy { source, target, remove_source, .. } => {
-            if *remove_source {
-                vec![source, target]
-            } else {
-                vec![target]
-            }
+            Err(error)
         },
-        RecoveryDescriptor::Remove { path, .. }
-        | RecoveryDescriptor::Directory { path, .. } => vec![path],
-        RecoveryDescriptor::Noop => vec![],
     }
 }
-
-fn verify_expected(expected: &BTreeMap<String, Expected>) -> Result<()> {
-    for (path, state) in expected {
-        match state {
-            Expected::File(identity) => {
-                let actual = match std::fs::symlink_metadata(path) {
-                    Ok(meta)
-                        if meta.is_file() && !meta.file_type().is_symlink() =>
-                    {
-                        Some(byte_identity(&std::fs::read(path)?))
-                    },
-                    Ok(_) => {
-                        bail!(
-                            "Unexpected file at {path}; operation remains recoverable"
-                        )
-                    },
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-                    Err(e) => return Err(e.into()),
-                };
-                if &actual != identity {
-                    bail!(
-                        "File changed during recorded operation at {path}; recovery stopped"
-                    );
-                }
-            },
-            Expected::Directory(exists) => {
-                if std::path::Path::new(path).is_dir() != *exists {
-                    bail!(
-                        "Directory changed during recorded operation at {path}"
-                    );
-                }
-            },
-        }
+fn prepare(
+    history: &History,
+    kind: OperationKind,
+    position: usize,
+    action: &StoredAction,
+    record_id: Option<usize>,
+) -> Result<PreparedAction> {
+    let executable = Action::try_from(action)?;
+    Ok(match &executable {
+        Action::EditTagValues { path, changes }
+            if kind == OperationKind::Apply =>
+        {
+            prepare_tag_edit(path, changes)?
+        },
+        Action::EditTagValues { .. } => {
+            let pair = history
+                .patches(record_id.unwrap(), position)?
+                .ok_or_else(|| {
+                    color_eyre::eyre::eyre!("Recorded binary patches missing")
+                })?;
+            prepare_tag_replay(
+                action,
+                &pair,
+                if kind == OperationKind::Undo {
+                    HistoryMode::Undo
+                } else {
+                    HistoryMode::Redo
+                },
+            )?
+        },
+        _ => prepare_action(&executable, kind)?,
+    })
+}
+fn execute_actions(
+    history: &mut History,
+    run: RunId,
+    kind: OperationKind,
+    actions: Vec<(usize, StoredAction)>,
+    record_id: Option<usize>,
+) -> Result<()> {
+    for (position, action) in actions {
+        let mut prepared =
+            prepare(history, kind, position, &action, record_id)?;
+        // Retain before committing intent: even an ambiguous commit cannot leave
+        // durable reporting paths pointing to automatically deleted artifacts.
+        prepared.retain_artifacts();
+        let attempt = history.begin_attempt(run,position,prepared.action(),prepared.details(),prepared.patches())
+            .wrap_err_with(||format!("Preparing history intent failed. Inspect these preparation paths if present: {}",prepared.details().paths.join(", ")))?;
+        prepared.execute()?;
+        history.confirm_attempt(attempt).wrap_err_with(||format!("History completion could not be confirmed. Inspect the recorded history and retained paths: {}",prepared.details().paths.join(", ")))?;
+        prepared.confirm().wrap_err_with(||format!("Action is confirmed in history. Remove leftover artifacts manually: {}",prepared.details().paths.join(", ")))?;
     }
     Ok(())
 }
@@ -400,10 +229,54 @@ fn absolute_actions(actions: Vec<Action>) -> Result<Vec<Action>> {
 }
 
 #[cfg(test)]
-mod tests {
-    use assert_fs::TempDir;
-    use tfmttools_core::action::{TagValueChange, TagValueKind};
-    use tfmttools_core::history::TemplateMetadata;
+mod manual_tests {
+    use tfmttools_core::history::{AttemptOutcome, TemplateMetadata};
+    use tfmttools_core::util::FSMode;
+
+    use super::*;
+    #[test]
+    fn ordinary_error_preserves_confirmed_prefix_and_never_continues() {
+        let d = assert_fs::TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(d.path().to_owned()).unwrap();
+        let mut h = History::new(root.join("history"));
+        let fs = FsHandler::new(FSMode::Default);
+        let metadata = ActionRecordMetadata::new(
+            TemplateMetadata::Validation { value: "test".into() },
+            vec![],
+            "test".into(),
+        );
+        assert!(
+            execute_recorded(
+                &mut h,
+                &fs,
+                vec![
+                    Action::MakeDir(root.join("first")),
+                    Action::MoveFile {
+                        source: root.join("missing"),
+                        target: root.join("target")
+                    },
+                    Action::MakeDir(root.join("last"))
+                ],
+                metadata
+            )
+            .is_err()
+        );
+        assert!(root.join("first").is_dir());
+        assert!(!root.join("last").exists());
+        assert_eq!(h.records()[0].applied_count(), 1);
+        if let Some(a) = h.current_attempt().unwrap() {
+            h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
+        }
+        let record = h.get_all_records_to_undo().unwrap().remove(0);
+        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        assert!(!root.join("first").exists());
+        assert!(h.get_all_records_to_redo().unwrap().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use tfmttools_core::history::{AttemptOutcome, TemplateMetadata};
     use tfmttools_core::util::FSMode;
 
     use super::*;
@@ -411,313 +284,99 @@ mod tests {
         ActionRecordMetadata::new(
             TemplateMetadata::Validation { value: "test".into() },
             vec![],
-            "unit".into(),
+            "failure".into(),
         )
     }
-    fn audio(dir: &TempDir) -> Utf8PathBuf {
-        let path = Utf8PathBuf::try_from(dir.path().join("song.mp3")).unwrap();
+    #[test]
+    fn execution_error_keeps_attempt_and_blocks_new_mutations() {
+        let dir = assert_fs::TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(dir.path().to_owned()).unwrap();
+        let mut h = History::new(root.join("history"));
+        let obstruction = root.join("obstruction");
+        std::fs::write(&obstruction, b"original").unwrap();
+        let fs = FsHandler::new(FSMode::Default);
+        assert!(
+            execute_recorded(
+                &mut h,
+                &fs,
+                vec![
+                    Action::MakeDir(root.join("first")),
+                    Action::RemoveDir(obstruction.clone()),
+                    Action::MakeDir(root.join("last"))
+                ],
+                metadata()
+            )
+            .is_err()
+        );
+        assert!(h.current_attempt().unwrap().is_some());
+        assert_eq!(h.records()[0].applied_count(), 1);
+        assert!(!root.join("last").exists());
+        assert_eq!(std::fs::read(&obstruction).unwrap(), b"original");
+        assert!(check_interrupted(&mut h, &fs).is_err());
+        let a = h.current_attempt().unwrap().unwrap();
+        h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
+        let record = h.records()[0].clone();
+        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        assert!(!root.join("first").exists());
+    }
+    #[test]
+    fn database_failure_after_install_retains_original_and_attempt() {
+        use lofty::file::TaggedFileExt;
+        use lofty::tag::ItemKey;
+        use tfmttools_core::action::{TagValueChange, TagValueKind};
+        let dir = assert_fs::TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(dir.path().to_owned()).unwrap();
+        let path = root.join("song.mp3");
         std::fs::copy(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3"),
             &path,
         )
         .unwrap();
-        path
-    }
-    fn edit(path: &Utf8PathBuf, from: &str, to: &str) -> Action {
-        Action::EditTagValues {
+        let before = std::fs::read(&path).unwrap();
+        let audio = lofty::read_from_path(&path).unwrap();
+        let title = audio
+            .primary_tag()
+            .unwrap()
+            .get_string(ItemKey::TrackTitle)
+            .unwrap();
+        let action = Action::EditTagValues {
             path: path.clone(),
             changes: vec![TagValueChange::new(
                 "track_title".into(),
                 TagValueKind::Text,
-                from.into(),
-                to.into(),
+                title.into(),
+                "changed".into(),
             )],
-        }
-    }
-    #[test]
-    fn copy_artifact_cleanup_survives_later_parent_directory_removal() {
-        let dir = TempDir::new().unwrap();
-        let root = Utf8PathBuf::try_from(dir.path().to_owned()).unwrap();
-        let parent = root.join("nested");
-        let source = parent.join("source");
-        let target = parent.join("target");
-        let moved = root.join("moved");
-        std::fs::create_dir(&parent).unwrap();
-        std::fs::write(&source, b"original").unwrap();
-        let fs = FsHandler::new(FSMode::Default);
-        let mut history = History::new(root.join("h.hist"));
-        history.load().unwrap();
-        let record = execute_recorded(
-            &mut history,
-            &fs,
-            vec![
-                Action::CopyFile {
-                    source: source.clone(),
-                    target: target.clone(),
-                },
-                Action::MoveFile { source: target, target: moved.clone() },
-                Action::RemoveFile(source.clone()),
-                Action::RemoveDir(parent.clone()),
-            ],
-            metadata(),
-        )
-        .unwrap();
-        assert!(!parent.exists());
-        assert_eq!(std::fs::read(&moved).unwrap(), b"original");
-        assert!(history.pending_operations().unwrap().is_empty());
-        let record =
-            replay_record(&mut history, &fs, &record, HistoryMode::Undo)
-                .unwrap();
-        assert_eq!(std::fs::read(&source).unwrap(), b"original");
-        replay_record(&mut history, &fs, &record, HistoryMode::Redo).unwrap();
-        assert!(!parent.exists());
-        assert_eq!(std::fs::read(moved).unwrap(), b"original");
-        assert!(history.pending_operations().unwrap().is_empty());
-    }
-    #[test]
-    fn sequential_edits_and_rename_replay_all_bytes_in_order() {
-        let dir = TempDir::new().unwrap();
-        let path = audio(&dir);
-        let target =
-            Utf8PathBuf::try_from(dir.path().join("moved.mp3")).unwrap();
-        let before = std::fs::read(&path).unwrap();
-        let fs = FsHandler::new(FSMode::Default);
-        let mut h = History::new(
-            Utf8PathBuf::try_from(dir.path().join("tfmt.hist")).unwrap(),
-        );
-        h.load().unwrap();
-        let record = execute_recorded(
-            &mut h,
-            &fs,
-            vec![
-                edit(&path, "Nemo", "First"),
-                edit(&path, "First", "Second"),
-                Action::MoveFile {
-                    source: path.clone(),
-                    target: target.clone(),
-                },
-            ],
-            metadata(),
-        )
-        .unwrap();
-        let after = std::fs::read(&target).unwrap();
-        assert!(!path.exists());
-        assert!(h.pending_operations().unwrap().is_empty());
-        let record =
-            replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), before);
-        assert!(!target.exists());
-        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
-        assert_eq!(std::fs::read(&target).unwrap(), after);
-        assert!(!path.exists());
-        assert!(!std::fs::read_dir(dir.path()).unwrap().any(|e| {
-            e.unwrap().file_name().to_string_lossy().starts_with(".tfmt-")
-        }));
-    }
-    #[test]
-    fn database_failure_after_installation_retains_original_until_recovery() {
-        let dir = TempDir::new().unwrap();
-        let path = audio(&dir);
-        let before = std::fs::read(&path).unwrap();
-        let history_path =
-            Utf8PathBuf::try_from(dir.path().join("tfmt.hist")).unwrap();
-        let mut h = History::new(history_path.clone());
-        h.load().unwrap();
-        let action = edit(&path, "Nemo", "Changed");
-        let id = h
-            .begin_operation(OperationKind::Apply, None, Some(metadata()))
-            .unwrap();
-        h.set_operation_plan(id, &[StoredAction::from(&action)]).unwrap();
-        let Action::EditTagValues { changes, .. } = &action else { panic!() };
-        let entry = prepare_tag_edit(&path, changes).unwrap();
-        h.append_prepared(id, &entry).unwrap();
-        install_prepared(&entry).unwrap();
-        let RecoveryDescriptor::FileSwitch { retained, .. } = &entry.recovery
-        else {
-            panic!()
         };
-        let c = rusqlite::Connection::open(&history_path).unwrap();
-        c.execute_batch("CREATE TRIGGER fail_progress BEFORE UPDATE ON progress BEGIN SELECT RAISE(ABORT,'injected'); END").unwrap();
-        assert!(run_operation(&mut h, id).is_err());
-        assert_eq!(std::fs::read(retained).unwrap(), before);
-        c.execute_batch("DROP TRIGGER fail_progress").unwrap();
-        drop(c);
-        drop(h);
-        let mut h = History::new(history_path);
-        h.load().unwrap();
-        recover_pending(&mut h, &FsHandler::new(FSMode::Default)).unwrap();
-        assert!(!std::path::Path::new(retained).exists());
-        assert!(h.pending_operations().unwrap().is_empty());
-    }
-    #[test]
-    fn dotted_path_edits_and_rename_replay_without_alias_conflicts() {
-        let dir = TempDir::new().unwrap();
-        let path = audio(&dir);
-        let dotted =
-            Utf8PathBuf::try_from(dir.path().join(".").join("song.mp3"))
-                .unwrap();
-        let target =
-            Utf8PathBuf::try_from(dir.path().join("moved.mp3")).unwrap();
-        let before = std::fs::read(&path).unwrap();
-        let fs = FsHandler::new(FSMode::Default);
-        let mut h = History::new(
-            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+        let mut h = History::new(root.join("history"));
+        let run =
+            h.begin_run(OperationKind::Apply, None, Some(metadata())).unwrap();
+        h.close_run(run, false).unwrap();
+        let db = rusqlite::Connection::open(root.join("history")).unwrap();
+        db.execute_batch("CREATE TRIGGER fail_confirmation BEFORE DELETE ON attempts BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+        assert!(
+            execute_recorded(
+                &mut h,
+                &FsHandler::new(FSMode::Default),
+                vec![action],
+                metadata()
+            )
+            .is_err()
         );
-        h.load().unwrap();
-        let record = execute_recorded(
-            &mut h,
-            &fs,
-            vec![edit(&dotted, "Nemo", "Changed"), Action::MoveFile {
-                source: dotted.clone(),
-                target: target.clone(),
-            }],
-            metadata(),
-        )
-        .unwrap();
-        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), before);
-        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
-        assert!(target.is_file());
-        assert!(h.pending_operations().unwrap().is_empty());
-    }
-
-    #[test]
-    fn recovery_preserves_original_when_completed_copy_is_changed_or_missing() {
-        for damage in ["changed", "missing", "already removed"] {
-            let dir = TempDir::new().unwrap();
-            let source =
-                Utf8PathBuf::try_from(dir.path().join("source")).unwrap();
-            let target =
-                Utf8PathBuf::try_from(dir.path().join("target")).unwrap();
-            let history_path =
-                Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap();
-            std::fs::write(&source, b"only original").unwrap();
-            let copy = Action::CopyFile {
-                source: source.clone(),
-                target: target.clone(),
-            };
-            let remove = Action::RemoveFile(source.clone());
-            let mut h = History::new(history_path.clone());
-            h.load().unwrap();
-            let id = h
-                .begin_operation(OperationKind::Apply, None, Some(metadata()))
-                .unwrap();
-            h.set_operation_plan(id, &[
-                StoredAction::from(&copy),
-                StoredAction::from(&remove),
-            ])
-            .unwrap();
-            let entry = prepare_action(&copy, OperationKind::Apply).unwrap();
-            h.append_prepared(id, &entry).unwrap();
-            install_prepared(&entry).unwrap();
-            h.complete_action(id, 0).unwrap();
-            let entry = prepare_action(&remove, OperationKind::Apply).unwrap();
-            h.append_prepared(id, &entry).unwrap();
-            match damage {
-                "changed" => {
-                    std::fs::write(&target, b"external change").unwrap();
-                },
-                "missing" => std::fs::remove_file(&target).unwrap(),
-                _ => install_prepared(&entry).unwrap(),
-            }
-            drop(h);
-            let mut h = History::new(history_path);
-            h.load().unwrap();
-            let result =
-                recover_pending(&mut h, &FsHandler::new(FSMode::Default));
-            if damage == "already removed" {
-                result.unwrap();
-                assert!(!source.exists());
-                assert_eq!(std::fs::read(&target).unwrap(), b"only original");
-            } else {
-                assert!(result.is_err());
-                assert_eq!(std::fs::read(&source).unwrap(), b"only original");
-                assert!(
-                    !h.pending_operations().unwrap()[0].entries[1].completed
-                );
-            }
-        }
-    }
-    #[cfg(unix)]
-    #[test]
-    fn parent_symlink_edit_and_rename_share_expected_identity() {
-        let dir = TempDir::new().unwrap();
-        let path = audio(&dir);
-        let link = dir.path().join("alias");
-        std::os::unix::fs::symlink(dir.path(), &link).unwrap();
-        let alias = Utf8PathBuf::try_from(link.join("song.mp3")).unwrap();
-        let target =
-            Utf8PathBuf::try_from(dir.path().join("moved.mp3")).unwrap();
-        let before = std::fs::read(&path).unwrap();
-        let fs = FsHandler::new(FSMode::Default);
-        let mut h = History::new(
-            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
+        let a = h.current_attempt().unwrap().unwrap();
+        assert_eq!(
+            std::fs::read(a.details.paths.last().unwrap()).unwrap(),
+            before
         );
-        h.load().unwrap();
-        let record = execute_recorded(
-            &mut h,
-            &fs,
-            vec![edit(&alias, "Nemo", "Changed"), Action::MoveFile {
-                source: alias,
-                target: target.clone(),
-            }],
-            metadata(),
-        )
-        .unwrap();
-        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), before);
-        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
-        assert!(target.exists());
-    }
-
-    #[test]
-    fn case_only_move_uses_one_identity_when_filesystem_folds_case() {
-        let dir = TempDir::new().unwrap();
-        let source =
-            Utf8PathBuf::try_from(dir.path().join("Original")).unwrap();
-        let target =
-            Utf8PathBuf::try_from(dir.path().join("original")).unwrap();
-        std::fs::write(&source, b"bytes").unwrap();
-        if !target.exists() {
-            return;
-        } // This host has case-sensitive names.
-        let fs = FsHandler::new(FSMode::Default);
-        let mut h = History::new(
-            Utf8PathBuf::try_from(dir.path().join("h.hist")).unwrap(),
-        );
-        h.load().unwrap();
-        let record = execute_recorded(
-            &mut h,
-            &fs,
-            vec![Action::MoveFile {
-                source: source.clone(),
-                target: target.clone(),
-            }],
-            metadata(),
-        )
-        .unwrap();
-        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
-        replay_record(&mut h, &fs, &record, HistoryMode::Redo).unwrap();
-        assert_eq!(std::fs::read(target).unwrap(), b"bytes");
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn distinct_case_sensitive_hard_links_keep_separate_expected_keys() {
-        let dir = TempDir::new().unwrap();
-        let source =
-            Utf8PathBuf::try_from(dir.path().join("Original")).unwrap();
-        let target =
-            Utf8PathBuf::try_from(dir.path().join("original")).unwrap();
-        std::fs::write(&source, b"bytes").unwrap();
-        if target.exists() {
-            return;
-        }
-        std::fs::hard_link(&source, &target).unwrap();
-        assert_ne!(
-            path_key(source.as_str()).unwrap(),
-            path_key(target.as_str()).unwrap()
+        assert_ne!(std::fs::read(&path).unwrap(), before);
+        assert_eq!(h.records().last().unwrap().applied_count(), 0);
+        db.execute_batch("DROP TRIGGER fail_confirmation").unwrap();
+        h.resolve_attempt(a.id, AttemptOutcome::Applied).unwrap();
+        assert_eq!(h.records().last().unwrap().applied_count(), 1);
+        assert_eq!(
+            std::fs::read(a.details.paths.last().unwrap()).unwrap(),
+            before
         );
     }
 }

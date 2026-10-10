@@ -157,7 +157,7 @@ fn invalid_recording_does_not_mutate_history() {
         )],
     };
     let id = history
-        .begin_operation(
+        .begin_run(
             OperationKind::Apply,
             None,
             Some(ActionRecordMetadata::new(
@@ -168,9 +168,20 @@ fn invalid_recording_does_not_mutate_history() {
         )
         .unwrap();
     assert!(
-        history.set_operation_plan(id, &[StoredAction::from(&action)]).is_err()
+        history
+            .begin_attempt(
+                id,
+                0,
+                &StoredAction::from(&action),
+                &tfmttools_core::history::AttemptDetails {
+                    paths: vec!["a".into()],
+                    instructions: "Inspect".into()
+                },
+                None
+            )
+            .is_err()
     );
-    history.cancel_unstarted(id).unwrap();
-    assert!(history.pending_operations().unwrap().is_empty());
-    assert!(history.is_empty());
+    history.close_run(id, false).unwrap();
+    assert!(history.current_attempt().unwrap().is_none());
+    assert!(history.records().iter().all(Record::is_empty));
 }

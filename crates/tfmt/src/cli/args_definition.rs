@@ -1,5 +1,5 @@
 use camino::Utf8PathBuf;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use tfmttools_fs::FileOrName;
 
 use crate::ui::PreviewListSize;
@@ -38,6 +38,9 @@ pub struct TFMTArgs {
 pub enum TFMTSubcommand {
     /// Clear the rename history.
     ClearHistory,
+
+    /// Resolve the last attempted action in history after manual file repair.
+    ResolveHistory(ResolveHistoryArgs),
 
     #[command(alias = "history")]
     /// Show a summary of the rename history.
@@ -145,4 +148,17 @@ pub struct TemplateArgs {
 pub struct UndoRedoArgs {
     /// Amount of actions.
     pub amount: Option<usize>,
+}
+
+#[derive(Args, Debug)]
+pub struct ResolveHistoryArgs {
+    #[arg(long)]
+    pub attempt: i64,
+    #[arg(long, value_enum)]
+    pub outcome: ResolutionOutcome,
+}
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ResolutionOutcome {
+    Applied,
+    NotApplied,
 }

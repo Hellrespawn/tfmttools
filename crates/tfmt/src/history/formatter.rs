@@ -146,13 +146,28 @@ impl HistoryFormatter {
     pub fn format_record(&self, record: &Record) -> String {
         let summary = RecordSummary::from_record(record);
 
-        let base_string = format!(
+        let mut base_string = format!(
             "{} [#{}] ({})",
             record.timestamp().format(DATE_FORMAT),
             summary.run_id,
             summary
         );
 
+        if !record.is_complete()
+            || !record.redo_allowed()
+            || (record.applied_count() > 0
+                && record.applied_count() < record.len())
+        {
+            write!(
+                base_string,
+                " [applied {}/{}{}{}]",
+                record.applied_count(),
+                record.len(),
+                if record.is_complete() { "" } else { ", partial run" },
+                if record.redo_allowed() { "" } else { ", redo disabled" }
+            )
+            .expect("Writing to String cannot fail");
+        }
         match self.format {
             HistoryFormat::Normal => base_string,
             HistoryFormat::Verbose => {

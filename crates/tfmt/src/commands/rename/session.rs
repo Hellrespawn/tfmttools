@@ -30,7 +30,7 @@ impl<'a> RenameSession<'a> {
             app_options.fs_mode(),
         )?;
 
-        crate::history::execution::recover_pending(&mut history, fs_handler)?;
+        crate::history::execution::check_interrupted(&mut history, fs_handler)?;
 
         Ok(Self {
             fs_handler,

@@ -85,7 +85,7 @@ impl<'a> ActionHandler<'a> {
                 self.fs_handler.create_dir(path)?;
             },
             Action::EditTagValues { .. } => {
-                return Err(crate::error::FsError::Recovery(
+                return Err(crate::error::FsError::Execution(
                     "Tag replay requires recorded binary patches".into(),
                 ));
             },
@@ -119,8 +119,8 @@ impl<'a> ActionHandler<'a> {
                 self.fs_handler.remove_dir(path)?;
             },
             Action::EditTagValues { .. } => {
-                return Err(crate::error::FsError::Recovery(
-                    "Tag edits require a journaled candidate switch".into(),
+                return Err(crate::error::FsError::Execution(
+                    "Tag edits require a prepared candidate switch".into(),
                 ));
             },
         }

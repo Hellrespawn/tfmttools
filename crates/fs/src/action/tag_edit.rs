@@ -28,7 +28,7 @@ pub fn write_tag_candidate(
             .items()
             .any(|item| tag_item_matches(item, key, change.kind(), expected))
         {
-            return Err(FsError::Recovery(format!(
+            return Err(FsError::Execution(format!(
                 "Requested source tag value missing: {}",
                 change.key()
             )));
@@ -53,7 +53,7 @@ pub fn write_tag_candidate(
     let written = lofty::read_from_path(path)
         .map_err(|e| FsError::Lofty(path.to_owned(), e))?;
     let written_tag = written.primary_tag().ok_or_else(|| {
-        FsError::Recovery("Written candidate has no primary tag".into())
+        FsError::Execution("Written candidate has no primary tag".into())
     })?;
     for change in changes {
         let key = parse_item_key(change.key())?;
@@ -62,14 +62,14 @@ pub fn write_tag_candidate(
             .items()
             .any(|item| tag_item_matches(item, key, change.kind(), value))
         {
-            return Err(FsError::Recovery(format!(
+            return Err(FsError::Execution(format!(
                 "Candidate tag verification failed: {}",
                 change.key()
             )));
         }
         if let Some(encoding) = encoding {
             let id = key.map_key(TagType::Id3v2).ok_or_else(|| {
-                FsError::Recovery("Requested encoding has no ID3 frame".into())
+                FsError::Execution("Requested encoding has no ID3 frame".into())
             })?;
             let mut file = std::fs::File::open(path)?;
             let options = lofty::config::ParseOptions::new();
@@ -95,13 +95,13 @@ pub fn write_tag_candidate(
                 _ => None,
             }
             .ok_or_else(|| {
-                FsError::Recovery(
+                FsError::Execution(
                     "Cannot verify native ID3 encoding for this format".into(),
                 )
             })?;
             let expected =
                 text_encoding_from_name(encoding).ok_or_else(|| {
-                    FsError::Recovery("Unknown requested encoding".into())
+                    FsError::Execution("Unknown requested encoding".into())
                 })?;
             let mut found = false;
             for frame in frames {
@@ -123,14 +123,14 @@ pub fn write_tag_candidate(
                 if let Some(actual) = actual {
                     found = true;
                     if actual != expected {
-                        return Err(FsError::Recovery(
+                        return Err(FsError::Execution(
                             "Candidate encoding verification failed".into(),
                         ));
                     }
                 }
             }
             if !found {
-                return Err(FsError::Recovery(
+                return Err(FsError::Execution(
                     "Candidate encoding frame missing".into(),
                 ));
             }
@@ -183,13 +183,13 @@ fn tag_with_encoding_changes(
                 )));
             } else if id.starts_with('W') && id.len() == 4 {
                 let frame_id = FrameId::new(id)
-                    .map_err(|e| FsError::Recovery(e.to_string()))?;
+                    .map_err(|e| FsError::Execution(e.to_string()))?;
                 id3v2_tag.insert(Frame::Url(UrlLinkFrame::new(
                     frame_id,
                     value.to_owned(),
                 )));
             } else {
-                return Err(FsError::Recovery(
+                return Err(FsError::Execution(
                     "Unsupported ID3 locator mapping".into(),
                 ));
             }

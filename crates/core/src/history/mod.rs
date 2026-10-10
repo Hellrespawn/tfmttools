@@ -1,7 +1,7 @@
+mod attempt;
 mod conversion;
 mod database;
 mod error;
-mod journal;
 mod model;
 mod patch;
 mod persistence;
@@ -36,10 +36,10 @@ impl HistoryMode {
     }
 }
 
-pub use database::history_schema_sql;
-pub use journal::{
-    OperationId, OperationKind, PendingEntry, PendingOperation, PreparedAction,
-    RecoveryDescriptor,
+pub use attempt::{
+    AttemptDetails, AttemptId, AttemptOutcome, CurrentAttempt, OperationKind,
+    RunId,
 };
+pub use database::history_schema_sql;
 pub use patch::{BinaryPatchPair, ByteIdentity};
 pub use stored::{StoredAction, StoredTagValueChange, StoredTagValueKind};

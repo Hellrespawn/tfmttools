@@ -1,7 +1,7 @@
 # Incremental history and manual interruption handling
 
 Date: 2026-10-10
-Status: Draft for review
+Status: Approved
 
 ## Implementation priorities
 

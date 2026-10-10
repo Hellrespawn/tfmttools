@@ -66,7 +66,7 @@ impl<'a> ActionExecutor<'a> {
             };
             if let Action::MoveFile { source, target } = &action
                 && (matches!(self.move_mode, MoveMode::AlwaysCopy)
-                    || super::recorded_execution::crosses_devices(
+                    || super::prepared_execution::crosses_devices(
                         source, target,
                     )?)
             {

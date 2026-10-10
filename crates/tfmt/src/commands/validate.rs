@@ -21,7 +21,7 @@ use tfmttools_fs::{
 use tracing::{debug, trace};
 
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
-use crate::history::load_history;
+use crate::history::load_history_for_mode;
 use crate::ui::ProgressBar;
 
 pub fn validate(
@@ -36,11 +36,12 @@ pub fn validate(
         bail!("--fix requires a validation type.");
     }
 
-    let mut history = if validate_args.fix
-        && !matches!(app_options.fs_mode(), FSMode::DryRun)
-    {
-        let (mut history, _) = load_history(&app_options.history_file_path()?)?;
-        crate::history::execution::recover_pending(&mut history, fs_handler)?;
+    let mut history = if validate_args.fix {
+        let (mut history, _) = load_history_for_mode(
+            &app_options.history_file_path()?,
+            app_options.fs_mode(),
+        )?;
+        crate::history::execution::check_interrupted(&mut history, fs_handler)?;
         Some(history)
     } else {
         None

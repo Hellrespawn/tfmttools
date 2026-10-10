@@ -3,6 +3,6 @@ use tfmttools_core::history::history_schema_sql;
 fn schema_matches_snapshot() {
     assert_eq!(
         history_schema_sql(),
-        include_str!("../../../docs/history/schema-v1.sql")
+        include_str!("../../../docs/history/schema-v2.sql")
     );
 }

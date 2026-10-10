@@ -6,8 +6,8 @@ pub type FsResult<T = (), E = FsError> = std::result::Result<T, E>;
 
 #[derive(Error, Debug)]
 pub enum FsError {
-    #[error("File recovery error: {0}")]
-    Recovery(String),
+    #[error("Filesystem execution error: {0}")]
+    Execution(String),
 
     #[error("Path exists but is not a directory: {0}")]
     NotADirectory(Utf8PathBuf),

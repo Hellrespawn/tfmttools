@@ -61,12 +61,8 @@ fn rejects_json_without_importing_or_rewriting() {
         );
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
         assert!(
-            h.begin_operation(
-                OperationKind::Apply,
-                None,
-                Some(metadata("rejected"))
-            )
-            .is_err()
+            h.begin_run(OperationKind::Apply, None, Some(metadata("rejected")))
+                .is_err()
         );
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
     }

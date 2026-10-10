@@ -41,7 +41,7 @@ The workspace is split by responsibility:
 - `crates/fs/` applies rename plans to the filesystem and provides related file
   handling helpers.
 - `crates/core/src/history/` contains the history data model and the concrete
-  SQLite history storage and recovery journal used by the CLI.
+  SQLite history storage and interruption reporting used by the CLI.
 - [crates/picotmpl/](crates/picotmpl/README.md) implements the new
   path template language as an independent library. Its example is
   `examples/stef.tfmt`; the CLI uses this library for all templates.
@@ -307,15 +307,15 @@ and unsupported schema versions stop commands before applying new actions.
 
 Records preserve IDs, ordering, timestamps, template metadata, and replay states.
 SQLite uses STRICT tables, enforced foreign keys, rollback journaling, and
-`synchronous=EXTRA` to make recovery intent and binary patches durable before
-file changes. Database commits and filesystem changes remain separate operations.
+`synchronous=EXTRA`. Intent and tag patches are saved before each action; its
+successful completion is committed before the next action starts. Database
+commits and filesystem changes remain separate operations.
 
-Tag fixes edit and verify a candidate beside the audio file. Before switching,
-tfmt saves forward and reverse binary patches and a pending operation. It then
-moves the original aside, installs the candidate, and finalizes history before
-deleting the retained original. This uses no additional backup copy. The portable
-switch briefly leaves the original pathname absent. Audio symlinks retain their
-links while the target is edited; hard-linked audio files are rejected. Audio
+Tag fixes edit and verify a candidate beside the audio file. tfmt moves the
+original to a temporary backup, installs the candidate, records completion, then
+removes the backup. This uses no additional backup copy. The portable switch
+briefly leaves the original pathname absent. Audio symlinks retain their links
+while the target is edited; hard-linked audio files are rejected. Audio
 replacement currently requires Unix hard-link checks, and preserves permissions
 but does not promise to preserve ACLs or extended attributes.
 
@@ -325,25 +325,50 @@ layout and encodings. If the file has changed since the operation, replay fails
 without overwriting it. New files and restored candidates are verified before
 installation; raw tag serialization is never used for undo/redo.
 
-Mutating commands recover interrupted operations before planning new work.
-`show-history` reports pending recovery without changing audio or the database;
-`clear-history` refuses pending recovery work. Recovery inspects saved progress,
-paths, and hashes. Unexpected file states stop recovery and retain the candidate
-and original for inspection. Recovery retries directory synchronization before
-acknowledging file changes or artifact cleanup. File actions require regular files;
-move destinations must be absent or a verified case-only alias of the source.
-Distinct hard links at the destination are rejected before recording the move.
-Do not delete recovery files while work is pending.
-Dry runs neither recover pending work nor write history or audio files.
-
-Rename and cleanup actions are recorded in order, including staging moves and
+Commands stop on the first error. Confirmed actions stay in history and can be
+undone, including the applied prefix of a partially undone record. Partial runs
+and records affected by failed or interrupted replay cannot be redone. Rename
+and cleanup actions are recorded in order, including staging moves and
 copy/remove steps. Cleanup confirmation happens before file changes, and the
-configuration and bin directories are protected from cleanup. A run is finalized
-only after its actions complete; replay finalizes each record separately. The
-session lock excludes cooperating writers but cannot prevent arbitrary external
-programs from changing files during a switch.
+configuration and bin directories are protected from cleanup.
 
-The generated [version 1 SQL schema](docs/history/schema-v1.sql) describes the
+An error after an action starts, a crash, or power loss can leave that action's
+completion unconfirmed. tfmt reports the last attempted action, affected paths,
+and what history confirms. It never resumes, reverses, or infers the outcome of
+an interrupted action. Check and repair the files manually, then explicitly
+record whether the attempted action happened:
+
+```sh
+tfmt resolve-history --attempt 12 --outcome applied
+# Or, after restoring the state before the attempted action:
+tfmt resolve-history --attempt 12 --outcome not-applied
+```
+
+Use the same configuration directory as the interrupted command. Resolution
+updates history only; it does not inspect or change files or remove artifacts.
+For a partial copy/delete operation, finish the operation or restore its original
+state manually before choosing an outcome. A surviving tag backup is retained
+until completion is confirmed; inspect the reported candidate and backup paths
+before removing anything. Interruption during backup cleanup can leave an orphan
+backup after the action is already confirmed. Remove that backup manually;
+tfmt does not scan for or automatically delete orphan artifacts.
+
+Unresolved attempts block new file mutations, undo, redo, and clear-history.
+`show-history` and dry runs can report unresolved history without changing it.
+A writable invocation closes a marker-free interrupted run as partial and
+reports its confirmed actions, without executing file operations. Completed
+version-1 databases migrate on a writable invocation; pending version-1 work
+must be resolved with the compatible tfmt version first. Read-only commands ask
+for a writable migration when necessary. Invalid databases remain errors;
+manual resolution does not repair database corruption.
+
+File actions require regular files. Move destinations must be absent or a
+verified case-only alias of the source; distinct hard links are rejected.
+Copies are verified and synced before associated source deletion. The session
+lock excludes cooperating writers but cannot prevent arbitrary external
+programs from changing files. Dry runs write neither history nor audio.
+
+The generated [version 2 SQL schema](docs/history/schema-v2.sql) describes the
 SQLite contract. Regenerate it with `cargo xtask history-schema`; core tests
 compare it against the checked-in snapshot. Published database format changes
 require a version bump, migration, updated schema, and compatibility/replay tests.

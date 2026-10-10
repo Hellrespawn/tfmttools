@@ -30,7 +30,13 @@ fn ids(records: &[Record]) -> Vec<Option<usize>> {
 fn undo_is_reverse_and_redo_is_forward() {
     let (_directory, mut history) = history();
     for _ in 0..4 {
-        support::history::apply(&mut history, vec![], metadata());
+        support::history::apply(
+            &mut history,
+            vec![tfmttools_core::history::StoredAction::MakeDir {
+                path: "test".into(),
+            }],
+            metadata(),
+        );
     }
     for index in [0, 2, 3] {
         support::history::replay(&mut history, index, OperationKind::Undo);
@@ -54,12 +60,24 @@ fn undo_is_reverse_and_redo_is_forward() {
 fn apply_supersedes_only_undone_records() {
     let (_directory, mut history) = history();
     for _ in 0..3 {
-        support::history::apply(&mut history, vec![], metadata());
+        support::history::apply(
+            &mut history,
+            vec![tfmttools_core::history::StoredAction::MakeDir {
+                path: "test".into(),
+            }],
+            metadata(),
+        );
     }
     support::history::replay(&mut history, 0, OperationKind::Undo);
     support::history::replay(&mut history, 1, OperationKind::Undo);
     support::history::replay(&mut history, 1, OperationKind::Redo);
-    support::history::apply(&mut history, vec![], metadata());
+    support::history::apply(
+        &mut history,
+        vec![tfmttools_core::history::StoredAction::MakeDir {
+            path: "test".into(),
+        }],
+        metadata(),
+    );
     assert_eq!(
         history.records().iter().map(Record::state).collect::<Vec<_>>(),
         vec![
@@ -74,19 +92,35 @@ fn apply_supersedes_only_undone_records() {
 #[test]
 fn ids_follow_existing_record_count() {
     let (_directory, mut history) = history();
-    support::history::apply(&mut history, vec![], metadata());
-    support::history::apply(&mut history, vec![], metadata());
+    support::history::apply(
+        &mut history,
+        vec![tfmttools_core::history::StoredAction::MakeDir {
+            path: "test".into(),
+        }],
+        metadata(),
+    );
+    support::history::apply(
+        &mut history,
+        vec![tfmttools_core::history::StoredAction::MakeDir {
+            path: "test".into(),
+        }],
+        metadata(),
+    );
     assert_eq!(ids(history.records()), vec![Some(0), Some(1)]);
 }
 
 #[test]
 fn replay_requires_an_existing_finalized_record() {
     let (_directory, mut history) = history();
-    support::history::apply(&mut history, vec![], metadata());
-    assert!(history.begin_operation(OperationKind::Undo, None, None).is_err());
-    assert!(
-        history.begin_operation(OperationKind::Undo, Some(8), None).is_err()
+    support::history::apply(
+        &mut history,
+        vec![tfmttools_core::history::StoredAction::MakeDir {
+            path: "test".into(),
+        }],
+        metadata(),
     );
-    assert!(history.pending_operations().unwrap().is_empty());
+    assert!(history.begin_run(OperationKind::Undo, None, None).is_err());
+    assert!(history.begin_run(OperationKind::Undo, Some(8), None).is_err());
+    assert!(history.current_attempt().unwrap().is_none());
     assert_eq!(history.records()[0].state(), RecordState::Applied);
 }
