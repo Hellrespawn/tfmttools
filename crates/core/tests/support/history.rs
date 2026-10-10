@@ -1,6 +1,6 @@
 use tfmttools_core::history::{
-    ActionRecordMetadata, AttemptDetails, History, OperationKind, Record,
-    StoredAction, TemplateMetadata,
+    ActionRecordMetadata, AttemptDetails, History, Record, StoredAction,
+    TemplateMetadata,
 };
 pub fn metadata(run: &str) -> ActionRecordMetadata {
     ActionRecordMetadata::new(
@@ -14,8 +14,9 @@ pub fn apply(
     actions: Vec<StoredAction>,
     metadata: ActionRecordMetadata,
 ) -> Record {
-    let id =
-        history.begin_run(OperationKind::Apply, None, Some(metadata)).unwrap();
+    let id = history
+        .begin_run(tfmttools_core::history::RunRequest::Apply { metadata })
+        .unwrap();
     for (pos, action) in actions.into_iter().enumerate() {
         let a = history
             .begin_attempt(
@@ -36,7 +37,7 @@ pub fn apply(
 pub fn replay(
     history: &mut History,
     record_id: usize,
-    kind: OperationKind,
+    direction: tfmttools_core::history::HistoryMode,
 ) -> Record {
     let record = history
         .records()
@@ -44,12 +45,18 @@ pub fn replay(
         .find(|r| r.id() == Some(record_id))
         .unwrap()
         .clone();
-    let positions: Vec<_> = if kind == OperationKind::Undo {
-        (0..record.applied_count()).rev().collect()
-    } else {
-        (record.applied_count()..record.len()).collect()
-    };
-    let id = history.begin_run(kind, Some(record_id), None).unwrap();
+    let positions: Vec<_> =
+        if matches!(direction, tfmttools_core::history::HistoryMode::Undo) {
+            (0..record.applied_count()).rev().collect()
+        } else {
+            (record.applied_count()..record.len()).collect()
+        };
+    let id = history
+        .begin_run(tfmttools_core::history::RunRequest::Replay {
+            record_id,
+            direction,
+        })
+        .unwrap();
     for pos in positions {
         let a = history
             .begin_attempt(

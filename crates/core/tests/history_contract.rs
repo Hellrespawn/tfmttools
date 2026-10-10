@@ -1,8 +1,7 @@
 use serde_json::{Value, json};
 use tfmttools_core::action::{Action, TagValueChange, TagValueKind};
 use tfmttools_core::history::{
-    ActionRecordMetadata, History, OperationKind, Record, StoredAction,
-    TemplateMetadata,
+    ActionRecordMetadata, History, Record, StoredAction, TemplateMetadata,
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -157,15 +156,13 @@ fn invalid_recording_does_not_mutate_history() {
         )],
     };
     let id = history
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "characters".into() },
                 vec![],
                 "test".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     assert!(
         history

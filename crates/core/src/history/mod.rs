@@ -38,7 +38,7 @@ impl HistoryMode {
 
 pub use attempt::{
     AttemptDetails, AttemptId, AttemptOutcome, CurrentAttempt, OperationKind,
-    RunId,
+    RunId, RunRequest,
 };
 pub use database::history_schema_sql;
 pub use patch::{BinaryPatchPair, ByteIdentity};

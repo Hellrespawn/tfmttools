@@ -124,6 +124,12 @@ impl Drop for History {
             }
             let _ = connection.execute_batch("PRAGMA optimize");
         }
+        // Close SQLite before releasing the session lock. Explicitly unlock:
+        // a concurrent fork may still hold an inherited descriptor until exec.
+        self.connection.take();
+        if let Some(file) = &self.lock_file {
+            let _ = file.unlock();
+        }
     }
 }
 
@@ -166,4 +172,23 @@ pub(super) fn resolve_history_path(path: &Utf8Path) -> Result<Utf8PathBuf> {
     Err(HistoryError::SaveError(format!(
         "Too many history symlink levels: {path}"
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn drop_releases_lock_even_with_a_duplicated_handle() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = Utf8PathBuf::try_from(dir.path().join("history")).unwrap();
+        let mut history = History::new(path.clone());
+        history.load().unwrap();
+        // A concurrent subprocess fork can temporarily inherit this descriptor.
+        let inherited =
+            history.lock_file.as_ref().unwrap().try_clone().unwrap();
+        drop(history);
+        History::new(path).load().unwrap();
+        drop(inherited);
+    }
 }

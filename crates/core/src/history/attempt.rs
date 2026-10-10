@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     ActionRecordMetadata, BinaryPatchPair, ByteIdentity, History, HistoryError,
-    Record, Result, StoredAction, database,
+    HistoryMode, Record, Result, StoredAction, database,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +35,21 @@ impl OperationKind {
         }
     }
 }
+impl From<HistoryMode> for OperationKind {
+    fn from(direction: HistoryMode) -> Self {
+        match direction {
+            HistoryMode::Undo => Self::Undo,
+            HistoryMode::Redo => Self::Redo,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum RunRequest {
+    Apply { metadata: ActionRecordMetadata },
+    Replay { record_id: usize, direction: HistoryMode },
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum AttemptOutcome {
     Applied,
@@ -83,12 +98,11 @@ impl History {
         Ok(())
     }
 
-    pub fn begin_run(
-        &mut self,
-        kind: OperationKind,
-        record_id: Option<usize>,
-        metadata: Option<ActionRecordMetadata>,
-    ) -> Result<RunId> {
+    pub fn begin_run(&mut self, request: RunRequest) -> Result<RunId> {
+        let kind = match &request {
+            RunRequest::Apply { .. } => OperationKind::Apply,
+            RunRequest::Replay { direction, .. } => (*direction).into(),
+        };
         self.ensure_connection()?;
         let tx = self.connection.as_mut().unwrap().transaction()?;
         if tx.query_row("SELECT count(*) FROM runs", [], |r| {
@@ -99,13 +113,8 @@ impl History {
                 "Previous run requires manual history resolution",
             ));
         }
-        let record_id = match kind {
-            OperationKind::Apply => {
-                if record_id.is_some() {
-                    return Err(invalid("New run must not select a record"));
-                }
-                let metadata = metadata
-                    .ok_or_else(|| invalid("New run requires metadata"))?;
+        let record_id = match request {
+            RunRequest::Apply { metadata } => {
                 let id: i64 = tx.query_row(
                     "SELECT coalesce(max(id)+1,0) FROM records",
                     [],
@@ -114,9 +123,7 @@ impl History {
                 tx.execute("INSERT INTO records(id,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,'applied',?2,?3,0,0,1)", params![id,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
                 index(id)?
             },
-            OperationKind::Undo | OperationKind::Redo => {
-                let id = record_id
-                    .ok_or_else(|| invalid("Replay requires a record"))?;
+            RunRequest::Replay { record_id: id, .. } => {
                 let record = database::read_record(&tx, id)?;
                 let eligible = record.next_action_position(kind).is_some();
                 if !eligible {

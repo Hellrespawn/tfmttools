@@ -88,9 +88,7 @@ fn dry_run_tag_fix_leaves_audio_and_history_untouched() {
 #[test]
 fn interrupted_tag_attempt_reports_and_resolves_without_touching_files() {
     use tfmttools_core::action::{TagValueChange, TagValueKind};
-    use tfmttools_core::history::{
-        ActionRecordMetadata, OperationKind, TemplateMetadata,
-    };
+    use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
     for installed in [false, true] {
         for outcome in ["applied", "not-applied"] {
             let dir = setup();
@@ -111,17 +109,15 @@ fn interrupted_tag_attempt_reports_and_resolves_without_touching_files() {
                     .unwrap(),
             );
             let id = h
-                .begin_run(
-                    OperationKind::Apply,
-                    None,
-                    Some(ActionRecordMetadata::new(
+                .begin_run(tfmttools_core::history::RunRequest::Apply {
+                    metadata: ActionRecordMetadata::new(
                         TemplateMetadata::Validation {
                             value: "characters".into(),
                         },
                         vec!["validate".into()],
                         "interrupted".into(),
-                    )),
-                )
+                    ),
+                })
                 .unwrap();
             let attempt = h
                 .begin_attempt(
@@ -193,23 +189,20 @@ fn interrupted_tag_attempt_reports_and_resolves_without_touching_files() {
 #[test]
 fn history_resolution_does_not_require_files_to_exist() {
     use tfmttools_core::history::{
-        ActionRecordMetadata, AttemptDetails, OperationKind, StoredAction,
-        TemplateMetadata,
+        ActionRecordMetadata, AttemptDetails, StoredAction, TemplateMetadata,
     };
     let dir = setup();
     let mut h = History::new(
         Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap(),
     );
     let run_id = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "test".into() },
                 vec![],
                 "manual".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     let a = h
         .begin_attempt(
@@ -261,23 +254,20 @@ fn history_resolution_does_not_require_files_to_exist() {
 #[test]
 fn read_only_history_reports_run_interrupted_between_actions() {
     use tfmttools_core::history::{
-        ActionRecordMetadata, AttemptDetails, OperationKind, StoredAction,
-        TemplateMetadata,
+        ActionRecordMetadata, AttemptDetails, StoredAction, TemplateMetadata,
     };
     let dir = setup();
     let path =
         Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap();
     let mut h = History::new(path.clone());
     let id = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "test".into() },
                 vec![],
                 "between".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     let a = h
         .begin_attempt(
@@ -302,23 +292,20 @@ fn read_only_history_reports_run_interrupted_between_actions() {
 #[test]
 fn dry_run_validation_reports_unresolved_history_without_writes() {
     use tfmttools_core::history::{
-        ActionRecordMetadata, AttemptDetails, OperationKind, StoredAction,
-        TemplateMetadata,
+        ActionRecordMetadata, AttemptDetails, StoredAction, TemplateMetadata,
     };
     let dir = setup();
     let path =
         Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap();
     let mut h = History::new(path.clone());
     let run_id = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "test".into() },
                 vec![],
                 "manual".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     h.begin_attempt(
         run_id,
@@ -343,9 +330,7 @@ fn dry_run_validation_reports_unresolved_history_without_writes() {
 #[test]
 fn interruption_during_tag_switch_preserves_backup_and_missing_original_path() {
     use tfmttools_core::action::{TagValueChange, TagValueKind};
-    use tfmttools_core::history::{
-        ActionRecordMetadata, OperationKind, TemplateMetadata,
-    };
+    use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
     let dir = setup();
     let path = Utf8PathBuf::try_from(dir.path().join("song.mp3")).unwrap();
     let before = std::fs::read(&path).unwrap();
@@ -361,15 +346,13 @@ fn interruption_during_tag_switch_preserves_backup_and_missing_original_path() {
         Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap(),
     );
     let id = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "test".into() },
                 vec![],
                 "switch".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     h.begin_attempt(id, 0, p.action(), p.details(), p.patches()).unwrap();
     p.retain_artifacts();
@@ -385,9 +368,7 @@ fn interruption_during_tag_switch_preserves_backup_and_missing_original_path() {
 #[test]
 fn interruption_after_tag_confirmation_leaves_backup_as_manual_housekeeping() {
     use tfmttools_core::action::{TagValueChange, TagValueKind};
-    use tfmttools_core::history::{
-        ActionRecordMetadata, OperationKind, TemplateMetadata,
-    };
+    use tfmttools_core::history::{ActionRecordMetadata, TemplateMetadata};
     let dir = setup();
     let path = Utf8PathBuf::try_from(dir.path().join("song.mp3")).unwrap();
     let before = std::fs::read(&path).unwrap();
@@ -403,15 +384,13 @@ fn interruption_after_tag_confirmation_leaves_backup_as_manual_housekeeping() {
         Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap(),
     );
     let id = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: ActionRecordMetadata::new(
                 TemplateMetadata::Validation { value: "test".into() },
                 vec![],
                 "cleanup".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     let a =
         h.begin_attempt(id, 0, p.action(), p.details(), p.patches()).unwrap();

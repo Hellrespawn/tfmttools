@@ -32,17 +32,15 @@ fn historical_rename() -> TempDir {
         target: root.join("renamed.mp3"),
     };
     let id = history
-        .begin_run(
-            tfmttools_core::history::OperationKind::Apply,
-            None,
-            Some(tfmttools_core::history::ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: tfmttools_core::history::ActionRecordMetadata::new(
                 tfmttools_core::history::TemplateMetadata::InlineTemplate {
                     value: "{{ artist }}/{{ title }}".into(),
                 },
                 vec![],
                 "old-run".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     let mut prepared = tfmttools_fs::prepare_action(
         &action,

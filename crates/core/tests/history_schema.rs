@@ -14,17 +14,15 @@ fn new_history_uses_initial_schema_and_opens_read_only() {
         .unwrap();
     let mut history = tfmttools_core::history::History::new(path.clone());
     let run = history
-        .begin_run(
-            tfmttools_core::history::OperationKind::Apply,
-            None,
-            Some(tfmttools_core::history::ActionRecordMetadata::new(
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: tfmttools_core::history::ActionRecordMetadata::new(
                 tfmttools_core::history::TemplateMetadata::Validation {
                     value: "test".into(),
                 },
                 vec![],
                 "initial".into(),
-            )),
-        )
+            ),
+        })
         .unwrap();
     history.close_run(run, true).unwrap();
     drop(history);

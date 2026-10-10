@@ -1,7 +1,7 @@
 use camino::Utf8PathBuf;
 use rusqlite::Connection;
 use tempfile::TempDir;
-use tfmttools_core::history::{History, OperationKind, history_schema_sql};
+use tfmttools_core::history::{History, history_schema_sql};
 
 fn database(dir: &TempDir) -> Utf8PathBuf {
     let path =
@@ -53,7 +53,13 @@ fn read_only_access_does_not_modify_database() {
     let path = database(&dir);
     let before = std::fs::read(&path).unwrap();
     let mut h = History::open_read_only(path.clone()).unwrap();
-    assert!(h.begin_run(OperationKind::Undo, Some(0), None).is_err());
+    assert!(
+        h.begin_run(tfmttools_core::history::RunRequest::Replay {
+            record_id: 0,
+            direction: tfmttools_core::history::HistoryMode::Undo
+        })
+        .is_err()
+    );
     drop(h);
     assert_eq!(std::fs::read(path).unwrap(), before);
 }

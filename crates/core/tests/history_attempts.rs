@@ -1,7 +1,7 @@
 mod support;
 use camino::Utf8PathBuf;
 use tfmttools_core::history::{
-    AttemptDetails, AttemptOutcome, History, OperationKind, StoredAction,
+    AttemptDetails, AttemptOutcome, History, StoredAction,
 };
 
 fn setup() -> (tempfile::TempDir, History) {
@@ -36,11 +36,9 @@ fn attempt(
 fn confirmed_prefix_survives_error_and_not_applied_resolution() {
     let (_dir, mut h) = setup();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("partial")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("partial"),
+        })
         .unwrap();
     for (pos, name) in ["a", "b"].iter().enumerate() {
         let id = attempt(&mut h, run, pos, name);
@@ -50,11 +48,9 @@ fn confirmed_prefix_survives_error_and_not_applied_resolution() {
     h.load().unwrap();
     assert_eq!(h.records()[0].len(), 2);
     assert!(
-        h.begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("blocked"))
-        )
+        h.begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("blocked")
+        })
         .is_err()
     );
     let r = h.resolve_attempt(failed, AttemptOutcome::NotApplied).unwrap();
@@ -68,16 +64,19 @@ fn confirmed_prefix_survives_error_and_not_applied_resolution() {
 fn manual_applied_resolution_and_partial_undo_use_cursor() {
     let (_dir, mut h) = setup();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("apply")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("apply"),
+        })
         .unwrap();
     let id = attempt(&mut h, run, 0, "a");
     let r = h.resolve_attempt(id, AttemptOutcome::Applied).unwrap();
     assert_eq!(r.len(), 1);
-    let undo = h.begin_run(OperationKind::Undo, r.id(), None).unwrap();
+    let undo = h
+        .begin_run(tfmttools_core::history::RunRequest::Replay {
+            record_id: r.id().unwrap(),
+            direction: tfmttools_core::history::HistoryMode::Undo,
+        })
+        .unwrap();
     let id = attempt(&mut h, undo, 0, "a");
     h.resolve_attempt(id, AttemptOutcome::Applied).unwrap();
     assert_eq!(h.records()[0].applied_count(), 0);
@@ -87,11 +86,9 @@ fn manual_applied_resolution_and_partial_undo_use_cursor() {
 fn abandoned_run_closes_without_actions_or_attempt() {
     let (_dir, mut h) = setup();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("abandoned")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("abandoned"),
+        })
         .unwrap();
     let id = attempt(&mut h, run, 0, "a");
     h.confirm_attempt(id).unwrap();
@@ -105,11 +102,9 @@ fn abandoned_run_closes_without_actions_or_attempt() {
 fn failed_confirmation_is_atomic_and_stale_attempts_cannot_resolve_new_work() {
     let (dir, mut h) = setup();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("failure")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("failure"),
+        })
         .unwrap();
     let id = attempt(&mut h, run, 0, "a");
     let c = rusqlite::Connection::open(dir.path().join("history")).unwrap();
@@ -120,11 +115,9 @@ fn failed_confirmation_is_atomic_and_stale_attempts_cannot_resolve_new_work() {
     c.execute_batch("DROP TRIGGER fail_confirmation").unwrap();
     h.resolve_attempt(id, AttemptOutcome::NotApplied).unwrap();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("next")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("next"),
+        })
         .unwrap();
     let next = attempt(&mut h, run, 0, "b");
     assert_ne!(id, next);
@@ -139,14 +132,24 @@ fn partial_undo_remains_selectable_and_failed_replay_disables_redo() {
         vec![action("a"), action("b")],
         support::history::metadata("full"),
     );
-    let run = h.begin_run(OperationKind::Undo, r.id(), None).unwrap();
+    let run = h
+        .begin_run(tfmttools_core::history::RunRequest::Replay {
+            record_id: r.id().unwrap(),
+            direction: tfmttools_core::history::HistoryMode::Undo,
+        })
+        .unwrap();
     let id = attempt(&mut h, run, 1, "b");
     h.confirm_attempt(id).unwrap();
     let r = h.close_run(run, false).unwrap();
     assert_eq!(r.applied_count(), 1);
     assert_eq!(h.get_all_records_to_undo().unwrap()[0].applied_count(), 1);
     assert!(h.get_all_records_to_redo().unwrap().is_empty());
-    let run = h.begin_run(OperationKind::Undo, r.id(), None).unwrap();
+    let run = h
+        .begin_run(tfmttools_core::history::RunRequest::Replay {
+            record_id: r.id().unwrap(),
+            direction: tfmttools_core::history::HistoryMode::Undo,
+        })
+        .unwrap();
     let id = attempt(&mut h, run, 0, "a");
     h.confirm_attempt(id).unwrap();
     h.close_run(run, true).unwrap();
@@ -157,11 +160,9 @@ fn partial_undo_remains_selectable_and_failed_replay_disables_redo() {
 fn loading_rejects_attempt_that_disagrees_with_record_cursor() {
     let (dir, mut h) = setup();
     let run = h
-        .begin_run(
-            OperationKind::Apply,
-            None,
-            Some(support::history::metadata("tampered")),
-        )
+        .begin_run(tfmttools_core::history::RunRequest::Apply {
+            metadata: support::history::metadata("tampered"),
+        })
         .unwrap();
     attempt(&mut h, run, 0, "a");
     drop(h);
@@ -196,11 +197,9 @@ fn attempt_details_are_checked_before_insertion_and_when_loaded() {
     ] {
         let (dir, mut h) = setup();
         let run = h
-            .begin_run(
-                OperationKind::Apply,
-                None,
-                Some(support::history::metadata("details")),
-            )
+            .begin_run(tfmttools_core::history::RunRequest::Apply {
+                metadata: support::history::metadata("details"),
+            })
             .unwrap();
         assert!(h.begin_attempt(run, 0, &action("a"), &details, None).is_err());
         assert!(h.current_attempt().unwrap().is_none());

@@ -4,12 +4,27 @@ use color_eyre::eyre::{WrapErr, bail};
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{
     ActionRecordMetadata, History, HistoryMode, OperationKind, Record, RunId,
-    StoredAction,
+    RunRequest, StoredAction,
 };
 use tfmttools_fs::{
     FsHandler, PreparedAction, prepare_action, prepare_tag_edit,
     prepare_tag_replay,
 };
+
+#[derive(Clone, Copy)]
+enum ExecutionContext {
+    Apply,
+    Replay { record_id: usize, direction: HistoryMode },
+}
+
+impl ExecutionContext {
+    fn kind(self) -> OperationKind {
+        match self {
+            Self::Apply => OperationKind::Apply,
+            Self::Replay { direction, .. } => direction.into(),
+        }
+    }
+}
 
 pub(crate) fn interruption_report(history: &History) -> Result<Option<String>> {
     let Some(a) = history.current_attempt()? else {
@@ -73,17 +88,16 @@ pub(crate) fn execute_recorded(
             metadata,
         ));
     }
-    let run = history.begin_run(OperationKind::Apply, None, Some(metadata))?;
+    let run = history.begin_run(RunRequest::Apply { metadata })?;
     let result = execute_actions(
         history,
         run,
-        OperationKind::Apply,
+        ExecutionContext::Apply,
         actions
             .into_iter()
             .enumerate()
             .map(|(p, a)| (p, StoredAction::from(&a)))
             .collect(),
-        None,
     );
     finish_run(history, run, result)
 }
@@ -97,10 +111,6 @@ pub(crate) fn replay_record(
     if fs.is_dry_run() {
         return Ok(record.clone());
     }
-    let kind = match direction {
-        HistoryMode::Undo => OperationKind::Undo,
-        HistoryMode::Redo => OperationKind::Redo,
-    };
     let positions: Vec<_> = match direction {
         HistoryMode::Undo => (0..record.applied_count()).rev().collect(),
         HistoryMode::Redo => (record.applied_count()..record.len()).collect(),
@@ -109,8 +119,16 @@ pub(crate) fn replay_record(
         .into_iter()
         .map(|p| (p, record.actions()[p].clone()))
         .collect();
-    let run = history.begin_run(kind, record.id(), None)?;
-    let result = execute_actions(history, run, kind, actions, record.id());
+    let record_id = record.id().ok_or_else(|| {
+        color_eyre::eyre::eyre!("Replay requires a stored record")
+    })?;
+    let run = history.begin_run(RunRequest::Replay { record_id, direction })?;
+    let result = execute_actions(
+        history,
+        run,
+        ExecutionContext::Replay { record_id, direction },
+        actions,
+    );
     finish_run(history, run, result)
 }
 fn finish_run(
@@ -144,47 +162,36 @@ fn finish_run(
 }
 fn prepare(
     history: &History,
-    kind: OperationKind,
+    context: ExecutionContext,
     position: usize,
     action: &StoredAction,
-    record_id: Option<usize>,
 ) -> Result<PreparedAction> {
     let executable = Action::try_from(action)?;
-    Ok(match &executable {
-        Action::EditTagValues { path, changes }
-            if kind == OperationKind::Apply =>
-        {
+    Ok(match (&executable, context) {
+        (Action::EditTagValues { path, changes }, ExecutionContext::Apply) => {
             prepare_tag_edit(path, changes)?
         },
-        Action::EditTagValues { .. } => {
-            let pair = history
-                .patches(record_id.unwrap(), position)?
-                .ok_or_else(|| {
+        (
+            Action::EditTagValues { .. },
+            ExecutionContext::Replay { record_id, direction },
+        ) => {
+            let pair =
+                history.patches(record_id, position)?.ok_or_else(|| {
                     color_eyre::eyre::eyre!("Recorded binary patches missing")
                 })?;
-            prepare_tag_replay(
-                action,
-                &pair,
-                if kind == OperationKind::Undo {
-                    HistoryMode::Undo
-                } else {
-                    HistoryMode::Redo
-                },
-            )?
+            prepare_tag_replay(action, &pair, direction)?
         },
-        _ => prepare_action(&executable, kind)?,
+        _ => prepare_action(&executable, context.kind())?,
     })
 }
 fn execute_actions(
     history: &mut History,
     run: RunId,
-    kind: OperationKind,
+    context: ExecutionContext,
     actions: Vec<(usize, StoredAction)>,
-    record_id: Option<usize>,
 ) -> Result<()> {
     for (position, action) in actions {
-        let mut prepared =
-            prepare(history, kind, position, &action, record_id)?;
+        let mut prepared = prepare(history, context, position, &action)?;
         // Retain before committing intent: even an ambiguous commit cannot leave
         // durable reporting paths pointing to automatically deleted artifacts.
         prepared.retain_artifacts();
@@ -351,7 +358,7 @@ mod failure_tests {
         };
         let mut h = History::new(root.join("history"));
         let run =
-            h.begin_run(OperationKind::Apply, None, Some(metadata())).unwrap();
+            h.begin_run(RunRequest::Apply { metadata: metadata() }).unwrap();
         h.close_run(run, false).unwrap();
         let db = rusqlite::Connection::open(root.join("history")).unwrap();
         db.execute_batch("CREATE TRIGGER fail_confirmation BEFORE DELETE ON attempts BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();

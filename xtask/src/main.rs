@@ -17,12 +17,12 @@ Tasks:
     manpage DIR       Generate manpages into DIR
     test              cargo test --workspace --exclude tfmt
                       cargo test -p tfmt --lib --bin tfmt
-                      cargo test -p tfmt --test history_compatibility --test history_recovery --test path_templates
+                      cargo test -p tfmt --test history_compatibility --test history_interruption --test path_templates
                       cargo test -p tfmt --test integration -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
     test-cli          cargo test -p tfmt --lib --bin tfmt
-                      cargo test -p tfmt --test history_compatibility --test history_recovery --test path_templates
+                      cargo test -p tfmt --test history_compatibility --test history_interruption --test path_templates
                       cargo test -p tfmt --test integration -- --nocapture
     test-integration  cargo test -p tfmt --test integration -- --nocapture
     lint              cargo +nightly fmt --all --check
@@ -40,7 +40,7 @@ const TEST_HISTORY_COMPAT_ARGS: &[&str] = &[
     "--test",
     "history_compatibility",
     "--test",
-    "history_recovery",
+    "history_interruption",
     "--test",
     "path_templates",
 ];

@@ -39,9 +39,17 @@ fn undo_is_reverse_and_redo_is_forward() {
         );
     }
     for index in [0, 2, 3] {
-        support::history::replay(&mut history, index, OperationKind::Undo);
+        support::history::replay(
+            &mut history,
+            index,
+            tfmttools_core::history::HistoryMode::Undo,
+        );
     }
-    support::history::replay(&mut history, 3, OperationKind::Redo);
+    support::history::replay(
+        &mut history,
+        3,
+        tfmttools_core::history::HistoryMode::Redo,
+    );
     assert_eq!(ids(&history.get_all_records_to_undo().unwrap()), vec![
         Some(3),
         Some(1)
@@ -68,9 +76,21 @@ fn apply_supersedes_only_undone_records() {
             metadata(),
         );
     }
-    support::history::replay(&mut history, 0, OperationKind::Undo);
-    support::history::replay(&mut history, 1, OperationKind::Undo);
-    support::history::replay(&mut history, 1, OperationKind::Redo);
+    support::history::replay(
+        &mut history,
+        0,
+        tfmttools_core::history::HistoryMode::Undo,
+    );
+    support::history::replay(
+        &mut history,
+        1,
+        tfmttools_core::history::HistoryMode::Undo,
+    );
+    support::history::replay(
+        &mut history,
+        1,
+        tfmttools_core::history::HistoryMode::Redo,
+    );
     support::history::apply(
         &mut history,
         vec![tfmttools_core::history::StoredAction::MakeDir {
@@ -119,8 +139,14 @@ fn replay_requires_an_existing_complete_record() {
         }],
         metadata(),
     );
-    assert!(history.begin_run(OperationKind::Undo, None, None).is_err());
-    assert!(history.begin_run(OperationKind::Undo, Some(8), None).is_err());
+    assert!(
+        history
+            .begin_run(tfmttools_core::history::RunRequest::Replay {
+                record_id: 8,
+                direction: tfmttools_core::history::HistoryMode::Undo
+            })
+            .is_err()
+    );
     assert!(history.current_attempt().unwrap().is_none());
     assert_eq!(history.records()[0].state(), RecordState::Applied);
 }
