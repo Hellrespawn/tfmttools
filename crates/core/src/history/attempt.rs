@@ -2,8 +2,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    ActionRecordMetadata, BinaryPatchPair, ByteIdentity, History, HistoryError,
-    HistoryMode, Record, Result, StoredAction, database,
+    ActionRecordMetadata, BinaryPatchPair, History, HistoryError, HistoryMode,
+    Record, Result, StoredAction, database, patch,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,10 +82,10 @@ fn index(n: i64) -> Result<usize> {
     usize::try_from(n).map_err(|e| invalid(&e.to_string()))
 }
 fn encode<T: Serialize>(v: &T) -> Result<String> {
-    serde_json::to_string(v).map_err(|e| invalid(&e.to_string()))
+    serde_json::to_string(v).map_err(|e| HistoryError::SaveError(e.to_string()))
 }
 fn decode<T: serde::de::DeserializeOwned>(v: &str) -> Result<T> {
-    serde_json::from_str(v).map_err(|e| invalid(&e.to_string()))
+    serde_json::from_str(v).map_err(|e| HistoryError::LoadError(e.to_string()))
 }
 
 impl History {
@@ -167,7 +167,7 @@ impl History {
         tx.execute("INSERT INTO attempts(run_id,action_position,payload,details) VALUES(?1,?2,?3,?4)", params![run.0,number(action_position)?,encode(action)?,encode(details)?])?;
         let id = AttemptId(tx.last_insert_rowid());
         if let Some(pair) = patches {
-            insert_attempt_patch(&tx, id, pair)?;
+            patch::insert_attempt(&tx, id, pair)?;
         }
         tx.commit()?;
         Ok(id)
@@ -275,7 +275,7 @@ impl History {
     ) -> Result<Option<BinaryPatchPair>> {
         self.connection
             .as_ref()
-            .map_or(Ok(None), |c| read_patch(c, record_id, position))
+            .map_or(Ok(None), |c| patch::read(c, record_id, position))
     }
 }
 pub(super) fn read_current_attempt(
@@ -288,7 +288,7 @@ pub(super) fn read_current_attempt(
     let action: StoredAction = decode(&r.get::<_, String>(5)?)?;
     database::validate_action(&action)?;
     let details: AttemptDetails = decode(&r.get::<_, String>(6)?)?;
-    let patches = read_attempt_patch(c, id)?;
+    let patches = patch::read_attempt(c, id)?;
     let attempt = CurrentAttempt {
         id,
         run_id: RunId(r.get(1)?),
@@ -299,7 +299,14 @@ pub(super) fn read_current_attempt(
         details,
         patches,
     };
-    validate_attempt(c, &attempt)?;
+    validate_attempt(c, &attempt).map_err(|error| {
+        match error {
+            HistoryError::MutError(message) => {
+                HistoryError::LoadError(format!("Attempt {}: {message}", id.0))
+            },
+            other => other,
+        }
+    })?;
     Ok(Some(attempt))
 }
 
@@ -324,17 +331,10 @@ fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
     if record.next_action_position(a.kind) != Some(a.action_position) {
         return Err(invalid("Attempt position differs from replay cursor"));
     }
-    if matches!(a.action, StoredAction::EditTagValues { .. })
-        != a.patches.is_some()
-    {
-        return Err(invalid("Tag actions require binary patches only"));
-    }
-    if let Some(pair) = &a.patches {
-        validate_patch(pair)?;
-    }
+    patch::validate_action_pair(&a.action, a.patches.as_ref())?;
     if a.kind != OperationKind::Apply
         && (record.actions().get(a.action_position) != Some(&a.action)
-            || a.patches != read_patch(c, a.record_id, a.action_position)?)
+            || a.patches != patch::read(c, a.record_id, a.action_position)?)
     {
         return Err(invalid("Attempt differs from recorded action or patches"));
     }
@@ -352,13 +352,13 @@ fn confirm(c: &Connection, a: &CurrentAttempt) -> Result<()> {
     let rid = number(a.record_id)?;
     match a.kind {
         OperationKind::Apply => {
-            c.execute("INSERT INTO actions VALUES(?1,?2,?3)", params![
+            c.execute("INSERT INTO actions(record_id,position,payload) VALUES(?1,?2,?3)", params![
                 rid,
                 number(a.action_position)?,
                 encode(&a.action)?
             ])?;
             if let Some(pair) = &a.patches {
-                insert_patch(c, a.record_id, a.action_position, pair)?;
+                patch::insert(c, a.record_id, a.action_position, pair)?;
             }
             // Preserve an applied prefix of a partially undone record while invalidating its redo suffix.
             c.execute("UPDATE records SET redo_allowed=0,state=CASE WHEN applied_count=0 THEN 'superseded' ELSE state END WHERE applied_count < (SELECT count(*) FROM actions WHERE record_id=records.id) AND id<>?1",[rid])?;
@@ -375,147 +375,5 @@ fn confirm(c: &Connection, a: &CurrentAttempt) -> Result<()> {
         },
     }
     c.execute("DELETE FROM attempts WHERE id=?1", [a.id.0])?;
-    Ok(())
-}
-fn insert_attempt_patch(
-    c: &Connection,
-    id: AttemptId,
-    p: &BinaryPatchPair,
-) -> Result<()> {
-    c.execute(
-        "INSERT INTO attempt_patches VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-        params![
-            id.0,
-            p.format,
-            i64::try_from(p.before.length)
-                .map_err(|e| invalid(&e.to_string()))?,
-            i64::try_from(p.after.length)
-                .map_err(|e| invalid(&e.to_string()))?,
-            p.before.sha256.as_slice(),
-            p.after.sha256.as_slice(),
-            p.forward,
-            p.reverse
-        ],
-    )?;
-    Ok(())
-}
-fn read_attempt_patch(
-    c: &Connection,
-    id: AttemptId,
-) -> Result<Option<BinaryPatchPair>> {
-    // Reuse patch decoding through a parameterized query with the same column order.
-    read_patch_query(
-        c,
-        "SELECT format,before_length,after_length,before_hash,after_hash,forward,reverse FROM attempt_patches WHERE attempt_id=?1",
-        &[&id.0],
-    )
-}
-fn insert_patch(
-    c: &Connection,
-    record: usize,
-    position: usize,
-    p: &BinaryPatchPair,
-) -> Result<()> {
-    validate_patch(p)?;
-    c.execute(
-        "INSERT INTO patches VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-        params![
-            number(record)?,
-            number(position)?,
-            p.format,
-            i64::try_from(p.before.length)
-                .map_err(|e| HistoryError::SaveError(e.to_string()))?,
-            i64::try_from(p.after.length)
-                .map_err(|e| HistoryError::SaveError(e.to_string()))?,
-            p.before.sha256.as_slice(),
-            p.after.sha256.as_slice(),
-            p.forward,
-            p.reverse
-        ],
-    )?;
-    Ok(())
-}
-fn validate_patch(p: &BinaryPatchPair) -> Result<()> {
-    if p.format != "bsdiff40-v1"
-        || !p.forward.starts_with(b"BSDIFF40")
-        || !p.reverse.starts_with(b"BSDIFF40")
-        || p.forward.len() < 32
-        || p.reverse.len() < 32
-    {
-        return Err(HistoryError::LoadError(
-            "Invalid patch format or header".into(),
-        ));
-    }
-    Ok(())
-}
-fn read_patch(
-    c: &Connection,
-    record: usize,
-    position: usize,
-) -> Result<Option<BinaryPatchPair>> {
-    read_patch_query(
-        c,
-        "SELECT format,before_length,after_length,before_hash,after_hash,forward,reverse FROM patches WHERE record_id=?1 AND action_position=?2",
-        &[&number(record)?, &number(position)?],
-    )
-}
-fn read_patch_query(
-    c: &Connection,
-    sql: &str,
-    values: &[&dyn rusqlite::ToSql],
-) -> Result<Option<BinaryPatchPair>> {
-    let raw = c
-        .query_row(sql, values, |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, i64>(1)?,
-                r.get::<_, i64>(2)?,
-                r.get::<_, Vec<u8>>(3)?,
-                r.get::<_, Vec<u8>>(4)?,
-                r.get::<_, Vec<u8>>(5)?,
-                r.get::<_, Vec<u8>>(6)?,
-            ))
-        })
-        .optional()?;
-    raw.map(|(format, before, after, bh, ah, forward, reverse)| {
-        let pair = BinaryPatchPair {
-            format,
-            before: ByteIdentity {
-                length: u64::try_from(before)
-                    .map_err(|e| HistoryError::LoadError(e.to_string()))?,
-                sha256: bh.try_into().map_err(|_| {
-                    HistoryError::LoadError("Invalid hash length".into())
-                })?,
-            },
-            after: ByteIdentity {
-                length: u64::try_from(after)
-                    .map_err(|e| HistoryError::LoadError(e.to_string()))?,
-                sha256: ah.try_into().map_err(|_| {
-                    HistoryError::LoadError("Invalid hash length".into())
-                })?,
-            },
-            forward,
-            reverse,
-        };
-        validate_patch(&pair)?;
-        Ok(pair)
-    })
-    .transpose()
-}
-
-pub(super) fn validate_patches(
-    c: &Connection,
-    records: &[Record],
-) -> Result<()> {
-    for stored in records {
-        for (position, action) in stored.iter().enumerate() {
-            let pair = read_patch(c, stored.id().unwrap(), position)?;
-            if matches!(action, StoredAction::EditTagValues { .. })
-                != pair.is_some()
-            {
-                return Err(invalid("Action patch data differs from action"));
-            }
-        }
-    }
     Ok(())
 }

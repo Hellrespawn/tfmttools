@@ -60,7 +60,7 @@ impl History {
         // Validate one consistent snapshot, including uncomplete records.
         let transaction = connection.unchecked_transaction()?;
         let records = database::read_records(&transaction)?;
-        super::attempt::validate_patches(&transaction, &records)?;
+        super::patch::validate_records(&transaction, &records)?;
         super::attempt::read_current_attempt(&transaction)?;
         transaction.commit()?;
         self.connection = Some(connection);

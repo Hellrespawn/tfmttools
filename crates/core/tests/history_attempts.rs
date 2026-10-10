@@ -214,3 +214,154 @@ fn attempt_details_are_checked_before_insertion_and_when_loaded() {
         assert!(h.load().is_err());
     }
 }
+
+#[test]
+fn invalid_patch_requests_are_mutation_errors() {
+    use tfmttools_core::history::{
+        BinaryPatchPair, ByteIdentity, HistoryError,
+    };
+    let tag: StoredAction = serde_json::from_value(serde_json::json!({
+        "type":"edit_tag_values", "path":"song.mp3", "changes":[{
+            "key":"track_title", "kind":"text", "old_value":"a", "new_value":"b"
+        }]
+    }))
+    .unwrap();
+    let valid = BinaryPatchPair {
+        format: "bsdiff40-v1".into(),
+        before: ByteIdentity { length: 1, sha256: [1; 32] },
+        after: ByteIdentity { length: 2, sha256: [2; 32] },
+        forward: [b"BSDIFF40".as_slice(), &[0; 24]].concat(),
+        reverse: [b"BSDIFF40".as_slice(), &[0; 24]].concat(),
+    };
+    for case in 0..5 {
+        let (_dir, mut h) = setup();
+        let run = h
+            .begin_run(tfmttools_core::history::RunRequest::Apply {
+                metadata: support::history::metadata("patch"),
+            })
+            .unwrap();
+        let mut pair = valid.clone();
+        match case {
+            0 => pair.format = "unknown".into(),
+            1 => pair.forward.truncate(8),
+            2 => pair.reverse[0] = 0,
+            3 => pair.before.length = u64::MAX,
+            _ => (),
+        }
+        let selected = if case == 4 { action("dir") } else { tag.clone() };
+        let result = h.begin_attempt(
+            run,
+            0,
+            &selected,
+            &AttemptDetails {
+                paths: vec!["path".into()],
+                instructions: "Inspect".into(),
+            },
+            Some(&pair),
+        );
+        if case == 3 {
+            assert!(
+                matches!(result, Err(HistoryError::SaveError(_))),
+                "{result:?}"
+            );
+        } else {
+            assert!(
+                matches!(result, Err(HistoryError::MutError(_))),
+                "{result:?}"
+            );
+        }
+        assert!(h.current_attempt().unwrap().is_none());
+    }
+}
+
+#[test]
+fn malformed_persisted_patches_are_load_errors_with_identity() {
+    use tfmttools_core::history::{BinaryPatchPair, ByteIdentity};
+    let tag: StoredAction = serde_json::from_value(serde_json::json!({
+        "type":"edit_tag_values", "path":"song.mp3", "changes":[{
+            "key":"track_title", "kind":"text", "old_value":"a", "new_value":"b"
+        }]
+    }))
+    .unwrap();
+    let valid = BinaryPatchPair {
+        format: "bsdiff40-v1".into(),
+        before: ByteIdentity { length: 1, sha256: [1; 32] },
+        after: ByteIdentity { length: 2, sha256: [2; 32] },
+        forward: [b"BSDIFF40".as_slice(), &[0; 24]].concat(),
+        reverse: [b"BSDIFF40".as_slice(), &[0; 24]].concat(),
+    };
+
+    for attempted in [true, false] {
+        for corruption in [
+            "SET format='unknown'",
+            "SET forward=X'00'",
+            "SET reverse=zeroblob(32)",
+            "SET before_length=-1",
+            "SET after_hash=X'01'",
+            "delete",
+            "non_tag",
+        ] {
+            let (dir, mut h) = setup();
+            let run = h
+                .begin_run(tfmttools_core::history::RunRequest::Apply {
+                    metadata: support::history::metadata("stored-patch"),
+                })
+                .unwrap();
+            let id = h
+                .begin_attempt(
+                    run,
+                    0,
+                    &tag,
+                    &AttemptDetails {
+                        paths: vec!["song.mp3".into()],
+                        instructions: "Inspect".into(),
+                    },
+                    Some(&valid),
+                )
+                .unwrap();
+            if !attempted {
+                h.confirm_attempt(id).unwrap();
+                h.close_run(run, true).unwrap();
+            }
+            let db =
+                rusqlite::Connection::open(dir.path().join("history")).unwrap();
+            db.execute_batch("PRAGMA ignore_check_constraints=ON").unwrap();
+            let table = if attempted { "attempt_patches" } else { "patches" };
+            let sql = match corruption {
+                "delete" => format!("DELETE FROM {table}"),
+                "non_tag" => {
+                    format!(
+                        "UPDATE {} SET payload='{{\"type\":\"make_dir\",\"path\":\"dir\"}}'",
+                        if attempted { "attempts" } else { "actions" }
+                    )
+                },
+                _ => format!("UPDATE {table} {corruption}"),
+            };
+            db.execute_batch(&sql).unwrap();
+            let error = h.load().unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    tfmttools_core::history::HistoryError::LoadError(_)
+                ),
+                "{corruption}: {error:?}"
+            );
+            if matches!(
+                corruption,
+                "SET forward=X'00'"
+                    | "SET reverse=zeroblob(32)"
+                    | "delete"
+                    | "non_tag"
+            ) {
+                assert!(
+                    error.to_string().contains(if attempted {
+                        "Attempt"
+                    } else {
+                        "Record"
+                    }),
+                    "{error}"
+                );
+            }
+        }
+    }
+}
