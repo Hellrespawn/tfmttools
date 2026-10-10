@@ -165,3 +165,49 @@ fn failed_copy_preserves_source_and_reports_both_paths() {
         target.to_string()
     ]);
 }
+
+#[cfg(unix)]
+#[test]
+#[ignore = "helper subprocess for interrupted_copy_has_only_reported_paths"]
+fn interrupted_copy_worker() {
+    let root =
+        Utf8PathBuf::from(std::env::var("TFMT_INTERRUPTED_COPY_ROOT").unwrap());
+    let mut p = prepare_action(
+        &Action::CopyFile {
+            source: root.join("source"),
+            target: root.join("target"),
+        },
+        OperationKind::Apply,
+    )
+    .unwrap();
+    p.execute().unwrap();
+}
+#[cfg(unix)]
+#[test]
+fn interrupted_copy_has_only_reported_paths() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "source");
+    let target = path(&dir, "target");
+    let before = vec![b'x'; 64 * 1024];
+    std::fs::write(&source, &before).unwrap();
+    // A file-size limit terminates the child during the write, deterministically
+    // leaving the same artifacts as process interruption. It is local to child.
+    let status=std::process::Command::new("/bin/sh")
+        .args(["-c","ulimit -c 0; ulimit -f 1; exec \"$1\" --ignored --exact interrupted_copy_worker", "copy-test"])
+        .arg(std::env::current_exe().unwrap())
+        .env("TFMT_INTERRUPTED_COPY_ROOT",dir.path())
+        .stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null())
+        .status().unwrap();
+    assert!(!status.success());
+    assert!(
+        target.exists(),
+        "Partial copy must be at its reported destination"
+    );
+    assert!(std::fs::metadata(&target).unwrap().len() < before.len() as u64);
+    assert_eq!(std::fs::read(source).unwrap(), before);
+    assert_eq!(
+        std::fs::read_dir(dir.path()).unwrap().count(),
+        2,
+        "No unreported candidate artifacts"
+    );
+}

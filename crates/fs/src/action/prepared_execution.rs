@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use camino::Utf8Path;
 use tfmttools_core::action::Action;
 use tfmttools_core::history::{
@@ -162,26 +160,16 @@ fn execute_filesystem(action: &Action, kind: OperationKind) -> FsResult<()> {
                 return Err(conflict(target));
             }
             if existing.is_none() {
-                let mut candidate = tempfile::Builder::new()
-                    .prefix(".tfmt-copy-")
-                    .tempfile_in(
-                        target.parent().ok_or_else(|| conflict(target))?,
-                    )?;
-                candidate.write_all(&fs_err::read(source)?)?;
-                fs_err::set_permissions(
-                    candidate.path(),
-                    fs_err::metadata(source)?.permissions(),
-                )?;
-                candidate.as_file().sync_all()?;
-                if identity_if_regular(
-                    Utf8Path::from_path(candidate.path()).unwrap(),
-                )?
-                .as_ref()
-                    != Some(&identity)
-                {
-                    return Err(conflict(source));
-                }
-                candidate.persist_noclobber(target).map_err(|e| e.error)?;
+                // A partial copy stays at the already reported destination.
+                // create_new preserves collision safety without hidden artifacts.
+                let mut output = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(target)?;
+                std::io::copy(&mut std::fs::File::open(source)?, &mut output)?;
+                output
+                    .set_permissions(fs_err::metadata(source)?.permissions())?;
+                output.sync_all()?;
             }
             if identity_if_regular(source)?.as_ref() != Some(&identity)
                 || identity_if_regular(target)?.as_ref() != Some(&identity)

@@ -97,30 +97,30 @@ fn close_abandoned_run(&mut self) -> Result<Option<Record>>;
 `Record` adds `applied_count() -> usize`, `is_complete() -> bool`, and
 `redo_allowed() -> bool`. Reuse `History::patches` with its existing signature.
 
-- [ ] Add failing core tests: confirm two actions then fail a third; only the
+- [x] Add failing core tests: confirm two actions then fail a third; only the
   first two are recorded, undo selection includes the partial record, and redo
   eligibility is false. Applied resolution adds exactly the attempted action;
   not-applied resolution does not. Both close the run and clear its marker.
-- [ ] Add failing replay tests: undo decrements the applied cursor, redo
+- [x] Add failing replay tests: undo decrements the applied cursor, redo
   increments it; unconfirmed attempts do neither. Resolution respects direction.
   Partial undo selects the same record before earlier records; a new confirmed
   action supersedes redo, but an empty abandoned run does not.
-- [ ] Add failing migration/transaction tests: completed v1 IDs, timestamps,
+- [x] Add failing migration/transaction tests: completed v1 IDs, timestamps,
   actions, patches, and states survive; pending v1 operations reject migration
   without writes; failed confirmation leaves a marker or a committed completion,
   never half of each. A future schema remains rejected.
-- [ ] Run `cargo xtask test-core`; confirm new assertions fail before implementation.
-- [ ] Implement the interfaces and version-2 migration. Store one open run,
+- [x] Run `cargo xtask test-core`; confirm new assertions fail before implementation.
+- [x] Implement the interfaces and version-2 migration. Store one open run,
   at most one attempt, record completeness/redo eligibility, and applied cursor.
   Migrate undone records with cursor zero and applied/redone records with cursor
   at action count. Validate old schema/pending work before migration. Reject old
   read-only opens with a clear writable-migration requirement rather than mutating.
-- [ ] Replace journal exports and validation dependencies. Delete durable plans,
+- [x] Replace journal exports and validation dependencies. Delete durable plans,
   recovery descriptors, completed/cleaned progress, and old journal mutation
   methods. Preserve payload/patch integrity and stale attempt-ID rejection.
-- [ ] Run `cargo xtask test-core`; expect all core tests to pass. Later consumer
+- [x] Run `cargo xtask test-core`; expect all core tests to pass. Later consumer
   compilation is restored by Tasks 2 and 3; no compatibility recovery adapter.
-- [ ] Commit as `Replace recovery journal with incremental history`.
+- [x] Commit as `Replace recovery journal with incremental history`.
 
 ### Task 2: One-shot filesystem effects and private tag backups
 
@@ -143,23 +143,23 @@ after durable intent. Execute once; do not interpret an already changed target
 as proof of successful prior execution. `confirm` only performs local
 post-confirmation housekeeping; it cannot restore or replay anything.
 
-- [ ] Add failing tests for tag backup retained after execution, deleted only by
+- [x] Add failing tests for tag backup retained after execution, deleted only by
   confirmation, and preserved after an injected install error. Instructions and
   artifact paths identify everything needed for manual repair.
-- [ ] Add failing tests for copy errors preserving the source, partial destination
+- [x] Add failing tests for copy errors preserving the source, partial destination
   reporting, destination verification/synchronization before source deletion,
   collision checks, and staging rename execution without retry logic.
-- [ ] Add a cleanup-error test: confirmation reports the leftover backup path,
+- [x] Add a cleanup-error test: confirmation reports the leftover backup path,
   leaves installed bytes intact, and performs no rollback. Retain exact-byte
   replay, symlink, permissions, hard-link, and stale-input tests.
-- [ ] Run focused fs tests and confirm new assertions fail before implementation.
-- [ ] Implement private one-shot tag switching and non-tag execution. Keep
+- [x] Run focused fs tests and confirm new assertions fail before implementation.
+- [x] Implement private one-shot tag switching and non-tag execution. Keep
   necessary input validation and durability operations within the owning action.
   Remove retained-original restoration, recovery state matching, generalized
   artifact cleanup, and `recover_prepared` exports. Remove the obsolete recovery
   error name where a normal execution error is sufficient.
-- [ ] Run `cargo xtask test-fs`; expect all fs tests to pass.
-- [ ] Commit as `Execute filesystem actions without recovery inference`.
+- [x] Run `cargo xtask test-fs`; expect all fs tests to pass.
+- [x] Commit as `Execute filesystem actions without recovery inference`.
 
 ### Task 3: One execution loop and incremental replay
 
@@ -173,28 +173,28 @@ fs: &FsHandler) -> Result<()>`: report stored intent, close marker-free abandone
 runs only on writable invocations, and reject file mutation if an attempt exists.
 Read-only and dry-run paths report without writing or preparing effects.
 
-- [ ] Add failing CLI execution tests: the first error stops later actions;
+- [x] Add failing CLI execution tests: the first error stops later actions;
   history contains confirmed actions; an execution error retains its marker;
   preparation failure does not create one. Successful history confirmation
   precedes backup deletion and starting the next action.
-- [ ] Add failing tests for completion-commit ambiguity and cleanup failure:
+- [x] Add failing tests for completion-commit ambiguity and cleanup failure:
   reopen/read committed history before claiming completion; retain artifacts
   if completion is unconfirmed. Cleanup failure leaves the action confirmed
   and closes the run as partial without an attempted-action marker.
-- [ ] Add failing mixed-run/replay tests with staging moves: cursor updates
+- [x] Add failing mixed-run/replay tests with staging moves: cursor updates
   survive errors, undo affects only the applied prefix, and redo excludes
   partial or failed/interrupted records.
-- [ ] Run `cargo xtask test-cli`; confirm new behavioral assertions fail.
-- [ ] Rewrite the loop: prepare, commit attempt, retain artifacts, execute,
+- [x] Run `cargo xtask test-cli`; confirm new behavioral assertions fail.
+- [x] Rewrite the loop: prepare, commit attempt, retain artifacts, execute,
   confirm history, perform housekeeping. Close ordinary stopped runs as partial
   where database writes remain possible; leave the durable open run otherwise.
   Replay iterates the remaining applied prefix for undo and the unapplied suffix
   for eligible redo. No filesystem outcome categories or next-session retries.
-- [ ] Delete `expected_states`, `path_key`, recovery mutation-path logic, and
+- [x] Delete `expected_states`, `path_key`, recovery mutation-path logic, and
   all startup recovery calls. Use one interruption formatter across commands.
-- [ ] Run `cargo xtask test-cli`; expect execution and existing CLI tests to pass
+- [x] Run `cargo xtask test-cli`; expect execution and existing CLI tests to pass
   except replaced recovery expectations, which must be removed in this task.
-- [ ] Commit as `Unify incremental apply undo and redo execution`.
+- [x] Commit as `Unify incremental apply undo and redo execution`.
 
 ### Task 4: Explicit history-only manual resolution
 
@@ -207,22 +207,22 @@ Read-only and dry-run paths report without writing or preparing effects.
 outcome: AttemptOutcome) -> Result<()>`. Reject dry-run resolution with a clear
 message; normal dry-run commands remain read-only. No implicit resolution prompt.
 
-- [ ] Add failing subprocess tests: explicit applied/not-applied resolution
+- [x] Add failing subprocess tests: explicit applied/not-applied resolution
   changes only history, including when target paths are absent or inaccessible;
   resolving a tag attempt never removes its backup/candidate. Wrong attempt IDs
   fail without writes, and an unresolved compound copy/delete reports both paths.
-- [ ] Add failing interruption tests at intent, file effect, completion commit,
+- [x] Add failing interruption tests at intent, file effect, completion commit,
   and cleanup: reopening never executes, restores, deletes, or hashes audio
   files. Reports show command direction, confirmed action count, attempted action,
   and saved artifact paths. Interruption between actions closes only the run.
-- [ ] Add CLI tests for blocked mutation/undo/redo/clear-history, read-only
+- [x] Add CLI tests for blocked mutation/undo/redo/clear-history, read-only
   show-history, dry runs, and successful resolution followed by explicit undo.
-- [ ] Run `cargo xtask test-cli`; confirm new tests fail before command changes.
-- [ ] Implement the command and reports using stored data only. Include guidance
+- [x] Run `cargo xtask test-cli`; confirm new tests fail before command changes.
+- [x] Implement the command and reports using stored data only. Include guidance
   to repair a compound partial result into applied or not-applied state before
   resolution. Never provide a filesystem recovery option.
-- [ ] Run `cargo xtask test-cli` and `cargo xtask test-integration`; expect PASS.
-- [ ] Commit as `Add explicit manual history resolution`.
+- [x] Run `cargo xtask test-cli` and `cargo xtask test-integration`; expect PASS.
+- [x] Commit as `Add explicit manual history resolution`.
 
 ### Task 5: Documentation, deletion review, and final verification
 
@@ -233,20 +233,20 @@ snapshots, `xtask/src/main.rs`, and relevant CLI fixtures/report expectations.
 retaining v1 migration input. Public help documents explicit resolution and the
 manual filesystem repair contract.
 
-- [ ] Update user documentation with partial-run undo, redo restrictions,
+- [x] Update user documentation with partial-run undo, redo restrictions,
   interruption reports, tag backups, and history-only resolution examples.
   Update crate guidance using writing-for-agents instructions at execution time.
-- [ ] Run `cargo xtask history-schema`; update versioned snapshots and schema
+- [x] Run `cargo xtask history-schema`; update versioned snapshots and schema
   tests to compare v2. Check fixture/report expectations affected by display.
-- [ ] Search for `recover_pending`, `recover_prepared`, `RecoveryDescriptor`,
+- [x] Search for `recover_pending`, `recover_prepared`, `RecoveryDescriptor`,
   `set_operation_plan`, `complete_cleanup`, and expected-state reconstruction.
   Remove obsolete production code and tests; historical specs/migrations remain.
-- [ ] Review the resulting diff for one attempt-and-confirm flow, local tag
+- [x] Review the resulting diff for one attempt-and-confirm flow, local tag
   backups, no generic recovery replacement, and no stored remaining plan.
-- [ ] Run `cargo test --workspace`,
+- [x] Run `cargo test --workspace`,
   `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`.
   Expect all commands to pass; fix actionable failures before completion.
-- [ ] Commit as `Document manual interruption handling and remove recovery remnants`.
+- [x] Commit as `Document manual interruption handling and remove recovery remnants`.
 
 ## Self-review
 
@@ -261,3 +261,20 @@ Tasks 1–3 replace coupled interfaces in order; a workspace build is required
 after Task 3. Do not retain the old recovery engine just to keep intermediate
 commits workspace-buildable. The proposed CLI spelling and conservative replay
 eligibility rule are explicit review points before implementation.
+
+## Execution rulings
+
+- Core, fs, and CLI replacements were committed together after workspace
+  verification because their removed interfaces were coupled. Focused crate
+  tests ran during the transition; xtask's own dependencies require the CLI to
+  compile even for a core-only command.
+- Tag preparation artifacts are retained before committing intent, protecting
+  ambiguous commits. Intent failures report their paths for manual removal.
+- Copies write to a newly created destination directly. Partial copies therefore
+  remain at a reported path; no random copy candidate or cleanup protocol is
+  needed. Destination verification and synchronization still precede deletion.
+- The generated v2 SQL snapshot is the executable historical v1 plus v2
+  migration sequence, avoiding a second maintained copy of the complete schema.
+- Independent final review found the unreported-copy-candidate issue. The direct
+  destination implementation replaces it; a subprocess file-size-limit test
+  observed the failure before the fix and verifies interruption artifacts after.
