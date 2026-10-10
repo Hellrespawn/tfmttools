@@ -22,7 +22,7 @@ pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
         println!("{report}");
     }
     if path.as_path().exists() {
-        println!("{}", formatter.format_history(&history)?);
+        println!("{}", formatter.format_history(&history));
     } else {
         println!("There is no history.");
     }

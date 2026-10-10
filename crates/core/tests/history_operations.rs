@@ -22,8 +22,8 @@ fn metadata() -> ActionRecordMetadata {
     )
 }
 
-fn ids(records: &[Record]) -> Vec<Option<usize>> {
-    records.iter().map(Record::id).collect()
+fn ids(records: &[&Record]) -> Vec<Option<usize>> {
+    records.iter().map(|r| r.id()).collect()
 }
 
 #[test]
@@ -50,18 +50,43 @@ fn undo_is_reverse_and_redo_is_forward() {
         3,
         tfmttools_core::history::HistoryMode::Redo,
     );
-    assert_eq!(ids(&history.get_all_records_to_undo().unwrap()), vec![
-        Some(3),
-        Some(1)
-    ]);
-    assert_eq!(ids(&history.get_all_records_to_redo().unwrap()), vec![
-        Some(0),
-        Some(2)
-    ]);
-    assert_eq!(ids(&history.get_n_records_to_undo(1).unwrap()), vec![Some(3)]);
-    assert_eq!(ids(&history.get_n_records_to_redo(1).unwrap()), vec![Some(0)]);
-    assert!(history.get_n_records_to_undo(0).unwrap().is_empty());
-    assert!(history.get_n_records_to_redo(0).unwrap().is_empty());
+    assert_eq!(
+        ids(&history
+            .records_for(tfmttools_core::history::HistoryMode::Undo, None)),
+        vec![Some(3), Some(1)]
+    );
+    assert_eq!(
+        ids(&history
+            .records_for(tfmttools_core::history::HistoryMode::Redo, None)),
+        vec![Some(0), Some(2)]
+    );
+    assert_eq!(
+        ids(&history
+            .records_for(tfmttools_core::history::HistoryMode::Undo, Some(1))),
+        vec![Some(3)]
+    );
+    assert_eq!(
+        ids(&history
+            .records_for(tfmttools_core::history::HistoryMode::Redo, Some(1))),
+        vec![Some(0)]
+    );
+    assert_eq!(
+        history
+            .records_for(tfmttools_core::history::HistoryMode::Undo, Some(100))
+            .len(),
+        2
+    );
+    assert_eq!(history.previous_record().unwrap().id(), Some(3));
+    assert!(
+        history
+            .records_for(tfmttools_core::history::HistoryMode::Undo, Some(0))
+            .is_empty()
+    );
+    assert!(
+        history
+            .records_for(tfmttools_core::history::HistoryMode::Redo, Some(0))
+            .is_empty()
+    );
 }
 
 #[test]
@@ -126,7 +151,10 @@ fn ids_follow_existing_record_count() {
         }],
         metadata(),
     );
-    assert_eq!(ids(history.records()), vec![Some(0), Some(1)]);
+    assert_eq!(ids(&history.records().iter().collect::<Vec<_>>()), vec![
+        Some(0),
+        Some(1)
+    ]);
 }
 
 #[test]

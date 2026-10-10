@@ -1,8 +1,7 @@
 use std::fmt::Write;
 
-use color_eyre::Result;
 use tfmttools_core::history::{
-    History, Record, StoredAction, TemplateMetadata,
+    History, HistoryMode, Record, StoredAction, TemplateMetadata,
 };
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
@@ -54,17 +53,17 @@ impl HistoryFormatter {
         self
     }
 
-    pub fn format_history(&self, history: &History) -> Result<String> {
-        let undo = history.get_all_records_to_undo()?;
+    pub fn format_history(&self, history: &History) -> String {
+        let undo = history.records_for(HistoryMode::Undo, None);
 
         let undo_string = self.format_records(&undo);
 
-        let redo = history.get_all_records_to_redo()?;
+        let redo = history.records_for(HistoryMode::Redo, None);
 
         let redo_string = self.format_records(&redo);
 
         if undo_string.is_none() && redo_string.is_none() {
-            Ok("There is nothing to undo or redo.".to_owned())
+            "There is nothing to undo or redo.".to_owned()
         } else {
             let mut buffer = String::new();
 
@@ -84,11 +83,11 @@ impl HistoryFormatter {
                 buffer.push_str("There is nothing to redo.\n");
             }
 
-            Ok(buffer)
+            buffer
         }
     }
 
-    pub fn format_records(&self, records: &[Record]) -> Option<String> {
+    pub fn format_records(&self, records: &[&Record]) -> Option<String> {
         if records.is_empty() {
             None
         } else {
@@ -270,5 +269,49 @@ fn push_summary_part(
         0 => (),
         1 => strings.push(format!("1 {singular}")),
         amount => strings.push(format!("{amount} {plural}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tfmttools_core::history::ActionRecordMetadata;
+
+    use super::*;
+
+    #[test]
+    fn empty_history_and_partial_progress_remain_visible() {
+        let formatter = HistoryFormatter::new();
+        let history = History::new("unused".into());
+        assert_eq!(
+            formatter.format_history(&history),
+            "There is nothing to undo or redo."
+        );
+        let record = Record::new(
+            vec![
+                StoredAction::MakeDir { path: "a".into() },
+                StoredAction::MakeDir { path: "b".into() },
+            ],
+            ActionRecordMetadata::new(
+                TemplateMetadata::Validation { value: "test".into() },
+                vec![],
+                "test".into(),
+            ),
+        );
+        let mut value = serde_json::to_value(record).unwrap();
+        value["applied_count"] = 1.into();
+        value["complete"] = false.into();
+        value["redo_allowed"] = false.into();
+        let partial = serde_json::from_value(value).unwrap();
+        assert!(
+            formatter
+                .format_record(&partial)
+                .ends_with("[applied 1/2, partial run, redo disabled]")
+        );
+        assert!(
+            formatter
+                .format_records(&[&partial])
+                .unwrap()
+                .contains("directories created")
+        );
     }
 }

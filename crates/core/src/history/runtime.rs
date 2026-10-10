@@ -33,57 +33,34 @@ impl History {
         }
     }
 
-    pub fn get_previous_record(&self) -> Result<Option<Record>> {
-        Ok(self.records.last().cloned())
+    #[must_use]
+    pub fn previous_record(&self) -> Option<&Record> {
+        self.records.last()
     }
 
-    pub fn get_records_to_undo(
-        &self,
-        amount: Option<usize>,
-    ) -> Result<Vec<Record>> {
-        Ok(self.collect_records(HistoryMode::Undo, amount))
-    }
-
-    pub fn get_records_to_redo(
-        &self,
-        amount: Option<usize>,
-    ) -> Result<Vec<Record>> {
-        Ok(self.collect_records(HistoryMode::Redo, amount))
-    }
-
-    pub fn get_n_records_to_undo(&self, amount: usize) -> Result<Vec<Record>> {
-        self.get_records_to_undo(Some(amount))
-    }
-
-    pub fn get_n_records_to_redo(&self, amount: usize) -> Result<Vec<Record>> {
-        self.get_records_to_redo(Some(amount))
-    }
-
-    pub fn get_all_records_to_undo(&self) -> Result<Vec<Record>> {
-        self.get_records_to_undo(None)
-    }
-
-    pub fn get_all_records_to_redo(&self) -> Result<Vec<Record>> {
-        self.get_records_to_redo(None)
-    }
-
-    fn collect_records(
+    #[must_use]
+    pub fn records_for(
         &self,
         mode: HistoryMode,
-        amount: Option<usize>,
-    ) -> Vec<Record> {
-        let records: Box<dyn Iterator<Item = &Record> + '_> = match mode {
+        limit: Option<usize>,
+    ) -> Vec<&Record> {
+        let limit = limit.unwrap_or(usize::MAX);
+        match mode {
             HistoryMode::Undo => {
-                Box::new(self.records.iter().rev().filter(|r| r.can_undo()))
+                self.records
+                    .iter()
+                    .rev()
+                    .filter(|r| r.can_undo())
+                    .take(limit)
+                    .collect()
             },
             HistoryMode::Redo => {
-                Box::new(self.records.iter().filter(|r| r.can_redo()))
+                self.records
+                    .iter()
+                    .filter(|r| r.can_redo())
+                    .take(limit)
+                    .collect()
             },
-        };
-
-        match amount {
-            Some(amount) => records.take(amount).cloned().collect(),
-            None => records.cloned().collect(),
         }
     }
 

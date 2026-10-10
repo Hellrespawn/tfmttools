@@ -32,7 +32,7 @@ pub fn undo_redo(
             Ok(())
         },
         LoadHistoryResult::Loaded => {
-            let records = get_records(&history, mode, amount)?;
+            let records = get_records(&history, mode, amount);
 
             let actual = records.len();
 
@@ -80,11 +80,8 @@ fn get_records(
     history: &History,
     mode: HistoryMode,
     amount: usize,
-) -> Result<Vec<Record>> {
-    Ok(match mode {
-        HistoryMode::Undo => history.get_n_records_to_undo(amount)?,
-        HistoryMode::Redo => history.get_n_records_to_redo(amount)?,
-    })
+) -> Vec<Record> {
+    history.records_for(mode, Some(amount)).into_iter().cloned().collect()
 }
 
 fn confirm_undo_redo(

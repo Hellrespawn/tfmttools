@@ -49,7 +49,7 @@ fn resolve_previous_template(
     load_history_result: LoadHistoryResult,
 ) -> Result<ResolvedTemplate> {
     if let LoadHistoryResult::Loaded = load_history_result
-        && let Some(record) = history.get_previous_record()?
+        && let Some(record) = history.previous_record()
     {
         let metadata = record.metadata();
         let arguments = metadata.arguments().to_owned();

@@ -17,7 +17,7 @@ pub fn load_history(path: &Utf8File) -> Result<(History, LoadHistoryResult)> {
             "Loaded history:\n{}",
             HistoryFormatter::new()
                 .with_format(HistoryFormat::Verbose)
-                .format_history(&history)?
+                .format_history(&history)
         );
     }
 

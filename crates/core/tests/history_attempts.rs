@@ -58,7 +58,10 @@ fn confirmed_prefix_survives_error_and_not_applied_resolution() {
     assert!(!r.is_complete());
     assert!(!r.redo_allowed());
     assert!(h.current_attempt().unwrap().is_none());
-    assert_eq!(h.get_all_records_to_undo().unwrap().len(), 1);
+    assert_eq!(
+        h.records_for(tfmttools_core::history::HistoryMode::Undo, None).len(),
+        1
+    );
 }
 #[test]
 fn manual_applied_resolution_and_partial_undo_use_cursor() {
@@ -80,7 +83,10 @@ fn manual_applied_resolution_and_partial_undo_use_cursor() {
     let id = attempt(&mut h, undo, 0, "a");
     h.resolve_attempt(id, AttemptOutcome::Applied).unwrap();
     assert_eq!(h.records()[0].applied_count(), 0);
-    assert!(h.get_all_records_to_redo().unwrap().is_empty());
+    assert!(
+        h.records_for(tfmttools_core::history::HistoryMode::Redo, None)
+            .is_empty()
+    );
 }
 #[test]
 fn abandoned_run_closes_without_actions_or_attempt() {
@@ -142,8 +148,15 @@ fn partial_undo_remains_selectable_and_failed_replay_disables_redo() {
     h.confirm_attempt(id).unwrap();
     let r = h.close_run(run, false).unwrap();
     assert_eq!(r.applied_count(), 1);
-    assert_eq!(h.get_all_records_to_undo().unwrap()[0].applied_count(), 1);
-    assert!(h.get_all_records_to_redo().unwrap().is_empty());
+    assert_eq!(
+        h.records_for(tfmttools_core::history::HistoryMode::Undo, None)[0]
+            .applied_count(),
+        1
+    );
+    assert!(
+        h.records_for(tfmttools_core::history::HistoryMode::Redo, None)
+            .is_empty()
+    );
     let run = h
         .begin_run(tfmttools_core::history::RunRequest::Replay {
             record_id: r.id().unwrap(),
@@ -153,8 +166,14 @@ fn partial_undo_remains_selectable_and_failed_replay_disables_redo() {
     let id = attempt(&mut h, run, 0, "a");
     h.confirm_attempt(id).unwrap();
     h.close_run(run, true).unwrap();
-    assert!(h.get_all_records_to_undo().unwrap().is_empty());
-    assert!(h.get_all_records_to_redo().unwrap().is_empty());
+    assert!(
+        h.records_for(tfmttools_core::history::HistoryMode::Undo, None)
+            .is_empty()
+    );
+    assert!(
+        h.records_for(tfmttools_core::history::HistoryMode::Redo, None)
+            .is_empty()
+    );
 }
 #[test]
 fn loading_rejects_attempt_that_disagrees_with_record_cursor() {

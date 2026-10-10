@@ -42,7 +42,11 @@ fn saves_sqlite_and_preserves_order_metadata_and_replay_states() {
     let mut loaded = History::new(path);
     loaded.load().unwrap();
     assert_eq!(serde_json::to_value(loaded.records()).unwrap(), expected);
-    assert_eq!(loaded.get_all_records_to_redo().unwrap()[0].id(), Some(0));
+    assert_eq!(
+        loaded.records_for(tfmttools_core::history::HistoryMode::Redo, None)[0]
+            .id(),
+        Some(0)
+    );
 }
 
 #[test]

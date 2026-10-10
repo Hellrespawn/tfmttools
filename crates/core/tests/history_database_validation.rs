@@ -122,8 +122,7 @@ fn records_are_ordered_by_id_with_gaps() {
         vec![2, 7, 11]
     );
     assert_eq!(
-        h.get_all_records_to_undo()
-            .unwrap()
+        h.records_for(tfmttools_core::history::HistoryMode::Undo, None)
             .iter()
             .map(|r| r.id().unwrap())
             .collect::<Vec<_>>(),

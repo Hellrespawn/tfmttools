@@ -274,10 +274,10 @@ mod manual_tests {
         if let Some(a) = h.current_attempt().unwrap() {
             h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
         }
-        let record = h.get_all_records_to_undo().unwrap().remove(0);
+        let record = h.records_for(HistoryMode::Undo, None).remove(0).clone();
         replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
         assert!(!root.join("first").exists());
-        assert!(h.get_all_records_to_redo().unwrap().is_empty());
+        assert!(h.records_for(HistoryMode::Redo, None).is_empty());
     }
 }
 
