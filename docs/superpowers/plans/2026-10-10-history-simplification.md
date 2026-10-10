@@ -1,6 +1,6 @@
 # History Simplification Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Address all seven SQLite history review findings while preserving manual interruption handling and exact replay.
 
@@ -51,12 +51,12 @@
 - Concrete private progress fields and direct accessors; `Record::from_storage(id, actions, state, timestamp, metadata, applied_count, complete, redo_allowed) -> Result<Record>` validates the cursor/state contract. Remove `set_progress`.
 - Internal `AttemptDetails::validate(&self) -> Result<()>` and `validate_attempt(connection: &Connection, attempt: &CurrentAttempt) -> Result<()>` serve both creation and loading. Tag/patch checks move to Task 4's helpers later.
 
-- [ ] Add tests that preview records initialize `(len, true, true)`, records require all progress fields when deserializing, and persistence retains explicit partial progress. Preserve null tag locator/encoding assertions and strict action/metadata checks.
-- [ ] Add an eligibility/cursor matrix covering applied, undone, redone, superseded, empty, partial, and redo-disabled records. Exercise both run admission and selection through existing APIs; test wrong position, mismatched replay action/patch, and empty reporting details through mutation and reload.
-- [ ] Run `cargo test -p tfmttools-core --test history_contract --test history_attempts --test history_operations`; verify new expectations fail before implementation.
-- [ ] Implement concrete construction, shared helpers, and one attempt validator. Construct the prospective `CurrentAttempt` before insertion for validation; assign its durable ID only after insertion. Do not validate by writing then rereading the attempt.
-- [ ] Update existing record fixtures with explicit progress matching their states. Keep action/metadata representations unchanged; remove fallback-specific expectations.
-- [ ] Run `cargo xtask test-core`, fix failures, and commit this independently testable change.
+- [x] Add tests that preview records initialize `(len, true, true)`, records require all progress fields when deserializing, and persistence retains explicit partial progress. Preserve null tag locator/encoding assertions and strict action/metadata checks.
+- [x] Add an eligibility/cursor matrix covering applied, undone, redone, superseded, empty, partial, and redo-disabled records. Exercise both run admission and selection through existing APIs; test wrong position, mismatched replay action/patch, and empty reporting details through mutation and reload.
+- [x] Run `cargo test -p tfmttools-core --test history_contract --test history_attempts --test history_operations`; verify new expectations fail before implementation.
+- [x] Implement concrete construction, shared helpers, and one attempt validator. Construct the prospective `CurrentAttempt` before insertion for validation; assign its durable ID only after insertion. Do not validate by writing then rereading the attempt.
+- [x] Update existing record fixtures with explicit progress matching their states. Keep action/metadata representations unchanged; remove fallback-specific expectations.
+- [x] Run `cargo xtask test-core`, fix failures, and commit this independently testable change.
 
 ### Task 2: Simplify stored records and initial schema
 
@@ -64,11 +64,11 @@
 
 **Interfaces:** `database::read_record(&Connection, usize) -> Result<Record>` and `read_records(&Connection) -> Result<Vec<Record>>`; remove `DatabaseRecord`. Record queries order by ID and no longer select position.
 
-- [ ] Add a database test inserting valid records with IDs `2, 7, 11` out of insertion order; assert ascending cache order, descending undo order, and unchanged timestamp offsets. Retain rejection of noncontiguous action positions.
-- [ ] Build an old-shape database by adding `position INTEGER NOT NULL DEFAULT 0` to the new records table. Assert writable and read-only loading reject it and database bytes remain unchanged. Existing foreign/version/schema rejection cases remain.
-- [ ] Run `cargo test -p tfmttools-core --test history_schema --test history_database_validation`; verify the new ordering/schema expectations fail where applicable.
-- [ ] Remove record position, its allocation query, and wrapper mappings; adapt all SQL fixtures and constructors. Amend version 1 directly, retaining identity pragmas, strict tables, foreign keys, and durability settings.
-- [ ] Run `cargo xtask history-schema` and verify its result matches the amended SQL snapshot. Run `cargo xtask test-core`, then commit.
+- [x] Add a database test inserting valid records with IDs `2, 7, 11` out of insertion order; assert ascending cache order, descending undo order, and unchanged timestamp offsets. Retain rejection of noncontiguous action positions.
+- [x] Build an old-shape database by adding `position INTEGER NOT NULL DEFAULT 0` to the new records table. Assert writable and read-only loading reject it and database bytes remain unchanged. Existing foreign/version/schema rejection cases remain.
+- [x] Run `cargo test -p tfmttools-core --test history_schema --test history_database_validation`; verify the new ordering/schema expectations fail where applicable.
+- [x] Remove record position, its allocation query, and wrapper mappings; adapt all SQL fixtures and constructors. Amend version 1 directly, retaining identity pragmas, strict tables, foreign keys, and durability settings.
+- [x] Run `cargo xtask history-schema` and verify its result matches the amended SQL snapshot. Run `cargo xtask test-core`, then commit.
 
 ### Task 3: Typed operation requests and CLI execution
 
@@ -81,10 +81,10 @@
 - CLI-private copyable `ExecutionContext::{Apply, Replay { record_id: usize, direction: HistoryMode }}` with `kind(self) -> OperationKind`.
 - `prepare(history, context, position, action)` and `execute_actions(history, run, context, actions)` replace kind/optional-ID parameters; their remaining parameter and return types stay unchanged.
 
-- [ ] Preserve/add behavior cases for apply metadata retention, selecting a missing or ineligible replay record, and tag replay in both directions. Invalid request combinations are eliminated by enum construction rather than runtime tests.
-- [ ] Run `cargo xtask test-core` and `cargo xtask test-cli` as the baseline before changing signatures.
-- [ ] Implement the request enum, conversion, and context; migrate core test helpers and all call sites. Branch on context for tag preparation, remove replay ID unwrap, and keep the shared execution loop unchanged otherwise.
-- [ ] Run `cargo xtask test-core`, `cargo xtask test-fs`, and `cargo xtask test-cli`; confirm original-retention, partial replay, and resolution cases pass, then commit.
+- [x] Preserve/add behavior cases for apply metadata retention, selecting a missing or ineligible replay record, and tag replay in both directions. Invalid request combinations are eliminated by enum construction rather than runtime tests.
+- [x] Run `cargo xtask test-core` and `cargo xtask test-cli` as the baseline before changing signatures.
+- [x] Implement the request enum, conversion, and context; migrate core test helpers and all call sites. Branch on context for tag preparation, remove replay ID unwrap, and keep the shared execution loop unchanged otherwise.
+- [x] Run `cargo xtask test-core`, `cargo xtask test-fs`, and `cargo xtask test-cli`; confirm original-retention, partial replay, and resolution cases pass, then commit.
 
 ### Task 4: Consolidate patch persistence and error categories
 
@@ -101,10 +101,10 @@
 
 Reading helpers map invalid persisted pair/association data to `LoadError`, with record/position or attempt context. Mutation validation returns `MutError`. Shared length/parameter encoding returns `SaveError` on conversion failure. SQLite failures remain `Database` errors. Share validation rules without losing boundary-specific categories.
 
-- [ ] Add table-driven mutation/load tests for wrong format, short/missing BSDIFF headers, invalid lengths/hash widths, tag actions missing patches, and non-tag actions with patches. Use constraint-disabled fixtures only for malformed persisted values that normal SQL constraints reject.
-- [ ] Run `cargo test -p tfmttools-core --test history_attempts --test history_database_validation`; verify missing category/context expectations fail.
-- [ ] Move persistence functions into `patch.rs`; share row decoding and patch parameter encoding but keep explicit SQL per table. Replace positional INSERTs in touched confirmation/patch code with explicit columns. Use the shared pair association rule in attempt and record loading.
-- [ ] Run `cargo xtask test-core` and `cargo xtask test-fs`; retain exact replay and stale-file rejection coverage, then commit.
+- [x] Add table-driven mutation/load tests for wrong format, short/missing BSDIFF headers, invalid lengths/hash widths, tag actions missing patches, and non-tag actions with patches. Use constraint-disabled fixtures only for malformed persisted values that normal SQL constraints reject.
+- [x] Run `cargo test -p tfmttools-core --test history_attempts --test history_database_validation`; verify missing category/context expectations fail.
+- [x] Move persistence functions into `patch.rs`; share row decoding and patch parameter encoding but keep explicit SQL per table. Replace positional INSERTs in touched confirmation/patch code with explicit columns. Use the shared pair association rule in attempt and record loading.
+- [x] Run `cargo xtask test-core` and `cargo xtask test-fs`; retain exact replay and stale-file rejection coverage, then commit.
 
 ### Task 5: Borrowed, infallible cache queries
 
@@ -117,10 +117,10 @@ Reading helpers map invalid persisted pair/association data to `LoadError`, with
 - `HistoryFormatter::format_records(&self, &[&Record]) -> Option<String>`.
 - CLI `get_records` returns owned `Vec<Record>` by cloning only selected replay records before mutation; confirmation/output remain fallible.
 
-- [ ] Adapt selection tests to the new API and assert `Some(0)`, `Some(1)`, overlarge limits, and `None` preserve expected undo/redo ordering and eligibility. Add formatter coverage for empty history, partial cursor, and redo-disabled records with unchanged text.
-- [ ] Run `cargo xtask test-core` and `cargo xtask test-cli`; new API references initially fail compilation.
-- [ ] Replace wrappers with two ordinary iterator branches using shared eligibility predicates and `limit.unwrap_or(usize::MAX)`. Borrow for formatting and previous-template resolution; clone explicitly at replay's mutable boundary. Remove obsolete `?` and imports only where operations became infallible.
-- [ ] Use `rg` to confirm all old accessor names are gone. Run `cargo xtask test-core` and `cargo xtask test-cli`, then commit.
+- [x] Adapt selection tests to the new API and assert `Some(0)`, `Some(1)`, overlarge limits, and `None` preserve expected undo/redo ordering and eligibility. Add formatter coverage for empty history, partial cursor, and redo-disabled records with unchanged text.
+- [x] Run `cargo xtask test-core` and `cargo xtask test-cli`; new API references initially fail compilation.
+- [x] Replace wrappers with two ordinary iterator branches using shared eligibility predicates and `limit.unwrap_or(usize::MAX)`. Borrow for formatting and previous-template resolution; clone explicitly at replay's mutable boundary. Remove obsolete `?` and imports only where operations became infallible.
+- [x] Use `rg` to confirm all old accessor names are gone. Run `cargo xtask test-core` and `cargo xtask test-cli`, then commit.
 
 ### Task 6: Transactional affected-record cache publication
 
@@ -134,20 +134,20 @@ Reading helpers map invalid persisted pair/association data to `LoadError`, with
 - Mutation code invalidates the cache immediately before `tx.commit()`. A successful commit publishes staged records and restores usability; a commit error leaves the session poisoned. Statement/decoding failures before commit leave the previously valid cache unchanged because the transaction rolls back.
 - `finish_run` reloads committed history through `load()` on its error branch before reading attempts, reporting, or closing an abandoned run. If reload fails, return contextual original/reload errors and leave the session unusable. `interruption_report` checks `ensure_usable()` before reading cached records. Other callers already start with a successful load or propagate mutation errors without further cache access.
 
-- [ ] Add cache-versus-read-only-reopen assertions after apply start, confirmation, undo/redo, close, and both resolution outcomes. Cover first-action supersession of an undone record and preservation of another record's applied prefix; subsequent confirmations must not change those records again.
-- [ ] Add rollback tests using an aborting confirmation trigger: cached records remain unchanged and the attempt remains durable. Add internal commit fault injection immediately at the commit boundary: assert cache access cannot return stale data, mutation fails until load succeeds, and load restores the committed database state. Test failed reload leaves the guard in force. Keep test hooks compiled only for tests.
-- [ ] Add a scoped thread-local decode observer in record decoding under `#[cfg(test)]`. With unrelated older records and a multi-action active record, assert later confirmations decode only the active record. First-confirmation supersession may decode affected older records, but not unaffected ones. No timing threshold or production tracing dependency.
-- [ ] Run the new cache tests before optimization to demonstrate the unrelated-record decoding failure.
-- [ ] Stage affected records inside each transaction before commit. Query supersession IDs with the same predicate as the update, only for the first apply confirmation (`action_position == 0`). Reuse this confirmation path for manual applied resolution. Preserve synchronous per-action commits and patch handling.
-- [ ] Remove full refresh calls. Apply start publishes its new record, replay start publishes none, attempt creation publishes none, and close/resolution publish only affected records. Apply the commit guard to all history transactions that can produce an uncertain session, including attempt insertion.
-- [ ] Verify `finish_run` reloads before errors use history, artifact retention survives commit/reload errors, and resolution failures leave markers intact. Run `cargo xtask test-core`, `cargo xtask test-fs`, and `cargo xtask test-cli`, then commit.
+- [x] Add cache-versus-read-only-reopen assertions after apply start, confirmation, undo/redo, close, and both resolution outcomes. Cover first-action supersession of an undone record and preservation of another record's applied prefix; subsequent confirmations must not change those records again.
+- [x] Add rollback tests using an aborting confirmation trigger: cached records remain unchanged and the attempt remains durable. Add internal commit fault injection immediately at the commit boundary: assert cache access cannot return stale data, mutation fails until load succeeds, and load restores the committed database state. Test failed reload leaves the guard in force. Keep test hooks compiled only for tests.
+- [x] Add a scoped thread-local decode observer in record decoding under `#[cfg(test)]`. With unrelated older records and a multi-action active record, assert later confirmations decode only the active record. First-confirmation supersession may decode affected older records, but not unaffected ones. No timing threshold or production tracing dependency.
+- [x] Run the new cache tests before optimization to demonstrate the unrelated-record decoding failure.
+- [x] Stage affected records inside each transaction before commit. Query supersession IDs with the same predicate as the update, only for the first apply confirmation (`action_position == 0`). Reuse this confirmation path for manual applied resolution. Preserve synchronous per-action commits and patch handling.
+- [x] Remove full refresh calls. Apply start publishes its new record, replay start publishes none, attempt creation publishes none, and close/resolution publish only affected records. Apply the commit guard to all history transactions that can produce an uncertain session, including attempt insertion.
+- [x] Verify `finish_run` reloads before errors use history, artifact retention survives commit/reload errors, and resolution failures leave markers intact. Run `cargo xtask test-core`, `cargo xtask test-fs`, and `cargo xtask test-cli`, then commit.
 
 ### Task 7: Documentation, final verification, and review
 
 **Files:** Modify `README.md`, `CHANGELOG.md`, relevant history/fixture documentation and crate guidance discovered with `rg`. Review all modified production/test files against the spec.
 
-- [ ] Document concrete progress in the record contract and the amended undeployed schema. Remove obsolete accessor/fallback references and retain existing manual-resolution instructions. Do not promise constant-time active-record append or automatic recovery.
-- [ ] Check all seven spec sections against the diff: old wrappers, `DatabaseRecord`, record position, optional progress, full mutation refresh, duplicated attempt rules, and replay-ID unwrap must be absent.
-- [ ] Run `cargo +nightly fmt --all`, `cargo test --workspace`, `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`. Fix actionable failures and rerun affected checks. Record exact results and any environment blockers.
-- [ ] Review transaction failure paths, borrowed cache lifetimes, schema rejection without writes, and filesystem artifact retention. Apply the requesting-code-review skill for the final review workflow; do not merge or publish without authorization.
-- [ ] Commit documentation and verification fixes. Report changes, evidence, and remaining limitations with links to the spec and plan.
+- [x] Document concrete progress in the record contract and the amended undeployed schema. Remove obsolete accessor/fallback references and retain existing manual-resolution instructions. Do not promise constant-time active-record append or automatic recovery.
+- [x] Check all seven spec sections against the diff: old wrappers, `DatabaseRecord`, record position, optional progress, full mutation refresh, duplicated attempt rules, and replay-ID unwrap must be absent.
+- [x] Run `cargo +nightly fmt --all`, `cargo test --workspace`, `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`. Fix actionable failures and rerun affected checks. Record exact results and any environment blockers.
+- [x] Review transaction failure paths, borrowed cache lifetimes, schema rejection without writes, and filesystem artifact retention. Apply the requesting-code-review skill for the final review workflow; do not merge or publish without authorization.
+- [x] Commit documentation and verification fixes. Report changes, evidence, and remaining limitations with links to the spec and plan.
