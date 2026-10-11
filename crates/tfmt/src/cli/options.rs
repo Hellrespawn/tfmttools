@@ -34,7 +34,6 @@ pub struct TFMTOptions {
     fs_mode: FSMode,
     display_mode: DisplayMode,
     confirm_mode: ConfirmMode,
-    verbosity: u8,
     preview_list_size: PreviewListSize,
     run_id: String,
 }
@@ -63,11 +62,6 @@ impl TFMTOptions {
     #[must_use]
     pub fn preview_list_size(&self) -> PreviewListSize {
         self.preview_list_size
-    }
-
-    #[must_use]
-    pub fn verbosity(&self) -> u8 {
-        self.verbosity
     }
 
     #[must_use]
@@ -131,7 +125,6 @@ impl TryFrom<&TFMTArgs> for TFMTOptions {
             } else {
                 ConfirmMode::Confirm
             },
-            verbosity: 0,
             preview_list_size,
             run_id: args.custom_run_id.clone().unwrap_or_else(|| {
                 std::iter::repeat_with(fastrand::alphanumeric)

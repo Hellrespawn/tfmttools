@@ -1,9 +1,8 @@
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
-use camino::Utf8Path;
 use serde::{Deserialize, Serialize};
 
-use crate::util::{Utf8Directory, Utf8File};
+use crate::util::{Utf8Directory, Utf8File, Utf8PathExt};
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct RenameAction {
@@ -46,37 +45,21 @@ impl RenameAction {
     pub fn intermediate_directories(
         rename_actions: &[RenameAction],
     ) -> Vec<Utf8Directory> {
-        let target_paths =
-            rename_actions.iter().map(RenameAction::target).collect::<Vec<_>>();
-
-        Self::list_all_intermediate_paths_of_files(&target_paths)
-    }
-
-    fn list_all_intermediate_paths_of_files(
-        paths: &[&Utf8File],
-    ) -> Vec<Utf8Directory> {
-        let mut directories = paths
+        rename_actions
             .iter()
-            .flat_map(|p| {
-                let parent = p.parent();
-
-                parent
+            .flat_map(|action| {
+                action
+                    .target()
+                    .as_path()
+                    .parent()
+                    .expect("Utf8File should have parent")
                     .ancestors()
-                    .into_iter()
-                    .filter(|p| {
-                        let path: &Utf8Path = p.as_ref();
-
-                        !path.as_str().is_empty()
-                    })
-                    .collect::<Vec<_>>()
             })
-            .collect::<HashSet<_>>()
+            .filter(|path| !path.as_str().is_empty())
+            .map(Utf8Directory::new)
+            .collect::<BTreeSet<_>>()
             .into_iter()
-            .collect::<Vec<_>>();
-
-        directories.sort();
-
-        directories
+            .collect()
     }
 }
 
@@ -103,10 +86,12 @@ mod test {
 
         let paths: Vec<Utf8File> = paths.iter().map(Utf8File::new).collect();
 
-        let paths_ref = paths.iter().collect::<Vec<_>>();
+        let actions = paths
+            .into_iter()
+            .map(|path| RenameAction::new(path.clone(), path))
+            .collect::<Vec<_>>();
 
-        let directories =
-            RenameAction::list_all_intermediate_paths_of_files(&paths_ref);
+        let directories = RenameAction::intermediate_directories(&actions);
 
         assert_eq!(directories, reference);
     }
@@ -129,10 +114,12 @@ mod test {
 
         let paths = paths.iter().map(Utf8File::new).collect::<Vec<_>>();
 
-        let paths_ref = paths.iter().collect::<Vec<_>>();
+        let actions = paths
+            .into_iter()
+            .map(|path| RenameAction::new(path.clone(), path))
+            .collect::<Vec<_>>();
 
-        let directories =
-            RenameAction::list_all_intermediate_paths_of_files(&paths_ref);
+        let directories = RenameAction::intermediate_directories(&actions);
 
         assert_eq!(directories, reference);
     }

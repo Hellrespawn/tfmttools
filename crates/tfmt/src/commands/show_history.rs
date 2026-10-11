@@ -3,16 +3,11 @@ use tfmttools_core::history::History;
 use tfmttools_core::util::Utf8PathExt;
 
 use crate::cli::TFMTOptions;
-use crate::history::{HistoryFormat, HistoryFormatter, HistoryPrefix};
+use crate::history::{HistoryFormatter, HistoryPrefix};
 
 pub fn show_history(app_options: &TFMTOptions) -> Result<()> {
     let formatter =
         HistoryFormatter::new().with_prefix(HistoryPrefix::Ordered(')'));
-    let formatter = if app_options.verbosity() > 0 {
-        formatter.with_format(HistoryFormat::Verbose)
-    } else {
-        formatter
-    };
 
     let path = app_options.history_file_path()?;
     let history = History::open_read_only(path.as_path().to_owned())?;

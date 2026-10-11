@@ -2,7 +2,7 @@ use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::Utf8PathExt;
 
 use super::PlannedAction;
-use super::rename_cycles::RenameCycleDetector;
+use super::rename_cycles::needs_temporary_staging;
 use super::rename_staging::StagedRenamePlanner;
 
 pub(super) struct RenamePlanner {
@@ -29,9 +29,7 @@ impl RenamePlanner {
     }
 
     fn plan_move_actions(self) -> Vec<PlannedAction> {
-        if RenameCycleDetector::new(&self.rename_actions)
-            .needs_temporary_staging()
-        {
+        if needs_temporary_staging(&self.rename_actions) {
             StagedRenamePlanner::new(&self.rename_actions)
                 .plan(self.rename_actions)
         } else {
