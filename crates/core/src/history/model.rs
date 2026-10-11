@@ -7,29 +7,21 @@ use super::{HistoryError, OperationKind, Result, StoredAction};
 #[derive(
     Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum RecordState {
-    #[serde(rename = "applied")]
     Applied,
-    #[serde(rename = "undone")]
     Undone,
-    #[serde(rename = "redone")]
     Redone,
-    #[serde(rename = "superseded")]
     Superseded,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Record {
-    #[serde(rename = "id")]
     id: Option<usize>,
-    #[serde(rename = "actions")]
     actions: Vec<StoredAction>,
-    #[serde(rename = "state")]
     state: RecordState,
-    #[serde(rename = "timestamp")]
     timestamp: DateTime<FixedOffset>,
-    #[serde(rename = "metadata")]
     metadata: ActionRecordMetadata,
     applied_count: usize,
     complete: bool,
@@ -165,33 +157,18 @@ impl Record {
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
-#[serde(tag = "type", deny_unknown_fields)]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TemplateMetadata {
-    #[serde(rename = "file_or_name")]
-    FileOrName {
-        #[serde(rename = "value")]
-        value: String,
-    },
-    #[serde(rename = "inline_template")]
-    InlineTemplate {
-        #[serde(rename = "value")]
-        value: String,
-    },
-    #[serde(rename = "validation")]
-    Validation {
-        #[serde(rename = "value")]
-        value: String,
-    },
+    FileOrName { value: String },
+    InlineTemplate { value: String },
+    Validation { value: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ActionRecordMetadata {
-    #[serde(rename = "template")]
     template: TemplateMetadata,
-    #[serde(rename = "arguments")]
     arguments: Vec<String>,
-    #[serde(rename = "run_id")]
     run_id: String,
 }
 

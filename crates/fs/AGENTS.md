@@ -7,6 +7,8 @@ direct filesystem operations, and rename staging/planning.
 ## Task Map
 
 - Planner and prepared-action entry points: `src/action.rs`.
+- Read-only action planning: `src/action/planning.rs` (`plan_actions`).
+- Prepared filesystem execution: `src/action/prepared_execution.rs`.
 - Rename staging and planning internals: `src/action/`.
 - Filesystem mode and path helpers: `src/fs_handler.rs`.
 - Template loading from config directories: `src/template.rs`.

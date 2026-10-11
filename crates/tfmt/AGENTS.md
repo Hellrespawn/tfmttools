@@ -9,7 +9,9 @@ dispatches through `src/commands/`.
 
 - CLI argument parsing: `src/cli/args.rs`.
 - Option conversion and defaults: `src/cli/options.rs`.
-- Rename command behavior: `src/commands/rename/`.
+- Rename command behavior: `src/commands/rename/` (`confirmation.rs` and
+  `cleanup.rs` plan actions; `session.rs` records execution).
+- Shared audio discovery: `src/commands/audio_discovery.rs`.
 - History display formatting: `src/history/formatter.rs`.
 - Terminal UI helpers: `src/ui/`.
 - Integration entry point: `tests/integration.rs`.

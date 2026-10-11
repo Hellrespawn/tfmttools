@@ -64,6 +64,18 @@ Supporting directories:
 
 ## Usage
 
+Cleanup previews describe proposed deletions; dry runs say “Would delete”.
+A writable rename reports completion only after filesystem execution and history
+confirmation succeed. Nonempty directories may remain after cleanup.
+
+Audio discovery errors abort rename and validation before applying file changes.
+An incomplete directory scan is never treated as a complete selection.
+
+Commands return status 0 on success and 1 on validation findings or operational
+failure. Validation findings print their report without an operational-error
+banner. Normal returns allow history and logging guards to close before exit.
+
+
 Write a path template and run `tfmt rename` against a directory of audio
 files.
 
@@ -391,14 +403,3 @@ and expected language constructs; template syntax is unchanged.
 `cargo xtask test` runs the workspace tests, and `cargo xtask test-cli` runs
 all CLI tests. Cargo discovers conventional integration targets automatically.
 Use `cargo xtask test-integration` for the focused fixture harness.
-
-Cleanup previews describe proposed deletions; dry runs say “Would delete”.
-A writable rename reports completion only after filesystem execution and history
-confirmation succeed. Nonempty directories may remain after cleanup.
-
-Audio discovery errors abort rename and validation before applying file changes.
-An incomplete directory scan is never treated as a complete selection.
-
-Commands return status 0 on success and 1 on validation findings or operational
-failure. Validation findings print their report without an operational-error
-banner. Normal returns allow history and logging guards to close before exit.

@@ -56,6 +56,8 @@ pub fn run() -> Result<ExitCode> {
     command_exit_code(result, name)
 }
 
+// The shared signature propagates rich errors when the debug feature is enabled.
+#[cfg_attr(not(feature = "debug"), allow(clippy::unnecessary_wraps))]
 fn command_exit_code(
     result: Result<CommandOutcome>,
     name: &str,

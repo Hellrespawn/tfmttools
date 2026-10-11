@@ -26,7 +26,9 @@ fn planned_swap_and_forced_copy_replay_in_order() {
         assert_eq!(std::fs::read(&b).unwrap(), b"B");
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
         if matches!(mode, MoveMode::AlwaysCopy) {
-            for pair in actions.chunks_exact(2) {
+            let (pairs, remainder) = actions.as_chunks::<2>();
+            assert!(remainder.is_empty());
+            for pair in pairs {
                 assert!(matches!(&pair[0], Action::CopyFile { source, .. }
                     if matches!(&pair[1], Action::RemoveFile(path) if path == source)));
             }

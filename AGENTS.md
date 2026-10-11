@@ -16,6 +16,8 @@ notes or design work live under `docs/`.
 - CLI flags and option conversion:
   `crates/tfmt/src/cli/args.rs`, `crates/tfmt/src/cli/options.rs`.
 - Rename command flow: `crates/tfmt/src/commands/rename/`.
+  Confirmation and planning: `confirmation.rs`; cleanup planning: `cleanup.rs`.
+- Shared audio discovery: `crates/tfmt/src/commands/audio_discovery.rs`.
 - Rename action model: `crates/core/src/action/rename_action.rs`.
 - Rename validation: `crates/core/src/action/validation.rs`.
 - Filesystem application and staging:
@@ -34,7 +36,7 @@ Use Cargo from the workspace root.
 - `cargo xtask check` runs `cargo check --workspace`.
 - `cargo xtask completions` generates shell completions into
   `target/completions`.
-- `cargo xtask history-schema` regenerates `docs/history/schema-v1.json`.
+- `cargo xtask history-schema` regenerates `docs/history/schema-v1.sql`.
 - `cargo xtask manpage` generates man pages into `target/man`.
 - `cargo xtask test` runs unit and integration tests across the workspace.
 - `cargo xtask test-integration` runs the fixture-backed CLI integration suite.

@@ -79,7 +79,9 @@ fn run_steps(steps: &[&[&str]]) -> ExitCode {
 }
 
 fn run_cargo(args: &[&str]) -> ExitCode {
-    run_cargo_with_env(args, &[])
+    let mut command = Command::new("cargo");
+    command.args(args);
+    run_command(command, "cargo")
 }
 
 fn test_args_with_trailing<'a>(
@@ -104,21 +106,6 @@ fn test_args_with_trailing<'a>(
     }
 
     args
-}
-
-fn run_cargo_with_env(args: &[&str], env: &[(&str, &str)]) -> ExitCode {
-    let mut command = Command::new("cargo");
-    command.args(args);
-
-    for (name, value) in env {
-        command.env(name, value);
-    }
-
-    for (name, value) in env {
-        command.env(name, value);
-    }
-
-    run_command(command, "cargo")
 }
 
 fn run_reports_server(args: &[String]) -> ExitCode {

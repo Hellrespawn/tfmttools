@@ -53,7 +53,7 @@ pub fn copy_files(
     source_dir: Utf8PathBuf,
     target_dir: &camino::Utf8Path,
 ) -> Result<()> {
-    let paths = fs_err::read_dir(&source_dir)?
+    let paths = fs_err::read_dir(source_dir)?
         .map(|entry| {
             let path = entry?.path();
             Ok(Utf8PathBuf::try_from(path)?)

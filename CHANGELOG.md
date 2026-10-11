@@ -32,6 +32,10 @@
 
 ### Changed
 
+- Remove obsolete xtask environment scaffolding and redundant history serde
+  renames, preserving serialized names, defaults, and strict payload validation.
+  Align repository task maps and schema guidance with the current modules.
+
 - Share canonical tag encoding names and Lofty conversions across history,
   tag editing, validation, and reports, preserving stored payloads and independent
   raw ID3 frame verification.
