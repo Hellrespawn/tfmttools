@@ -9,6 +9,13 @@ pub enum FSMode {
     Default,
     DryRun,
 }
+impl FSMode {
+    #[must_use]
+    pub fn is_dry_run(self) -> bool {
+        matches!(self, Self::DryRun)
+    }
+}
+
 #[derive(Debug, Default, Copy, Clone)]
 pub enum MoveMode {
     #[default]

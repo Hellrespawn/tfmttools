@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove the internal `FsHandler` wrapper; commands use `FSMode` directly.
+
 - Parse path templates with pest, preserving syntax and improving expected-construct diagnostics.
 
 ### Added

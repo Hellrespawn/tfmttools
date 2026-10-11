@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use tfmttools_core::history::{History, LoadHistoryResult};
 use tfmttools_core::util::Utf8PathExt;
-use tfmttools_fs::{FsHandler, PathIteratorOptions};
+use tfmttools_fs::PathIteratorOptions;
 use tracing::info;
 
 use super::{RenameDecision, cleanup, confirmation, planning, preview};
@@ -9,7 +9,6 @@ use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
 use crate::history::load_history_for_mode;
 
 pub struct RenameSession<'a> {
-    fs_handler: &'a FsHandler,
     app_options: &'a TFMTOptions,
     rename_options: RenameOptions,
     history: History,
@@ -18,7 +17,6 @@ pub struct RenameSession<'a> {
 
 impl<'a> RenameSession<'a> {
     pub fn from_args(
-        fs_handler: &'a FsHandler,
         app_options: &'a TFMTOptions,
         rename_args: RenameArgs,
     ) -> Result<Self> {
@@ -30,19 +28,12 @@ impl<'a> RenameSession<'a> {
             app_options.fs_mode(),
         )?;
 
-        crate::history::execution::check_interrupted(&mut history, fs_handler)?;
+        crate::history::execution::check_interrupted(
+            &mut history,
+            app_options.fs_mode(),
+        )?;
 
-        Ok(Self {
-            fs_handler,
-            app_options,
-            rename_options,
-            history,
-            load_result,
-        })
-    }
-
-    pub fn fs_handler(&self) -> &FsHandler {
-        self.fs_handler
+        Ok(Self { app_options, rename_options, history, load_result })
     }
 
     pub fn path_iterator_options(&self) -> PathIteratorOptions<'_> {
@@ -86,7 +77,7 @@ impl<'a> RenameSession<'a> {
                 )?;
                 crate::history::execution::execute_recorded(
                     &mut self.history,
-                    self.fs_handler,
+                    self.app_options.fs_mode(),
                     actions,
                     metadata,
                 )?;

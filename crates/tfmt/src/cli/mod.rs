@@ -10,7 +10,6 @@ use clap::error::ErrorKind;
 use color_eyre::Result;
 #[cfg(not(feature = "debug"))]
 use color_eyre::eyre::Report;
-use tfmttools_fs::FsHandler;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -49,9 +48,8 @@ pub fn run() -> Result<ExitCode> {
 
     let result = (|| {
         let app_options = TFMTOptions::try_from(&args)?;
-        let fs_handler = FsHandler::new(app_options.fs_mode());
         install_restore_cursor_hooks();
-        args.command.run(&app_options, &fs_handler)
+        args.command.run(&app_options)
     })();
     command_exit_code(result, name)
 }

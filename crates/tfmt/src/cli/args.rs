@@ -1,7 +1,7 @@
 use clap::{Command, CommandFactory, Parser};
 use color_eyre::Result;
 use tfmttools_core::history::HistoryMode;
-use tfmttools_fs::{FsHandler, verify_directory};
+use tfmttools_fs::verify_directory;
 use tracing::debug;
 
 use super::TFMTOptions;
@@ -32,7 +32,6 @@ impl TFMTSubcommand {
     pub(crate) fn run(
         self,
         app_options: &TFMTOptions,
-        fs_handler: &FsHandler,
     ) -> Result<CommandOutcome> {
         match self {
             TFMTSubcommand::ResolveHistory(args) => {
@@ -59,17 +58,16 @@ impl TFMTSubcommand {
                 list_templates(&template_directory)?;
             },
             TFMTSubcommand::Rename(rename_args) => {
-                rename(fs_handler, app_options, rename_args)?;
+                rename(app_options, rename_args)?;
             },
             TFMTSubcommand::Validate(validate_args) => {
-                return validate(fs_handler, app_options, validate_args);
+                return validate(app_options, validate_args);
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
                 undo_redo(
                     HistoryMode::Undo,
                     undo_redo_args.amount.unwrap_or(1),
                     app_options,
-                    fs_handler,
                 )?;
             },
             TFMTSubcommand::Redo(undo_redo_args) => {
@@ -77,7 +75,6 @@ impl TFMTSubcommand {
                     HistoryMode::Redo,
                     undo_redo_args.amount.unwrap_or(1),
                     app_options,
-                    fs_handler,
                 )?;
             },
             TFMTSubcommand::ShowHistory => {

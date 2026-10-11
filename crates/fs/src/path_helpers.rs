@@ -1,22 +1,4 @@
 use camino::{Utf8Path, Utf8PathBuf};
-use tfmttools_core::util::FSMode;
-
-#[derive(Debug)]
-pub struct FsHandler {
-    fs_mode: FSMode,
-}
-
-impl FsHandler {
-    #[must_use]
-    pub fn new(fs_mode: FSMode) -> Self {
-        Self { fs_mode }
-    }
-
-    #[must_use]
-    pub fn is_dry_run(&self) -> bool {
-        matches!(self.fs_mode, FSMode::DryRun)
-    }
-}
 
 #[must_use]
 pub fn get_longest_common_prefix<'a>(

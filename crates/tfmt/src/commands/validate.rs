@@ -16,7 +16,7 @@ use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::tag_encoding::TagTextEncoding;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
-use tfmttools_fs::{FsError, FsHandler, PathIteratorOptions, read_audio_file};
+use tfmttools_fs::{FsError, PathIteratorOptions, read_audio_file};
 use tracing::{debug, trace};
 
 use super::CommandOutcome;
@@ -25,7 +25,6 @@ use crate::history::load_history_for_mode;
 use crate::ui::ProgressBar;
 
 pub fn validate(
-    fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     validate_args: ValidateArgs,
 ) -> Result<CommandOutcome> {
@@ -56,21 +55,19 @@ pub fn validate(
         &app_options.history_file_path()?,
         app_options.fs_mode(),
     )?;
-    crate::history::execution::check_interrupted(&mut history, fs_handler)?;
+    crate::history::execution::check_interrupted(
+        &mut history,
+        app_options.fs_mode(),
+    )?;
     let file_paths = gather()?;
     debug!("Read {} files.", file_paths.len());
 
     match validate_args.command {
         Some(ValidateType::Characters) => {
-            fix_characters(fs_handler, app_options, file_paths, &mut history)?;
+            fix_characters(app_options, file_paths, &mut history)?;
         },
         Some(ValidateType::Id3Encoding) => {
-            fix_id3_encoding(
-                fs_handler,
-                app_options,
-                file_paths,
-                &mut history,
-            )?;
+            fix_id3_encoding(app_options, file_paths, &mut history)?;
         },
         None => unreachable!("bare validate --fix is rejected early"),
     }
@@ -94,7 +91,6 @@ fn check(
 }
 
 fn fix_characters(
-    fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
     history: &mut History,
@@ -111,7 +107,6 @@ fn fix_characters(
 
     apply_and_store_fix(
         history,
-        fs_handler,
         app_options,
         &actions,
         "validate characters --fix",
@@ -119,7 +114,6 @@ fn fix_characters(
 }
 
 fn fix_id3_encoding(
-    fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
     history: &mut History,
@@ -143,7 +137,6 @@ fn fix_id3_encoding(
 
     apply_and_store_fix(
         history,
-        fs_handler,
         app_options,
         &actions,
         "validate id3-encoding --fix",
@@ -212,7 +205,6 @@ fn tag_item_value(item: &TagItem) -> Option<(TagValueKind, &str)> {
 
 fn apply_and_store_fix(
     history: &mut History,
-    fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     actions: &[Action],
     command: &str,
@@ -234,7 +226,7 @@ fn apply_and_store_fix(
     );
     crate::history::execution::execute_recorded(
         history,
-        fs_handler,
+        app_options.fs_mode(),
         actions.to_vec(),
         metadata,
     )?;

@@ -261,7 +261,7 @@ fn preview_files_to_delete(
     session: &RenameSession,
     files: &[Utf8File],
 ) -> Result<()> {
-    if session.fs_handler().is_dry_run() {
+    if session.app_options().fs_mode().is_dry_run() {
         println!("Would delete the following files:");
     } else {
         println!("Files to delete:");

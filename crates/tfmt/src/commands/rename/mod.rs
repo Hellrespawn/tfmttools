@@ -13,7 +13,6 @@ use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::history::ActionRecordMetadata;
 use tfmttools_core::util::Utf8File;
 use tfmttools_core::warning::Warning;
-use tfmttools_fs::FsHandler;
 
 use crate::cli::{RenameArgs, TFMTOptions};
 
@@ -35,9 +34,8 @@ pub(crate) enum RenameDecision {
 }
 
 pub fn rename(
-    fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     rename_args: RenameArgs,
 ) -> Result<()> {
-    RenameSession::from_args(fs_handler, app_options, rename_args)?.run()
+    RenameSession::from_args(app_options, rename_args)?.run()
 }

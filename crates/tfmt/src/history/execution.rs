@@ -6,9 +6,9 @@ use tfmttools_core::history::{
     ActionRecordMetadata, History, HistoryMode, OperationKind, Record, RunId,
     RunRequest, StoredAction,
 };
+use tfmttools_core::util::FSMode;
 use tfmttools_fs::{
-    FsHandler, PreparedAction, prepare_action, prepare_tag_edit,
-    prepare_tag_replay,
+    PreparedAction, prepare_action, prepare_tag_edit, prepare_tag_replay,
 };
 
 #[derive(Clone, Copy)]
@@ -54,7 +54,7 @@ pub(crate) fn interruption_report(history: &History) -> Result<Option<String>> {
 }
 pub(crate) fn check_interrupted(
     history: &mut History,
-    fs: &FsHandler,
+    fs: FSMode,
 ) -> Result<()> {
     if let Some(report) = interruption_report(history)? {
         println!("{report}");
@@ -77,7 +77,7 @@ pub(crate) fn check_interrupted(
 }
 pub(crate) fn execute_recorded(
     history: &mut History,
-    fs: &FsHandler,
+    fs: FSMode,
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
 ) -> Result<Record> {
@@ -104,7 +104,7 @@ pub(crate) fn execute_recorded(
 }
 pub(crate) fn replay_record(
     history: &mut History,
-    fs: &FsHandler,
+    fs: FSMode,
     record: &Record,
     direction: HistoryMode,
 ) -> Result<Record> {
@@ -248,7 +248,7 @@ mod manual_tests {
         let d = assert_fs::TempDir::new().unwrap();
         let root = Utf8PathBuf::try_from(d.path().to_owned()).unwrap();
         let mut h = History::new(root.join("history"));
-        let fs = FsHandler::new(FSMode::Default);
+        let fs = FSMode::Default;
         let metadata = ActionRecordMetadata::new(
             TemplateMetadata::Validation { value: "test".into() },
             vec![],
@@ -257,7 +257,7 @@ mod manual_tests {
         assert!(
             execute_recorded(
                 &mut h,
-                &fs,
+                fs,
                 vec![
                     Action::MakeDir(root.join("first")),
                     Action::MoveFile {
@@ -277,7 +277,7 @@ mod manual_tests {
             h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
         }
         let record = h.records_for(HistoryMode::Undo, None).remove(0).clone();
-        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        replay_record(&mut h, fs, &record, HistoryMode::Undo).unwrap();
         assert!(!root.join("first").exists());
         assert!(h.records_for(HistoryMode::Redo, None).is_empty());
     }
@@ -303,11 +303,11 @@ mod failure_tests {
         let mut h = History::new(root.join("history"));
         let obstruction = root.join("obstruction");
         std::fs::write(&obstruction, b"original").unwrap();
-        let fs = FsHandler::new(FSMode::Default);
+        let fs = FSMode::Default;
         assert!(
             execute_recorded(
                 &mut h,
-                &fs,
+                fs,
                 vec![
                     Action::MakeDir(root.join("first")),
                     Action::RemoveDir(obstruction.clone()),
@@ -321,11 +321,11 @@ mod failure_tests {
         assert_eq!(h.records()[0].applied_count(), 1);
         assert!(!root.join("last").exists());
         assert_eq!(std::fs::read(&obstruction).unwrap(), b"original");
-        assert!(check_interrupted(&mut h, &fs).is_err());
+        assert!(check_interrupted(&mut h, fs).is_err());
         let a = h.current_attempt().unwrap().unwrap();
         h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
         let record = h.records()[0].clone();
-        replay_record(&mut h, &fs, &record, HistoryMode::Undo).unwrap();
+        replay_record(&mut h, fs, &record, HistoryMode::Undo).unwrap();
         assert!(!root.join("first").exists());
     }
     #[test]
@@ -365,13 +365,8 @@ mod failure_tests {
         let db = rusqlite::Connection::open(root.join("history")).unwrap();
         db.execute_batch("CREATE TRIGGER fail_confirmation BEFORE DELETE ON attempts BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
         assert!(
-            execute_recorded(
-                &mut h,
-                &FsHandler::new(FSMode::Default),
-                vec![action],
-                metadata()
-            )
-            .is_err()
+            execute_recorded(&mut h, FSMode::Default, vec![action], metadata())
+                .is_err()
         );
         assert!(h.ensure_usable().is_err());
         db.execute_batch("DROP TRIGGER fail_confirmation").unwrap();

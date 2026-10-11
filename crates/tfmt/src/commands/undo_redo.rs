@@ -2,7 +2,7 @@ use color_eyre::Result;
 use tfmttools_core::history::{
     History, HistoryMode, LoadHistoryResult, Record,
 };
-use tfmttools_fs::FsHandler;
+use tfmttools_core::util::FSMode;
 
 use crate::cli::{ConfirmMode, TFMTOptions};
 use crate::history::{HistoryFormatter, HistoryPrefix, load_history_for_mode};
@@ -12,7 +12,6 @@ pub fn undo_redo(
     mode: HistoryMode,
     amount: usize,
     app_options: &TFMTOptions,
-    fs_handler: &FsHandler,
 ) -> Result<()> {
     let verb = match mode {
         HistoryMode::Undo => "undo",
@@ -24,7 +23,10 @@ pub fn undo_redo(
         app_options.fs_mode(),
     )?;
 
-    crate::history::execution::check_interrupted(&mut history, fs_handler)?;
+    crate::history::execution::check_interrupted(
+        &mut history,
+        app_options.fs_mode(),
+    )?;
 
     match load_history_result {
         LoadHistoryResult::New => {
@@ -62,7 +64,7 @@ pub fn undo_redo(
                     perform_undo_redo_actions(
                         &mut history,
                         records,
-                        fs_handler,
+                        app_options.fs_mode(),
                         mode,
                         &formatter,
                     )?;
@@ -126,7 +128,7 @@ fn preview_undo_redo(
 fn perform_undo_redo_actions(
     history: &mut History,
     records: Vec<Record>,
-    fs_handler: &FsHandler,
+    fs_mode: FSMode,
     mode: HistoryMode,
     formatter: &HistoryFormatter,
 ) -> Result<()> {
@@ -138,7 +140,7 @@ fn perform_undo_redo_actions(
         );
 
         crate::history::execution::replay_record(
-            history, fs_handler, &record, mode,
+            history, fs_mode, &record, mode,
         )?;
 
         println!("Done.");
