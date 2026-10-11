@@ -22,12 +22,18 @@ use tracing::{debug, trace};
 use super::CommandOutcome;
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
 use crate::history::load_history_for_mode;
-use crate::ui::ProgressBar;
+use crate::ui::{ProgressBar, current_dir_utf8};
 
 pub fn validate(
     app_options: &TFMTOptions,
     validate_args: ValidateArgs,
 ) -> Result<CommandOutcome> {
+    let relative_input = validate_args
+        .common_args
+        .custom_input_directory
+        .as_ref()
+        .is_some_and(|path| path.is_relative());
+    let cwd = current_dir_utf8()?;
     let validate_options =
         ValidateOptions::try_from(validate_args.common_args)?;
 
@@ -39,8 +45,20 @@ pub fn validate(
         validate_options.input_directory().as_path(),
         validate_options.recursion_depth(),
     );
-    let gather =
-        || super::audio_discovery::gather_audio_paths(app_options, &options);
+    let gather = || -> Result<Vec<Utf8PathBuf>> {
+        let paths =
+            super::audio_discovery::gather_audio_paths(app_options, &options)?;
+        Ok(paths
+            .into_iter()
+            .map(|path| {
+                if relative_input {
+                    path.strip_prefix(cwd.as_path()).unwrap_or(&path).to_owned()
+                } else {
+                    path
+                }
+            })
+            .collect())
+    };
 
     if !validate_args.fix {
         let scope = match validate_args.command {

@@ -221,22 +221,27 @@ impl RenameOptions {
     }
 }
 
+fn resolve_input_scope(
+    input: Option<Utf8PathBuf>,
+    depth: Option<usize>,
+) -> Result<(Utf8Directory, usize)> {
+    let cwd = current_dir_utf8()?;
+    let directory = match input {
+        Some(path) => verify_directory(cwd.join(path))?,
+        None => cwd,
+    };
+    Ok((directory, depth.unwrap_or(DEFAULT_RECURSION_DEPTH)))
+}
+
 impl TryFrom<ValidateCommonArgs> for ValidateOptions {
     type Error = color_eyre::Report;
 
     fn try_from(validate_args: ValidateCommonArgs) -> Result<Self> {
-        Ok(Self {
-            input_directory: if let Some(input_directory) =
-                validate_args.custom_input_directory
-            {
-                verify_directory(input_directory)?
-            } else {
-                current_dir_utf8()?
-            },
-            recursion_depth: validate_args
-                .recursion_depth
-                .unwrap_or(DEFAULT_RECURSION_DEPTH),
-        })
+        let (input_directory, recursion_depth) = resolve_input_scope(
+            validate_args.custom_input_directory,
+            validate_args.recursion_depth,
+        )?;
+        Ok(Self { input_directory, recursion_depth })
     }
 }
 
@@ -246,14 +251,12 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
     fn try_from(
         (rename_args, options): (RenameArgs, &TFMTOptions),
     ) -> Result<Self> {
+        let (input_directory, recursion_depth) = resolve_input_scope(
+            rename_args.custom_input_directory,
+            rename_args.recursion_depth,
+        )?;
         Ok(Self {
-            input_directory: if let Some(input_directory) =
-                rename_args.custom_input_directory
-            {
-                verify_directory(current_dir_utf8()?.join(input_directory))?
-            } else {
-                current_dir_utf8()?
-            },
+            input_directory,
             template_directory: if let Some(template_directory) =
                 rename_args.custom_template_directory
             {
@@ -273,9 +276,7 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
                         .join(BIN_DIRECTORY_NAME),
                 )?
             },
-            recursion_depth: rename_args
-                .recursion_depth
-                .unwrap_or(DEFAULT_RECURSION_DEPTH),
+            recursion_depth,
             move_mode: if rename_args.always_copy {
                 MoveMode::AlwaysCopy
             } else {
@@ -284,5 +285,68 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             template_option: rename_args.template_args.into(),
             arguments: rename_args.arguments,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn validation_scope(
+        input: Option<Utf8PathBuf>,
+        depth: Option<usize>,
+    ) -> ValidateOptions {
+        ValidateOptions::try_from(ValidateCommonArgs {
+            custom_input_directory: input,
+            recursion_depth: depth,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn relative_input_is_absolute_without_canonicalization() {
+        let options =
+            validation_scope(Some("missing scope/../songs".into()), None);
+        assert_eq!(
+            options.input_directory().as_path(),
+            current_dir_utf8()
+                .unwrap()
+                .join("missing scope/../songs")
+                .as_path()
+        );
+    }
+
+    #[test]
+    fn absolute_and_default_input_scopes() {
+        let cwd = current_dir_utf8().unwrap();
+        assert_eq!(validation_scope(None, None).input_directory(), &cwd);
+        let path = cwd.join("missing absolute scope").into_path_buf();
+        assert_eq!(
+            validation_scope(Some(path.clone()), None)
+                .input_directory()
+                .as_path(),
+            path
+        );
+    }
+
+    #[test]
+    fn depth_zero_and_missing_paths() {
+        assert_eq!(
+            validation_scope(Some("missing scope".into()), None)
+                .recursion_depth(),
+            4
+        );
+        assert_eq!(
+            validation_scope(Some("missing scope".into()), Some(0))
+                .recursion_depth(),
+            0
+        );
+        assert!(
+            ValidateOptions::try_from(ValidateCommonArgs {
+                custom_input_directory: Some("Cargo.toml".into()),
+                recursion_depth: None,
+            })
+            .is_err()
+        );
     }
 }
