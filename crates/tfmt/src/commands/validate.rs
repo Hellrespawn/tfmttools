@@ -2,9 +2,9 @@ use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
 use color_eyre::eyre::bail;
 use lofty::TextEncoding;
-use lofty::file::AudioFile as LoftyAudioFile;
-use lofty::id3::v2::{Frame, Id3v2Tag};
-use lofty::tag::{ItemKey, TagItem, TagType};
+use lofty::file::FileType;
+use lofty::id3::v2::Id3v2Tag;
+use lofty::tag::{ItemKey, TagItem};
 use tfmttools_core::action::{
     Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
 };
@@ -12,11 +12,14 @@ use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::history::{
     ActionRecordMetadata, History, TemplateMetadata,
 };
+use tfmttools_core::id3::text_encodings_for_key;
 use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::tag_encoding::TagTextEncoding;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
-use tfmttools_fs::{FsError, PathIteratorOptions, read_audio_file};
+use tfmttools_fs::{
+    FsError, PathIteratorOptions, read_audio_file, read_native_id3v2,
+};
 use tracing::{debug, trace};
 
 use super::CommandOutcome;
@@ -413,40 +416,14 @@ fn native_id3v2_tag(path: &Utf8Path) -> Option<Id3v2Tag> {
     if path.extension() != Some("mp3") {
         return None;
     }
-    let mut file = std::fs::File::open(path).ok()?;
-    lofty::mpeg::MpegFile::read_from(
-        &mut file,
-        lofty::config::ParseOptions::new().read_properties(false),
-    )
-    .ok()?
-    .id3v2()
-    .cloned()
+    read_native_id3v2(path, FileType::Mpeg).ok().flatten()
 }
 
 fn lofty_id3v2_text_encoding(
     tag: &Id3v2Tag,
     item_key: ItemKey,
 ) -> Option<TextEncoding> {
-    let id = item_key.map_key(TagType::Id3v2)?;
-    let id3v2_tag = tag.clone();
-
-    id3v2_tag.into_iter().find_map(|frame| {
-        match frame {
-            Frame::Text(frame) if frame.id().as_str() == id => {
-                Some(frame.encoding)
-            },
-            Frame::UserText(frame)
-                if frame.description.as_ref() == id
-                    || ItemKey::from_key(
-                        TagType::Id3v2,
-                        &frame.description,
-                    ) == Some(item_key) =>
-            {
-                Some(frame.encoding)
-            },
-            _ => None,
-        }
-    })
+    text_encodings_for_key(tag, item_key).next().map(TextEncoding::from)
 }
 
 #[derive(Debug)]

@@ -1,14 +1,17 @@
 use lofty::TextEncoding;
 use lofty::config::WriteOptions;
-use lofty::file::{AudioFile as LoftyAudioFile, TaggedFileExt};
+use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::id3::v2::{
     ExtendedUrlFrame, Frame, FrameId, Id3v2Tag, UrlLinkFrame,
 };
 use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{TagValueChange, TagValueKind};
+use tfmttools_core::id3::{frame_matches_item_key, text_encodings_for_key};
 use tfmttools_core::item_keys::parse_item_key;
+use tfmttools_core::tag_encoding::TagTextEncoding;
 
 use crate::error::{FsError, FsResult};
+use crate::read_native_id3v2;
 
 #[allow(clippy::too_many_lines)] // Verify every requested value and native encoding before install.
 pub fn write_tag_candidate(
@@ -55,6 +58,19 @@ pub fn write_tag_candidate(
     let written_tag = written.primary_tag().ok_or_else(|| {
         FsError::Execution("Written candidate has no primary tag".into())
     })?;
+    let native_tag =
+        if changes.iter().any(|change| change.new_encoding().is_some()) {
+            Some(read_native_id3v2(path, written.file_type())?.ok_or_else(
+                || {
+                    FsError::Execution(
+                        "Cannot verify native ID3 encoding for this format"
+                            .into(),
+                    )
+                },
+            )?)
+        } else {
+            None
+        };
     for change in changes {
         let key = parse_item_key(change.key())?;
         let (value, encoding) = (change.new_value(), change.new_encoding());
@@ -68,70 +84,33 @@ pub fn write_tag_candidate(
             )));
         }
         if let Some(encoding) = encoding {
-            let id = key.map_key(TagType::Id3v2).ok_or_else(|| {
-                FsError::Execution("Requested encoding has no ID3 frame".into())
-            })?;
-            let mut file = std::fs::File::open(path)?;
-            let options = lofty::config::ParseOptions::new();
-            let frames = match written.file_type() {
-                lofty::file::FileType::Mpeg => {
-                    lofty::mpeg::MpegFile::read_from(&mut file, options)
-                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
-                        .id3v2()
-                        .cloned()
-                },
-                lofty::file::FileType::Wav => {
-                    lofty::iff::wav::WavFile::read_from(&mut file, options)
-                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
-                        .id3v2()
-                        .cloned()
-                },
-                lofty::file::FileType::Aiff => {
-                    lofty::iff::aiff::AiffFile::read_from(&mut file, options)
-                        .map_err(|e| FsError::Lofty(path.to_owned(), e))?
-                        .id3v2()
-                        .cloned()
-                },
-                _ => None,
-            }
-            .ok_or_else(|| {
-                FsError::Execution(
-                    "Cannot verify native ID3 encoding for this format".into(),
-                )
-            })?;
-            let expected = TextEncoding::from(encoding);
-            let mut found = false;
-            for frame in frames {
-                let actual = match frame {
-                    Frame::Text(frame) if frame.id().as_str() == id => {
-                        Some(frame.encoding)
-                    },
-                    Frame::UserText(frame)
-                        if frame.description.as_ref() == id
-                            || ItemKey::from_key(
-                                TagType::Id3v2,
-                                &frame.description,
-                            ) == Some(key) =>
-                    {
-                        Some(frame.encoding)
-                    },
-                    _ => None,
-                };
-                if let Some(actual) = actual {
-                    found = true;
-                    if actual != expected {
-                        return Err(FsError::Execution(
-                            "Candidate encoding verification failed".into(),
-                        ));
-                    }
-                }
-            }
-            if !found {
-                return Err(FsError::Execution(
-                    "Candidate encoding frame missing".into(),
-                ));
-            }
+            verify_native_encoding(
+                native_tag
+                    .as_ref()
+                    .expect("Encoding requested native inspection"),
+                key,
+                encoding,
+            )?;
         }
+    }
+    Ok(())
+}
+
+fn verify_native_encoding(
+    tag: &Id3v2Tag,
+    key: ItemKey,
+    expected: TagTextEncoding,
+) -> FsResult {
+    let mut encodings = text_encodings_for_key(tag, key).peekable();
+    if encodings.peek().is_none() {
+        return Err(FsError::Execution(
+            "Candidate encoding frame missing".into(),
+        ));
+    }
+    if encodings.any(|actual| actual != expected) {
+        return Err(FsError::Execution(
+            "Candidate encoding verification failed".into(),
+        ));
     }
     Ok(())
 }
@@ -200,26 +179,19 @@ fn tag_with_encoding_changes(
         };
         let encoding = TextEncoding::from(encoding);
         let key = parse_item_key(change.key())?;
-        let Some(id) = key.map_key(TagType::Id3v2) else {
-            continue;
-        };
-
         let frames = id3v2_tag
             .into_iter()
             .map(|frame| {
+                if !frame_matches_item_key(&frame, key) {
+                    return frame;
+                }
                 match frame {
-                    Frame::Text(mut frame) if frame.id().as_str() == id => {
+                    Frame::Text(mut frame) => {
                         frame.encoding = encoding;
                         encoding_changed = true;
                         Frame::Text(frame)
                     },
-                    Frame::UserText(mut frame)
-                        if frame.description.as_ref() == id
-                            || ItemKey::from_key(
-                                TagType::Id3v2,
-                                &frame.description,
-                            ) == Some(key) =>
-                    {
+                    Frame::UserText(mut frame) => {
                         frame.encoding = encoding;
                         encoding_changed = true;
                         Frame::UserText(frame)
@@ -268,4 +240,56 @@ fn replacement_item(
     replacement.set_lang(*item.lang());
 
     replacement
+}
+
+#[cfg(test)]
+mod tests {
+    use lofty::id3::v2::ExtendedTextFrame;
+    use tfmttools_core::tag_encoding::TagTextEncoding;
+
+    use super::*;
+
+    #[test]
+    fn candidate_encoding_requires_every_matching_frame() {
+        let mut tag = Id3v2Tag::default();
+        tag.insert(Frame::UserText(ExtendedTextFrame::new(
+            TextEncoding::UTF16,
+            "ALBUMARTIST",
+            "Artist",
+        )));
+        tag.insert(Frame::UserText(ExtendedTextFrame::new(
+            TextEncoding::UTF8,
+            "ALBUM ARTIST",
+            "Artist",
+        )));
+        assert!(
+            verify_native_encoding(
+                &tag,
+                ItemKey::AlbumArtist,
+                TagTextEncoding::UTF16
+            )
+            .is_err()
+        );
+        assert!(
+            verify_native_encoding(
+                &tag,
+                ItemKey::TrackTitle,
+                TagTextEncoding::UTF16
+            )
+            .is_err()
+        );
+        tag.insert(Frame::UserText(ExtendedTextFrame::new(
+            TextEncoding::UTF16,
+            "ALBUM ARTIST",
+            "Artist",
+        )));
+        assert!(
+            verify_native_encoding(
+                &tag,
+                ItemKey::AlbumArtist,
+                TagTextEncoding::UTF16
+            )
+            .is_ok()
+        );
+    }
 }

@@ -2,6 +2,7 @@ pub mod action;
 pub mod audiofile;
 pub mod error;
 pub mod history;
+pub mod id3;
 pub mod item_keys;
 pub mod tag_encoding;
 pub mod templates;
