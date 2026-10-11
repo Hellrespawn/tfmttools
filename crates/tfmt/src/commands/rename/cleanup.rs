@@ -6,8 +6,8 @@ use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::{Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
-    plan_actions, FsResult, PathIterator, PathIteratorOptions,
-    get_file_checksum, get_longest_common_prefix,
+    FsResult, PathIterator, PathIteratorOptions, get_file_checksum,
+    get_longest_common_prefix, plan_actions,
 };
 use tracing::{debug, info, trace};
 
@@ -16,7 +16,7 @@ use crate::ui::{PreviewList, current_dir_utf8};
 
 const AUTO_DELETE_EXTENSIONS: [&str; 5] = ["jpg", "jpeg", "png", "gif", "bmp"];
 
-pub(crate) fn handle_remaining_files(
+pub(crate) fn append_cleanup_actions(
     session: &RenameSession,
     mut applied_actions: Vec<Action>,
     unchanged_files: &[Utf8File],
@@ -85,20 +85,8 @@ pub(crate) fn handle_remaining_files(
                 return Ok(applied_actions);
             }
 
-            let confirmed_delete = cleanup_plan.requires_confirmation
-                && !cleanup_plan.files_to_delete.is_empty();
-            let removed_directories =
-                !cleanup_plan.directories_to_remove.is_empty();
             let cleanup_actions =
-                execute_cleanup(session, &common_prefix, cleanup_plan)?;
-
-            if confirmed_delete {
-                println!("Deleted.");
-            }
-
-            if removed_directories {
-                println!("Removed empty folders.");
-            }
+                plan_cleanup_actions(session, &common_prefix, cleanup_plan)?;
 
             applied_actions.extend(cleanup_actions);
         }
@@ -234,7 +222,6 @@ fn prepare_cleanup(
     } else if !cleanup_plan.files_to_delete.is_empty() {
         info!("Has only files that are safe to delete.");
 
-        println!("Deleted the following files:");
         preview_files_to_delete(session, &cleanup_plan.files_to_delete)?;
     }
 
@@ -274,6 +261,11 @@ fn preview_files_to_delete(
     session: &RenameSession,
     files: &[Utf8File],
 ) -> Result<()> {
+    if session.fs_handler().is_dry_run() {
+        println!("Would delete the following files:");
+    } else {
+        println!("Files to delete:");
+    }
     let working_directory = current_dir_utf8()?;
 
     let items = PreviewList::new(
@@ -296,7 +288,7 @@ fn confirm_cleanup(session: &RenameSession) -> Result<bool> {
     super::shared::confirm(session, "Delete these remaining files?")
 }
 
-fn execute_cleanup(
+fn plan_cleanup_actions(
     session: &RenameSession,
     common_prefix: &Utf8Path,
     cleanup_plan: CleanupPlan,
@@ -306,7 +298,7 @@ fn execute_cleanup(
         common_prefix,
         cleanup_plan.files_to_delete,
     )?;
-    let mut actions = move_files(session, rename_actions)?;
+    let mut actions = plan_file_moves(session, rename_actions)?;
 
     actions.extend(remove_directories(cleanup_plan.directories_to_remove));
 
@@ -331,13 +323,11 @@ fn create_rename_actions(
         .collect()
 }
 
-fn move_files(
+fn plan_file_moves(
     session: &RenameSession,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
-    Ok(plan_actions(
-        rename_actions, session.rename_options().move_mode(),
-    )?)
+    Ok(plan_actions(rename_actions, session.rename_options().move_mode())?)
 }
 
 fn remove_directories(directories: Vec<Utf8Directory>) -> Vec<Action> {

@@ -32,6 +32,9 @@
 
 ### Changed
 
+- Describe cleanup prospectively and report run completion only after successful
+  execution. Dry runs never claim deletion or saved history.
+
 - Replace filesystem `ActionExecutor` and `ActionHandler` exports with read-only
   `plan_actions`. Remove their direct execution APIs and unused `FsHandler`
   effect methods/result types; execute through prepared actions instead.

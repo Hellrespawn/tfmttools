@@ -4,7 +4,7 @@ use tfmttools_core::util::Utf8PathExt;
 use tfmttools_fs::{FsHandler, PathIteratorOptions};
 use tracing::info;
 
-use super::{RenameExecutionResult, apply, finish, planning, preview};
+use super::{RenameDecision, cleanup, confirmation, planning, preview};
 use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
 use crate::history::load_history_for_mode;
 
@@ -68,18 +68,18 @@ impl<'a> RenameSession<'a> {
             preview::preview(&self, &plan)?;
         }
 
-        let execution = apply::execute(&self, plan)?;
+        let execution = confirmation::confirm_and_plan(&self, plan)?;
         self.finish(execution)
     }
 
-    fn finish(&mut self, execution: RenameExecutionResult) -> Result<()> {
+    fn finish(&mut self, execution: RenameDecision) -> Result<()> {
         match execution {
-            RenameExecutionResult::Applied {
+            RenameDecision::Confirmed {
                 actions,
                 unchanged_files,
                 metadata,
             } => {
-                let actions = finish::handle_remaining_files(
+                let actions = cleanup::append_cleanup_actions(
                     self,
                     actions,
                     &unchanged_files,
@@ -94,18 +94,19 @@ impl<'a> RenameSession<'a> {
                     self.app_options.fs_mode(),
                     tfmttools_core::util::FSMode::DryRun
                 ) {
+                    println!("Run completed.");
                     println!(
                         "Saved run #{} to history.",
                         self.app_options.run_id()
                     );
                 }
             },
-            RenameExecutionResult::NothingToRename(_unchanged_paths) => {
+            RenameDecision::NothingToRename => {
                 let msg = "There are no audio files to rename.";
                 println!("{msg}");
                 info!("{msg}");
             },
-            RenameExecutionResult::Aborted => {
+            RenameDecision::Aborted => {
                 println!("Aborting!");
             },
         }

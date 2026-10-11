@@ -1,6 +1,6 @@
-mod apply;
+mod cleanup;
+mod confirmation;
 mod discovery;
-mod finish;
 mod planning;
 mod preview;
 mod session;
@@ -24,13 +24,13 @@ pub(crate) struct RenamePlan {
     pub(crate) warnings: Vec<Warning>,
 }
 
-pub(crate) enum RenameExecutionResult {
-    Applied {
+pub(crate) enum RenameDecision {
+    Confirmed {
         actions: Vec<Action>,
         unchanged_files: Vec<Utf8File>,
         metadata: ActionRecordMetadata,
     },
-    NothingToRename(Vec<Utf8File>),
+    NothingToRename,
     Aborted,
 }
 

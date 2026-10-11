@@ -4,12 +4,12 @@ use tfmttools_core::util::Utf8File;
 use tfmttools_fs::plan_actions;
 use tracing::trace;
 
-use super::{RenameExecutionResult, RenamePlan, RenameSession};
+use super::{RenameDecision, RenamePlan, RenameSession};
 
-pub fn execute(
+pub fn confirm_and_plan(
     session: &RenameSession,
     plan: RenamePlan,
-) -> Result<RenameExecutionResult> {
+) -> Result<RenameDecision> {
     // Can't apply compiler attribute to macro invocation directly.
     #[allow(unstable_name_collisions)]
     {
@@ -24,21 +24,22 @@ pub fn execute(
     }
 
     if plan.actions.is_empty() {
-        Ok(RenameExecutionResult::NothingToRename(plan.unchanged_files))
+        Ok(RenameDecision::NothingToRename)
     } else {
         let confirmation = super::shared::confirm(session, "Move files?")?;
 
         if confirmation {
             let actions = plan_actions(
-                plan.actions, session.rename_options().move_mode(),
+                plan.actions,
+                session.rename_options().move_mode(),
             )?;
-            Ok(RenameExecutionResult::Applied {
+            Ok(RenameDecision::Confirmed {
                 actions,
                 unchanged_files: plan.unchanged_files,
                 metadata: plan.metadata,
             })
         } else {
-            Ok(RenameExecutionResult::Aborted)
+            Ok(RenameDecision::Aborted)
         }
     }
 }

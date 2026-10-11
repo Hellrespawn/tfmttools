@@ -391,3 +391,7 @@ and expected language constructs; template syntax is unchanged.
 `cargo xtask test` runs the workspace tests, and `cargo xtask test-cli` runs
 all CLI tests. Cargo discovers conventional integration targets automatically.
 Use `cargo xtask test-integration` for the focused fixture harness.
+
+Cleanup previews describe proposed deletions; dry runs say “Would delete”.
+A writable rename reports completion only after filesystem execution and history
+confirmation succeed. Nonempty directories may remain after cleanup.
