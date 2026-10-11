@@ -11,6 +11,7 @@ History IO lives here; executable filesystem operations live in `fs`.
 - Case-insensitive path handling: `src/action/case_insensitive_path.rs`.
 - Template rendering context and template wrapper: `src/templates/`.
 - Audio metadata model: `src/audiofile.rs`.
+- Native ID3 frame matching: `src/id3.rs`.
 - Canonical tag encoding names and conversions: `src/tag_encoding.rs`.
 - Item key constants: `src/item_keys.rs`.
 - History model and persistence: `src/history/`.

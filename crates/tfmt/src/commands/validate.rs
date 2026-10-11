@@ -1,26 +1,18 @@
-use camino::{Utf8Path, Utf8PathBuf};
+mod inspection;
+
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 use color_eyre::eyre::bail;
-use lofty::TextEncoding;
-use lofty::file::FileType;
-use lofty::id3::v2::Id3v2Tag;
-use lofty::tag::{ItemKey, TagItem};
-use tfmttools_core::action::{
-    Action, FORBIDDEN_CHARACTERS, TagValueChange, TagValueKind,
+use inspection::{
+    Id3EncodingIssue, TagValueIssue, ValidationScope, inspect_file,
 };
-use tfmttools_core::audiofile::AudioFile;
+use tfmttools_core::action::Action;
 use tfmttools_core::history::{
     ActionRecordMetadata, History, TemplateMetadata,
 };
-use tfmttools_core::id3::text_encodings_for_key;
-use tfmttools_core::item_keys::canonical_tag_name;
-use tfmttools_core::tag_encoding::TagTextEncoding;
-use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
-use tfmttools_fs::{
-    FsError, PathIteratorOptions, read_audio_file, read_native_id3v2,
-};
-use tracing::{debug, trace};
+use tfmttools_fs::{FsError, PathIteratorOptions};
+use tracing::debug;
 
 use super::CommandOutcome;
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
@@ -63,12 +55,12 @@ pub fn validate(
             .collect())
     };
 
+    let scope = match validate_args.command {
+        None => ValidationScope::All,
+        Some(ValidateType::Characters) => ValidationScope::Characters,
+        Some(ValidateType::Id3Encoding) => ValidationScope::Id3Encoding,
+    };
     if !validate_args.fix {
-        let scope = match validate_args.command {
-            None => ValidationScope::All,
-            Some(ValidateType::Characters) => ValidationScope::Characters,
-            Some(ValidateType::Id3Encoding) => ValidationScope::Id3Encoding,
-        };
         return Ok(check(app_options, gather()?, scope));
     }
 
@@ -83,18 +75,23 @@ pub fn validate(
     let file_paths = gather()?;
     debug!("Read {} files.", file_paths.len());
 
-    match validate_args.command {
-        Some(ValidateType::Characters) => {
-            fix_characters(app_options, file_paths, &mut history)?;
-        },
-        Some(ValidateType::Id3Encoding) => {
-            fix_id3_encoding(app_options, file_paths, &mut history)?;
-        },
-        None => unreachable!("bare validate --fix is rejected early"),
+    let result = validate_files(app_options, file_paths, scope);
+    if !result.read_errors.is_empty() {
+        result.print_read_errors();
+        bail!(
+            "Cannot apply tag fixes because audio inspection was incomplete; no tag fixes were applied"
+        );
     }
+    let command = match scope {
+        ValidationScope::Characters => "validate characters --fix",
+        ValidationScope::Id3Encoding => "validate id3-encoding --fix",
+        ValidationScope::All => {
+            unreachable!("bare validate --fix is rejected early")
+        },
+    };
+    apply_and_store_fix(&mut history, app_options, &result.actions, command)?;
     Ok(CommandOutcome::Success)
 }
-
 fn check(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
@@ -109,119 +106,6 @@ fn check(
     } else {
         CommandOutcome::ValidationFailed
     }
-}
-
-fn fix_characters(
-    app_options: &TFMTOptions,
-    file_paths: Vec<Utf8PathBuf>,
-    history: &mut History,
-) -> Result<()> {
-    let actions = create_fix_actions(app_options, file_paths, |_, _, value| {
-        let fixed = sanitize_tag_value(value);
-
-        (fixed != value).then_some(FieldFix {
-            new_value: fixed,
-            old_encoding: None,
-            new_encoding: None,
-        })
-    });
-
-    apply_and_store_fix(
-        history,
-        app_options,
-        &actions,
-        "validate characters --fix",
-    )
-}
-
-fn fix_id3_encoding(
-    app_options: &TFMTOptions,
-    file_paths: Vec<Utf8PathBuf>,
-    history: &mut History,
-) -> Result<()> {
-    let file_paths = file_paths
-        .into_iter()
-        .filter(|path| path.extension() == Some("mp3"))
-        .collect::<Vec<_>>();
-    let native_tags: std::collections::HashMap<_, _> = file_paths
-        .iter()
-        .filter_map(|path| {
-            native_id3v2_tag(path).map(|tag| (path.clone(), tag))
-        })
-        .collect();
-    let actions =
-        create_fix_actions(app_options, file_paths, |path, item, value| {
-            let source_encoding =
-                lofty_id3v2_text_encoding(native_tags.get(path)?, item.key())?;
-            rewrite_id3_text_as_utf16(value, source_encoding)
-        });
-
-    apply_and_store_fix(
-        history,
-        app_options,
-        &actions,
-        "validate id3-encoding --fix",
-    )
-}
-
-fn create_fix_actions(
-    app_options: &TFMTOptions,
-    file_paths: Vec<Utf8PathBuf>,
-    fix_value: impl Fn(&Utf8Path, &TagItem, &str) -> Option<FieldFix>,
-) -> Vec<Action> {
-    let bar = ProgressBar::bar(
-        app_options.display_mode(),
-        "Determining tag fixes...",
-        "Determined tag fixes.",
-        file_paths.len() as u64,
-        false,
-    );
-    let mut actions = Vec::new();
-
-    for path in file_paths {
-        bar.inc_found();
-
-        if let Ok(audio_file) = read_audio_file(path.clone()) {
-            let changes = audio_file
-                .tag()
-                .items()
-                .filter_map(|item| tag_value_change(&path, item, &fix_value))
-                .collect::<Vec<_>>();
-
-            if !changes.is_empty() {
-                actions.push(Action::EditTagValues { path, changes });
-            }
-        }
-    }
-
-    bar.finish();
-
-    actions
-}
-
-fn tag_value_change(
-    path: &Utf8Path,
-    item: &TagItem,
-    fix_value: &impl Fn(&Utf8Path, &TagItem, &str) -> Option<FieldFix>,
-) -> Option<TagValueChange> {
-    let (kind, value) = tag_item_value(item)?;
-    let fixed = fix_value(path, item, value)?;
-
-    Some(
-        TagValueChange::new(
-            canonical_tag_name(item.key())?.to_owned(),
-            kind,
-            value.to_owned(),
-            fixed.new_value,
-        )
-        .with_encoding(fixed.old_encoding, fixed.new_encoding),
-    )
-}
-
-fn tag_item_value(item: &TagItem) -> Option<(TagValueKind, &str)> {
-    item.value().text().map(|value| (TagValueKind::Text, value)).or_else(|| {
-        item.value().locator().map(|value| (TagValueKind::Locator, value))
-    })
 }
 
 fn apply_and_store_fix(
@@ -293,21 +177,22 @@ fn validate_files(
     for path in file_paths {
         bar.inc_found();
 
-        match read_audio_file(path.clone()) {
-            Ok(audio_file) => {
-                trace!("Validated audio file encoding: {audio_file:?}");
+        match inspect_file(&path, scope) {
+            Ok(inspection) => {
                 result.checked_files += 1;
-                if scope.includes_characters() {
-                    result.tag_issues.extend(validate_tag_values(&audio_file));
-                }
-                if scope.includes_id3_encoding() {
-                    result
-                        .id3_encoding_issues
-                        .extend(validate_id3_encoding(&audio_file));
+                result.tag_issues.extend(inspection.tag_issues);
+                result
+                    .id3_encoding_issues
+                    .extend(inspection.id3_encoding_issues);
+                if !inspection.changes.is_empty() {
+                    result.actions.push(Action::EditTagValues {
+                        path,
+                        changes: inspection.changes,
+                    });
                 }
             },
             Err(error) => {
-                result.read_errors.push(ValidationReadError { path, error });
+                result.read_errors.push(ValidationReadError { path, error })
             },
         }
 
@@ -320,122 +205,10 @@ fn validate_files(
     result
 }
 
-#[derive(Debug, Clone, Copy)]
-enum ValidationScope {
-    All,
-    Characters,
-    Id3Encoding,
-}
-
-impl ValidationScope {
-    fn includes_characters(self) -> bool {
-        matches!(self, Self::All | Self::Characters)
-    }
-
-    fn includes_id3_encoding(self) -> bool {
-        matches!(self, Self::All | Self::Id3Encoding)
-    }
-}
-
-fn validate_tag_values(audio_file: &AudioFile) -> Vec<TagValueIssue> {
-    audio_file
-        .tag()
-        .items()
-        .filter_map(|item| {
-            let (_, value) = tag_item_value(item)?;
-            let forbidden_characters = forbidden_characters_in(value);
-
-            (!forbidden_characters.is_empty()).then(|| {
-                TagValueIssue {
-                    path: audio_file.file().as_path().to_owned(),
-                    key: format!("{:?}", item.key()),
-                    value: value.to_owned(),
-                    characters: forbidden_characters,
-                }
-            })
-        })
-        .collect()
-}
-
-fn validate_id3_encoding(audio_file: &AudioFile) -> Vec<Id3EncodingIssue> {
-    let Some(native_tag) = native_id3v2_tag(audio_file.file().as_path()) else {
-        return Vec::new();
-    };
-    audio_file
-        .tag()
-        .items()
-        .filter_map(|item| {
-            let (_, value) = tag_item_value(item)?;
-            let encoding = lofty_id3v2_text_encoding(&native_tag, item.key())?;
-
-            should_rewrite_id3_text_as_utf16(value, encoding).then(|| {
-                Id3EncodingIssue {
-                    path: audio_file.file().as_path().to_owned(),
-                    key: format!("{:?}", item.key()),
-                    value: value.to_owned(),
-                    encoding: TagTextEncoding::from(encoding).name().to_owned(),
-                }
-            })
-        })
-        .collect()
-}
-
-fn forbidden_characters_in(value: &str) -> Vec<&'static str> {
-    let mut forbidden_characters = Vec::new();
-
-    for forbidden_character in FORBIDDEN_CHARACTERS.iter() {
-        if value.contains(forbidden_character.char()) {
-            forbidden_characters.push(forbidden_character.char());
-        }
-    }
-
-    forbidden_characters
-}
-
-fn should_rewrite_id3_text_as_utf16(
-    value: &str,
-    encoding: TextEncoding,
-) -> bool {
-    encoding == TextEncoding::UTF8 && !value.is_ascii()
-}
-
-fn rewrite_id3_text_as_utf16(
-    value: &str,
-    source_encoding: TextEncoding,
-) -> Option<FieldFix> {
-    should_rewrite_id3_text_as_utf16(value, source_encoding).then(|| {
-        FieldFix {
-            new_value: value.to_owned(),
-            old_encoding: Some(TagTextEncoding::from(source_encoding)),
-            new_encoding: Some(TagTextEncoding::UTF16),
-        }
-    })
-}
-
-fn native_id3v2_tag(path: &Utf8Path) -> Option<Id3v2Tag> {
-    if path.extension() != Some("mp3") {
-        return None;
-    }
-    read_native_id3v2(path, FileType::Mpeg).ok().flatten()
-}
-
-fn lofty_id3v2_text_encoding(
-    tag: &Id3v2Tag,
-    item_key: ItemKey,
-) -> Option<TextEncoding> {
-    text_encodings_for_key(tag, item_key).next().map(TextEncoding::from)
-}
-
-#[derive(Debug)]
-struct FieldFix {
-    new_value: String,
-    old_encoding: Option<TagTextEncoding>,
-    new_encoding: Option<TagTextEncoding>,
-}
-
 #[derive(Debug, Default)]
 struct ValidationResult {
     checked_files: usize,
+    actions: Vec<Action>,
     read_errors: Vec<ValidationReadError>,
     tag_issues: Vec<TagValueIssue>,
     id3_encoding_issues: Vec<Id3EncodingIssue>,
@@ -448,12 +221,7 @@ impl ValidationResult {
             && self.id3_encoding_issues.is_empty()
     }
 
-    fn print(&self) {
-        if self.is_valid() {
-            println!("Validated {} audio files.", self.checked_files);
-            return;
-        }
-
+    fn print_read_errors(&self) {
         if !self.read_errors.is_empty() {
             println!();
             println!("Tag encoding/read errors:");
@@ -461,6 +229,15 @@ impl ValidationResult {
                 println!("\t{}: {}", error.path, error.error);
             }
         }
+    }
+
+    fn print(&self) {
+        if self.is_valid() {
+            println!("Validated {} audio files.", self.checked_files);
+            return;
+        }
+
+        self.print_read_errors();
 
         if !self.tag_issues.is_empty() {
             println!();
@@ -506,90 +283,4 @@ impl ValidationResult {
 struct ValidationReadError {
     path: Utf8PathBuf,
     error: FsError,
-}
-
-#[derive(Debug)]
-struct TagValueIssue {
-    path: Utf8PathBuf,
-    key: String,
-    value: String,
-    characters: Vec<&'static str>,
-}
-
-#[derive(Debug)]
-struct Id3EncodingIssue {
-    path: Utf8PathBuf,
-    key: String,
-    value: String,
-    encoding: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use lofty::TextEncoding;
-
-    use super::{
-        forbidden_characters_in, rewrite_id3_text_as_utf16, sanitize_tag_value,
-        should_rewrite_id3_text_as_utf16,
-    };
-
-    #[test]
-    fn finds_forbidden_characters() {
-        assert_eq!(forbidden_characters_in("AC/DC: Live"), vec![":", "/"]);
-    }
-
-    #[test]
-    fn replaces_forbidden_characters_like_templates() {
-        assert_eq!(sanitize_tag_value("AC/DC: Live."), "AC-DC Live");
-        assert_eq!(sanitize_tag_value(" AC/DC: Live. "), " AC-DC Live. ");
-    }
-
-    #[test]
-    fn rewrites_non_ascii_utf8_text_as_utf16() {
-        let fix =
-            rewrite_id3_text_as_utf16("Ich Weiß Es Nicht", TextEncoding::UTF8)
-                .unwrap();
-
-        assert_eq!(fix.new_value, "Ich Weiß Es Nicht");
-        assert_eq!(
-            fix.old_encoding,
-            Some(crate::commands::validate::TagTextEncoding::UTF8)
-        );
-        assert_eq!(
-            fix.new_encoding,
-            Some(crate::commands::validate::TagTextEncoding::UTF16)
-        );
-    }
-
-    #[test]
-    fn skips_ascii_id3_text() {
-        assert!(
-            rewrite_id3_text_as_utf16("Nothing To Fix", TextEncoding::UTF8)
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn skips_id3_text_that_is_already_utf16() {
-        assert!(
-            rewrite_id3_text_as_utf16("Ich Weiß Es Nicht", TextEncoding::UTF16)
-                .is_none()
-        );
-    }
-
-    #[test]
-    fn uses_same_id3_encoding_predicate_for_check_and_fix() {
-        assert!(should_rewrite_id3_text_as_utf16(
-            "Ich Weiß Es Nicht",
-            TextEncoding::UTF8
-        ));
-        assert!(!should_rewrite_id3_text_as_utf16(
-            "Nothing To Fix",
-            TextEncoding::UTF8
-        ));
-        assert!(!should_rewrite_id3_text_as_utf16(
-            "Ich Weiß Es Nicht",
-            TextEncoding::UTF16
-        ));
-    }
 }

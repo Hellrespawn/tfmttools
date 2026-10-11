@@ -136,6 +136,10 @@ tfmt validate id3-encoding --fix
 ```
 
 Both `--fix` commands change file tags and record undoable history.
+They inspect the selected files before applying changes. If any required audio
+inspection fails, they report the errors and apply no tag fixes. Dry runs use the
+same inspection policy. An execution failure after inspection can still leave
+a confirmed partial run, as described above.
 
 ### Templates
 

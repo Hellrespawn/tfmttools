@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Inspect validation inputs before applying tag fixes; report read/parse errors
+  and apply no fixes when inspection is incomplete, including dry runs.
+
 - Remove the internal `FsHandler` wrapper; commands use `FSMode` directly.
 
 - Parse path templates with pest, preserving syntax and improving expected-construct diagnostics.

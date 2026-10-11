@@ -11,6 +11,8 @@ dispatches through `src/commands/`.
 - Option conversion and defaults: `src/cli/options.rs`.
 - Rename command behavior: `src/commands/rename/` (`confirmation.rs` and
   `cleanup.rs` plan actions; `session.rs` records execution).
+- Validation command policy: `src/commands/validate.rs`; per-file tag inspection:
+  `src/commands/validate/inspection.rs`.
 - Shared audio discovery: `src/commands/audio_discovery.rs`.
 - History display formatting: `src/history/formatter.rs`.
 - Terminal UI helpers: `src/ui/`.

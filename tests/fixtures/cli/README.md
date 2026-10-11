@@ -2,6 +2,11 @@
 
 These fixtures drive the `tfmt` integration test harness.
 
+Validation fixes reject incomplete audio inspection before changing tags.
+Deterministic malformed-input regressions live in
+`crates/tfmt/tests/validation_inspection.rs`; fixture tag-encoding checks retain
+their independent raw ID3 inspection.
+
 ## Directory Roles
 
 - `cases/`: JSON test cases discovered by the integration harness.

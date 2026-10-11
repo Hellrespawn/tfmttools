@@ -25,7 +25,10 @@ fn native_reader_distinguishes_missing_tags_and_failed_reads() {
         assert!(read_native_id3v2(&path, format).unwrap().is_none());
         tag.save_to_path(&path, WriteOptions::default()).unwrap();
         let native = read_native_id3v2(&path, format).unwrap().unwrap();
-        assert_eq!(native.get_text(&FrameId::new("TIT2").unwrap()), Some("Title"));
+        assert_eq!(
+            native.get_text(&FrameId::new("TIT2").unwrap()),
+            Some("Title")
+        );
     }
     let mp3 = root.join("audio.mp3");
     std::fs::copy("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3", &mp3)
