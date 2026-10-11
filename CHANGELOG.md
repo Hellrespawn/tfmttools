@@ -32,6 +32,10 @@
 
 ### Changed
 
+- Share audio discovery between rename and validation; propagate traversal errors
+  before file changes and clear progress UI on failure. Fixture discovery and
+  copying now report errors instead of silently omitting cases or inputs.
+
 - Describe cleanup prospectively and report run completion only after successful
   execution. Dry runs never claim deletion or saved history.
 

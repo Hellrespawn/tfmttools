@@ -24,6 +24,11 @@ impl<'pio> PathIteratorOptions<'pio> {
     }
 
     #[must_use]
+    pub fn input_directory(&self) -> &Utf8Path {
+        self.input_directory
+    }
+
+    #[must_use]
     pub fn recursion_depth(&self) -> usize {
         self.recursion_depth.map_or(1, |d| d + 1)
     }

@@ -53,12 +53,12 @@ pub fn copy_files(
     source_dir: Utf8PathBuf,
     target_dir: &camino::Utf8Path,
 ) -> Result<()> {
-    let paths = fs_err::read_dir(source_dir)?
-        .flat_map(|result| {
-            result.map(|entry| Utf8PathBuf::from_path_buf(entry.path()))
+    let paths = fs_err::read_dir(&source_dir)?
+        .map(|entry| {
+            let path = entry?.path();
+            Ok(Utf8PathBuf::try_from(path)?)
         })
-        .flatten()
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
 
     fs_err::create_dir(target_dir)?;
 
@@ -70,4 +70,32 @@ pub fn copy_files(
     }
 
     Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    use super::*;
+
+    #[test]
+    fn fixture_copy_rejects_incomplete_scan_before_creating_destination() {
+        let root = std::env::temp_dir()
+            .join(format!("tfmt-fixture-copy-{}", std::process::id()));
+        let source = root.join("source");
+        let target = Utf8PathBuf::try_from(root.join("target")).unwrap();
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::write(source.join("valid"), b"valid").unwrap();
+        std::fs::write(
+            source.join(OsString::from_vec(b"invalid-\xff".to_vec())),
+            b"invalid",
+        )
+        .unwrap();
+        let result =
+            copy_files(Utf8PathBuf::try_from(source).unwrap(), &target);
+        assert!(result.is_err());
+        assert!(!target.exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

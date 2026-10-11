@@ -1,3 +1,4 @@
+mod audio_discovery;
 mod clear_history;
 mod list_templates;
 mod rename;

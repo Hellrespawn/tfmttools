@@ -93,8 +93,8 @@ impl ProgressBar {
         self.inner.as_ref().inspect(|inner| inner.inc_length(1));
     }
 
-    pub fn finish(self) {
-        if let Some(inner) = self.inner {
+    pub fn finish(mut self) {
+        if let Some(inner) = self.inner.take() {
             inner.set_message(self.finished_message);
             inner.abandon();
 
@@ -103,6 +103,15 @@ impl ProgressBar {
                 eprintln!();
             }
 
+            show_cursor();
+        }
+    }
+}
+
+impl Drop for ProgressBar {
+    fn drop(&mut self) {
+        if let Some(inner) = &self.inner {
+            inner.finish_and_clear();
             show_cursor();
         }
     }

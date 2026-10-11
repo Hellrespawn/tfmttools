@@ -166,3 +166,6 @@ so mappings may swap two files without overwriting the source of a later
 copy. This occurs before the first expectation check. The staged swap case
 starts with the two tracks under one another's names and uses ordinary tag
 interpolation to restore them, exercising staging and undo/redo.
+
+Fixture discovery fails on traversal errors rather than running a partial set
+of cases. Case filenames remain sorted; an empty case directory is an error.

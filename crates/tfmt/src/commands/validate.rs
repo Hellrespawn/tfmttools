@@ -15,9 +15,7 @@ use tfmttools_core::history::{
 use tfmttools_core::item_keys::canonical_tag_name;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
-use tfmttools_fs::{
-    FsError, FsHandler, PathIterator, PathIteratorOptions, read_audio_file,
-};
+use tfmttools_fs::{FsError, FsHandler, PathIteratorOptions, read_audio_file};
 use tracing::{debug, trace};
 
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
@@ -47,7 +45,12 @@ pub fn validate(
         None
     };
 
-    let file_paths = gather_file_paths(app_options, &validate_options);
+    let options = PathIteratorOptions::with_depth(
+        validate_options.input_directory().as_path(),
+        validate_options.recursion_depth(),
+    );
+    let file_paths =
+        super::audio_discovery::gather_audio_paths(app_options, &options)?;
 
     debug!("Read {} files.", file_paths.len());
 
@@ -267,40 +270,6 @@ fn report_actions(actions: &[Action], dry_run: bool) {
             }
         }
     }
-}
-
-fn gather_file_paths(
-    app_options: &TFMTOptions,
-    validate_options: &ValidateOptions,
-) -> Vec<Utf8PathBuf> {
-    let spinner = ProgressBar::spinner(
-        app_options.display_mode(),
-        "audio",
-        "total files",
-        "Gathering files...",
-        "Gathered files.",
-    );
-
-    let options = PathIteratorOptions::with_depth(
-        validate_options.input_directory().as_path(),
-        validate_options.recursion_depth(),
-    );
-
-    let file_paths = PathIterator::new(&options)
-        .flatten()
-        .inspect(|_| spinner.inc_total())
-        .filter(|path| AudioFile::path_predicate(path))
-        .inspect(|_| {
-            spinner.inc_found();
-
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
-        })
-        .collect::<Vec<_>>();
-
-    spinner.finish();
-
-    file_paths
 }
 
 fn validate_files(

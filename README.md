@@ -395,3 +395,6 @@ Use `cargo xtask test-integration` for the focused fixture harness.
 Cleanup previews describe proposed deletions; dry runs say “Would delete”.
 A writable rename reports completion only after filesystem execution and history
 confirmation succeed. Nonempty directories may remain after cleanup.
+
+Audio discovery errors abort rename and validation before applying file changes.
+An incomplete directory scan is never treated as a complete selection.

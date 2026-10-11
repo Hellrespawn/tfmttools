@@ -9,7 +9,7 @@ use assert_cmd::Command;
 use camino::{Utf8Path, Utf8PathBuf};
 use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::{WrapErr, eyre};
 use libtest_mimic::{Arguments, Trial};
 use lofty::TextEncoding;
 use lofty::file::TaggedFileExt;
@@ -103,24 +103,25 @@ fn load_data(
 ) -> Result<Vec<(String, tfmttools_test_harness::TestCaseData)>> {
     let test_cases_dir = fixture_dirs.case_dir();
 
-    let test_case_iterator = PathIterator::single_directory(&test_cases_dir);
+    load_cases(&test_cases_dir, PathIterator::single_directory(&test_cases_dir))
+}
 
-    let mut cases = test_case_iterator
-        .flatten()
-        .filter(|p| {
-            let file_name = p.file_name().expect(
-                "iterator of path components should always have one element",
-            );
-
-            file_name.ends_with(".case.json")
-        })
-        .map(|path| {
-            Ok((
+fn load_cases(
+    test_cases_dir: &Utf8Path,
+    entries: impl Iterator<Item = tfmttools_fs::FsResult<Utf8PathBuf>>,
+) -> Result<Vec<(String, tfmttools_test_harness::TestCaseData)>> {
+    let mut cases = Vec::new();
+    for entry in entries {
+        let path = entry.wrap_err_with(|| {
+            format!("Unable to discover fixture cases in {test_cases_dir}")
+        })?;
+        if path.file_name().is_some_and(|name| name.ends_with(".case.json")) {
+            cases.push((
                 path.file_name().unwrap().to_owned(),
                 tfmttools_test_harness::TestCaseData::from_file(&path)?,
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
+            ));
+        }
+    }
 
     cases.sort_by(|(left, _), (right, _)| left.cmp(right));
 
@@ -564,4 +565,49 @@ fn git_output(args: &[&str]) -> Option<String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
     (!stdout.is_empty()).then_some(stdout)
+}
+
+#[cfg(test)]
+mod discovery_tests {
+    use super::*;
+
+    #[test]
+    fn fixture_cases_are_sorted_and_empty_directory_is_distinct() {
+        let directory = assert_fs::TempDir::new().unwrap();
+        let root = Utf8Path::from_path(directory.path()).unwrap();
+        for name in ["z.case.json", "a.case.json"] {
+            std::fs::write(
+                root.join(name),
+                r#"{"description":"empty","expectations":{},"tests":{}}"#,
+            )
+            .unwrap();
+        }
+        let cases = load_cases(
+            root,
+            ["z.case.json", "a.case.json", "ignored.txt"]
+                .into_iter()
+                .map(|name| Ok(root.join(name))),
+        )
+        .unwrap();
+        assert_eq!(
+            cases.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
+            ["a.case.json", "z.case.json"]
+        );
+        let error = load_cases(root, std::iter::empty()).unwrap_err();
+        assert!(error.to_string().contains("Did not find any testcases"));
+    }
+
+    #[test]
+    fn fixture_discovery_reports_iterator_failure_with_directory_context() {
+        let directory = Utf8Path::new("fixtures/cases");
+        let error = load_cases(
+            directory,
+            std::iter::once(Err(tfmttools_fs::FsError::Execution(
+                "injected traversal error".into(),
+            ))),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("fixtures/cases"));
+        assert!(format!("{error:?}").contains("injected traversal error"));
+    }
 }

@@ -3,7 +3,7 @@ use color_eyre::Result;
 use tfmttools_core::action::RenameAction;
 use tfmttools_core::audiofile::AudioFile;
 use tfmttools_core::warning::Warning;
-use tfmttools_fs::{FsResult, PathIterator, read_audio_file};
+use tfmttools_fs::{FsResult, read_audio_file};
 use tfmttools_picotmpl::BoundTemplate;
 use tracing::{debug, trace};
 
@@ -16,7 +16,10 @@ pub(super) fn create_actions_from_template(
     session: &RenameSession,
     resolved: &ResolvedTemplate,
 ) -> Result<(Vec<RenameAction>, Vec<Warning>)> {
-    let paths = gather_file_paths(session);
+    let paths = crate::commands::audio_discovery::gather_audio_paths(
+        session.app_options(),
+        &session.path_iterator_options(),
+    )?;
 
     debug!("Read {} files.", paths.len());
 
@@ -32,32 +35,6 @@ pub(super) fn create_actions_from_template(
     )?;
 
     Ok((rename_actions, warnings))
-}
-
-fn gather_file_paths(session: &RenameSession) -> Vec<Utf8PathBuf> {
-    let spinner = ProgressBar::spinner(
-        session.app_options().display_mode(),
-        "audio",
-        "total files",
-        "Gathering files...",
-        "Gathered files.",
-    );
-
-    let file_paths = PathIterator::new(&session.path_iterator_options())
-        .flatten()
-        .inspect(|_| spinner.inc_total())
-        .filter(|path| AudioFile::path_predicate(path))
-        .inspect(|_| {
-            spinner.inc_found();
-
-            #[cfg(feature = "debug")]
-            crate::debug::delay();
-        })
-        .collect::<Vec<_>>();
-
-    spinner.finish();
-
-    file_paths
 }
 
 fn read_files(
