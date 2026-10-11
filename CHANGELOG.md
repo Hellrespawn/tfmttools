@@ -32,6 +32,11 @@
 
 ### Changed
 
+- Replace filesystem `ActionExecutor` and `ActionHandler` exports with read-only
+  `plan_actions`. Remove their direct execution APIs and unused `FsHandler`
+  effect methods/result types; execute through prepared actions instead.
+- Plan relative, not-yet-created cleanup destinations using the current device.
+
 - Let Cargo discover all CLI test targets in `cargo xtask test` and `test-cli`.
 
 - Simplify SQLite history with explicit record progress, typed run requests,

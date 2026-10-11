@@ -248,6 +248,9 @@ pub(super) fn crosses_devices(
         use std::os::unix::fs::MetadataExt;
         let ancestor = |path: &Utf8Path| -> FsResult<u64> {
             for p in path.ancestors() {
+                // A relative path's final ancestor is empty, meaning cwd.
+                let p =
+                    if p.as_str().is_empty() { Utf8Path::new(".") } else { p };
                 if let Ok(meta) = fs_err::metadata(p) {
                     return Ok(meta.dev());
                 }

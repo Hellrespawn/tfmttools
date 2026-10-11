@@ -6,7 +6,7 @@ use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::{Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
-    ActionExecutor, FsResult, PathIterator, PathIteratorOptions,
+    plan_actions, FsResult, PathIterator, PathIteratorOptions,
     get_file_checksum, get_longest_common_prefix,
 };
 use tracing::{debug, info, trace};
@@ -335,10 +335,9 @@ fn move_files(
     session: &RenameSession,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
-    let executor = ActionExecutor::new(session.fs_handler())
-        .move_mode(session.rename_options().move_mode());
-
-    Ok(executor.plan_actions(rename_actions)?)
+    Ok(plan_actions(
+        rename_actions, session.rename_options().move_mode(),
+    )?)
 }
 
 fn remove_directories(directories: Vec<Utf8Directory>) -> Vec<Action> {

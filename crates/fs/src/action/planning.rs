@@ -1,118 +1,37 @@
 use tfmttools_core::action::{Action, RenameAction};
-use tfmttools_core::util::{MoveMode, Utf8Directory, Utf8PathExt};
+use tfmttools_core::util::MoveMode;
 
 use super::PlannedAction;
-use super::handler::ActionHandler;
 use super::rename_planner::RenamePlanner;
 use crate::error::FsResult;
-use crate::fs_handler::FsHandler;
 
-pub struct ActionExecutor<'a> {
-    handler: ActionHandler<'a>,
+/// Plan ordered actions without changing the filesystem.
+pub fn plan_actions(
+    rename_actions: Vec<RenameAction>,
     move_mode: MoveMode,
-}
-
-impl<'a> ActionExecutor<'a> {
-    #[must_use]
-    pub fn new(fs_handler: &'a FsHandler) -> Self {
-        Self {
-            handler: ActionHandler::new(fs_handler),
-            move_mode: MoveMode::Auto,
-        }
-    }
-
-    #[must_use]
-    pub fn move_mode(mut self, move_mode: MoveMode) -> Self {
-        self.move_mode = move_mode;
-        self.handler = self.handler.move_mode(move_mode);
-        self
-    }
-
-    pub fn apply_rename_actions(
-        &self,
-        rename_actions: Vec<RenameAction>,
-    ) -> impl Iterator<Item = FsResult<Action>> + '_ {
-        let planned_actions = Self::plan_rename_actions(rename_actions);
-
-        planned_actions.into_iter().flat_map(|planned_action| {
-            match planned_action {
-                PlannedAction::Action(action) => {
-                    match self.handler.apply(&action) {
-                        Ok(()) => vec![Ok(action)],
-                        Err(err) => vec![Err(err)],
-                    }
-                },
-                PlannedAction::Rename(rename_action) => {
-                    match self.handler.rename(&rename_action) {
-                        Ok(actions) => actions.into_iter().map(Ok).collect(),
-                        Err(err) => vec![Err(err)],
-                    }
-                },
-            }
-        })
-    }
-
-    pub fn plan_actions(
-        &self,
-        rename_actions: Vec<RenameAction>,
-    ) -> FsResult<Vec<Action>> {
-        let mut result = Vec::new();
-        for planned in Self::plan_rename_actions(rename_actions) {
-            let action = match planned {
-                PlannedAction::Action(action) => action,
-                PlannedAction::Rename(rename) => {
-                    Action::move_from_rename_action(&rename)
-                },
-            };
-            if let Action::MoveFile { source, target } = &action
-                && (matches!(self.move_mode, MoveMode::AlwaysCopy)
-                    || super::prepared_execution::crosses_devices(
-                        source, target,
-                    )?)
-            {
-                result.push(Action::CopyFile {
-                    source: source.clone(),
-                    target: target.clone(),
-                });
-                result.push(Action::RemoveFile(source.clone()));
-                continue;
-            }
+) -> FsResult<Vec<Action>> {
+    let mut result = Vec::new();
+    for planned in RenamePlanner::new(rename_actions).plan() {
+        let action = match planned {
+            PlannedAction::Action(action) => action,
+            PlannedAction::Rename(rename) => {
+                Action::move_from_rename_action(&rename)
+            },
+        };
+        if let Action::MoveFile { source, target } = &action
+            && (matches!(move_mode, MoveMode::AlwaysCopy)
+                || super::prepared_execution::crosses_devices(source, target)?)
+        {
+            result.push(Action::CopyFile {
+                source: source.clone(),
+                target: target.clone(),
+            });
+            result.push(Action::RemoveFile(source.clone()));
+        } else {
             result.push(action);
         }
-        Ok(result)
     }
-
-    fn plan_rename_actions(
-        rename_actions: Vec<RenameAction>,
-    ) -> Vec<PlannedAction> {
-        RenamePlanner::new(rename_actions).plan()
-    }
-
-    pub fn apply_actions(
-        &self,
-        actions: impl IntoIterator<Item = Action>,
-    ) -> FsResult<Vec<Action>> {
-        actions
-            .into_iter()
-            .map(|action| {
-                self.handler.apply(&action)?;
-
-                Ok(action)
-            })
-            .collect()
-    }
-
-    pub fn remove_directories(
-        &self,
-        directories: Vec<Utf8Directory>,
-    ) -> FsResult<Vec<Action>> {
-        self.apply_actions(
-            directories
-                .into_iter()
-                .rev()
-                .map(|dir| Action::RemoveDir(dir.into_path_buf())),
-        )
-    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -121,9 +40,11 @@ mod tests {
     use camino::Utf8PathBuf;
     use color_eyre::Result;
     use tfmttools_core::action::{Action, RenameAction};
-    use tfmttools_core::util::{FSMode, Utf8File};
+    use tfmttools_core::history::OperationKind;
+    use tfmttools_core::util::{Utf8File, Utf8PathExt};
 
     use super::*;
+    use crate::prepare_action;
 
     fn temp_path(temp_dir: &TempDir, name: &str) -> Result<Utf8PathBuf> {
         Ok(Utf8PathBuf::try_from(temp_dir.path().join(name))?)
@@ -157,14 +78,29 @@ mod tests {
         Ok(RenameAction::new(Utf8File::new(source), Utf8File::new(target)))
     }
 
-    fn apply_actions(
-        fs_handler: &FsHandler,
-        actions: Vec<RenameAction>,
-    ) -> Result<Vec<Action>> {
-        ActionExecutor::new(fs_handler)
-            .apply_rename_actions(actions)
-            .collect::<FsResult<Vec<_>>>()
-            .map_err(Into::into)
+    fn apply_actions(actions: Vec<RenameAction>) -> Result<Vec<Action>> {
+        let before = actions
+            .iter()
+            .map(|a| {
+                let path = a.source().as_path();
+                Ok((path.to_owned(), fs_err::read(path)?))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let planned = plan_actions(actions, MoveMode::Auto)?;
+        for (path, bytes) in before {
+            assert_eq!(fs_err::read(path)?, bytes);
+        }
+        for action in &planned {
+            execute(action, OperationKind::Apply)?;
+        }
+        Ok(planned)
+    }
+
+    fn execute(action: &Action, direction: OperationKind) -> Result<()> {
+        let mut prepared = prepare_action(action, direction)?;
+        prepared.execute()?;
+        prepared.confirm()?;
+        Ok(())
     }
 
     #[test]
@@ -175,11 +111,7 @@ mod tests {
         write_file(&a, "a")?;
         write_file(&b, "b")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
-        apply_actions(&fs_handler, vec![
-            rename_action(&a, &b)?,
-            rename_action(&b, &a)?,
-        ])?;
+        apply_actions(vec![rename_action(&a, &b)?, rename_action(&b, &a)?])?;
 
         assert_eq!(read_file(&a)?, "b");
         assert_eq!(read_file(&b)?, "a");
@@ -197,8 +129,7 @@ mod tests {
         write_file(&b, "b")?;
         write_file(&c, "c")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
-        apply_actions(&fs_handler, vec![
+        apply_actions(vec![
             rename_action(&a, &b)?,
             rename_action(&b, &c)?,
             rename_action(&c, &a)?,
@@ -222,8 +153,7 @@ mod tests {
         write_file(&b, "b")?;
         write_file(&c, "c")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
-        apply_actions(&fs_handler, vec![
+        apply_actions(vec![
             rename_action(&a, &b)?,
             rename_action(&b, &c)?,
             rename_action(&c, &d)?,
@@ -247,10 +177,9 @@ mod tests {
         let target = Utf8PathBuf::try_from(existing_dir.join("B.mp3"))?;
         write_file(&source, "a")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
         // Should not error even though the intermediate directory
         // ("existing") is already present on disk.
-        apply_actions(&fs_handler, vec![rename_action(&source, &target)?])?;
+        apply_actions(vec![rename_action(&source, &target)?])?;
 
         assert_eq!(read_file(&target)?, "a");
 
@@ -264,8 +193,7 @@ mod tests {
         let title = temp_path(&temp_dir, "Track.mp3")?;
         write_file(&lower, "track")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
-        apply_actions(&fs_handler, vec![rename_action(&lower, &title)?])?;
+        apply_actions(vec![rename_action(&lower, &title)?])?;
 
         assert_eq!(dir_entry_name(&title)?, "Track.mp3");
         assert_eq!(read_file(&title)?, "track");
@@ -281,22 +209,20 @@ mod tests {
         write_file(&a, "a")?;
         write_file(&b, "b")?;
 
-        let fs_handler = FsHandler::new(FSMode::Default);
-        let applied_actions = apply_actions(&fs_handler, vec![
+        let applied_actions = apply_actions(vec![
             rename_action(&a, &b)?,
             rename_action(&b, &a)?,
         ])?;
 
-        let action_handler = ActionHandler::new(&fs_handler);
         for action in applied_actions.iter().rev() {
-            action_handler.undo(action)?;
+            execute(action, OperationKind::Undo)?;
         }
 
         assert_eq!(read_file(&a)?, "a");
         assert_eq!(read_file(&b)?, "b");
 
         for action in &applied_actions {
-            action_handler.redo(action)?;
+            execute(action, OperationKind::Redo)?;
         }
 
         assert_eq!(read_file(&a)?, "b");

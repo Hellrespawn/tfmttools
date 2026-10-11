@@ -1,15 +1,13 @@
 mod binary_patch;
-mod executor;
 mod file_switch;
-mod handler;
+mod planning;
 mod prepared_execution;
 mod rename_cycles;
 mod rename_planner;
 mod rename_staging;
 mod tag_edit;
 
-pub use executor::ActionExecutor;
-pub use handler::ActionHandler;
+pub use planning::plan_actions;
 use tfmttools_core::action::{Action, RenameAction};
 
 enum PlannedAction {

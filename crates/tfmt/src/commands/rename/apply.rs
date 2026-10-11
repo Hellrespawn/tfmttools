@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use itertools::Itertools;
 use tfmttools_core::util::Utf8File;
-use tfmttools_fs::ActionExecutor;
+use tfmttools_fs::plan_actions;
 use tracing::trace;
 
 use super::{RenameExecutionResult, RenamePlan, RenameSession};
@@ -29,9 +29,9 @@ pub fn execute(
         let confirmation = super::shared::confirm(session, "Move files?")?;
 
         if confirmation {
-            let executor = ActionExecutor::new(session.fs_handler())
-                .move_mode(session.rename_options().move_mode());
-            let actions = executor.plan_actions(plan.actions)?;
+            let actions = plan_actions(
+                plan.actions, session.rename_options().move_mode(),
+            )?;
             Ok(RenameExecutionResult::Applied {
                 actions,
                 unchanged_files: plan.unchanged_files,

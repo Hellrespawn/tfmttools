@@ -15,9 +15,6 @@ pub enum FsError {
     #[error("Path exists but is not a file: {0}")]
     NotAFile(Utf8PathBuf),
 
-    #[error("Unexpected error while trying to move {0} to {1}: {2} ")]
-    UnexpectedMoveError(Utf8PathBuf, Utf8PathBuf, String),
-
     #[error("File is too big for checksum: {0}")]
     FileTooLargeError(Utf8PathBuf),
 

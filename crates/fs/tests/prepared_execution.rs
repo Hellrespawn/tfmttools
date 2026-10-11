@@ -1,27 +1,36 @@
 use camino::Utf8PathBuf;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::history::OperationKind;
-use tfmttools_core::util::{FSMode, MoveMode, Utf8File};
-use tfmttools_fs::{ActionExecutor, FsHandler, prepare_action};
+use tfmttools_core::util::{MoveMode, Utf8File};
+use tfmttools_fs::{plan_actions, prepare_action};
 fn path(dir: &tempfile::TempDir, name: &str) -> Utf8PathBuf {
     Utf8PathBuf::try_from(dir.path().join(name)).unwrap()
 }
 #[test]
-fn recorded_swap_and_forced_copy_replay_in_order() {
+fn planned_swap_and_forced_copy_replay_in_order() {
     for mode in [MoveMode::Auto, MoveMode::AlwaysCopy] {
         let dir = tempfile::tempdir().unwrap();
         let a = path(&dir, "a");
         let b = path(&dir, "b");
         std::fs::write(&a, b"A").unwrap();
         std::fs::write(&b, b"B").unwrap();
-        let fs = FsHandler::new(FSMode::Default);
-        let ex = ActionExecutor::new(&fs).move_mode(mode);
-        let actions = ex
-            .plan_actions(vec![
+        let actions = plan_actions(
+            vec![
                 RenameAction::new(Utf8File::new(&a), Utf8File::new(&b)),
                 RenameAction::new(Utf8File::new(&b), Utf8File::new(&a)),
-            ])
-            .unwrap();
+            ],
+            mode,
+        )
+        .unwrap();
+        assert_eq!(std::fs::read(&a).unwrap(), b"A");
+        assert_eq!(std::fs::read(&b).unwrap(), b"B");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
+        if matches!(mode, MoveMode::AlwaysCopy) {
+            for pair in actions.chunks_exact(2) {
+                assert!(matches!(&pair[0], Action::CopyFile { source, .. }
+                    if matches!(&pair[1], Action::RemoveFile(path) if path == source)));
+            }
+        }
         for action in &actions {
             let mut entry =
                 prepare_action(action, OperationKind::Apply).unwrap();
@@ -210,4 +219,26 @@ fn interrupted_copy_has_only_reported_paths() {
         2,
         "No unreported candidate artifacts"
     );
+}
+
+#[test]
+fn planning_relative_missing_destination_uses_current_device_without_effects() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "source");
+    std::fs::write(&source, b"original").unwrap();
+    let target = Utf8PathBuf::from(format!(
+        ".tfmt-missing-{}/nested/target",
+        std::process::id()
+    ));
+    assert!(!target.ancestors().nth(2).unwrap().exists());
+    let actions = plan_actions(
+        vec![RenameAction::new(Utf8File::new(&source), Utf8File::new(&target))],
+        MoveMode::Auto,
+    )
+    .unwrap();
+    assert!(actions.iter().any(|action| matches!(action,
+        Action::MoveFile { source: s, target: t } | Action::CopyFile { source: s, target: t }
+            if s == &source && t == &target)));
+    assert_eq!(std::fs::read(&source).unwrap(), b"original");
+    assert!(!target.ancestors().nth(2).unwrap().exists());
 }

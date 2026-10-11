@@ -6,9 +6,9 @@ direct filesystem operations, and rename staging/planning.
 
 ## Task Map
 
-- Action handler and executor entry points: `src/action.rs`.
+- Planner and prepared-action entry points: `src/action.rs`.
 - Rename staging and planning internals: `src/action/`.
-- Direct filesystem behavior: `src/fs.rs`.
+- Filesystem mode and path helpers: `src/fs_handler.rs`.
 - Template loading from config directories: `src/template.rs`.
 - Path discovery: `src/path_iterator.rs`.
 - File and tree checksums: `src/checksum.rs`.
