@@ -86,7 +86,7 @@ fn conversion_requires_canonical_writable_keys_and_known_encodings() {
     }
     for encoding in [
         "Latin1", "UTF16", "UTF16BE", "UTF8", "unknown", "latin1", "utf8",
-        "UTF-8", "",
+        "UTF-8", "", " UTF8",
     ] {
         let mut value = base.clone();
         value["changes"][0]["new_encoding"] = json!(encoding);

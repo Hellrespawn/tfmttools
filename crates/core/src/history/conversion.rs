@@ -84,8 +84,12 @@ impl From<&TagValueChange> for StoredTagValueChange {
             },
             old_value: change.old_value().to_owned(),
             new_value: change.new_value().to_owned(),
-            old_encoding: change.old_encoding().map(str::to_owned),
-            new_encoding: change.new_encoding().map(str::to_owned),
+            old_encoding: change
+                .old_encoding()
+                .map(|encoding| encoding.name().to_owned()),
+            new_encoding: change
+                .new_encoding()
+                .map(|encoding| encoding.name().to_owned()),
         }
     }
 }
@@ -102,17 +106,17 @@ impl TryFrom<&StoredTagValueChange> for TagValueChange {
                 change.key
             )));
         }
-        for encoding in
-            [change.old_encoding.as_deref(), change.new_encoding.as_deref()]
-                .into_iter()
-                .flatten()
-        {
-            if TagTextEncoding::parse(encoding).is_none() {
-                return Err(HistoryError::LoadError(format!(
-                    "Unknown tag encoding '{encoding}'"
-                )));
-            }
-        }
+        let parse_encoding = |name: &str| {
+            TagTextEncoding::parse(name).ok_or_else(|| {
+                HistoryError::LoadError(format!(
+                    "Unknown tag encoding '{name}'"
+                ))
+            })
+        };
+        let old_encoding =
+            change.old_encoding.as_deref().map(parse_encoding).transpose()?;
+        let new_encoding =
+            change.new_encoding.as_deref().map(parse_encoding).transpose()?;
         Ok(Self::new(
             change.key.clone(),
             match change.kind {
@@ -122,9 +126,6 @@ impl TryFrom<&StoredTagValueChange> for TagValueChange {
             change.old_value.clone(),
             change.new_value.clone(),
         )
-        .with_encoding(
-            change.old_encoding.clone(),
-            change.new_encoding.clone(),
-        ))
+        .with_encoding(old_encoding, new_encoding))
     }
 }

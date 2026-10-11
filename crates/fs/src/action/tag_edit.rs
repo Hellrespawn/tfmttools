@@ -7,7 +7,6 @@ use lofty::id3::v2::{
 use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{TagValueChange, TagValueKind};
 use tfmttools_core::item_keys::parse_item_key;
-use tfmttools_core::tag_encoding::TagTextEncoding;
 
 use crate::error::{FsError, FsResult};
 
@@ -100,11 +99,7 @@ pub fn write_tag_candidate(
                     "Cannot verify native ID3 encoding for this format".into(),
                 )
             })?;
-            let expected = TagTextEncoding::parse(encoding)
-                .map(TextEncoding::from)
-                .ok_or_else(|| {
-                    FsError::Execution("Unknown requested encoding".into())
-                })?;
+            let expected = TextEncoding::from(encoding);
             let mut found = false;
             for frame in frames {
                 let actual = match frame {
@@ -203,11 +198,7 @@ fn tag_with_encoding_changes(
         let Some(encoding) = change.new_encoding() else {
             continue;
         };
-        let Some(encoding) =
-            TagTextEncoding::parse(encoding).map(TextEncoding::from)
-        else {
-            continue;
-        };
+        let encoding = TextEncoding::from(encoding);
         let key = parse_item_key(change.key())?;
         let Some(id) = key.map_key(TagType::Id3v2) else {
             continue;

@@ -403,12 +403,8 @@ fn rewrite_id3_text_as_utf16(
     should_rewrite_id3_text_as_utf16(value, source_encoding).then(|| {
         FieldFix {
             new_value: value.to_owned(),
-            old_encoding: Some(
-                TagTextEncoding::from(source_encoding).name().to_owned(),
-            ),
-            new_encoding: Some(
-                TagTextEncoding::from(TextEncoding::UTF16).name().to_owned(),
-            ),
+            old_encoding: Some(TagTextEncoding::from(source_encoding)),
+            new_encoding: Some(TagTextEncoding::UTF16),
         }
     })
 }
@@ -456,8 +452,8 @@ fn lofty_id3v2_text_encoding(
 #[derive(Debug)]
 struct FieldFix {
     new_value: String,
-    old_encoding: Option<String>,
-    new_encoding: Option<String>,
+    old_encoding: Option<TagTextEncoding>,
+    new_encoding: Option<TagTextEncoding>,
 }
 
 #[derive(Debug, Default)]
@@ -578,8 +574,14 @@ mod tests {
                 .unwrap();
 
         assert_eq!(fix.new_value, "Ich Weiß Es Nicht");
-        assert_eq!(fix.old_encoding.as_deref(), Some("UTF8"));
-        assert_eq!(fix.new_encoding.as_deref(), Some("UTF16"));
+        assert_eq!(
+            fix.old_encoding,
+            Some(crate::commands::validate::TagTextEncoding::UTF8)
+        );
+        assert_eq!(
+            fix.new_encoding,
+            Some(crate::commands::validate::TagTextEncoding::UTF16)
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ pub use case_insensitive_path::{
 pub use rename_action::RenameAction;
 pub use validation::{FORBIDDEN_CHARACTERS, validate_rename_actions};
 
+use crate::tag_encoding::TagTextEncoding;
 use crate::util::Utf8PathExt;
 
 #[derive(Debug, Clone)]
@@ -34,8 +35,8 @@ pub struct TagValueChange {
     kind: TagValueKind,
     old_value: String,
     new_value: String,
-    old_encoding: Option<String>,
-    new_encoding: Option<String>,
+    old_encoding: Option<TagTextEncoding>,
+    new_encoding: Option<TagTextEncoding>,
 }
 
 impl TagValueChange {
@@ -59,8 +60,8 @@ impl TagValueChange {
     #[must_use]
     pub fn with_encoding(
         mut self,
-        old_encoding: Option<String>,
-        new_encoding: Option<String>,
+        old_encoding: Option<TagTextEncoding>,
+        new_encoding: Option<TagTextEncoding>,
     ) -> Self {
         self.old_encoding = old_encoding;
         self.new_encoding = new_encoding;
@@ -88,13 +89,13 @@ impl TagValueChange {
     }
 
     #[must_use]
-    pub fn old_encoding(&self) -> Option<&str> {
-        self.old_encoding.as_deref()
+    pub fn old_encoding(&self) -> Option<TagTextEncoding> {
+        self.old_encoding
     }
 
     #[must_use]
-    pub fn new_encoding(&self) -> Option<&str> {
-        self.new_encoding.as_deref()
+    pub fn new_encoding(&self) -> Option<TagTextEncoding> {
+        self.new_encoding
     }
 }
 

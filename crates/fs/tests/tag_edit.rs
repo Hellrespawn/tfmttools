@@ -86,7 +86,10 @@ fn verifies_locator_and_id3_encoding_changes() {
             title,
             "Ω title".into(),
         )
-        .with_encoding(None, Some("UTF16".into())),
+        .with_encoding(
+            None,
+            Some(tfmttools_core::tag_encoding::TagTextEncoding::UTF16),
+        ),
         TagValueChange::new(
             "audio_file_url".into(),
             TagValueKind::Locator,
