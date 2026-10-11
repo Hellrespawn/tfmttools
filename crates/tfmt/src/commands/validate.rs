@@ -17,18 +17,14 @@ use tracing::debug;
 use super::CommandOutcome;
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
 use crate::history::load_history_for_mode;
-use crate::ui::{ProgressBar, current_dir_utf8};
+use crate::ui::ProgressBar;
 
 pub fn validate(
     app_options: &TFMTOptions,
     validate_args: ValidateArgs,
 ) -> Result<CommandOutcome> {
-    let relative_input = validate_args
-        .common_args
-        .custom_input_directory
-        .as_ref()
-        .is_some_and(|path| path.is_relative());
-    let cwd = current_dir_utf8()?;
+    let supplied_directory =
+        validate_args.common_args.custom_input_directory.clone();
     let validate_options =
         ValidateOptions::try_from(validate_args.common_args)?;
 
@@ -37,23 +33,15 @@ pub fn validate(
     }
 
     let options = PathIteratorOptions::with_depth(
-        validate_options.input_directory().as_path(),
+        // Walk the verified scope using the caller's spelling so discovered
+        // paths and traversal errors preserve relative prefixes such as "./".
+        supplied_directory
+            .as_deref()
+            .unwrap_or(validate_options.input_directory().as_path()),
         validate_options.recursion_depth(),
     );
-    let gather = || -> Result<Vec<Utf8PathBuf>> {
-        let paths =
-            super::audio_discovery::gather_audio_paths(app_options, &options)?;
-        Ok(paths
-            .into_iter()
-            .map(|path| {
-                if relative_input {
-                    path.strip_prefix(cwd.as_path()).unwrap_or(&path).to_owned()
-                } else {
-                    path
-                }
-            })
-            .collect())
-    };
+    let gather =
+        || super::audio_discovery::gather_audio_paths(app_options, &options);
 
     let scope = match validate_args.command {
         None => ValidationScope::All,

@@ -39,11 +39,16 @@ fn setup(title: &str, encoding: TextEncoding) -> TempDir {
 #[test]
 fn malformed_audio_blocks_all_fixes() {
     for scope in ["characters", "id3-encoding"] {
-        for dry_run in [false, true] {
+        for (dry_run, broken_name) in [
+            (false, "broken.mp3"),
+            (true, "broken.mp3"),
+            (false, "z-broken.mp3"),
+            (true, "z-broken.mp3"),
+        ] {
             let dir = setup("Bad ? Ω title", TextEncoding::UTF8);
             let song = dir.path().join("song.mp3");
             let before = std::fs::read(&song).unwrap();
-            let broken = dir.path().join("broken.mp3");
+            let broken = dir.path().join(broken_name);
             std::fs::write(&broken, b"invalid audio").unwrap();
             let mut args = vec!["validate", scope, "--fix"];
             if dry_run {
@@ -56,7 +61,7 @@ fn malformed_audio_blocks_all_fixes() {
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
             );
-            assert!(report.contains("broken.mp3"), "{report}");
+            assert!(report.contains(broken_name), "{report}");
             assert!(!report.contains("No tag values changed"), "{report}");
             assert!(!report.contains("Updated "), "{report}");
             assert_eq!(std::fs::read(song).unwrap(), before);

@@ -8,8 +8,11 @@ fn commands_find_the_same_input_through_relative_and_absolute_paths() {
     let input = dir.path().join("input with spaces");
     std::fs::create_dir(&input).unwrap();
     std::fs::write(input.join("broken.mp3"), b"invalid audio").unwrap();
-    let mut scopes =
-        vec![std::path::PathBuf::from("input with spaces"), input.clone()];
+    let mut scopes = vec![
+        std::path::PathBuf::from("input with spaces"),
+        std::path::PathBuf::from("./input with spaces"),
+        input.clone(),
+    ];
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(&input, dir.path().join("linked input"))
@@ -51,5 +54,37 @@ fn commands_find_the_same_input_through_relative_and_absolute_paths() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn missing_relative_directory_retains_its_supplied_diagnostic_scope() {
+    let dir = TempDir::new().unwrap();
+    for scope in ["missing", "./missing"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+            .current_dir(dir.path())
+            .args([
+                "--simple",
+                "-c",
+                "config",
+                "validate",
+                "-i",
+                scope,
+                "characters",
+            ])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(&format!(
+                "Unable to discover audio files in {scope}"
+            )),
+            "{stderr}"
+        );
+        assert!(
+            !stderr.contains(&dir.path().display().to_string()),
+            "{stderr}"
+        );
     }
 }
