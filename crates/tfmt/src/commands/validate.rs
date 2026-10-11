@@ -18,6 +18,7 @@ use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{FsError, FsHandler, PathIteratorOptions, read_audio_file};
 use tracing::{debug, trace};
 
+use super::CommandOutcome;
 use crate::cli::{TFMTOptions, ValidateArgs, ValidateOptions, ValidateType};
 use crate::history::load_history_for_mode;
 use crate::ui::ProgressBar;
@@ -26,7 +27,7 @@ pub fn validate(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     validate_args: ValidateArgs,
-) -> Result<()> {
+) -> Result<CommandOutcome> {
     let validate_options =
         ValidateOptions::try_from(validate_args.common_args)?;
 
@@ -56,13 +57,11 @@ pub fn validate(
 
     match (validate_args.command, validate_args.fix) {
         (None, false) => {
-            check(app_options, file_paths, ValidationScope::All);
-            Ok(())
+            Ok(check(app_options, file_paths, ValidationScope::All))
         },
         (None, true) => unreachable!("bare validate --fix is rejected early"),
         (Some(ValidateType::Characters), false) => {
-            check(app_options, file_paths, ValidationScope::Characters);
-            Ok(())
+            Ok(check(app_options, file_paths, ValidationScope::Characters))
         },
         (Some(ValidateType::Characters), true) => {
             fix_characters(
@@ -71,10 +70,10 @@ pub fn validate(
                 file_paths,
                 history.as_mut(),
             )
+            .map(|()| CommandOutcome::Success)
         },
         (Some(ValidateType::Id3Encoding), false) => {
-            check(app_options, file_paths, ValidationScope::Id3Encoding);
-            Ok(())
+            Ok(check(app_options, file_paths, ValidationScope::Id3Encoding))
         },
         (Some(ValidateType::Id3Encoding), true) => {
             fix_id3_encoding(
@@ -83,6 +82,7 @@ pub fn validate(
                 file_paths,
                 history.as_mut(),
             )
+            .map(|()| CommandOutcome::Success)
         },
     }
 }
@@ -91,13 +91,15 @@ fn check(
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
     scope: ValidationScope,
-) {
+) -> CommandOutcome {
     let result = validate_files(app_options, file_paths, scope);
 
     result.print();
 
-    if !result.is_valid() {
-        std::process::exit(1);
+    if result.is_valid() {
+        CommandOutcome::Success
+    } else {
+        CommandOutcome::ValidationFailed
     }
 }
 

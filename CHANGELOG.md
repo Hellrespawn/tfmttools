@@ -32,6 +32,10 @@
 
 ### Changed
 
+- Return normal command statuses through the binary boundary so owned history,
+  progress, and tracing guards drop. Keep validation findings at exit status 1
+  without adding an operational-error message.
+
 - Share audio discovery between rename and validation; propagate traversal errors
   before file changes and clear progress UI on failure. Fixture discovery and
   copying now report errors instead of silently omitting cases or inputs.

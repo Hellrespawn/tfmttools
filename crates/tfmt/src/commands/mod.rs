@@ -16,3 +16,9 @@ pub use undo_redo::undo_redo;
 pub use validate::validate;
 
 mod templates;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum CommandOutcome {
+    Success,
+    ValidationFailed,
+}

@@ -398,3 +398,7 @@ confirmation succeed. Nonempty directories may remain after cleanup.
 
 Audio discovery errors abort rename and validation before applying file changes.
 An incomplete directory scan is never treated as a complete selection.
+
+Commands return status 0 on success and 1 on validation findings or operational
+failure. Validation findings print their report without an operational-error
+banner. Normal returns allow history and logging guards to close before exit.

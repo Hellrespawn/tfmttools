@@ -1,10 +1,14 @@
+use std::process::ExitCode;
+
 mod args;
 mod args_definition;
 pub(crate) mod options;
 
 use chrono::Local;
+#[cfg(not(feature = "debug"))]
 use clap::error::ErrorKind;
 use color_eyre::Result;
+#[cfg(not(feature = "debug"))]
 use color_eyre::eyre::Report;
 use tfmttools_fs::FsHandler;
 use tracing::{debug, info};
@@ -19,12 +23,13 @@ pub use self::options::{
     ConfirmMode, DisplayMode, RenameOptions, TFMTOptions, TemplateOption,
     ValidateOptions,
 };
+use crate::commands::CommandOutcome;
 use crate::ui::show_cursor;
 
 const LOG_ENV_VAR: &str = "TFMT_LOG";
 
 /// Main entrypoint for tfmt
-pub fn run() -> Result<()> {
+pub fn run() -> Result<ExitCode> {
     let _guard = init_tracing();
 
     info!("Initialized tracing.");
@@ -42,24 +47,36 @@ pub fn run() -> Result<()> {
         println!("Doing dry run. No files will be modified.");
     }
 
-    let app_options = TFMTOptions::try_from(&args)?;
+    let result = (|| {
+        let app_options = TFMTOptions::try_from(&args)?;
+        let fs_handler = FsHandler::new(app_options.fs_mode());
+        install_restore_cursor_hooks();
+        args.command.run(&app_options, &fs_handler)
+    })();
+    command_exit_code(result, name)
+}
 
-    let fs_handler = FsHandler::new(app_options.fs_mode());
-
-    install_restore_cursor_hooks();
-
-    let result = args.command.run(&app_options, &fs_handler);
-
+fn command_exit_code(
+    result: Result<CommandOutcome>,
+    name: &str,
+) -> Result<ExitCode> {
     #[cfg(not(feature = "debug"))]
-    if let Err(err) = result {
-        render_cli_error(&err, name);
-        std::process::exit(1);
-    }
-
+    let outcome = match result {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            render_cli_error(&error, name);
+            return Ok(ExitCode::FAILURE);
+        },
+    };
     #[cfg(feature = "debug")]
-    return result;
-
-    Ok(())
+    let outcome = {
+        let _ = name;
+        result?
+    };
+    Ok(match outcome {
+        CommandOutcome::Success => ExitCode::SUCCESS,
+        CommandOutcome::ValidationFailed => ExitCode::FAILURE,
+    })
 }
 
 #[must_use]
@@ -67,6 +84,7 @@ pub fn command() -> clap::Command {
     TFMTArgs::command()
 }
 
+#[cfg(not(feature = "debug"))]
 fn render_cli_error(err: &Report, name: &str) {
     let mut command = TFMTArgs::command();
 
@@ -124,4 +142,50 @@ fn install_restore_cursor_hooks() {
         std::process::exit(-1);
     })
     .expect("Unable to intercept Ctrl-c.");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+    use std::process::ExitCode;
+
+    use super::*;
+    use crate::commands::CommandOutcome;
+
+    struct DropFlag<'a>(&'a Cell<bool>);
+    impl Drop for DropFlag<'_> {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
+
+    #[test]
+    fn normal_outcomes_return_and_drop_owned_guards() {
+        for (result, expected) in [
+            (Ok(CommandOutcome::Success), ExitCode::SUCCESS),
+            (Ok(CommandOutcome::ValidationFailed), ExitCode::FAILURE),
+            (
+                Err(color_eyre::eyre::eyre!("operational failure")),
+                ExitCode::FAILURE,
+            ),
+        ] {
+            #[cfg(feature = "debug")]
+            let is_error = result.is_err();
+            let dropped = Cell::new(false);
+            let outcome = {
+                let _guard = DropFlag(&dropped);
+                command_exit_code(result, "validate")
+            };
+            assert!(dropped.get());
+            #[cfg(not(feature = "debug"))]
+            assert_eq!(outcome.unwrap(), expected);
+            #[cfg(feature = "debug")]
+            {
+                assert_eq!(outcome.is_err(), is_error);
+                if let Ok(code) = outcome {
+                    assert_eq!(code, expected);
+                }
+            }
+        }
+    }
 }

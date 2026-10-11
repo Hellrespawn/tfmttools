@@ -10,8 +10,8 @@ pub use super::args_definition::{
     ValidateCommonArgs, ValidateType,
 };
 use crate::commands::{
-    clear_history, list_templates, rename, resolve_history, show_history,
-    undo_redo, validate,
+    CommandOutcome, clear_history, list_templates, rename, resolve_history,
+    show_history, undo_redo, validate,
 };
 
 impl TFMTArgs {
@@ -29,11 +29,11 @@ impl TFMTArgs {
 }
 
 impl TFMTSubcommand {
-    pub fn run(
+    pub(crate) fn run(
         self,
         app_options: &TFMTOptions,
         fs_handler: &FsHandler,
-    ) -> Result<()> {
+    ) -> Result<CommandOutcome> {
         match self {
             TFMTSubcommand::ResolveHistory(args) => {
                 let outcome = match args.outcome {
@@ -62,7 +62,7 @@ impl TFMTSubcommand {
                 rename(fs_handler, app_options, rename_args)?;
             },
             TFMTSubcommand::Validate(validate_args) => {
-                validate(fs_handler, app_options, validate_args)?;
+                return validate(fs_handler, app_options, validate_args);
             },
             TFMTSubcommand::Undo(undo_redo_args) => {
                 undo_redo(
@@ -85,7 +85,7 @@ impl TFMTSubcommand {
             },
         }
 
-        Ok(())
+        Ok(CommandOutcome::Success)
     }
 
     pub fn name(&self) -> &'static str {
