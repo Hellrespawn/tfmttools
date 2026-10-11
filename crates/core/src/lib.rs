@@ -3,6 +3,7 @@ pub mod audiofile;
 pub mod error;
 pub mod history;
 pub mod item_keys;
+pub mod tag_encoding;
 pub mod templates;
 pub mod util;
 pub mod warning;

@@ -3,6 +3,7 @@ use super::{
 };
 use crate::action::{Action, TagValueChange, TagValueKind};
 use crate::item_keys::{canonical_tag_name, parse_item_key};
+use crate::tag_encoding::TagTextEncoding;
 
 impl From<&Action> for StoredAction {
     fn from(action: &Action) -> Self {
@@ -106,7 +107,7 @@ impl TryFrom<&StoredTagValueChange> for TagValueChange {
                 .into_iter()
                 .flatten()
         {
-            if !matches!(encoding, "Latin1" | "UTF16" | "UTF16BE" | "UTF8") {
+            if TagTextEncoding::parse(encoding).is_none() {
                 return Err(HistoryError::LoadError(format!(
                     "Unknown tag encoding '{encoding}'"
                 )));

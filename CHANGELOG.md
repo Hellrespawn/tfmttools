@@ -32,6 +32,10 @@
 
 ### Changed
 
+- Share canonical tag encoding names and Lofty conversions across history,
+  tag editing, validation, and reports, preserving stored payloads and independent
+  raw ID3 frame verification.
+
 - Require a history session in validation fix helpers; check-only validation
   does not open history, and dry-run fixes retain their read-only load mode.
 

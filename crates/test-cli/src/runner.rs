@@ -16,6 +16,7 @@ use lofty::file::TaggedFileExt;
 use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::tag::{ItemKey, Tag, TagType};
 use tfmttools_core::item_keys::parse_item_key;
+use tfmttools_core::tag_encoding::TagTextEncoding;
 use tfmttools_fs::{PathIterator, get_path_checksum};
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
@@ -442,7 +443,7 @@ fn tag_encoding(
     id3v2_tag.into_iter().find_map(|frame| {
         match frame {
             Frame::Text(frame) if frame.id().as_str() == id => {
-                Some(text_encoding_name(frame.encoding).to_owned())
+                Some(TagTextEncoding::from(frame.encoding).name().to_owned())
             },
             Frame::UserText(frame)
                 if frame.description.as_ref() == id
@@ -451,7 +452,7 @@ fn tag_encoding(
                         &frame.description,
                     ) == Some(item_key) =>
             {
-                Some(text_encoding_name(frame.encoding).to_owned())
+                Some(TagTextEncoding::from(frame.encoding).name().to_owned())
             },
             _ => None,
         }
@@ -490,7 +491,7 @@ fn raw_id3v2_text_encoding(path: &Utf8Path, id: &str) -> Option<String> {
         if frame_id == id && content_offset < end {
             let encoding =
                 TextEncoding::try_from(bytes[content_offset]).ok()?;
-            return Some(text_encoding_name(encoding).to_owned());
+            return Some(TagTextEncoding::from(encoding).name().to_owned());
         }
 
         if next_offset <= offset || next_offset > end {
@@ -514,15 +515,6 @@ fn synchsafe_u32(bytes: &[u8]) -> Option<u32> {
             | (u32::from(bytes[2]) << 7)
             | u32::from(bytes[3]),
     )
-}
-
-fn text_encoding_name(encoding: TextEncoding) -> &'static str {
-    match encoding {
-        TextEncoding::Latin1 => "Latin1",
-        TextEncoding::UTF16 => "UTF16",
-        TextEncoding::UTF16BE => "UTF16BE",
-        TextEncoding::UTF8 => "UTF8",
-    }
 }
 
 fn harness_environment() -> BTreeMap<String, String> {

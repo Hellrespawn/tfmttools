@@ -7,6 +7,7 @@ use lofty::id3::v2::{
 use lofty::tag::{ItemKey, ItemValue, TagExt, TagItem, TagType};
 use tfmttools_core::action::{TagValueChange, TagValueKind};
 use tfmttools_core::item_keys::parse_item_key;
+use tfmttools_core::tag_encoding::TagTextEncoding;
 
 use crate::error::{FsError, FsResult};
 
@@ -99,8 +100,9 @@ pub fn write_tag_candidate(
                     "Cannot verify native ID3 encoding for this format".into(),
                 )
             })?;
-            let expected =
-                text_encoding_from_name(encoding).ok_or_else(|| {
+            let expected = TagTextEncoding::parse(encoding)
+                .map(TextEncoding::from)
+                .ok_or_else(|| {
                     FsError::Execution("Unknown requested encoding".into())
                 })?;
             let mut found = false;
@@ -201,7 +203,9 @@ fn tag_with_encoding_changes(
         let Some(encoding) = change.new_encoding() else {
             continue;
         };
-        let Some(encoding) = text_encoding_from_name(encoding) else {
+        let Some(encoding) =
+            TagTextEncoding::parse(encoding).map(TextEncoding::from)
+        else {
             continue;
         };
         let key = parse_item_key(change.key())?;
@@ -241,16 +245,6 @@ fn tag_with_encoding_changes(
     }
 
     Ok(encoding_changed.then_some(id3v2_tag))
-}
-
-fn text_encoding_from_name(encoding: &str) -> Option<TextEncoding> {
-    match encoding {
-        "Latin1" => Some(TextEncoding::Latin1),
-        "UTF16" => Some(TextEncoding::UTF16),
-        "UTF16BE" => Some(TextEncoding::UTF16BE),
-        "UTF8" => Some(TextEncoding::UTF8),
-        _ => None,
-    }
 }
 
 fn tag_item_matches(

@@ -129,3 +129,30 @@ fn records_are_ordered_by_id_with_gaps() {
         vec![11, 7, 2]
     );
 }
+
+#[test]
+fn rejects_noncanonical_stored_encoding_without_rewriting() {
+    for encoding in ["utf8", "UTF-8", "latin1", "unknown", ""] {
+        let dir = TempDir::new().unwrap();
+        let path = database(&dir);
+        let db = Connection::open(&path).unwrap();
+        let metadata = r#"{"template":{"type":"validation","value":"test"},"arguments":[],"run_id":"r"}"#;
+        db.execute("INSERT INTO records(id,state,timestamp,metadata,complete,applied_count) VALUES(0,'applied','2026-01-01T00:00:00+00:00',?1,1,1)", [metadata]).unwrap();
+        let payload = serde_json::json!({"type":"edit_tag_values","path":"song.mp3","changes":[{
+            "key":"track_title","kind":"text","old_value":"old","new_value":"new","new_encoding":encoding
+        }]}).to_string();
+        db.execute(
+            "INSERT INTO actions(record_id,position,payload) VALUES(0,0,?1)",
+            [payload],
+        )
+        .unwrap();
+        drop(db);
+        let before = std::fs::read(&path).unwrap();
+        let error = History::open_read_only(path.clone()).unwrap_err();
+        assert!(
+            error.to_string().contains("Unknown tag encoding"),
+            "{encoding:?}: {error}"
+        );
+        assert_eq!(std::fs::read(path).unwrap(), before);
+    }
+}

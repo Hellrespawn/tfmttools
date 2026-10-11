@@ -13,6 +13,7 @@ use tfmttools_core::history::{
     ActionRecordMetadata, History, TemplateMetadata,
 };
 use tfmttools_core::item_keys::canonical_tag_name;
+use tfmttools_core::tag_encoding::TagTextEncoding;
 use tfmttools_core::templates::sanitize_tag_value;
 use tfmttools_core::util::{FSMode, Utf8PathExt};
 use tfmttools_fs::{FsError, FsHandler, PathIteratorOptions, read_audio_file};
@@ -359,7 +360,7 @@ fn validate_id3_encoding(audio_file: &AudioFile) -> Vec<Id3EncodingIssue> {
                     path: audio_file.file().as_path().to_owned(),
                     key: format!("{:?}", item.key()),
                     value: value.to_owned(),
-                    encoding: text_encoding_name(encoding).to_owned(),
+                    encoding: TagTextEncoding::from(encoding).name().to_owned(),
                 }
             })
         })
@@ -392,9 +393,11 @@ fn rewrite_id3_text_as_utf16(
     should_rewrite_id3_text_as_utf16(value, source_encoding).then(|| {
         FieldFix {
             new_value: value.to_owned(),
-            old_encoding: Some(text_encoding_name(source_encoding).to_owned()),
+            old_encoding: Some(
+                TagTextEncoding::from(source_encoding).name().to_owned(),
+            ),
             new_encoding: Some(
-                text_encoding_name(TextEncoding::UTF16).to_owned(),
+                TagTextEncoding::from(TextEncoding::UTF16).name().to_owned(),
             ),
         }
     })
@@ -438,15 +441,6 @@ fn lofty_id3v2_text_encoding(
             _ => None,
         }
     })
-}
-
-fn text_encoding_name(encoding: TextEncoding) -> &'static str {
-    match encoding {
-        TextEncoding::Latin1 => "Latin1",
-        TextEncoding::UTF16 => "UTF16",
-        TextEncoding::UTF16BE => "UTF16BE",
-        TextEncoding::UTF8 => "UTF8",
-    }
 }
 
 #[derive(Debug)]
