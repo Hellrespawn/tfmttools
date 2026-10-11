@@ -35,56 +35,45 @@ pub fn validate(
         bail!("--fix requires a validation type.");
     }
 
-    let mut history = if validate_args.fix {
-        let (mut history, _) = load_history_for_mode(
-            &app_options.history_file_path()?,
-            app_options.fs_mode(),
-        )?;
-        crate::history::execution::check_interrupted(&mut history, fs_handler)?;
-        Some(history)
-    } else {
-        None
-    };
-
     let options = PathIteratorOptions::with_depth(
         validate_options.input_directory().as_path(),
         validate_options.recursion_depth(),
     );
-    let file_paths =
-        super::audio_discovery::gather_audio_paths(app_options, &options)?;
+    let gather =
+        || super::audio_discovery::gather_audio_paths(app_options, &options);
 
+    if !validate_args.fix {
+        let scope = match validate_args.command {
+            None => ValidationScope::All,
+            Some(ValidateType::Characters) => ValidationScope::Characters,
+            Some(ValidateType::Id3Encoding) => ValidationScope::Id3Encoding,
+        };
+        return Ok(check(app_options, gather()?, scope));
+    }
+
+    let (mut history, _) = load_history_for_mode(
+        &app_options.history_file_path()?,
+        app_options.fs_mode(),
+    )?;
+    crate::history::execution::check_interrupted(&mut history, fs_handler)?;
+    let file_paths = gather()?;
     debug!("Read {} files.", file_paths.len());
 
-    match (validate_args.command, validate_args.fix) {
-        (None, false) => {
-            Ok(check(app_options, file_paths, ValidationScope::All))
+    match validate_args.command {
+        Some(ValidateType::Characters) => {
+            fix_characters(fs_handler, app_options, file_paths, &mut history)?;
         },
-        (None, true) => unreachable!("bare validate --fix is rejected early"),
-        (Some(ValidateType::Characters), false) => {
-            Ok(check(app_options, file_paths, ValidationScope::Characters))
-        },
-        (Some(ValidateType::Characters), true) => {
-            fix_characters(
-                fs_handler,
-                app_options,
-                file_paths,
-                history.as_mut(),
-            )
-            .map(|()| CommandOutcome::Success)
-        },
-        (Some(ValidateType::Id3Encoding), false) => {
-            Ok(check(app_options, file_paths, ValidationScope::Id3Encoding))
-        },
-        (Some(ValidateType::Id3Encoding), true) => {
+        Some(ValidateType::Id3Encoding) => {
             fix_id3_encoding(
                 fs_handler,
                 app_options,
                 file_paths,
-                history.as_mut(),
-            )
-            .map(|()| CommandOutcome::Success)
+                &mut history,
+            )?;
         },
+        None => unreachable!("bare validate --fix is rejected early"),
     }
+    Ok(CommandOutcome::Success)
 }
 
 fn check(
@@ -107,7 +96,7 @@ fn fix_characters(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    history: Option<&mut History>,
+    history: &mut History,
 ) -> Result<()> {
     let actions = create_fix_actions(app_options, file_paths, |_, _, value| {
         let fixed = sanitize_tag_value(value);
@@ -132,7 +121,7 @@ fn fix_id3_encoding(
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     file_paths: Vec<Utf8PathBuf>,
-    history: Option<&mut History>,
+    history: &mut History,
 ) -> Result<()> {
     let file_paths = file_paths
         .into_iter()
@@ -221,7 +210,7 @@ fn tag_item_value(item: &TagItem) -> Option<(TagValueKind, &str)> {
 }
 
 fn apply_and_store_fix(
-    history: Option<&mut History>,
+    history: &mut History,
     fs_handler: &FsHandler,
     app_options: &TFMTOptions,
     actions: &[Action],
@@ -237,8 +226,6 @@ fn apply_and_store_fix(
         return Ok(());
     }
 
-    let history =
-        history.expect("Writable validation holds the history session");
     let metadata = ActionRecordMetadata::new(
         TemplateMetadata::Validation { value: command.to_owned() },
         Vec::new(),

@@ -32,6 +32,9 @@
 
 ### Changed
 
+- Require a history session in validation fix helpers; check-only validation
+  does not open history, and dry-run fixes retain their read-only load mode.
+
 - Return normal command statuses through the binary boundary so owned history,
   progress, and tracing guards drop. Keep validation findings at exit status 1
   without adding an operational-error message.

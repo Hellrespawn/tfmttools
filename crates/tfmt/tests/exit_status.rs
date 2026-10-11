@@ -51,3 +51,19 @@ fn success_findings_and_operational_errors_have_distinct_diagnostics() {
         }
     }
 }
+
+#[test]
+fn check_only_validation_does_not_open_invalid_history() {
+    let dir = TempDir::new().unwrap();
+    std::fs::create_dir(dir.path().join("config")).unwrap();
+    let history = dir.path().join("config/tfmt.hist");
+    std::fs::write(&history, b"not a history database").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+        .current_dir(dir.path())
+        .args(["--simple", "-c", "config", "validate"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(std::fs::read(history).unwrap(), b"not a history database");
+    assert!(!dir.path().join("config/tfmt.hist.lock").exists());
+}
