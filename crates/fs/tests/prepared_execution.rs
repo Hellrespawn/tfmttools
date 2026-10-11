@@ -34,11 +34,22 @@ fn planned_swap_and_forced_copy_replay_in_order() {
             }
         }
         for action in &actions {
+            let copied = match action {
+                Action::CopyFile { source, target } => {
+                    Some((source, target, std::fs::read(source).unwrap()))
+                },
+                _ => None,
+            };
             let mut entry =
                 prepare_action(action, OperationKind::Apply).unwrap();
             entry.execute().unwrap();
-
             entry.confirm().unwrap();
+            if let Some((source, target, original)) = copied {
+                // Copy verification and confirmation precede the separate
+                // source removal, even for temporary staging paths in a cycle.
+                assert_eq!(std::fs::read(source).unwrap(), original);
+                assert_eq!(std::fs::read(target).unwrap(), original);
+            }
         }
         assert_eq!(std::fs::read(&a).unwrap(), b"B");
         assert_eq!(std::fs::read(&b).unwrap(), b"A");
@@ -243,4 +254,48 @@ fn planning_relative_missing_destination_uses_current_device_without_effects() {
             if s == &source && t == &target)));
     assert_eq!(std::fs::read(&source).unwrap(), b"original");
     assert!(!target.ancestors().nth(2).unwrap().exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn cross_device_plan_copies_and_replays_when_two_devices_are_available() {
+    use std::os::unix::fs::MetadataExt;
+
+    let source_dir = tempfile::tempdir().unwrap();
+    let target_dir =
+        tempfile::tempdir_in(std::env::current_dir().unwrap()).unwrap();
+    if source_dir.path().metadata().unwrap().dev()
+        == target_dir.path().metadata().unwrap().dev()
+    {
+        return; // A second writable device is optional on developer machines.
+    }
+    let source = path(&source_dir, "source");
+    let target = path(&target_dir, "target");
+    std::fs::write(&source, b"across devices").unwrap();
+    let actions = plan_actions(
+        vec![RenameAction::new(Utf8File::new(&source), Utf8File::new(&target))],
+        MoveMode::Auto,
+    )
+    .unwrap();
+    assert!(matches!(actions.as_slice(), [
+        Action::CopyFile { .. },
+        Action::RemoveFile(_)
+    ]));
+    assert_eq!(std::fs::read(&source).unwrap(), b"across devices");
+    assert!(!target.exists());
+    for action in &actions {
+        let mut prepared =
+            prepare_action(action, OperationKind::Apply).unwrap();
+        prepared.execute().unwrap();
+        prepared.confirm().unwrap();
+    }
+    assert!(!source.exists());
+    assert_eq!(std::fs::read(&target).unwrap(), b"across devices");
+    for action in actions.iter().rev() {
+        let mut prepared = prepare_action(action, OperationKind::Undo).unwrap();
+        prepared.execute().unwrap();
+        prepared.confirm().unwrap();
+    }
+    assert_eq!(std::fs::read(&source).unwrap(), b"across devices");
+    assert!(!target.exists());
 }

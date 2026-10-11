@@ -117,6 +117,21 @@ fn cleanup_output_reports_effects_only_after_success() {
             "{stdout}"
         );
         assert_eq!(!leftover.exists(), cleanup);
+        if cleanup {
+            let history = tfmttools_core::history::History::open_read_only(
+                camino::Utf8PathBuf::try_from(
+                    directory.path().join("config/tfmt.hist"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            let root = directory.path().canonicalize().unwrap();
+            assert!(history.records()[0].actions().iter().any(|action| {
+                matches!(action, tfmttools_core::history::StoredAction::RemoveDir { path }
+                    if std::path::Path::new(path).canonicalize().ok().as_ref() == Some(&root))
+            }));
+            assert!(directory.path().is_dir());
+        }
         let audio = if dry_run || fails {
             original
         } else {
