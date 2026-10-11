@@ -192,7 +192,7 @@ fn validate_files(
                 }
             },
             Err(error) => {
-                result.read_errors.push(ValidationReadError { path, error })
+                result.read_errors.push(ValidationReadError { path, error });
             },
         }
 

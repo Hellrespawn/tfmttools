@@ -41,11 +41,6 @@ impl Utf8Directory {
     }
 
     #[must_use]
-    pub fn ancestors(self) -> Vec<Utf8Directory> {
-        self.0.ancestors().map(Utf8Directory::new).collect()
-    }
-
-    #[must_use]
     pub fn join(&self, path: impl AsRef<Utf8Path>) -> Utf8Directory {
         Utf8Directory::new(self.as_path().join(path))
     }

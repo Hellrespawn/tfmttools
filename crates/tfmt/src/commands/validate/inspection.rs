@@ -64,21 +64,19 @@ pub(super) fn inspect_file(
         if let Some(encoding) = native
             .as_ref()
             .and_then(|tag| text_encodings_for_key(tag, item.key()).next())
-        {
-            if let Some(mut encoding_fix) =
+            && let Some(mut encoding_fix) =
                 rewrite_id3_text_as_utf16(value, encoding.into())
-            {
-                result.id3_encoding_issues.push(Id3EncodingIssue {
-                    path: path.to_owned(),
-                    key: format!("{:?}", item.key()),
-                    value: value.to_owned(),
-                    encoding: encoding.name().to_owned(),
-                });
-                if let Some(character_fix) = fixed {
-                    encoding_fix.new_value = character_fix.new_value;
-                }
-                fixed = Some(encoding_fix);
+        {
+            result.id3_encoding_issues.push(Id3EncodingIssue {
+                path: path.to_owned(),
+                key: format!("{:?}", item.key()),
+                value: value.to_owned(),
+                encoding: encoding.name().to_owned(),
+            });
+            if let Some(character_fix) = fixed {
+                encoding_fix.new_value = character_fix.new_value;
             }
+            fixed = Some(encoding_fix);
         }
         if let (Some(fixed), Some(key)) =
             (fixed, canonical_tag_name(item.key()))
