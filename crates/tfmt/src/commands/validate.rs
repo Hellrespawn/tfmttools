@@ -68,7 +68,7 @@ pub fn validate(
         &app_options.history_file_path()?,
         app_options.fs_mode(),
     )?;
-    crate::history::execution::check_interrupted(
+    crate::history::execution::admit_command(
         &mut history,
         app_options.fs_mode(),
     )?;

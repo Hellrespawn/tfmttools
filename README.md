@@ -109,6 +109,10 @@ the same history through different links still exclude one another.
 
 ### Validate
 
+Rename, validation fixes, undo, and redo report existing interrupted history
+once when the command starts. Execution still checks unresolved attempts before
+changing files; newly failed actions produce their own failure report.
+
 `tfmt validate` checks audio files and tags without modifying files. It runs
 all validation checks and exits with a non-zero status when issues are found.
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Report interrupted history once at command startup while retaining quiet
+  execution guards and separate reports for newly failed actions.
+
 - Inspect validation inputs before applying tag fixes; report read/parse errors
   and apply no fixes when inspection is incomplete, including dry runs.
 

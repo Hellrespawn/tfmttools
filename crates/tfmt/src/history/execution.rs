@@ -52,29 +52,34 @@ pub(crate) fn interruption_report(history: &History) -> Result<Option<String>> {
         a.id.0
     )))
 }
-pub(crate) fn check_interrupted(
-    history: &mut History,
-    fs: FSMode,
-) -> Result<()> {
+pub(crate) fn admit_command(history: &mut History, mode: FSMode) -> Result<()> {
     if let Some(report) = interruption_report(history)? {
         println!("{report}");
     }
-    if !fs.is_dry_run() {
-        if history.current_attempt()?.is_some() {
-            bail!(
-                "Resolve the attempted action before changing files or history"
-            );
-        }
-        if let Some(record) = history.close_abandoned_run()? {
-            println!(
-                "Closed interrupted run {} as partial; {} actions remain applied.",
-                record.id().unwrap(),
-                record.applied_count()
-            );
-        }
+    if let Some(record) = guard_execution(history, mode)? {
+        println!(
+            "Closed interrupted run {} as partial; {} actions remain applied.",
+            record.id().expect("Closed record is stored"),
+            record.applied_count()
+        );
     }
     Ok(())
 }
+
+fn guard_execution(
+    history: &mut History,
+    mode: FSMode,
+) -> Result<Option<Record>> {
+    history.ensure_usable()?;
+    if mode.is_dry_run() {
+        return Ok(None);
+    }
+    if history.current_attempt()?.is_some() {
+        bail!("Resolve the attempted action before changing files or history");
+    }
+    Ok(history.close_abandoned_run()?)
+}
+
 pub(crate) fn execute_recorded(
     history: &mut History,
     fs: FSMode,
@@ -82,7 +87,7 @@ pub(crate) fn execute_recorded(
     metadata: ActionRecordMetadata,
 ) -> Result<Record> {
     let actions = absolute_actions(actions)?;
-    check_interrupted(history, fs)?;
+    guard_execution(history, fs)?;
     if fs.is_dry_run() {
         return Ok(Record::new(
             actions.iter().map(StoredAction::from).collect(),
@@ -108,7 +113,7 @@ pub(crate) fn replay_record(
     record: &Record,
     direction: HistoryMode,
 ) -> Result<Record> {
-    check_interrupted(history, fs)?;
+    guard_execution(history, fs)?;
     if fs.is_dry_run() {
         return Ok(record.clone());
     }
@@ -321,13 +326,60 @@ mod failure_tests {
         assert_eq!(h.records()[0].applied_count(), 1);
         assert!(!root.join("last").exists());
         assert_eq!(std::fs::read(&obstruction).unwrap(), b"original");
-        assert!(check_interrupted(&mut h, fs).is_err());
+        assert!(guard_execution(&mut h, fs).is_err());
         let a = h.current_attempt().unwrap().unwrap();
         h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
         let record = h.records()[0].clone();
         replay_record(&mut h, fs, &record, HistoryMode::Undo).unwrap();
         assert!(!root.join("first").exists());
     }
+    #[test]
+    fn direct_execution_rejects_unresolved_attempt_without_effects() {
+        use tfmttools_core::history::AttemptDetails;
+        let dir = assert_fs::TempDir::new().unwrap();
+        let root = Utf8PathBuf::try_from(dir.path().to_owned()).unwrap();
+        let mut history = History::new(root.join("history"));
+        let run = history
+            .begin_run(RunRequest::Apply { metadata: metadata() })
+            .unwrap();
+        let action =
+            StoredAction::MakeDir { path: root.join("pending").to_string() };
+        let attempt = history
+            .begin_attempt(
+                run,
+                0,
+                &action,
+                &AttemptDetails {
+                    paths: vec![root.join("pending").to_string()],
+                    instructions: "Inspect".into(),
+                },
+                None,
+            )
+            .unwrap();
+        let record = history.records()[0].clone();
+        assert!(
+            execute_recorded(
+                &mut history,
+                FSMode::Default,
+                vec![Action::MakeDir(root.join("new"))],
+                metadata()
+            )
+            .is_err()
+        );
+        assert!(
+            replay_record(
+                &mut history,
+                FSMode::Default,
+                &record,
+                HistoryMode::Undo
+            )
+            .is_err()
+        );
+        assert_eq!(history.current_attempt().unwrap().unwrap().id, attempt);
+        assert!(!root.join("new").exists());
+        assert!(!root.join("pending").exists());
+    }
+
     #[test]
     fn database_failure_after_install_retains_original_and_attempt() {
         use lofty::file::TaggedFileExt;

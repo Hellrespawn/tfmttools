@@ -410,3 +410,109 @@ fn interruption_after_tag_confirmation_leaves_backup_as_manual_housekeeping() {
     assert_eq!(std::fs::read(path).unwrap(), before);
     assert_eq!(std::fs::read(&backup).unwrap(), before);
 }
+
+fn make_interrupted_history(dir: &TempDir, pending: bool) -> Utf8PathBuf {
+    use tfmttools_core::history::{
+        ActionRecordMetadata, AttemptDetails, RunRequest, StoredAction,
+        TemplateMetadata,
+    };
+    let path =
+        Utf8PathBuf::try_from(dir.path().join("config/tfmt.hist")).unwrap();
+    let mut h = History::new(path.clone());
+    for number in 0..3 {
+        let id = h
+            .begin_run(RunRequest::Apply {
+                metadata: ActionRecordMetadata::new(
+                    TemplateMetadata::Validation { value: "test".into() },
+                    vec![],
+                    format!("run{number}"),
+                ),
+            })
+            .unwrap();
+        if number == 2 {
+            if pending {
+                h.begin_attempt(
+                    id,
+                    0,
+                    &StoredAction::RemoveFile { path: "missing".into() },
+                    &AttemptDetails {
+                        paths: vec!["missing".into()],
+                        instructions: "Inspect".into(),
+                    },
+                    None,
+                )
+                .unwrap();
+            }
+        } else {
+            let target = dir.path().join(format!("confirmed{number}"));
+            std::fs::create_dir(&target).unwrap();
+            let a = h
+                .begin_attempt(
+                    id,
+                    0,
+                    &StoredAction::MakeDir {
+                        path: target.display().to_string(),
+                    },
+                    &AttemptDetails {
+                        paths: vec![target.display().to_string()],
+                        instructions: "Inspect".into(),
+                    },
+                    None,
+                )
+                .unwrap();
+            h.confirm_attempt(a).unwrap();
+            h.close_run(id, true).unwrap();
+        }
+    }
+    path
+}
+
+#[test]
+fn dry_run_reports_startup_interruption_once_across_commands_and_records() {
+    for pending in [false, true] {
+        let dir = setup();
+        let path = make_interrupted_history(&dir, pending);
+        let history_before = std::fs::read(&path).unwrap();
+        let audio_before = std::fs::read(dir.path().join("song.mp3")).unwrap();
+        for command in [
+            vec!["--dry-run", "rename", "--script", "path: (\"Renamed\")"],
+            vec!["--dry-run", "validate", "characters", "--fix"],
+            vec!["--dry-run", "undo", "2"],
+            vec!["--dry-run", "redo", "2"],
+        ] {
+            let output = run(&dir, &command);
+            success(&output);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let marker =
+                if pending { "Unresolved attempt" } else { "Interrupted run" };
+            assert_eq!(
+                stdout.matches(marker).count(),
+                1,
+                "{command:?}: {stdout}"
+            );
+            assert_eq!(std::fs::read(&path).unwrap(), history_before);
+            assert_eq!(
+                std::fs::read(dir.path().join("song.mp3")).unwrap(),
+                audio_before
+            );
+            assert!(dir.path().join("confirmed0").is_dir());
+            assert!(dir.path().join("confirmed1").is_dir());
+        }
+    }
+}
+
+#[test]
+fn writable_admission_reports_and_closes_abandoned_run_once() {
+    let dir = setup();
+    let path = make_interrupted_history(&dir, false);
+    let out = run(&dir, &["undo", "2"]);
+    success(&out);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(stdout.matches("Interrupted run").count(), 1, "{stdout}");
+    assert_eq!(stdout.matches("Closed interrupted run").count(), 1, "{stdout}");
+    let h = History::open_read_only(path).unwrap();
+    assert!(h.open_run().unwrap().is_none());
+    assert!(h.current_attempt().unwrap().is_none());
+    assert!(!dir.path().join("confirmed0").exists());
+    assert!(!dir.path().join("confirmed1").exists());
+}

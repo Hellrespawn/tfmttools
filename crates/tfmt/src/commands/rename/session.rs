@@ -28,7 +28,7 @@ impl<'a> RenameSession<'a> {
             app_options.fs_mode(),
         )?;
 
-        crate::history::execution::check_interrupted(
+        crate::history::execution::admit_command(
             &mut history,
             app_options.fs_mode(),
         )?;
