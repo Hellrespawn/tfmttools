@@ -100,14 +100,6 @@ impl TagValueChange {
 
 impl Action {
     #[must_use]
-    pub fn copy_from_rename_action(rename_action: &RenameAction) -> Self {
-        Action::CopyFile {
-            source: rename_action.source().to_owned().into_path_buf(),
-            target: rename_action.target().to_owned().into_path_buf(),
-        }
-    }
-
-    #[must_use]
     pub fn move_from_rename_action(rename_action: &RenameAction) -> Self {
         Action::MoveFile {
             source: rename_action.source().to_owned().into_path_buf(),

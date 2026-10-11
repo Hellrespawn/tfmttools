@@ -20,10 +20,6 @@ impl FixtureDirs {
         &self.root
     }
 
-    pub fn test_case_dir() -> Utf8PathBuf {
-        Self::cli().case_dir()
-    }
-
     pub fn cli() -> Self {
         Self::new("../../tests/fixtures/cli")
     }

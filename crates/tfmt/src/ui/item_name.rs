@@ -1,16 +1,10 @@
 pub struct ItemName<'i> {
     single: &'i str,
-    plural: Option<&'i str>,
 }
 
 impl<'i> ItemName<'i> {
     pub fn simple(single: &'i str) -> Self {
-        Self { single, plural: None }
-    }
-
-    #[allow(dead_code)]
-    pub fn new(single: &'i str, plural: &'i str) -> Self {
-        Self { single, plural: Some(plural) }
+        Self { single }
     }
 
     pub fn single(&self) -> String {
@@ -18,10 +12,7 @@ impl<'i> ItemName<'i> {
     }
 
     pub fn plural(&self) -> String {
-        self.plural.map_or(
-            format!("{}s", self.single()),
-            std::borrow::ToOwned::to_owned,
-        )
+        format!("{}s", self.single())
     }
 
     pub fn by_amount(&self, amount: usize) -> String {
@@ -31,6 +22,6 @@ impl<'i> ItemName<'i> {
 
 impl Default for ItemName<'_> {
     fn default() -> Self {
-        Self { single: "item", plural: None }
+        Self { single: "item" }
     }
 }

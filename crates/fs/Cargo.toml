@@ -23,7 +23,6 @@ ignore = { workspace = true }
 lofty = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 assert_fs = { workspace = true }

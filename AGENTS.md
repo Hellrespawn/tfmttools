@@ -11,6 +11,11 @@ Workspace-level integration fixtures and sample report assets live under
 `tests/fixtures/cli/`. Example templates are under `examples/`, and
 notes or design work live under `docs/`.
 
+The project uses library crates for maintainability and organization.
+There are no consumers outside this workspace. Public APIs are internal
+workspace interfaces; unused public code can be removed without preserving
+compatibility for external consumers.
+
 ## Task Map
 
 - CLI flags and option conversion:

@@ -77,10 +77,6 @@ impl AudioFile {
         Ok((target_path, warnings))
     }
 
-    pub fn tag_mut(&mut self) -> &mut Tag {
-        &mut self.tag
-    }
-
     #[must_use]
     pub fn path_predicate(path: &Utf8Path) -> bool {
         path.extension().is_some_and(|extension| {

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 use serde::{Deserialize, Serialize};
 
 use crate::util::{Utf8Directory, Utf8File};
@@ -15,11 +15,6 @@ impl RenameAction {
     #[must_use]
     pub fn new(source: Utf8File, target: Utf8File) -> Self {
         Self { source, target }
-    }
-
-    #[must_use]
-    pub fn from_path_bufs(source: Utf8PathBuf, target: Utf8PathBuf) -> Self {
-        Self { source: Utf8File::new(source), target: Utf8File::new(target) }
     }
 
     pub fn separate_unchanged_destinations(

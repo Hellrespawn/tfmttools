@@ -3,14 +3,6 @@ use std::path::Path;
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
 
-#[must_use]
-pub fn normalize_separators(string: &str) -> String {
-    string
-        .split(['\\', '/'])
-        .collect::<Vec<&str>>()
-        .join(std::path::MAIN_SEPARATOR_STR)
-}
-
 #[derive(Debug, Default, Copy, Clone)]
 pub enum FSMode {
     #[default]

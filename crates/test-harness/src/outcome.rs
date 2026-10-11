@@ -414,12 +414,6 @@ impl CommandOutcome {
     pub fn passed(&self) -> bool {
         self.status == Status::Passed
     }
-
-    #[must_use]
-    pub fn with_duration_ms(mut self, duration_ms: u128) -> Self {
-        self.duration_ms = Some(duration_ms);
-        self
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]

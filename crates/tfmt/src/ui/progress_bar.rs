@@ -48,10 +48,6 @@ impl ProgressBar {
         )
     }
 
-    // pub fn exact_size(&self) -> bool {
-    //     self.length.is_some()
-    // }
-
     fn new(
         display_mode: DisplayMode,
         style: ProgressStyle,

@@ -12,7 +12,6 @@ version.workspace = true
 
 [dependencies]
 camino = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
 color-eyre = { workspace = true }
 fs-err = { workspace = true }
 indexmap = { workspace = true }
