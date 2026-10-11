@@ -385,3 +385,9 @@ promise.
 
 Template syntax is parsed with pest. Diagnostics identify the source location
 and expected language constructs; template syntax is unchanged.
+
+## Development checks
+
+`cargo xtask test` runs the workspace tests, and `cargo xtask test-cli` runs
+all CLI tests. Cargo discovers conventional integration targets automatically.
+Use `cargo xtask test-integration` for the focused fixture harness.

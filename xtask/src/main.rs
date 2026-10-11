@@ -15,15 +15,10 @@ Tasks:
     completions DIR   Generate shell completions into DIR
     manpage           Generate manpages into target/man
     manpage DIR       Generate manpages into DIR
-    test              cargo test --workspace --exclude tfmt
-                      cargo test -p tfmt --lib --bin tfmt
-                      cargo test -p tfmt --test history_compatibility --test history_interruption --test path_templates
-                      cargo test -p tfmt --test integration -- --nocapture
+    test              cargo test --workspace -- --nocapture
     test-core         cargo test -p tfmttools-core
     test-fs           cargo test -p tfmttools-fs
-    test-cli          cargo test -p tfmt --lib --bin tfmt
-                      cargo test -p tfmt --test history_compatibility --test history_interruption --test path_templates
-                      cargo test -p tfmt --test integration -- --nocapture
+    test-cli          cargo test -p tfmt -- --nocapture
     test-integration  cargo test -p tfmt --test integration -- --nocapture
     lint              cargo +nightly fmt --all --check
                       cargo +nightly clippy --workspace --all-targets
@@ -31,21 +26,6 @@ Tasks:
 ";
 const TEST_INTEGRATION_ARGS: &[&str] =
     &["test", "-p", "tfmt", "--test", "integration", "--", "--nocapture"];
-const TEST_WORKSPACE_ARGS: &[&str] =
-    &["test", "--workspace", "--exclude", "tfmt"];
-const TEST_HISTORY_COMPAT_ARGS: &[&str] = &[
-    "test",
-    "-p",
-    "tfmt",
-    "--test",
-    "history_compatibility",
-    "--test",
-    "history_interruption",
-    "--test",
-    "path_templates",
-];
-const TEST_CLI_BIN_ARGS: &[&str] =
-    &["test", "-p", "tfmt", "--lib", "--bin", "tfmt"];
 const FMT_ARGS: &[&str] = &["+nightly", "fmt", "--all", "--check"];
 const CLIPPY_ARGS: &[&str] =
     &["+nightly", "clippy", "--workspace", "--all-targets"];
@@ -63,23 +43,10 @@ fn main() -> ExitCode {
         "check" => run_cargo(&["check", "--workspace"]),
         "completions" => generate_completions(&trailing_args),
         "manpage" => generate_manpage(&trailing_args),
-        "test" => {
-            run_steps(&[
-                TEST_WORKSPACE_ARGS,
-                TEST_CLI_BIN_ARGS,
-                TEST_HISTORY_COMPAT_ARGS,
-                TEST_INTEGRATION_ARGS,
-            ])
-        },
+        "test" => run_cargo(&["test", "--workspace", "--", "--nocapture"]),
         "test-core" => run_cargo(&["test", "-p", "tfmttools-core"]),
         "test-fs" => run_cargo(&["test", "-p", "tfmttools-fs"]),
-        "test-cli" => {
-            run_steps(&[
-                TEST_CLI_BIN_ARGS,
-                TEST_HISTORY_COMPAT_ARGS,
-                TEST_INTEGRATION_ARGS,
-            ])
-        },
+        "test-cli" => run_cargo(&["test", "-p", "tfmt", "--", "--nocapture"]),
         "test-integration" => {
             run_cargo(&test_args_with_trailing(
                 TEST_INTEGRATION_ARGS,

@@ -32,6 +32,8 @@
 
 ### Changed
 
+- Let Cargo discover all CLI test targets in `cargo xtask test` and `test-cli`.
+
 - Simplify SQLite history with explicit record progress, typed run requests,
   borrowed record queries, and shared replay/patch validation. Refresh only
   affected cached records after each durable confirmation. Require a validated
