@@ -1,5 +1,5 @@
 // Match Rust char::is_whitespace, including non-ASCII separators.
-WHITESPACE = _{ '\u{0009}'..'\u{000d}' | " " | "\u{0085}" | "\u{00a0}" | "\u{1680}" | '\u{2000}'..'\u{200a}' | "\u{2028}" | "\u{2029}" | "\u{202f}" | "\u{205f}" | "\u{3000}" }
+WHITESPACE = _{ WHITE_SPACE }
 COMMENT = _{ "#" ~ (!"\n" ~ ANY)* }
 name_start = _{ ASCII_ALPHA | "_" }
 name_tail = _{ ASCII_ALPHANUMERIC | "_" }
