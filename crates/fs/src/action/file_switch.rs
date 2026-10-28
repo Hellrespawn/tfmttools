@@ -1,14 +1,15 @@
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
+use sha2::{Digest, Sha256};
 use tempfile::Builder;
 use tfmttools_core::action::TagValueChange;
 use tfmttools_core::history::{
     AttemptDetails, BinaryPatchPair, ByteIdentity, HistoryMode, StoredAction,
 };
 
-use super::binary_patch::{apply_patch, byte_identity, create_patch_pair};
+use super::binary_patch::{apply_patch, create_patch_pair};
 use super::prepared_execution::{Effect, PreparedAction};
 use super::tag_edit::write_tag_candidate;
 use crate::error::{FsError, FsResult};
@@ -210,9 +211,34 @@ pub(super) fn resolve_audio_path(path: &Utf8Path) -> FsResult<Utf8PathBuf> {
 pub(super) fn identity_if_regular(
     path: &Utf8Path,
 ) -> FsResult<Option<ByteIdentity>> {
+    if regular_file_metadata(path)?.is_none() {
+        return Ok(None);
+    }
+    let mut file = fs_err::File::open(path)?;
+    let mut hash = Sha256::new();
+    let mut length = 0;
+    let mut buffer = vec![0; 64 * 1024];
+    loop {
+        let count = match file.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => count,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                continue;
+            },
+            Err(error) => return Err(error.into()),
+        };
+        hash.update(&buffer[..count]);
+        length += count as u64;
+    }
+    Ok(Some(ByteIdentity { length, sha256: hash.finalize().into() }))
+}
+
+pub(super) fn regular_file_metadata(
+    path: &Utf8Path,
+) -> FsResult<Option<std::fs::Metadata>> {
     match fs_err::symlink_metadata(path) {
         Ok(meta) if meta.is_file() && !meta.file_type().is_symlink() => {
-            Ok(Some(byte_identity(&fs_err::read(path)?)))
+            Ok(Some(meta))
         },
         Ok(_) => Err(conflict(path)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -251,4 +277,29 @@ pub(super) fn conflict(path: &Utf8Path) -> FsError {
     FsError::Execution(format!(
         "Unexpected file state at {path}; inspect the reported paths manually"
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::byte_identity;
+
+    #[test]
+    fn streamed_identity_matches_bytes_across_buffer_boundaries() {
+        let directory = tempfile::tempdir().unwrap();
+        let path =
+            Utf8PathBuf::try_from(directory.path().join("audio")).unwrap();
+        for length in [0, 65_535, 65_536, 65_537, 131_073] {
+            let bytes = (0_u8..=255).cycle().take(length).collect::<Vec<_>>();
+            fs_err::write(&path, &bytes).unwrap();
+            assert_eq!(
+                identity_if_regular(&path).unwrap(),
+                Some(byte_identity(&bytes))
+            );
+        }
+        fs_err::remove_file(&path).unwrap();
+        assert_eq!(identity_if_regular(&path).unwrap(), None);
+        fs_err::create_dir(&path).unwrap();
+        assert!(identity_if_regular(&path).is_err());
+    }
 }

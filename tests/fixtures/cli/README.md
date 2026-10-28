@@ -21,6 +21,11 @@ their independent raw ID3 inspection.
 - `extra/`: non-audio files copied into `input/extra/`.
 - Reports are generated under `tests/reports/`.
 
+Cleanup expectations preserve relative directories beneath
+`config/trash/run_id/`, for example `extra/cover.jpg`. Filenames are no longer
+flattened or suffixed with checksums. Protected-path and cleanup-collision
+regressions live in `crates/tfmt/tests/confirmation.rs`.
+
 ## Case File Schema
 
 Case files live in `cases/` and are discovered when their file name ends

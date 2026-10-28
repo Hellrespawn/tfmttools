@@ -175,3 +175,158 @@ fn dry_run_image_cleanup_is_prospective_and_preserves_files() {
     assert!(!stdout.contains("Deleted"), "{stdout}");
     assert_eq!(std::fs::read(cover).unwrap(), b"cover");
 }
+
+#[test]
+fn cleanup_preserves_relative_config_and_trash_directories() {
+    for (config, trash) in [
+        ("music/config", "music/trash"),
+        ("music/../music/config", "music/../music/trash"),
+        #[cfg(unix)]
+        ("config-link", "trash-link"),
+    ] {
+        let directory = TempDir::new().unwrap();
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("music/config")).unwrap();
+        std::fs::create_dir_all(root.join("music/trash/old")).unwrap();
+        #[cfg(unix)]
+        if config == "config-link" {
+            std::os::unix::fs::symlink("music/config", root.join(config))
+                .unwrap();
+            std::os::unix::fs::symlink("music/trash", root.join(trash))
+                .unwrap();
+        }
+        std::fs::write(root.join("music/config/keep.jpg"), b"config").unwrap();
+        std::fs::write(root.join("music/trash/old/keep.jpg"), b"trash")
+            .unwrap();
+        std::fs::copy(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3"),
+            root.join("music/original.mp3"),
+        )
+        .unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+            .current_dir(root)
+            .args([
+                "--simple",
+                "--yes",
+                "-c",
+                config,
+                "rename",
+                "-i",
+                "music",
+                "--bin-directory",
+                trash,
+                "--script",
+                "path: (\"renamed\")",
+            ])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(
+            std::fs::read(root.join("music/config/keep.jpg")).unwrap(),
+            b"config"
+        );
+        assert_eq!(
+            std::fs::read(root.join("music/trash/old/keep.jpg")).unwrap(),
+            b"trash"
+        );
+        assert!(root.join("music/config/tfmt.hist.lock").is_file());
+        assert!(root.join("renamed.mp3").is_file());
+    }
+}
+
+#[test]
+fn cleanup_preserves_distinct_paths_and_undo_restores_them() {
+    let directory = TempDir::new().unwrap();
+    let root = directory.path();
+    std::fs::create_dir_all(root.join("music/a")).unwrap();
+    for name in ["music/a/b.jpg", "music/a_b.jpg"] {
+        std::fs::write(root.join(name), b"same cover").unwrap();
+    }
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3"),
+        root.join("music/original.mp3"),
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+        .current_dir(root)
+        .args([
+            "--simple",
+            "--yes",
+            "-c",
+            "config",
+            "--run-id",
+            "test",
+            "rename",
+            "-i",
+            "music",
+            "--script",
+            "path: (\"renamed\")",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    for name in ["a/b.jpg", "a_b.jpg"] {
+        assert_eq!(
+            std::fs::read(root.join("config/trash/test").join(name)).unwrap(),
+            b"same cover"
+        );
+        assert!(!root.join("music").join(name).exists());
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+        .current_dir(root)
+        .args(["--simple", "--yes", "-c", "config", "undo"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    for name in ["music/a/b.jpg", "music/a_b.jpg"] {
+        assert_eq!(std::fs::read(root.join(name)).unwrap(), b"same cover");
+    }
+    assert!(root.join("music/original.mp3").is_file());
+}
+
+#[test]
+fn cleanup_destination_collision_aborts_before_audio_moves() {
+    for (relative, blocker) in
+        [("cover.jpg", "cover.jpg"), ("a/cover.jpg", "a")]
+    {
+        let directory = TempDir::new().unwrap();
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("music/a")).unwrap();
+        std::fs::create_dir_all(root.join("config/trash/test")).unwrap();
+        let blocked = root.join("config/trash/test").join(blocker);
+        let cover = root.join("music").join(relative);
+        std::fs::write(&blocked, b"old cover").unwrap();
+        std::fs::write(&cover, b"new cover").unwrap();
+        std::fs::copy(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3"),
+            root.join("music/original.mp3"),
+        )
+        .unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+            .current_dir(root)
+            .args([
+                "--simple",
+                "--yes",
+                "-c",
+                "config",
+                "--run-id",
+                "test",
+                "rename",
+                "-i",
+                "music",
+                "--script",
+                "path: (\"renamed\")",
+            ])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{output:?}");
+        assert!(root.join("music/original.mp3").is_file(), "{output:?}");
+        assert!(!root.join("renamed.mp3").exists());
+        assert_eq!(std::fs::read(&cover).unwrap(), b"new cover");
+        assert_eq!(std::fs::read(&blocked).unwrap(), b"old cover");
+        assert!(!root.join("config/tfmt.hist").exists());
+    }
+}

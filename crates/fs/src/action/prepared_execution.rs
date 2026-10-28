@@ -5,7 +5,8 @@ use tfmttools_core::history::{
 };
 
 use super::file_switch::{
-    TagSwitch, conflict, identity_if_regular, sync_parent,
+    TagSwitch, conflict, identity_if_regular, regular_file_metadata,
+    sync_parent,
 };
 use crate::error::FsResult;
 
@@ -114,12 +115,14 @@ fn validate_inputs(action: &Action, kind: OperationKind) -> FsResult<()> {
         | Action::CopyFile { source, target } => {
             let (source, target) =
                 if undo { (target, source) } else { (source, target) };
-            let from =
-                identity_if_regular(source)?.ok_or_else(|| conflict(source))?;
-            if let Some(to) = identity_if_regular(target)? {
+            regular_file_metadata(source)?.ok_or_else(|| conflict(source))?;
+            if regular_file_metadata(target)?.is_some() {
                 let allowed = match action {
                     Action::MoveFile { .. } => same_case_alias(source, target)?,
-                    _ => undo && from == to,
+                    _ => {
+                        undo && identity_if_regular(source)?
+                            == identity_if_regular(target)?
+                    },
                 };
                 if !allowed {
                     return Err(conflict(target));
@@ -127,7 +130,7 @@ fn validate_inputs(action: &Action, kind: OperationKind) -> FsResult<()> {
             }
         },
         Action::RemoveFile(path) if !undo => {
-            identity_if_regular(path)?.ok_or_else(|| conflict(path))?;
+            regular_file_metadata(path)?.ok_or_else(|| conflict(path))?;
         },
         _ => {},
     }
@@ -140,12 +143,6 @@ fn execute_filesystem(action: &Action, kind: OperationKind) -> FsResult<()> {
         Action::MoveFile { source, target } => {
             let (source, target) =
                 if undo { (target, source) } else { (source, target) };
-            identity_if_regular(source)?.ok_or_else(|| conflict(source))?;
-            if identity_if_regular(target)?.is_some()
-                && !same_case_alias(source, target)?
-            {
-                return Err(conflict(target));
-            }
             fs_err::rename(source, target)?;
             sync_parent(source)?;
             sync_parent(target)?;
@@ -185,7 +182,6 @@ fn execute_filesystem(action: &Action, kind: OperationKind) -> FsResult<()> {
         },
         Action::RemoveFile(path) => {
             if !undo {
-                identity_if_regular(path)?.ok_or_else(|| conflict(path))?;
                 fs_err::remove_file(path)?;
                 sync_parent(path)?;
             }

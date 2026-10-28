@@ -355,6 +355,16 @@ and cleanup actions are recorded in order, including staging moves and
 copy/remove steps. Cleanup confirmation happens before file changes, and the
 configuration and bin directories are protected from cleanup.
 
+Cleanup preserves relative paths under `trash/<run ID>/`, so files such as
+`a/b.jpg` and `a_b.jpg` remain distinct. Cleanup destinations are validated
+before any files move. Protected directory checks resolve relative paths and
+symlink aliases.
+
+Moves and removals check file metadata without reading file contents. Copies
+and tag replacement still verify file bytes; their file hashes use a fixed-size
+buffer rather than loading the whole file into memory. Tag editing and binary
+patch creation still require whole-file buffers.
+
 An error after an action starts, a crash, or power loss can leave that action's
 completion unconfirmed. tfmt reports the last attempted action, affected paths,
 and what history confirms. It never resumes, reverses, or infers the outcome of

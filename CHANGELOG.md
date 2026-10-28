@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Protect configuration and trash directories during cleanup when selected
+  through relative paths or symlink aliases.
+- Preserve relative paths in cleanup trash and validate destinations before
+  moving audio, preventing flattened-name collisions and partial runs.
+- Remove unused whole-file hashing from moves and removals. Stream file hashes
+  for copy and tag-replacement verification with bounded memory.
+
 - Report interrupted history once at command startup while retaining quiet
   execution guards and separate reports for newly failed actions.
 

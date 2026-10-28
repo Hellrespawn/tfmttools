@@ -93,9 +93,9 @@
         "path": "Van Pletzen/Benaaihilism.m4a",
         "checksum": "166D0587"
       },
-      { "path": "config/trash/run_id/extra_cover.jpg_166003A3" },
+      { "path": "config/trash/run_id/extra/cover.jpg" },
       {
-        "path": "config/trash/run_id/extra_description.txt_3958064D"
+        "path": "config/trash/run_id/extra/description.txt"
       }
     ]
   },

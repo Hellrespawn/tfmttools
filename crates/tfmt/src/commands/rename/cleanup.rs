@@ -6,8 +6,8 @@ use itertools::Itertools;
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::{Utf8Directory, Utf8File, Utf8PathExt};
 use tfmttools_fs::{
-    FsResult, PathIterator, PathIteratorOptions, get_file_checksum,
-    get_longest_common_prefix, plan_actions,
+    FsResult, PathIterator, PathIteratorOptions, get_longest_common_prefix,
+    plan_actions,
 };
 use tracing::{debug, info, trace};
 
@@ -118,24 +118,25 @@ fn discover_remaining_items(
         common_prefix,
         session.rename_options().recursion_depth(),
     );
+    let config = resolve_cleanup_directory(
+        session.app_options().config_directory().as_path(),
+    )?;
+    let bin = resolve_cleanup_directory(
+        session.rename_options().bin_directory().as_path(),
+    )?;
 
     let remaining = PathIterator::new(&options)
-        .filter(|result| {
-            result.as_ref().map_or(true, |path| {
-                !path.starts_with(
-                    session.app_options().config_directory().as_path(),
-                ) && !path.starts_with(
-                    session.rename_options().bin_directory().as_path(),
-                )
-            })
-        })
         .map(|result| {
             result.and_then(|path| {
                 let canonical = path.canonicalize_utf8()?;
                 Ok((path, canonical))
             })
         })
-        .filter_ok(|(_, canonical)| !protected_paths.contains(canonical))
+        .filter_ok(|(_, canonical)| {
+            !canonical.starts_with(&config)
+                && !canonical.starts_with(&bin)
+                && !protected_paths.contains(canonical)
+        })
         .map_ok(|(path, _)| path)
         .collect::<FsResult<Vec<_>>>()?;
 
@@ -146,6 +147,22 @@ fn discover_remaining_items(
         files: files.into_iter().map(Utf8File::new).collect(),
         directories: folders.into_iter().map(Utf8Directory::new).collect(),
     })
+}
+
+fn resolve_cleanup_directory(path: &Utf8Path) -> FsResult<camino::Utf8PathBuf> {
+    let absolute = camino::Utf8PathBuf::try_from(std::path::absolute(path)?)?;
+    for ancestor in absolute.ancestors() {
+        match ancestor.canonicalize_utf8() {
+            Ok(resolved) => {
+                return Ok(
+                    resolved.join(absolute.strip_prefix(ancestor).unwrap())
+                );
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+            Err(error) => return Err(error.into()),
+        }
+    }
+    unreachable!("an absolute path has a root ancestor")
 }
 
 fn protected_cleanup_paths(
@@ -233,28 +250,21 @@ fn create_rename_action(
     common_prefix: &Utf8Path,
     file: Utf8File,
     run_id: &str,
-) -> Result<RenameAction> {
-    let checksum = get_file_checksum(&file)?;
-
+) -> RenameAction {
     let relative_path = file.as_path().strip_prefix(common_prefix).expect(
         "common_prefix is based on this file too, should always have prefix.",
     );
 
-    let path_concat = relative_path.components().join("_");
-    let target_name = format!("{path_concat}_{checksum}");
-
-    let rename_action = RenameAction::new(
-        file,
-        session
-            .rename_options()
-            .bin_directory()
-            .join(run_id)
-            .join_file(target_name),
-    );
+    let target = session
+        .rename_options()
+        .bin_directory()
+        .join(run_id)
+        .join_file(relative_path);
+    let rename_action = RenameAction::new(file, target);
 
     trace!("Created rename action: {rename_action:?}");
 
-    Ok(rename_action)
+    rename_action
 }
 
 fn preview_files_to_delete(
@@ -297,7 +307,7 @@ fn plan_cleanup_actions(
         session,
         common_prefix,
         cleanup_plan.files_to_delete,
-    )?;
+    );
     let mut actions = plan_file_moves(session, rename_actions)?;
 
     actions.extend(remove_directories(cleanup_plan.directories_to_remove));
@@ -309,7 +319,7 @@ fn create_rename_actions(
     session: &RenameSession,
     common_prefix: &Utf8Path,
     files: Vec<Utf8File>,
-) -> Result<Vec<RenameAction>> {
+) -> Vec<RenameAction> {
     files
         .into_iter()
         .map(|file| {
@@ -327,6 +337,10 @@ fn plan_file_moves(
     session: &RenameSession,
     rename_actions: Vec<RenameAction>,
 ) -> Result<Vec<Action>> {
+    super::preview::validate_rename_action_errors(&rename_actions)?;
+    for directory in RenameAction::intermediate_directories(&rename_actions) {
+        tfmttools_fs::verify_directory(directory.as_path())?;
+    }
     Ok(plan_actions(rename_actions, session.rename_options().move_mode())?)
 }
 

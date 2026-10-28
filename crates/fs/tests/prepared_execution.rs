@@ -299,3 +299,55 @@ fn cross_device_plan_copies_and_replays_when_two_devices_are_available() {
     assert_eq!(std::fs::read(&source).unwrap(), b"across devices");
     assert!(!target.exists());
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "helper subprocess for large_file_actions_use_bounded_memory"]
+fn large_move_worker() {
+    let root =
+        Utf8PathBuf::from(std::env::var("TFMT_LARGE_MOVE_ROOT").unwrap());
+    let source = root.join("source");
+    let target = root.join("target");
+    let mut entry = prepare_action(
+        &Action::MoveFile { source: source.clone(), target: target.clone() },
+        OperationKind::Apply,
+    )
+    .unwrap();
+    entry.execute().unwrap();
+    entry.confirm().unwrap();
+    assert!(!source.exists());
+    assert_eq!(std::fs::metadata(&target).unwrap().len(), 64 * 1024 * 1024);
+    let copied = root.join("copied");
+    let mut copy = prepare_action(
+        &Action::CopyFile { source: target.clone(), target: copied.clone() },
+        OperationKind::Apply,
+    )
+    .unwrap();
+    copy.execute().unwrap();
+    copy.confirm().unwrap();
+    assert_eq!(std::fs::metadata(copied).unwrap().len(), 64 * 1024 * 1024);
+    let mut entry = prepare_action(
+        &Action::RemoveFile(target.clone()),
+        OperationKind::Apply,
+    )
+    .unwrap();
+    entry.execute().unwrap();
+    assert!(!target.exists());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn large_file_actions_use_bounded_memory() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::File::create(dir.path().join("source"))
+        .unwrap()
+        .set_len(64 * 1024 * 1024)
+        .unwrap();
+    // The sparse file exceeds the child's address-space limit.
+    let output = std::process::Command::new("/bin/sh")
+        .args(["-c", "ulimit -c 0; ulimit -v 65536; exec \"$1\" --ignored --exact large_move_worker", "move-test"])
+        .arg(std::env::current_exe().unwrap())
+        .env("TFMT_LARGE_MOVE_ROOT", dir.path())
+        .output().unwrap();
+    assert!(output.status.success(), "{output:?}");
+}

@@ -20,7 +20,7 @@ pub fn preview(session: &RenameSession, plan: &RenamePlan) -> Result<()> {
     )
 }
 
-fn validate_rename_action_errors(
+pub(super) fn validate_rename_action_errors(
     rename_actions: &[RenameAction],
 ) -> Result<()> {
     let existing_targets = existing_target_paths(rename_actions);
