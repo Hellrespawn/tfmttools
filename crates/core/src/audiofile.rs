@@ -54,8 +54,9 @@ impl AudioFile {
         &self,
         template: &BoundTemplate,
         relative_path: &Utf8Directory,
+        strict: bool,
     ) -> TFMTResult<(Utf8File, Vec<Warning>)> {
-        let (path, warnings) = render_audio_path(template, self)?;
+        let (path, warnings) = render_audio_path(template, self, strict)?;
         let (filename, directories) = path
             .components()
             .split_last()
@@ -114,9 +115,12 @@ mod path_template_tests {
         values: &[(ItemKey, &str)],
     ) -> (Vec<String>, Vec<Warning>) {
         let template = compile_audio_template(source).unwrap();
-        let (path, warnings) =
-            render_audio_path(&template.bind(&[]).unwrap(), &audio(values))
-                .unwrap();
+        let (path, warnings) = render_audio_path(
+            &template.bind(&[]).unwrap(),
+            &audio(values),
+            false,
+        )
+        .unwrap();
         (path.components().to_vec(), warnings)
     }
 
@@ -235,7 +239,7 @@ mod path_template_tests {
     #[test]
     fn path_language_presence_and_malformed_numbers() {
         assert_eq!(render(r#"path: ([$track_number? {$track_number}] [!$artist? "missing"] )"#,
-            &[(ItemKey::TrackNumber, "0"), (ItemKey::TrackArtist, " ")]).0, ["0missing"]);
+            &[(ItemKey::TrackNumber, "0"), (ItemKey::TrackArtist, " ")]).0, ["0"]);
         for value in ["bad", "3/bad", "3/12/15", "18446744073709551616"] {
             assert_eq!(
                 render(r#"path: ({$track_number ?? "absent"})"#, &[(
@@ -300,7 +304,7 @@ mod path_template_tests {
         .unwrap();
         let bound = template.bind(&[r"Music\Artists".to_owned()]).unwrap();
         let (target, _) = audio(&[])
-            .construct_target_path(&bound, &Utf8Directory::new("work"))
+            .construct_target_path(&bound, &Utf8Directory::new("work"), false)
             .unwrap();
         assert_eq!(
             target.as_path(),
@@ -314,6 +318,7 @@ mod path_template_tests {
             .construct_target_path(
                 &template.bind(&[]).unwrap(),
                 &Utf8Directory::new("work"),
+                false,
             )
             .unwrap();
         assert_eq!(
@@ -324,41 +329,121 @@ mod path_template_tests {
     }
 
     #[test]
-    fn path_language_argument_policy_validates_every_forbidden_character() {
-        use crate::action::FORBIDDEN_CHARACTERS;
-        let template =
-            compile_audio_template(r#"arg unused: string path: ("Song")"#)
+    fn character_policy_is_shared_by_literals_tags_and_arguments() {
+        for (source, arguments) in [
+            (r#"path: (" A/B\\C?:. ")"#, vec![]),
+            ("path: ({$title})", vec![]),
+            ("arg value: string path: ({value})", vec![
+                " A/B\\C?:. ".to_owned(),
+            ]),
+        ] {
+            let bound = compile_audio_template(source)
+                .unwrap()
+                .bind(&arguments)
                 .unwrap();
-        for entry in FORBIDDEN_CHARACTERS.iter() {
-            assert!(
-                template.bind(&[format!("bad{}value", entry.char())]).is_err()
+            let file = audio(&[(ItemKey::TrackTitle, " A/B\\C?:. ")]);
+            assert_eq!(
+                render_audio_path(&bound, &file, false).unwrap().0.components(),
+                ["A-B-C"]
+            );
+            let error =
+                render_audio_path(&bound, &file, true).unwrap_err().to_string();
+            assert!(error.contains("input/song.mp3"));
+        }
+    }
+
+    #[test]
+    fn character_policy_runs_after_interpolation() {
+        let bound = compile_audio_template(
+            r#"arg suffix: string path: ("prefix" {$title} {suffix} "suffix")"#,
+        )
+        .unwrap()
+        .bind(&[". ".to_owned()])
+        .unwrap();
+        let file = audio(&[(ItemKey::TrackTitle, " Title. ")]);
+        for strict in [false, true] {
+            assert_eq!(
+                render_audio_path(&bound, &file, strict)
+                    .unwrap()
+                    .0
+                    .components(),
+                ["prefix Title. . suffix"]
             );
         }
-        let path = compile_audio_template(r#"arg unused: path path: ("Song")"#)
-            .unwrap();
-        for entry in FORBIDDEN_CHARACTERS
-            .iter()
-            .filter(|entry| !["/", "\\"].contains(&entry.char()))
-        {
-            let message = path
-                .bind(&[format!("ok/bad{}value", entry.char())])
-                .unwrap_err()
-                .to_string();
-            assert!(message.contains("unused"));
-            assert!(message.contains("component"));
-        }
-        assert!(template.bind(&[]).is_err());
-        assert!(template.bind(&["ok".to_owned(), "extra".to_owned()]).is_err());
-        let optional = compile_audio_template(
-            r#"arg unused: string(default: "") path: ("Song")"#,
+    }
+
+    #[test]
+    fn only_path_arguments_introduce_boundaries() {
+        let bound = compile_audio_template(
+            r#"arg prefix: path path: ({prefix} "A/B")"#,
         )
+        .unwrap()
+        .bind(&[" Music\\Artists? /Album. ".to_owned()])
         .unwrap();
-        assert!(optional.bind(&[]).is_ok());
-        let invalid = compile_audio_template(
-            r#"arg unused: string(default: "bad?") path: ("Song")"#,
-        )
-        .unwrap_err();
-        assert!(invalid.to_string().contains("unused"));
+        assert_eq!(
+            render_audio_path(&bound, &audio(&[]), false)
+                .unwrap()
+                .0
+                .components(),
+            ["Music", "Artists", "Album", "A-B"]
+        );
+        assert!(render_audio_path(&bound, &audio(&[]), true).is_err());
+    }
+
+    #[test]
+    fn prohibited_characters_are_rejected_before_normalization() {
+        for character in [
+            '\0', '\n', '\t', '\u{7f}', '\u{85}', '\u{2028}', '\u{2029}',
+            '\u{202e}', '\u{2066}',
+        ] {
+            for strict in [false, true] {
+                for (name, formatter) in [
+                    ("title", ""),
+                    ("track_number", ""),
+                    ("date", ""),
+                    ("date", " | year"),
+                ] {
+                    let key = match name {
+                        "title" => ItemKey::TrackTitle,
+                        "date" => ItemKey::RecordingDate,
+                        _ => ItemKey::TrackNumber,
+                    };
+                    let bound = compile_audio_template(&format!(
+                        "path: ({{${name} ?? \"fallback\"{formatter}}})"
+                    ))
+                    .unwrap()
+                    .bind(&[])
+                    .unwrap();
+                    assert!(
+                        render_audio_path(
+                            &bound,
+                            &audio(&[(key, &format!("2024{character}"))]),
+                            strict
+                        )
+                        .is_err()
+                    );
+                }
+            }
+            for kind in ["string", "path", "int"] {
+                let template = compile_audio_template(&format!(
+                    "arg value: {kind} path: (\"Song\")"
+                ))
+                .unwrap();
+                assert!(template.bind(&[format!("3{character}")]).is_err());
+            }
+            assert!(
+                compile_audio_template(&format!("path: (\"Song{character}\")"))
+                    .is_err()
+            );
+        }
+        assert_eq!(
+            render("path: ({$title})", &[(
+                ItemKey::TrackTitle,
+                "Cafe\u{301} 👩\u{200d}💻 ✈\u{fe0f}"
+            )])
+            .0,
+            ["Cafe\u{301} 👩\u{200d}💻 ✈\u{fe0f}"]
+        );
     }
 
     #[test]
@@ -370,6 +455,7 @@ mod path_template_tests {
         let message = render_audio_path(
             &template,
             &audio(&[(ItemKey::RecordingDate, "invalid")]),
+            false,
         )
         .unwrap_err()
         .to_string();
@@ -380,7 +466,7 @@ mod path_template_tests {
             .unwrap()
             .bind(&[])
             .unwrap();
-        assert!(render_audio_path(&template, &audio(&[])).is_err());
+        assert!(render_audio_path(&template, &audio(&[]), false).is_err());
     }
     #[test]
     fn path_language_stef_example_with_audio_metadata() {
@@ -398,13 +484,16 @@ mod path_template_tests {
             (ItemKey::TrackNumber, "3/12"),
             (ItemKey::TrackTitle, "Example Song"),
         ]);
-        assert_eq!(render_audio_path(&bound, &file).unwrap().0.components(), [
-            "Music",
-            "Artists",
-            "Example Artist",
-            "2024.02 - Example Album",
-            "103 - Example Artist - Example Song"
-        ]);
+        assert_eq!(
+            render_audio_path(&bound, &file, false).unwrap().0.components(),
+            [
+                "Music",
+                "Artists",
+                "Example Artist",
+                "2024.02 - Example Album",
+                "103 - Example Artist - Example Song"
+            ]
+        );
         for artist in [None, Some("")] {
             let mut values = vec![
                 (ItemKey::AlbumArtist, "Album Artist"),
@@ -417,7 +506,8 @@ mod path_template_tests {
             assert_eq!(
                 render_audio_path(
                     &template.bind(&[]).unwrap(),
-                    &audio(&values)
+                    &audio(&values),
+                    false
                 )
                 .unwrap()
                 .0
@@ -427,41 +517,37 @@ mod path_template_tests {
         }
     }
     #[test]
-    fn path_language_appends_extension_before_dot_component_conversion() {
-        for (source, expected) in [
-            (r#"path: (".")"#, "..mp3"),
-            (r#"path: ("..")"#, "...mp3"),
-            (r#"path: ("Album" / ".")"#, "Album/..mp3"),
-            (r#"path: ("Album" / "..")"#, "Album/...mp3"),
+    fn character_replacement_cannot_leave_empty_components() {
+        for source in [
+            r#"path: (".")"#,
+            r#"path: ("..")"#,
+            r#"path: ("???" / "Song")"#,
+            r#"path: (" ")"#,
         ] {
-            let template =
+            let bound =
                 compile_audio_template(source).unwrap().bind(&[]).unwrap();
-            let (target, _) = audio(&[])
-                .construct_target_path(&template, &Utf8Directory::new("work"))
-                .unwrap();
-            assert_eq!(
-                target.as_path(),
-                camino::Utf8Path::new("work").join(expected)
-            );
+            for strict in [false, true] {
+                assert!(
+                    render_audio_path(&bound, &audio(&[]), strict).is_err()
+                );
+            }
         }
     }
 
     #[test]
     fn path_language_empty_dates_do_not_block_fallback() {
-        for recording in ["", " ", "..."] {
-            assert_eq!(
-                render("path: ({$date})", &[
-                    (ItemKey::RecordingDate, recording),
-                    (ItemKey::Year, "1999"),
-                    (ItemKey::OriginalReleaseDate, "1980"),
-                ])
-                .0,
-                ["1999"]
-            );
-        }
         assert_eq!(
             render("path: ({$date})", &[
-                (ItemKey::RecordingDate, " "),
+                (ItemKey::RecordingDate, ""),
+                (ItemKey::Year, "1999"),
+                (ItemKey::OriginalReleaseDate, "1980"),
+            ])
+            .0,
+            ["1999"]
+        );
+        assert_eq!(
+            render("path: ({$date})", &[
+                (ItemKey::RecordingDate, ""),
                 (ItemKey::Year, ""),
                 (ItemKey::OriginalReleaseDate, "1980"),
             ])

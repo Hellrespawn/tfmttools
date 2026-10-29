@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Apply one filename character policy after interpolation to literals, tags,
+  and arguments. Replace forbidden characters by default; `rename --strict`
+  rejects them. Preserve interior whitespace and periods, reject prohibited
+  controls in both modes, and validate paths after replacement. Literal slashes
+  are component text; only path arguments and template separators create
+  directories. `validate characters --fix` also trims tag edge spaces/periods.
+
 - Reject rename destinations that require another target file to be a directory,
   including case differences, before changing files.
 - Keep read-only history records and interruption reports in the same loaded

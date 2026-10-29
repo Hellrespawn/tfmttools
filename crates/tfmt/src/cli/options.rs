@@ -157,6 +157,7 @@ impl From<TemplateArgs> for TemplateOption {
 
 #[derive(Debug, Clone)]
 pub struct RenameOptions {
+    strict: bool,
     input_directory: Utf8Directory,
     template_directory: Utf8Directory,
     bin_directory: Utf8Directory,
@@ -185,6 +186,11 @@ impl ValidateOptions {
 }
 
 impl RenameOptions {
+    #[must_use]
+    pub fn strict(&self) -> bool {
+        self.strict
+    }
+
     #[must_use]
     pub fn input_directory(&self) -> &Utf8Directory {
         &self.input_directory
@@ -288,6 +294,7 @@ impl TryFrom<(RenameArgs, &TFMTOptions)> for RenameOptions {
             },
             template_option: rename_args.template_args.into(),
             arguments: rename_args.arguments,
+            strict: rename_args.strict,
         })
     }
 }

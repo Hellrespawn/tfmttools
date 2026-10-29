@@ -2,6 +2,10 @@
 
 These fixtures drive the `tfmt` integration test harness.
 
+Character-policy regressions in `crates/tfmt/tests/path_templates.rs` cover
+`rename --strict`, default replacement, and final validation without file changes
+on rejection. Core rendering tests cover interpolation and Unicode controls.
+
 Validation fixes reject incomplete audio inspection before changing tags.
 Deterministic malformed-input regressions live in
 `crates/tfmt/tests/validation_inspection.rs`; fixture tag-encoding checks retain

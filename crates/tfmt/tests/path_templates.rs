@@ -186,8 +186,8 @@ fn template_arguments_are_validated_before_reading_audio() {
     let input = root(&directory).join("broken.mp3");
     std::fs::write(&input, "not audio").unwrap();
     for (template, args) in [
-        (r#"arg unused: string path: ("Song")"#, vec!["bad?"]),
-        (r#"arg unused: string(default: "bad?") path: ("Song")"#, vec![
+        (r#"arg unused: string path: ("Song")"#, vec!["bad\n"]),
+        ("arg unused: string(default: \"bad\n\") path: (\"Song\")", vec![
             "valid",
         ]),
         (r#"path: ([$album? {$not_a_tag}] "Song")"#, vec![]),
@@ -429,5 +429,74 @@ fn destination_ancestor_conflicts_fail_before_filesystem_changes() {
             assert!(!root(&directory).join("a.MP3").exists());
             assert!(!root(&directory).join("config/tfmt.hist").exists());
         }
+    }
+}
+
+#[test]
+fn strict_rejection_and_default_replacement_share_the_rendered_policy() {
+    let directory = historical_rename();
+    let before = std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
+    let template =
+        r#"arg suffix: string path: (" Album. " / {$title} " / " {suffix})"#;
+    let output =
+        run(&directory, &["rename", "--strict", "--script", template, "bad?"]);
+    assert!(!output.status.success());
+    let message = String::from_utf8_lossy(&output.stderr);
+    assert!(message.contains(" Album. "), "{message}");
+    assert!(message.contains("forbidden"), "{message}");
+    assert_eq!(
+        std::fs::read(root(&directory).join("renamed.mp3")).unwrap(),
+        before
+    );
+    assert!(!root(&directory).join("Album").exists());
+
+    let output = run(&directory, &["rename", "--script", template, "bad?"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read(root(&directory).join("Album/Nemo - bad.mp3")).unwrap(),
+        before
+    );
+    let output = run(&directory, &["undo"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read(root(&directory).join("renamed.mp3")).unwrap(),
+        before
+    );
+    let output = run(&directory, &[
+        "rename",
+        "--strict",
+        "--script",
+        "path: ({$title})",
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read(root(&directory).join("Nemo.mp3")).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn sanitized_paths_are_validated_before_files_move() {
+    for template in
+        [r#"path: ("CON?")"#, r#"path: ("...")"#, r#"path: ("Same?")"#]
+    {
+        let directory = historical_rename();
+        let before =
+            std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
+        if template.contains("Same") {
+            std::fs::copy(
+                root(&directory).join("renamed.mp3"),
+                root(&directory).join("second.mp3"),
+            )
+            .unwrap();
+        }
+        let output = run(&directory, &["rename", "--script", template]);
+        assert!(!output.status.success(), "{template}");
+        assert_eq!(
+            std::fs::read(root(&directory).join("renamed.mp3")).unwrap(),
+            before
+        );
+        assert!(!root(&directory).join("Same.mp3").exists());
+        assert!(!root(&directory).join("CON.mp3").exists());
     }
 }

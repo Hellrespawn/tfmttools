@@ -72,6 +72,10 @@ pub struct ListTemplatesArgs {
 
 #[derive(Args, Debug)]
 pub struct RenameArgs {
+    #[arg(long)]
+    /// Reject forbidden filename characters instead of replacing them.
+    pub strict: bool,
+
     #[arg(short = 'i', long = "input-directory")]
     /// Directory to scan for input files. Defaults to the current directory.
     pub custom_input_directory: Option<Utf8PathBuf>,

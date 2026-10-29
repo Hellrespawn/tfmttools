@@ -5,9 +5,7 @@ use pest_derive::Parser;
 
 use crate::ast::{Alternative, Expression, Formatter, Reference};
 use crate::template::Compiled;
-use crate::{
-    ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, Metadata, Span, TagReference,
-};
+use crate::{ArgKind, ArgSpec, Diagnostic, Metadata, Span, TagReference};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -69,10 +67,7 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
     Diagnostic::new(message, Span { start, end })
 }
 
-pub(crate) fn parse(
-    source: &str,
-    policy: ArgumentPolicy,
-) -> Result<Compiled, Diagnostic> {
+pub(crate) fn parse(source: &str) -> Result<Compiled, Diagnostic> {
     let document = Syntax::parse(Rule::document, source)
         .map_err(|error| syntax_error(source, error))?
         .next()
@@ -163,7 +158,6 @@ pub(crate) fn parse(
         references: builder.references,
         path,
         span: path_span,
-        policy,
     })
 }
 
@@ -231,9 +225,9 @@ impl Builder {
 
     fn literal(node: &Node<'_>) -> Result<String, Diagnostic> {
         let value = text(node);
-        if value.contains(['/', '\\']) {
+        if let Some(character) = crate::prohibited_character(&value) {
             return Err(Diagnostic::new(
-                "Use a bare '/' for path separators",
+                format!("Literal contains prohibited character {character:?}"),
                 span(node),
             ));
         }

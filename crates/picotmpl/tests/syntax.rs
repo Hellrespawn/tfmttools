@@ -1,7 +1,7 @@
-use tfmttools_picotmpl::{ArgKind, ArgumentPolicy, Template};
+use tfmttools_picotmpl::{ArgKind, Template};
 
 fn compile(source: &str) -> Result<Template, tfmttools_picotmpl::Diagnostic> {
-    Template::compile(source, ArgumentPolicy::new(&[]))
+    Template::compile(source)
 }
 
 #[test]
@@ -151,8 +151,6 @@ fn malformed_documents_and_strings() {
         "path: ([$title? \"A\")",
         "path: (\"unterminated)",
         r#"path: ("invalid\n")"#,
-        r#"path: ("A/B")"#,
-        r#"path: ("A\\B")"#,
         "path: (bare)",
         "path: ({$})",
         "arg 1prefix: string path: ({$title})",

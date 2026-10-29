@@ -207,7 +207,7 @@ dates, then any four-digit year. Invalid present dates are errors. Padding
 accepts widths from 0 through 1024 and never truncates text.
 
 A bare `/` separates components using the host platform's native separator.
-Quoted path literals cannot contain `/` or `\`; tag separators are sanitized.
+Quoted `/` and `\` are component text, subject to the filename character policy.
 Only a bare `/` as the first top-level expression requests the platform root;
 empty initial directories, repeated separators, and empty final filenames
 are errors. Windows drive and UNC prefixes are outside the initial grammar.
@@ -220,12 +220,11 @@ Declare arguments in CLI positional order with `arg name: type`. Types are
 defaults. Integer arguments must fit a signed 64-bit integer; empty integers
 are invalid. Excess arguments are errors, including templates with no declarations.
 
-String and path arguments are validated rather than sanitized. They reject
-the characters in the sanitization table below; `/` and `\` are allowed as
-structural separators in path arguments. Argument text is preserved without
-trimming or replacement. All defaults are validated during compilation, and
-all supplied values are checked before reading audio, including unused ones.
-Accepted whitespace still undergoes final filename validation.
+String arguments preserve their text until interpolation. Path arguments split
+into components first; all completed components then follow the same filename
+character policy as literals and tags. Defaults are type-checked during
+compilation. Prohibited controls are rejected in defaults and supplied values,
+including unused arguments, before reading audio.
 
 A path argument splits on both `/` and `\`, discards empty segments, and inserts
 complete directory components. Leading separators do not make it absolute.
@@ -252,8 +251,7 @@ is manual; there is no converter or compatibility mode.
 
 Use first-class argument declarations instead of frontmatter `args` entries.
 Remove `required` settings: omit `default` to require an argument, or specify
-`default: ""` to make it optional. Arguments previously sanitized may now be
-rejected and must be corrected by the caller. Move leading description
+`default: ""` to make it optional. Move leading description
 comments to `description: "..."`.
 
 Guards and fallbacks now retain zero values. The migrated Stef example also
@@ -295,7 +293,11 @@ underlying cause in diagnostic error chains.
 
 ### Filename Sanitization
 
-Interpolated tag values are sanitized before rendering final paths:
+After interpolation, the same rules apply to every completed component,
+including literals, string arguments, path argument components, and tags.
+By default, forbidden characters are replaced or removed. Use
+`tfmt rename --strict` to reject components that would require a change,
+with the original component shown in the error:
 
 | Character | Replacement |
 | --------- | ----------- |
@@ -310,9 +312,22 @@ Interpolated tag values are sanitized before rendering final paths:
 | `/`       | `-`         |
 | `\`       | `-`         |
 
-Trailing periods are also removed from interpolated tag values. Rendering
-trims surrounding whitespace and reports a warning; `validate characters --fix`
-preserves surrounding whitespace when applying the shared sanitization rules.
+Leading spaces and trailing spaces or periods are removed from completed
+components. Interior spaces and periods remain, including those originating
+at the edges of interpolated values. Tag whitespace still produces a metadata
+warning. `validate characters --fix` uses these same replacement rules on
+whole tag values.
+
+In both modes, Unicode control characters (including NUL, tabs, and newlines),
+line/paragraph separators U+2028/U+2029, and bidirectional formatting controls
+U+061C, U+200E/U+200F, U+202A–U+202E, and U+2066–U+2069 are always rejected.
+Combining marks, joiners, and variation selectors remain allowed. Controls in
+referenced tags are checked before numeric parsing or formatting can hide them.
+
+Replacement must leave nonempty components. Reserved names, collisions,
+existing targets, and path length are checked on the resulting paths before
+files move. Slashes in text never create directories; only template separator
+syntax and path arguments create component boundaries.
 
 ### History
 

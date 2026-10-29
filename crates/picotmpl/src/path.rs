@@ -28,6 +28,17 @@ impl RenderedPath {
         path
     }
 
+    /// Transform component text before converting it to a filesystem path.
+    pub fn try_map_components<E>(
+        mut self,
+        mut map: impl FnMut(&str) -> Result<String, E>,
+    ) -> Result<Self, E> {
+        for component in &mut self.components {
+            *component = map(component)?;
+        }
+        Ok(self)
+    }
+
     #[must_use]
     pub fn components(&self) -> &[String] {
         &self.components
@@ -43,9 +54,11 @@ pub(crate) struct Builder {
 
 impl Builder {
     pub fn append(&mut self, text: &str, span: Span) -> Result<(), Diagnostic> {
-        if text.contains(['/', '\\']) {
+        if let Some(character) = crate::prohibited_character(text) {
             return Err(Diagnostic::new(
-                "Component text contains a path separator",
+                format!(
+                    "Component contains prohibited character {character:?}"
+                ),
                 span,
             ));
         }

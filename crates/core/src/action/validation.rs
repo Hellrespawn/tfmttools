@@ -11,7 +11,6 @@ use collisions::{
 use errors::ValidationError;
 pub use forbidden::FORBIDDEN_CHARACTERS;
 use forbidden::{
-    FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS,
     validate_forbidden_leading_or_trailing_characters_in_path_component,
     validate_reserved_names,
 };
@@ -35,7 +34,7 @@ pub fn validate_rename_actions<'a>(
     errors.extend(
         validate_forbidden_leading_or_trailing_characters_in_path_component(
             rename_actions,
-            &FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS,
+            &FORBIDDEN_CHARACTERS,
         ),
     );
     errors.extend(validate_target_path_too_long(rename_actions));

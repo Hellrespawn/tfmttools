@@ -1,8 +1,7 @@
-use tfmttools_picotmpl::{ArgumentPolicy, Template};
+use tfmttools_picotmpl::Template;
 
 fn compile(source: &str) -> Result<Template, tfmttools_picotmpl::Diagnostic> {
-    let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
-    Template::compile(source, ArgumentPolicy::new(&forbidden))
+    Template::compile(source)
 }
 
 #[test]
@@ -59,31 +58,20 @@ fn declaration_order_and_excess_arguments() {
 }
 
 #[test]
-fn forbidden_string_and_path_text() {
-    let string = compile("arg suffix: string path: ({$title})").unwrap();
-    let path = compile("arg prefix: path path: ({$title})").unwrap();
-    for character in "<>\":|?*~/\\".chars() {
-        let value = format!("A{character}B");
-        let error = string.bind(std::slice::from_ref(&value)).unwrap_err();
-        assert!(error.message.contains("suffix"));
-        assert!(error.message.contains(character));
-        if ['/', '\\'].contains(&character) {
-            assert!(path.bind(&[value]).is_ok());
-        } else {
-            let error = path.bind(&[value]).unwrap_err();
-            assert!(error.message.contains("prefix"));
-            assert!(error.message.contains(character));
-            assert!(error.message.contains("component"));
-        }
+fn filename_characters_are_preserved_until_after_interpolation() {
+    for (kind, value) in [("string", "A/B\\C?"), ("path", "A/B?/")] {
+        let template =
+            compile(&format!("arg value: {kind} path: ({{value}} \"Song\")"))
+                .unwrap();
+        assert!(template.bind(&[value.to_owned()]).is_ok());
     }
 }
 
 #[test]
 fn invalid_defaults_even_when_overridden() {
     for source in [
-        "arg suffix: string(default: \"bad?\") path: ({$title})",
-        "arg prefix: path(default: \"A/bad~\") path: ({$title})",
         "arg count: int(default: \"\") path: ({$title})",
+        "arg suffix: string(default: \"bad\n\") path: ({$title})",
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
@@ -95,6 +83,6 @@ fn invalid_defaults_even_when_overridden() {
 #[test]
 fn invalid_unused_argument() {
     let template = compile("arg unused: string path: ({$title})").unwrap();
-    let error = template.bind(&["bad?".to_owned()]).unwrap_err();
+    let error = template.bind(&["bad\n".to_owned()]).unwrap_err();
     assert!(error.message.contains("unused"));
 }

@@ -93,7 +93,11 @@ fn create_rename_actions(
         .iter()
         .map(|audiofile| {
             let (target, warnings) = audiofile
-                .construct_target_path(template, &cwd)
+                .construct_target_path(
+                    template,
+                    &cwd,
+                    session.rename_options().strict(),
+                )
                 .map_err(|error| templates::named_error(lookup_name, error))?;
 
             all_warnings.extend(warnings);

@@ -122,7 +122,13 @@ fn forbidden_characters_in(value: &str) -> Vec<&'static str> {
     let mut forbidden_characters = Vec::new();
 
     for forbidden_character in FORBIDDEN_CHARACTERS.iter() {
-        if value.contains(forbidden_character.char()) {
+        if ((!forbidden_character.leading() && !forbidden_character.trailing())
+            && value.contains(forbidden_character.char()))
+            || (forbidden_character.leading()
+                && value.starts_with(forbidden_character.char()))
+            || (forbidden_character.trailing()
+                && value.ends_with(forbidden_character.char()))
+        {
             forbidden_characters.push(forbidden_character.char());
         }
     }
@@ -191,7 +197,7 @@ mod tests {
     #[test]
     fn replaces_forbidden_characters_like_templates() {
         assert_eq!(sanitize_tag_value("AC/DC: Live."), "AC-DC Live");
-        assert_eq!(sanitize_tag_value(" AC/DC: Live. "), " AC-DC Live. ");
+        assert_eq!(sanitize_tag_value(" AC/DC: Live. "), "AC-DC Live");
     }
 
     #[test]

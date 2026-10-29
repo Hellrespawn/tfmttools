@@ -1,12 +1,9 @@
-use std::convert::Infallible;
-
 use tfmttools_picotmpl::{
-    ArgumentPolicy, BoundTemplate, Diagnostic, RenderError, RenderedPath,
-    Template,
+    BoundTemplate, Diagnostic, RenderError, RenderedPath, Template,
 };
 
 use super::context::AudioContext;
-use crate::action::FORBIDDEN_CHARACTERS;
+use super::sanitize::sanitize_component;
 use crate::audiofile::AudioFile;
 use crate::error::{TFMTError, TFMTResult};
 use crate::item_keys::resolve_tag_name;
@@ -15,11 +12,7 @@ use crate::warning::Warning;
 
 /// Compile a path template and validate every reference against the audio schema.
 pub fn compile_audio_template(source: &str) -> TFMTResult<Template> {
-    let forbidden: Vec<char> = FORBIDDEN_CHARACTERS
-        .iter()
-        .flat_map(|entry| entry.char().chars())
-        .collect();
-    let template = Template::compile(source, ArgumentPolicy::new(&forbidden))
+    let template = Template::compile(source)
         .map_err(|error| compilation_error(source, &error))?;
     for reference in template.tag_references() {
         if resolve_tag_name(&reference.name).is_none() {
@@ -48,24 +41,37 @@ fn compilation_error(source: &str, error: &Diagnostic) -> TFMTError {
     TFMTError::Template(format!("{line}:{column}: {}{hint}", error.message))
 }
 
-/// Render using sanitized audio metadata, retaining warnings and file context.
+/// Render raw metadata, then apply character rules to completed components.
 pub fn render_audio_path(
     template: &BoundTemplate,
     audio_file: &AudioFile,
+    strict: bool,
 ) -> TFMTResult<(RenderedPath, Vec<Warning>)> {
     let mut context = AudioContext::new(audio_file);
-    let output = template
-        .render(|name| Ok::<_, Infallible>(context.resolve(name)))
-        .map_err(|error| {
+    let output =
+        template.render(|name| context.resolve(name)).map_err(|error| {
             let diagnostic = match error {
                 RenderError::Template(error) => error,
-                RenderError::Resolver { source, .. } => match source {},
+                RenderError::Resolver { source, .. } => {
+                    return TFMTError::TemplateRender {
+                        file: audio_file.file().clone().into_path_buf(),
+                        source: Box::new(source),
+                    };
+                },
             };
             TFMTError::TemplateRender {
                 file: audio_file.file().clone().into_path_buf(),
                 source: Box::new(TFMTError::Template(
                     template.format_diagnostic(&diagnostic),
                 )),
+            }
+        })?;
+    let output = output
+        .try_map_components(|component| sanitize_component(component, strict))
+        .map_err(|source| {
+            TFMTError::TemplateRender {
+                file: audio_file.file().clone().into_path_buf(),
+                source: Box::new(source),
             }
         })?;
     Ok((output, context.take_warnings()))

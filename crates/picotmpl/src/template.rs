@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::ast::{Alternative, Expression};
 use crate::value::Value;
 use crate::{
-    ArgKind, ArgSpec, ArgumentPolicy, Diagnostic, RenderError, RenderedPath,
-    Scalar, Span, args, parser, render,
+    ArgKind, ArgSpec, Diagnostic, RenderError, RenderedPath, Scalar, Span,
+    args, parser, render,
 };
 
 /// Optional listing metadata, independent of argument binding.
@@ -30,7 +30,6 @@ pub(crate) struct Compiled {
     pub references: Vec<TagReference>,
     pub path: Vec<Expression>,
     pub span: Span,
-    pub policy: ArgumentPolicy,
 }
 
 /// An owned, compiled template. Cloning shares its immutable representation.
@@ -94,24 +93,18 @@ impl Template {
                     spec.span,
                 )
             })?;
-            arguments.insert(
-                spec.name.clone(),
-                args::coerce(spec, raw, &self.inner.policy)?,
-            );
+            arguments.insert(spec.name.clone(), args::coerce(spec, raw)?);
         }
         Ok(BoundTemplate { template: self.clone(), arguments })
     }
 
-    /// Compile owned expressions and validate all defaults against the policy.
-    pub fn compile(
-        source: &str,
-        policy: ArgumentPolicy,
-    ) -> Result<Self, Diagnostic> {
-        let compiled = parser::parse(source, policy)?;
+    /// Compile owned expressions and validate argument defaults.
+    pub fn compile(source: &str) -> Result<Self, Diagnostic> {
+        let compiled = parser::parse(source)?;
         validate_arguments(&compiled.path, &compiled.arguments)?;
         for spec in &compiled.arguments {
             if let Some(default) = &spec.default {
-                args::coerce(spec, default, &compiled.policy)?;
+                args::coerce(spec, default)?;
             }
         }
         Ok(Self { inner: Arc::new(compiled) })

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 
-use tfmttools_picotmpl::{ArgumentPolicy, Scalar, Template};
+use tfmttools_picotmpl::{Scalar, Template};
 
 const SOURCE: &str = include_str!("fixtures/stef.tfmt");
 
@@ -26,9 +26,7 @@ fn render(
     tags: &BTreeMap<String, Scalar>,
     args: &[String],
 ) -> Vec<String> {
-    let forbidden: Vec<_> = "<>\":|?*~/\\".chars().collect();
-    let template =
-        Template::compile(source, ArgumentPolicy::new(&forbidden)).unwrap();
+    let template = Template::compile(source).unwrap();
     template
         .bind(args)
         .unwrap()

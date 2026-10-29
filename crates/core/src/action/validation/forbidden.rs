@@ -8,9 +8,19 @@ use crate::action::RenameAction;
 pub struct ForbiddenCharacter<'f> {
     char: &'f str,
     replacement: Option<&'f str>,
+    leading: bool,
+    trailing: bool,
 }
 
 impl ForbiddenCharacter<'_> {
+    pub fn leading(&self) -> bool {
+        self.leading
+    }
+
+    pub fn trailing(&self) -> bool {
+        self.trailing
+    }
+
     pub fn char(&self) -> &str {
         self.char
     }
@@ -23,55 +33,80 @@ impl ForbiddenCharacter<'_> {
 pub static FORBIDDEN_CHARACTERS: LazyLock<Vec<ForbiddenCharacter>> =
     LazyLock::new(|| {
         vec![
-            ForbiddenCharacter { char: "<", replacement: None },
-            ForbiddenCharacter { char: "\"", replacement: None },
-            ForbiddenCharacter { char: ">", replacement: None },
-            ForbiddenCharacter { char: ":", replacement: None },
-            ForbiddenCharacter { char: "|", replacement: None },
-            ForbiddenCharacter { char: "?", replacement: None },
-            ForbiddenCharacter { char: "*", replacement: None },
-            ForbiddenCharacter { char: "~", replacement: Some("-") },
-            ForbiddenCharacter { char: "/", replacement: Some("-") },
-            ForbiddenCharacter { char: "\\", replacement: Some("-") },
+            ForbiddenCharacter {
+                char: " ",
+                replacement: None,
+                leading: true,
+                trailing: true,
+            },
+            ForbiddenCharacter {
+                char: ".",
+                replacement: None,
+                leading: false,
+                trailing: true,
+            },
+            ForbiddenCharacter {
+                char: "<",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "\"",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: ">",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: ":",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "|",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "?",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "*",
+                replacement: None,
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "~",
+                replacement: Some("-"),
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "/",
+                replacement: Some("-"),
+                leading: false,
+                trailing: false,
+            },
+            ForbiddenCharacter {
+                char: "\\",
+                replacement: Some("-"),
+                leading: false,
+                trailing: false,
+            },
         ]
     });
-
-pub(super) struct ForbiddenLeadingOrTrailingChar<'f> {
-    char: &'f str,
-    leading: bool,
-    trailing: bool,
-}
-
-impl ForbiddenLeadingOrTrailingChar<'_> {
-    fn char(&self) -> &str {
-        self.char
-    }
-
-    fn leading(&self) -> bool {
-        self.leading
-    }
-
-    fn trailing(&self) -> bool {
-        self.trailing
-    }
-}
-
-pub(super) static FORBIDDEN_LEADING_OR_TRAILING_CHARACTERS: LazyLock<
-    Vec<ForbiddenLeadingOrTrailingChar>,
-> = LazyLock::new(|| {
-    vec![
-        ForbiddenLeadingOrTrailingChar {
-            char: " ",
-            leading: true,
-            trailing: true,
-        },
-        ForbiddenLeadingOrTrailingChar {
-            char: ".",
-            leading: false,
-            trailing: true,
-        },
-    ]
-});
 
 pub(super) fn validate_reserved_names(
     rename_actions: &'_ [RenameAction],
@@ -115,18 +150,18 @@ pub(super) fn validate_forbidden_leading_or_trailing_characters_in_path_componen
     'a,
 >(
     rename_actions: &'a [RenameAction],
-    forbidden_characters: &'static [ForbiddenLeadingOrTrailingChar],
+    forbidden_characters: &'static [ForbiddenCharacter],
 ) -> Vec<ValidationError<'a>> {
     let forbidden_leading_characters: Vec<&str> = forbidden_characters
         .iter()
         .filter(|f| f.leading())
-        .map(ForbiddenLeadingOrTrailingChar::char)
+        .map(ForbiddenCharacter::char)
         .collect();
 
     let forbidden_trailing_characters: Vec<&str> = forbidden_characters
         .iter()
         .filter(|f| f.trailing())
-        .map(ForbiddenLeadingOrTrailingChar::char)
+        .map(ForbiddenCharacter::char)
         .collect();
 
     rename_actions

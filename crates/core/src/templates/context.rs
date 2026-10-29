@@ -1,8 +1,8 @@
 use lofty::tag::ItemKey;
 use tfmttools_picotmpl::Scalar;
 
-use super::sanitize_tag_value;
 use crate::audiofile::AudioFile;
+use crate::error::{TFMTError, TFMTResult};
 use crate::item_keys::{TagSource, canonical_tag_name, resolve_tag_name};
 use crate::warning::Warning;
 
@@ -24,7 +24,7 @@ impl<'a> AudioContext<'a> {
         self.audio.tag().get_string(key)
     }
 
-    fn safe(&mut self, key: ItemKey) -> Option<Scalar> {
+    fn text(&mut self, key: ItemKey) -> Option<Scalar> {
         let raw = self.raw(key)?.to_owned();
         if raw != raw.trim() {
             let warning = Warning::WhitespaceInTag {
@@ -37,7 +37,7 @@ impl<'a> AudioContext<'a> {
                 self.warnings.push(warning);
             }
         }
-        Some(Self::scalar(sanitize_tag_value(raw.trim())))
+        Some(Self::scalar(raw))
     }
 
     fn scalar(text: String) -> Scalar {
@@ -73,7 +73,7 @@ impl<'a> AudioContext<'a> {
     }
 
     fn date_value(&mut self, key: ItemKey) -> Option<Scalar> {
-        self.safe(key).filter(|value| {
+        self.text(key).filter(|value| {
             match value {
                 Scalar::Text(text) => !text.is_empty(),
                 Scalar::Integer(_) => true,
@@ -81,8 +81,40 @@ impl<'a> AudioContext<'a> {
         })
     }
 
-    pub fn resolve(&mut self, name: &str) -> Option<Scalar> {
-        let key = match resolve_tag_name(name)? {
+    pub fn resolve(&mut self, name: &str) -> TFMTResult<Option<Scalar>> {
+        let Some(source) = resolve_tag_name(name) else { return Ok(None) };
+        let keys: &[ItemKey] = match source {
+            TagSource::DateFallback => {
+                &[
+                    ItemKey::RecordingDate,
+                    ItemKey::Year,
+                    ItemKey::OriginalReleaseDate,
+                ]
+            },
+            TagSource::Item(key) => {
+                match key {
+                    ItemKey::TrackTotal => &[key, ItemKey::TrackNumber],
+                    ItemKey::DiscTotal => &[key, ItemKey::DiscNumber],
+                    ItemKey::MovementTotal => &[key, ItemKey::MovementNumber],
+                    _ => &[key],
+                }
+            },
+        };
+        for key in keys {
+            if let Some(raw) = self.raw(*key)
+                && let Some(character) =
+                    tfmttools_picotmpl::prohibited_character(raw)
+            {
+                return Err(TFMTError::Template(format!(
+                    "Tag {name:?} contains prohibited character {character:?}"
+                )));
+            }
+        }
+        Ok(self.resolve_value(source))
+    }
+
+    fn resolve_value(&mut self, source: TagSource) -> Option<Scalar> {
+        let key = match source {
             TagSource::DateFallback => {
                 return self
                     .date_value(ItemKey::RecordingDate)
@@ -98,7 +130,7 @@ impl<'a> AudioContext<'a> {
             ItemKey::DiscNumber
             | ItemKey::TrackNumber
             | ItemKey::MovementNumber => self.number(key, false),
-            _ => self.safe(key),
+            _ => self.text(key),
         }
     }
 }

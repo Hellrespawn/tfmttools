@@ -28,8 +28,7 @@ path: (
 Bare references name declared arguments; `$` references name metadata
 fields. Adjacent expressions concatenate, and whitespace outside quoted
 strings is ignored. `#` starts a comment outside a string. Strings preserve
-all their text and support `\"` and `\\` escapes. Literal separator text is
-rejected in the path rule: use a bare `/` to end a directory component.
+all their text and support `\"` and `\\` escapes. Literal slashes remain component text. Use a bare `/` to end a directory component.
 
 `[reference? contents]` includes contents when a value is present and
 nonempty. `[!reference? contents]` handles missing or empty values. Integer
@@ -49,7 +48,7 @@ cannot be formatted.
 ```rust
 use std::convert::Infallible;
 
-use tfmttools_picotmpl::{ArgumentPolicy, Scalar, Template};
+use tfmttools_picotmpl::{Scalar, Template};
 
 let template = Template::compile(
     r#"
@@ -57,7 +56,6 @@ let template = Template::compile(
     arg prefix: path(default: "")
     path: ({prefix} {$artist ?? "Unknown Artist"} / {$title})
     "#,
-    ArgumentPolicy::new(&['?', '*', '~']),
 )?;
 
 // Check the caller's schema before binding or reading any files.
@@ -105,14 +103,12 @@ a string or path argument optional and absent when omitted; it is invalid
 for an integer argument. Defaults apply only to omitted values, and a
 supplied empty string overrides a nonempty default. Extra values are errors.
 
-The caller supplies forbidden characters through `ArgumentPolicy`. String
-arguments reject those characters and path separators. Path arguments
-split on `/` and `\`, discard empty input segments, and validate the
-remaining components against the policy. Component text is preserved,
-including whitespace and trailing periods; there is no trimming,
-replacement, or removal. Defaults are validated during compilation even
-when overridden later. Binding checks supplied values, including unused
-arguments, before any metadata is resolved.
+String arguments preserve their text. Path arguments split on `/` and `\`,
+discard empty input segments, and preserve the remaining components.
+Prohibited controls are rejected before coercion. Defaults are type-checked
+at compilation; binding checks supplied values, including unused arguments,
+before metadata resolution. Filename character replacement belongs to the caller
+and should run on completed components after interpolation.
 
 A path argument inserts complete directory components and must be used
 at a component boundary. It supplies its own boundary, so write
@@ -125,13 +121,14 @@ separators, trailing separators, and empty final filenames are errors.
 separator is rooted on the current drive; this language does not express
 drive or UNC prefixes.
 
-Metadata preparation belongs to the caller. The library does not trim,
-sanitize, or replace metadata text; separators in scalar values are
-rejected when they would enter a path component. Callers should prepare
-uncontrolled values before returning them, and validate complete paths
-against their filesystem rules, including reserved names, traversal,
-filename characters, and collisions. The library does not append file
-extensions or create directories.
+The library preserves component text without filename sanitization, including
+slashes in literals and scalars. Callers must transform completed components
+with `try_map_components()` before filesystem conversion, then validate paths
+for reserved names, traversal, filename characters, and collisions.
+`tfmt` applies its default or strict policy at this point. Controls, Unicode
+line/paragraph separators, and bidi formatting controls are prohibited;
+callers should also check raw metadata before numeric conversion or formatting.
+The library does not append file extensions or create directories.
 
 ## Diagnostics and development
 
