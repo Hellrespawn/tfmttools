@@ -65,7 +65,7 @@ impl History {
         let transaction = connection.unchecked_transaction()?;
         let records = database::read_records(&transaction)?;
         super::patch::validate_records(&transaction, &records)?;
-        super::attempt::read_current_attempt(&transaction)?;
+        super::attempt::read_current_attempt(&transaction, &records)?;
         transaction.commit()?;
         self.connection = Some(connection);
         self.records = records;

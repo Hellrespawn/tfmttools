@@ -93,10 +93,13 @@ fn render_cli_error(err: &Report, name: &str) {
     if let Some(subcommand) = subcommand {
         eprintln!(
             "{}",
-            subcommand.error(ErrorKind::DisplayHelp, err.to_string())
+            subcommand.error(ErrorKind::DisplayHelp, format!("{err:#}"))
         );
     } else {
-        eprintln!("{}", command.error(ErrorKind::DisplayHelp, err.to_string()));
+        eprintln!(
+            "{}",
+            command.error(ErrorKind::DisplayHelp, format!("{err:#}"))
+        );
     }
 }
 

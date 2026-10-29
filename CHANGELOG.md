@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Limit rename and validation recursion depth to 0–256, rejecting larger values
+  before discovery instead of overflowing.
+- Avoid repeatedly decoding the growing history record during apply, undo,
+  and redo. Publish confirmed cache changes only after a successful commit.
+- Include underlying causes in CLI operational errors, including failed scans.
+
 - Protect configuration and trash directories during cleanup when selected
   through relative paths or symlink aliases.
 - Preserve relative paths in cleanup trash and validate destinations before

@@ -85,7 +85,7 @@ pub struct RenameArgs {
     pub custom_bin_directory: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
-    /// Set custom recursion depth for scan.
+    /// Set custom recursion depth for scan (0–256).
     pub recursion_depth: Option<usize>,
 
     #[arg(hide = true, long)]
@@ -118,7 +118,7 @@ pub struct ValidateCommonArgs {
     pub custom_input_directory: Option<Utf8PathBuf>,
 
     #[arg(short, long)]
-    /// Set custom recursion depth for scan.
+    /// Set custom recursion depth for scan (0–256).
     pub recursion_depth: Option<usize>,
 }
 

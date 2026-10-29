@@ -70,6 +70,9 @@ confirmation succeed. Nonempty directories may remain after cleanup.
 
 Audio discovery errors abort rename and validation before applying file changes.
 An incomplete directory scan is never treated as a complete selection.
+Rename and validation accept `--recursion-depth` from 0 through 256; the default
+is 4. This is an application limit, independent of filesystem path-length limits.
+Operational errors include their underlying causes.
 
 Commands return status 0 on success and 1 on validation findings or operational
 failure. Validation findings print their report without an operational-error
@@ -333,6 +336,8 @@ SQLite uses STRICT tables, enforced foreign keys, rollback journaling, and
 `synchronous=EXTRA`. Intent and tag patches are saved before each action; its
 successful completion is committed before the next action starts. Database
 commits and filesystem changes remain separate operations.
+Per-action validation uses the loaded history cache, and confirmations update
+it only after commit, without rereading the growing action list for every file.
 
 Tag fixes edit and verify a candidate beside the audio file. tfmt moves the
 original to a temporary backup, installs the candidate, records completion, then

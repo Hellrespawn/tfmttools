@@ -159,7 +159,7 @@ impl History {
             details: details.clone(),
             patches: patches.cloned(),
         };
-        validate_attempt(&tx, &prospective)?;
+        validate_attempt(&tx, &prospective, &self.records)?;
         tx.execute("INSERT INTO attempts(run_id,action_position,payload,details) VALUES(?1,?2,?3,?4)", params![run.0,number(action_position)?,encode(action)?,encode(details)?])?;
         let id = AttemptId(tx.last_insert_rowid());
         if let Some(pair) = patches {
@@ -171,7 +171,9 @@ impl History {
 
     pub fn current_attempt(&self) -> Result<Option<CurrentAttempt>> {
         self.ensure_usable()?;
-        self.connection.as_ref().map_or(Ok(None), read_current_attempt)
+        self.connection
+            .as_ref()
+            .map_or(Ok(None), |c| read_current_attempt(c, &self.records))
     }
 
     pub fn confirm_attempt(&mut self, id: AttemptId) -> Result<()> {
@@ -180,10 +182,15 @@ impl History {
             .current_attempt()?
             .filter(|a| a.id == id)
             .ok_or_else(|| invalid("Unknown attempt"))?;
+        let position = record_position(&self.records, a.record_id)?;
         let tx = self.connection.as_mut().unwrap().transaction()?;
         let affected = confirm(&tx, &a)?;
-        let changed = read_affected(&tx, affected)?;
+        let changed = read_affected(
+            &tx,
+            affected.into_iter().filter(|id| *id != a.record_id).collect(),
+        )?;
         commit(tx, &mut self.cache_usable)?;
+        self.records[position].confirm_action(a.kind, a.action);
         self.publish_records(changed);
         Ok(())
     }
@@ -287,6 +294,7 @@ impl History {
 }
 pub(super) fn read_current_attempt(
     c: &Connection,
+    records: &[Record],
 ) -> Result<Option<CurrentAttempt>> {
     let mut s = c.prepare("SELECT a.id,a.run_id,r.record_id,r.kind,a.action_position,a.payload,a.details FROM attempts a JOIN runs r ON r.id=a.run_id")?;
     let mut rows = s.query([])?;
@@ -305,7 +313,7 @@ pub(super) fn read_current_attempt(
         details,
         patches,
     };
-    validate_attempt(c, &attempt).map_err(|error| {
+    validate_attempt(c, &attempt, records).map_err(|error| {
         match error {
             HistoryError::MutError(message) => {
                 HistoryError::LoadError(format!("Attempt {}: {message}", id.0))
@@ -330,7 +338,17 @@ impl AttemptDetails {
     }
 }
 
-fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
+fn record_position(records: &[Record], id: usize) -> Result<usize> {
+    records
+        .binary_search_by_key(&Some(id), Record::id)
+        .map_err(|_| invalid("Pending record missing"))
+}
+
+fn validate_attempt(
+    c: &Connection,
+    a: &CurrentAttempt,
+    records: &[Record],
+) -> Result<()> {
     database::validate_action(&a.action).map_err(|error| {
         match error {
             HistoryError::LoadError(message) => HistoryError::MutError(message),
@@ -338,7 +356,7 @@ fn validate_attempt(c: &Connection, a: &CurrentAttempt) -> Result<()> {
         }
     })?;
     a.details.validate()?;
-    let record = database::read_record(c, a.record_id)?;
+    let record = &records[record_position(records, a.record_id)?];
     if record.next_action_position(a.kind) != Some(a.action_position) {
         return Err(invalid("Attempt position differs from replay cursor"));
     }
@@ -453,7 +471,7 @@ mod tests {
         .unwrap()
     }
     #[test]
-    fn confirmation_decodes_only_affected_records() {
+    fn attempts_do_not_redecode_the_growing_record() {
         let (_dir, mut h) = setup();
         for _ in 0..8 {
             let run = h
@@ -475,17 +493,53 @@ mod tests {
         let run =
             h.begin_run(RunRequest::Apply { metadata: metadata() }).unwrap();
         for position in 0..3 {
-            let id = attempt(&mut h, run, position);
             database::DECODED_IDS.with_borrow_mut(|ids| *ids = Some(vec![]));
+            let id = attempt(&mut h, run, position);
             h.confirm_attempt(id).unwrap();
             let ids =
                 database::DECODED_IDS.with_borrow_mut(Option::take).unwrap();
             assert!(
-                ids.iter().all(|id| *id == 8 || (position == 0 && *id == 0)),
-                "unrelated records decoded: {ids:?}"
+                ids.iter().all(|id| position == 0 && *id == 0),
+                "growing or unrelated records decoded: {ids:?}"
             );
-            assert!(ids.contains(&8));
             assert_eq!(ids.contains(&0), position == 0);
+            assert_eq!(
+                encode(&h.records()).unwrap(),
+                encode(
+                    &database::read_records(h.connection.as_ref().unwrap())
+                        .unwrap()
+                )
+                .unwrap()
+            );
+        }
+        h.close_run(run, true).unwrap();
+        for direction in [HistoryMode::Undo, HistoryMode::Redo] {
+            let run = h
+                .begin_run(RunRequest::Replay { record_id: 8, direction })
+                .unwrap();
+            let positions = match direction {
+                HistoryMode::Undo => vec![2, 1, 0],
+                HistoryMode::Redo => vec![0, 1, 2],
+            };
+            for position in positions {
+                database::DECODED_IDS
+                    .with_borrow_mut(|ids| *ids = Some(vec![]));
+                let id = attempt(&mut h, run, position);
+                h.confirm_attempt(id).unwrap();
+                let ids = database::DECODED_IDS
+                    .with_borrow_mut(Option::take)
+                    .unwrap();
+                assert!(ids.is_empty(), "replay decoded records: {ids:?}");
+                assert_eq!(
+                    encode(&h.records()).unwrap(),
+                    encode(
+                        &database::read_records(h.connection.as_ref().unwrap())
+                            .unwrap()
+                    )
+                    .unwrap()
+                );
+            }
+            h.close_run(run, true).unwrap();
         }
     }
     #[test]

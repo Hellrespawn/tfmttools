@@ -86,5 +86,39 @@ fn missing_relative_directory_retains_its_supplied_diagnostic_scope() {
             !stderr.contains(&dir.path().display().to_string()),
             "{stderr}"
         );
+        assert!(stderr.contains("os error"), "{stderr}");
+    }
+}
+
+#[test]
+fn recursion_depth_is_limited_to_256() {
+    let dir = TempDir::new().unwrap();
+    for command in ["rename", "validate"] {
+        for depth in ["0", "256", "257", "18446744073709551615"] {
+            let mut invocation = Command::new(env!("CARGO_BIN_EXE_tfmt"));
+            invocation.current_dir(dir.path()).args([
+                "--simple",
+                "--dry-run",
+                "-c",
+                "config",
+                command,
+                "--recursion-depth",
+                depth,
+            ]);
+            if command == "rename" {
+                invocation.args(["--script", "path: (\"renamed\")"]);
+            }
+            let output = invocation.output().unwrap();
+            let accepted = matches!(depth, "0" | "256");
+            assert_eq!(output.status.success(), accepted, "{output:?}");
+            if !accepted {
+                assert_eq!(output.status.code(), Some(1), "{output:?}");
+                assert!(
+                    String::from_utf8_lossy(&output.stderr)
+                        .contains("Recursion depth must not exceed 256"),
+                    "{output:?}"
+                );
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::Result;
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::{bail, eyre};
 use tfmttools_core::util::{
     FSMode, MoveMode, Utf8Directory, Utf8File, Utf8PathExt,
 };
@@ -225,12 +225,16 @@ fn resolve_input_scope(
     input: Option<Utf8PathBuf>,
     depth: Option<usize>,
 ) -> Result<(Utf8Directory, usize)> {
+    let depth = depth.unwrap_or(DEFAULT_RECURSION_DEPTH);
+    if depth > 256 {
+        bail!("Recursion depth must not exceed 256");
+    }
     let cwd = current_dir_utf8()?;
     let directory = match input {
         Some(path) => verify_directory(cwd.join(path))?,
         None => cwd,
     };
-    Ok((directory, depth.unwrap_or(DEFAULT_RECURSION_DEPTH)))
+    Ok((directory, depth))
 }
 
 impl TryFrom<ValidateCommonArgs> for ValidateOptions {

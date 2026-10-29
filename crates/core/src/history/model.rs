@@ -29,6 +29,30 @@ pub struct Record {
 }
 
 impl Record {
+    /// Publish a validated confirmation only after its database commit.
+    pub(super) fn confirm_action(
+        &mut self,
+        kind: OperationKind,
+        action: StoredAction,
+    ) {
+        match kind {
+            OperationKind::Apply => {
+                self.actions.push(action);
+                self.applied_count += 1;
+            },
+            OperationKind::Undo => {
+                self.applied_count -= 1;
+                if self.applied_count == 0 {
+                    self.state = RecordState::Undone;
+                }
+            },
+            OperationKind::Redo => {
+                self.applied_count += 1;
+                self.state = RecordState::Redone;
+            },
+        }
+    }
+
     #[must_use]
     pub fn new(
         items: Vec<StoredAction>,
