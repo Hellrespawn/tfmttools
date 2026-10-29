@@ -99,7 +99,10 @@ See also the "examples"-folder.
 ### History locking
 
 Commands that change history hold an exclusive lock for the whole
-history session. `show-history` and dry runs use read-only database access. If another command is using the same history, tfmt exits
+history session. `show-history` and dry runs use read-only database access.
+Their records and interruption reports describe one snapshot captured when
+history is loaded.
+If another command is using the same history, a writable command exits
 with an error immediately. Validation fixes acquire the lock before changing
 audio files.
 
@@ -269,6 +272,7 @@ parsing templates. Old JSON histories are rejected without importing them.
 
 `tfmt` validates the full rename plan before it moves files. It rejects:
 
+- target files also required as directories by another destination
 - target collisions
 - targets that differ only by case
 - existing target files, except targets that are also sources in the same

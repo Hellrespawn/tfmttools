@@ -141,3 +141,58 @@ fn clearing_history_through_symlink_preserves_link_and_removes_database() {
     );
     assert!(target.is_file());
 }
+
+#[test]
+fn read_only_reporting_keeps_the_loaded_snapshot_until_reload() {
+    use tfmttools_core::history::{AttemptDetails, RunRequest, StoredAction};
+
+    let directory = TempDir::new().unwrap();
+    let path = history_path(&directory);
+    let mut writer = History::new(path.clone());
+    support::history::apply(
+        &mut writer,
+        vec![],
+        support::history::metadata("first"),
+    );
+    let mut reader = History::open_read_only(path.clone()).unwrap();
+    let run = writer
+        .begin_run(RunRequest::Apply {
+            metadata: support::history::metadata("second"),
+        })
+        .unwrap();
+    let mut marker_free = History::open_read_only(path).unwrap();
+    let attempt = writer
+        .begin_attempt(
+            run,
+            0,
+            &StoredAction::MakeDir { path: "pending".into() },
+            &AttemptDetails {
+                paths: vec!["pending".into()],
+                instructions: "Inspect".into(),
+            },
+            None,
+        )
+        .unwrap();
+    assert!(reader.current_attempt().unwrap().is_none());
+    assert!(reader.open_run().unwrap().is_none());
+    assert_eq!(reader.records().len(), 1);
+    assert!(marker_free.current_attempt().unwrap().is_none());
+    assert_eq!(marker_free.open_run().unwrap().unwrap().0, run);
+    reader.load().unwrap();
+    assert_eq!(reader.current_attempt().unwrap().unwrap().id, attempt);
+    assert_eq!(reader.records().len(), 2);
+    writer.confirm_attempt(attempt).unwrap();
+    writer.close_run(run, true).unwrap();
+    assert_eq!(reader.current_attempt().unwrap().unwrap().id, attempt);
+    assert_eq!(reader.records()[1].applied_count(), 0);
+    assert_eq!(reader.open_run().unwrap().unwrap().0, run);
+    marker_free.load().unwrap();
+    assert!(marker_free.open_run().unwrap().is_none());
+    assert!(marker_free.current_attempt().unwrap().is_none());
+    assert_eq!(marker_free.records()[1].applied_count(), 1);
+    writer.remove().unwrap();
+    marker_free.load().unwrap();
+    assert!(marker_free.is_empty());
+    assert!(marker_free.current_attempt().unwrap().is_none());
+    assert!(marker_free.open_run().unwrap().is_none());
+}

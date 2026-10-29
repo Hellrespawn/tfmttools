@@ -4,6 +4,7 @@ use super::errors::ValidationError;
 use crate::action::{
     CaseInsensitivePathKey, CaseInsensitivePathSet, RenameAction,
 };
+use crate::util::Utf8PathExt;
 
 pub(super) fn validate_double_separators(
     rename_actions: &'_ [RenameAction],
@@ -82,4 +83,27 @@ pub(super) fn validate_existing_files<'a>(
         })
         .map(ValidationError::TargetExists)
         .collect()
+}
+
+pub(super) fn validate_target_directory_conflicts(
+    rename_actions: &'_ [RenameAction],
+) -> Vec<ValidationError<'_>> {
+    let targets: HashMap<_, _> = rename_actions
+        .iter()
+        .map(|action| (CaseInsensitivePathKey::new(action.target()), action))
+        .collect();
+    let mut errors = Vec::new();
+    for action in rename_actions {
+        for parent in action.target().as_path().ancestors().skip(1) {
+            if let Some(file) =
+                targets.get(&CaseInsensitivePathKey::new(parent))
+            {
+                errors.push(ValidationError::TargetDirectoryConflict {
+                    file,
+                    child: action,
+                });
+            }
+        }
+    }
+    errors
 }

@@ -376,3 +376,58 @@ fn template_errors_use_lookup_name_instead_of_display_name() {
         }
     }
 }
+
+#[test]
+fn destination_ancestor_conflicts_fail_before_filesystem_changes() {
+    use lofty::config::WriteOptions;
+    use lofty::file::{AudioFile, TaggedFileExt};
+    use lofty::tag::ItemKey;
+
+    for album in ["A.mp3", "a.MP3"] {
+        let directory = TempDir::new().unwrap();
+        let input = root(&directory).join("input");
+        std::fs::create_dir(&input).unwrap();
+        let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
+        let mut originals = Vec::new();
+        for (name, title, album) in
+            [("a.mp3", "A", None), ("b.mp3", "B", Some(album))]
+        {
+            let path = input.join(name);
+            std::fs::copy(&fixture, &path).unwrap();
+            let mut file = lofty::read_from_path(&path).unwrap();
+            let tag = file.primary_tag_mut().unwrap();
+            tag.insert_text(ItemKey::TrackTitle, title.into());
+            tag.remove_key(ItemKey::AlbumTitle);
+            if let Some(album) = album {
+                tag.insert_text(ItemKey::AlbumTitle, album.into());
+            }
+            file.save_to_path(&path, WriteOptions::default()).unwrap();
+            originals.push((path.clone(), std::fs::read(&path).unwrap()));
+        }
+        for dry_run in [true, false] {
+            let mut arguments = vec![
+                "rename",
+                "-i",
+                "input",
+                "--script",
+                "path: ([$album? {$album} /] {$title})",
+            ];
+            if dry_run {
+                arguments.insert(0, "--dry-run");
+            }
+            let output = run(&directory, &arguments);
+            assert!(!output.status.success(), "{output:?}");
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("directory"),
+                "{output:?}"
+            );
+            for (path, bytes) in &originals {
+                assert_eq!(&std::fs::read(path).unwrap(), bytes);
+            }
+            assert!(!root(&directory).join("A.mp3").exists());
+            assert!(!root(&directory).join("a.MP3").exists());
+            assert!(!root(&directory).join("config/tfmt.hist").exists());
+        }
+    }
+}

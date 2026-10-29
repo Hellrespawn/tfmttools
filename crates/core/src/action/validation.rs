@@ -6,6 +6,7 @@ mod path_rules;
 use collisions::{
     validate_case_insensitive_collisions, validate_collisions,
     validate_double_separators, validate_existing_files,
+    validate_target_directory_conflicts,
 };
 use errors::ValidationError;
 pub use forbidden::FORBIDDEN_CHARACTERS;
@@ -27,6 +28,7 @@ pub fn validate_rename_actions<'a>(
 
     errors.extend(validate_double_separators(rename_actions));
     errors.extend(validate_collisions(rename_actions));
+    errors.extend(validate_target_directory_conflicts(rename_actions));
     errors.extend(validate_case_insensitive_collisions(rename_actions));
     errors.extend(validate_existing_files(rename_actions, existing_targets));
     errors.extend(validate_reserved_names(rename_actions));
@@ -172,6 +174,36 @@ mod test {
 
         let error = assert_single_error(&colliding);
         assert!(matches!(error, ValidationError::CaseInsensitiveCollision(..)));
+    }
+
+    #[test]
+    fn rejects_file_targets_used_as_directories() {
+        for child in ["music/A.mp3/B.mp3", "music/a.MP3/B.mp3"] {
+            let actions = [
+                RenameAction::new(
+                    Utf8File::new("a.mp3"),
+                    Utf8File::new("music/A.mp3"),
+                ),
+                RenameAction::new(Utf8File::new("b.mp3"), Utf8File::new(child)),
+            ];
+            let errors = validate_rename_actions(
+                &actions,
+                &CaseInsensitivePathSet::new(),
+            );
+            assert_eq!(errors.len(), 1);
+            assert!(errors[0].to_string().contains("directory"));
+        }
+        let actions = [
+            RenameAction::new(
+                Utf8File::new("a.mp3"),
+                Utf8File::new("music/A.mp3"),
+            ),
+            RenameAction::new(
+                Utf8File::new("b.mp3"),
+                Utf8File::new("music/A.mp3-other/B.mp3"),
+            ),
+        ];
+        assert_valid(&actions, &CaseInsensitivePathSet::new());
     }
 
     #[test]

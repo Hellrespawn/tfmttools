@@ -171,6 +171,9 @@ impl History {
 
     pub fn current_attempt(&self) -> Result<Option<CurrentAttempt>> {
         self.ensure_usable()?;
+        if self.read_only {
+            return Ok(self.loaded_attempt.clone());
+        }
         self.connection
             .as_ref()
             .map_or(Ok(None), |c| read_current_attempt(c, &self.records))
@@ -228,16 +231,10 @@ impl History {
     /// Stored run identity for read-only interruption reporting.
     pub fn open_run(&self) -> Result<Option<(RunId, usize, OperationKind)>> {
         self.ensure_usable()?;
-        let Some(c) = &self.connection else { return Ok(None) };
-        let row: Option<(i64, i64, String)> = c
-            .query_row("SELECT id,record_id,kind FROM runs", [], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-            })
-            .optional()?;
-        row.map(|(id, rid, kind)| {
-            Ok((RunId(id), index(rid)?, OperationKind::parse(&kind)?))
-        })
-        .transpose()
+        if self.read_only {
+            return Ok(self.loaded_run);
+        }
+        self.connection.as_ref().map_or(Ok(None), read_open_run)
     }
 
     pub fn close_abandoned_run(&mut self) -> Result<Option<Record>> {
@@ -292,6 +289,20 @@ impl History {
             .map_or(Ok(None), |c| patch::read(c, record_id, position))
     }
 }
+pub(super) fn read_open_run(
+    c: &Connection,
+) -> Result<Option<(RunId, usize, OperationKind)>> {
+    let row: Option<(i64, i64, String)> = c
+        .query_row("SELECT id,record_id,kind FROM runs", [], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })
+        .optional()?;
+    row.map(|(id, rid, kind)| {
+        Ok((RunId(id), index(rid)?, OperationKind::parse(&kind)?))
+    })
+    .transpose()
+}
+
 pub(super) fn read_current_attempt(
     c: &Connection,
     records: &[Record],

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Reject rename destinations that require another target file to be a directory,
+  including case differences, before changing files.
+- Keep read-only history records and interruption reports in the same loaded
+  snapshot when another command changes history.
+
 - Limit rename and validation recursion depth to 0–256, rejecting larger values
   before discovery instead of overflowing.
 - Avoid repeatedly decoding the growing history record during apply, undo,

@@ -5,6 +5,10 @@ pub enum ValidationError<'e> {
     DoubleSeparators(&'e RenameAction),
     Collision(Vec<&'e RenameAction>),
     CaseInsensitiveCollision(Vec<&'e RenameAction>),
+    TargetDirectoryConflict {
+        file: &'e RenameAction,
+        child: &'e RenameAction,
+    },
     TargetExists(&'e RenameAction),
     ReservedName {
         action: &'e RenameAction,
@@ -50,6 +54,11 @@ impl std::fmt::Display for ValidationError<'_> {
                     writeln!(f, "\tsource: {}", action.source())?;
                     writeln!(f, "\ttarget: {}", action.target())?;
                 }
+            },
+            ValidationError::TargetDirectoryConflict { file, child } => {
+                writeln!(f, "A target file is also required as a directory.")?;
+                write_source_and_target(f, file)?;
+                write_source_and_target(f, child)?;
             },
             ValidationError::TargetExists(action) => {
                 writeln!(f, "The target file already exists.")?;

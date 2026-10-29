@@ -2,7 +2,10 @@ use std::fs::File;
 
 use camino::Utf8PathBuf;
 
-use super::{HistoryError, HistoryMode, Record, Result};
+use super::{
+    CurrentAttempt, HistoryError, HistoryMode, OperationKind, Record, Result,
+    RunId,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoadHistoryResult {
@@ -20,6 +23,9 @@ pub struct History {
     pub(super) cache_usable: bool,
     pub(super) connection: Option<rusqlite::Connection>,
     pub(super) read_only: bool,
+    // Read-only reporting must not mix cached records with newer live state.
+    pub(super) loaded_attempt: Option<CurrentAttempt>,
+    pub(super) loaded_run: Option<(RunId, usize, OperationKind)>,
 }
 
 impl History {
@@ -32,6 +38,8 @@ impl History {
             cache_usable: true,
             connection: None,
             read_only: false,
+            loaded_attempt: None,
+            loaded_run: None,
         }
     }
 

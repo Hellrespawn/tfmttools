@@ -56,6 +56,8 @@ impl History {
         }
         if !path.exists() {
             self.records.clear();
+            self.loaded_attempt = None;
+            self.loaded_run = None;
             self.cache_usable = true;
             return Ok(LoadHistoryResult::New);
         }
@@ -65,10 +67,14 @@ impl History {
         let transaction = connection.unchecked_transaction()?;
         let records = database::read_records(&transaction)?;
         super::patch::validate_records(&transaction, &records)?;
-        super::attempt::read_current_attempt(&transaction, &records)?;
+        let attempt =
+            super::attempt::read_current_attempt(&transaction, &records)?;
+        let run = super::attempt::read_open_run(&transaction)?;
         transaction.commit()?;
         self.connection = Some(connection);
         self.records = records;
+        self.loaded_attempt = attempt;
+        self.loaded_run = run;
         self.cache_usable = true;
         Ok(LoadHistoryResult::Loaded)
     }
