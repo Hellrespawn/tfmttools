@@ -8,85 +8,100 @@ pub(crate) struct Reference {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum Alternative {
-    Reference(Reference),
-    Literal(String),
-}
-
-#[derive(Clone, Debug)]
 pub(crate) enum Formatter {
     Year(Span),
     Pad(usize),
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum Expression {
-    Literal(String, Span),
-    Root,
-    Separator(Span),
-    Interpolation {
-        alternatives: Vec<Alternative>,
+pub(crate) struct Expression {
+    pub kind: ExpressionKind,
+    pub span: Span,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum ExpressionKind {
+    Literal(String),
+    Reference(Reference),
+    Sequence(Vec<Expression>),
+    Negate(Box<Expression>),
+    Format {
+        input: Box<Expression>,
         formatters: Vec<Formatter>,
-        span: Span,
     },
-    Guard {
-        reference: Reference,
-        negative: bool,
-        contents: Vec<Self>,
+    Fallback(Vec<Expression>),
+    Conditional {
+        condition: Box<Expression>,
+        consequent: Box<Expression>,
+        alternative: Option<Box<Expression>>,
     },
+    Root,
+    Separator,
 }
 
 pub(crate) fn dump(path: &[Expression]) -> String {
     let mut lines = vec!["Path".to_owned()];
-    append_expressions(path, 1, &mut lines);
+    for expression in path {
+        append_expression(expression, 1, &mut lines);
+    }
     lines.join("\n")
 }
 
-fn reference_label(reference: &Reference) -> String {
-    let prefix = if reference.tag { "$" } else { "" };
-    format!("{prefix}{}", reference.name)
-}
-
-fn append_expressions(
-    expressions: &[Expression],
+fn append_expression(
+    expression: &Expression,
     depth: usize,
     lines: &mut Vec<String>,
 ) {
-    for expression in expressions {
-        let label = match expression {
-            Expression::Literal(text, _) => format!("Literal {text:?}"),
-            Expression::Root => "Root".to_owned(),
-            Expression::Separator(_) => "Separator".to_owned(),
-            Expression::Interpolation { alternatives, formatters, .. } => {
-                let alternatives = alternatives
-                    .iter()
-                    .map(|alternative| {
-                        match alternative {
-                            Alternative::Reference(reference) => {
-                                reference_label(reference)
-                            },
-                            Alternative::Literal(text) => format!("{text:?}"),
-                        }
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ?? ");
-                let mut parts = vec![format!("Interpolation {alternatives}")];
-                for formatter in formatters {
-                    parts.push(match formatter {
+    let label = match &expression.kind {
+        ExpressionKind::Literal(text) => format!("Literal {text:?}"),
+        ExpressionKind::Reference(reference) => {
+            let prefix = if reference.tag { "$" } else { "" };
+            format!("Reference {prefix}{}", reference.name)
+        },
+        ExpressionKind::Sequence(_) => "Sequence".to_owned(),
+        ExpressionKind::Negate(_) => "Negate".to_owned(),
+        ExpressionKind::Format { formatters, .. } => {
+            let names = formatters
+                .iter()
+                .map(|formatter| {
+                    match formatter {
                         Formatter::Year(_) => "year".to_owned(),
                         Formatter::Pad(width) => format!("pad({width})"),
-                    });
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" | ");
+            format!("Format {names}")
+        },
+        ExpressionKind::Fallback(_) => "Fallback".to_owned(),
+        ExpressionKind::Conditional { .. } => "Conditional".to_owned(),
+        ExpressionKind::Root => "Root".to_owned(),
+        ExpressionKind::Separator => "Separator".to_owned(),
+    };
+    lines.push(format!("{}{label}", "  ".repeat(depth)));
+    match &expression.kind {
+        ExpressionKind::Sequence(children)
+        | ExpressionKind::Fallback(children) => {
+            for child in children {
+                append_expression(child, depth + 1, lines);
+            }
+        },
+        ExpressionKind::Negate(input)
+        | ExpressionKind::Format { input, .. } => {
+            append_expression(input, depth + 1, lines);
+        },
+        ExpressionKind::Conditional { condition, consequent, alternative } => {
+            for (label, branch) in [
+                ("Condition", Some(condition)),
+                ("Then", Some(consequent)),
+                ("Else", alternative.as_ref()),
+            ] {
+                if let Some(branch) = branch {
+                    lines.push(format!("{}{label}", "  ".repeat(depth + 1)));
+                    append_expression(branch, depth + 2, lines);
                 }
-                parts.join(" | ")
-            },
-            Expression::Guard { reference, negative, .. } => {
-                let prefix = if *negative { "!" } else { "" };
-                format!("Guard {prefix}{}", reference_label(reference))
-            },
-        };
-        lines.push(format!("{}{label}", "  ".repeat(depth)));
-        if let Expression::Guard { contents, .. } = expression {
-            append_expressions(contents, depth + 1, lines);
-        }
+            }
+        },
+        _ => {},
     }
 }

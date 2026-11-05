@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::ast::{Alternative, Expression};
+use crate::ast::Expression;
 use crate::value::Value;
 use crate::{
-    ArgKind, ArgSpec, Diagnostic, RenderError, RenderedPath, Scalar, Span,
-    args, parser, render,
+    ArgSpec, Diagnostic, RenderError, RenderedPath, Scalar, Span, args, parser,
+    render, validation,
 };
 
 /// Optional listing metadata, independent of argument binding.
@@ -63,7 +63,7 @@ impl BoundTemplate {
 
 impl Template {
     /// Inspect the path AST as a compact, indented tree without source spans.
-    /// Fallbacks and formatters appear inline; guard contents are nested.
+    /// Operations and conditional branches are shown as nested expressions.
     /// The output format is intended for debugging and may change.
     #[must_use]
     pub fn dump_ast(&self) -> String {
@@ -109,7 +109,7 @@ impl Template {
     /// Compile owned expressions and validate argument defaults.
     pub fn compile(source: &str) -> Result<Self, Diagnostic> {
         let compiled = parser::parse(source)?;
-        validate_arguments(&compiled.path, &compiled.arguments)?;
+        validation::validate(&compiled.path, &compiled.arguments)?;
         for spec in &compiled.arguments {
             if let Some(default) = &spec.default {
                 args::coerce(spec, default)?;
@@ -132,52 +132,4 @@ impl Template {
     pub fn tag_references(&self) -> &[TagReference] {
         &self.inner.references
     }
-}
-
-fn validate_arguments(
-    path: &[Expression],
-    arguments: &[ArgSpec],
-) -> Result<(), Diagnostic> {
-    let validate = |reference: &crate::ast::Reference| {
-        if !reference.tag && !arguments.iter().any(|a| a.name == reference.name)
-        {
-            Err(Diagnostic::new(
-                format!("Undeclared argument '{}'", reference.name),
-                reference.span,
-            ))
-        } else {
-            Ok(())
-        }
-    };
-    for expression in path {
-        match expression {
-            Expression::Interpolation { alternatives, formatters, .. } => {
-                for alternative in alternatives {
-                    if let Alternative::Reference(reference) = alternative {
-                        validate(reference)?;
-                        if !reference.tag
-                            && !formatters.is_empty()
-                            && arguments.iter().any(|a| {
-                                a.name == reference.name
-                                    && a.kind == ArgKind::Path
-                            })
-                        {
-                            return Err(Diagnostic::new(
-                                "Cannot format a path argument",
-                                reference.span,
-                            ));
-                        }
-                    }
-                }
-            },
-            Expression::Guard { reference, contents, .. } => {
-                validate(reference)?;
-                validate_arguments(contents, arguments)?;
-            },
-            Expression::Literal(..)
-            | Expression::Root
-            | Expression::Separator(_) => {},
-        }
-    }
-    Ok(())
 }

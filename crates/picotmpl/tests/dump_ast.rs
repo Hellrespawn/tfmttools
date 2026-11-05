@@ -7,28 +7,41 @@ fn compact_tree_preserves_structure_and_values() {
         name: "Not part of the path AST"
         arg prefix: string
         path: (
-          / {prefix} "quoted \"text\"" /
-          [$album? {$album} / [!$disc? "Single disc"]]
-          {$date ?? $year ?? "Unknown" | year | pad(4)}
+          / prefix "quoted \"text\"" /
+          $album? ( $album / !$disc? ( "Single disc"))
+          (($date ?: $year ?: "Unknown") | year | pad(4))
         )
         "#,
     )
     .unwrap();
     assert_eq!(
         template.dump_ast(),
-        concat!(
-            "Path\n",
-            "  Root\n",
-            "  Interpolation prefix\n",
-            "  Literal \"quoted \\\"text\\\"\"\n",
-            "  Separator\n",
-            "  Guard $album\n",
-            "    Interpolation $album\n",
-            "    Separator\n",
-            "    Guard !$disc\n",
-            "      Literal \"Single disc\"\n",
-            "  Interpolation $date ?? $year ?? \"Unknown\" | year | pad(4)",
-        )
+        r#"Path
+  Root
+  Reference prefix
+  Literal "quoted \"text\""
+  Separator
+  Conditional
+    Condition
+      Reference $album
+    Then
+      Sequence
+        Reference $album
+        Separator
+        Conditional
+          Condition
+            Negate
+              Reference $disc
+          Then
+            Sequence
+              Literal "Single disc"
+  Sequence
+    Format year | pad(4)
+      Sequence
+        Fallback
+          Reference $date
+          Reference $year
+          Literal "Unknown""#,
     );
 }
 

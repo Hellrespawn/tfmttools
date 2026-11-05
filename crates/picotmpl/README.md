@@ -18,30 +18,63 @@ name: "Artist and title"
 arg prefix: path(default: "", description: "Output directory.")
 
 path: (
-  {prefix} {$album_artist ?? $artist ?? "Unknown Artist"} /
-  [$album? {$album} /]
-  [$track_number? {$track_number | pad(2)} " - "]
-  {$title}
+  prefix ($album_artist ?: $artist ?: "Unknown Artist") /
+  $album? ($album /)
+  $track_number? ($track_number | pad(2) " - ")
+  $title
 )
 ```
 
 Bare references name declared arguments; `$` references name metadata
 fields. Adjacent expressions concatenate, and whitespace outside quoted
 strings is ignored. `#` starts a comment outside a string. Strings preserve
-all their text and support `\"` and `\\` escapes. Literal slashes remain component text. Use a bare `/` to end a directory component.
+all their text and support `\"` and `\\` escapes. Literal slashes remain
+component text. Use a bare `/` to end a directory component.
 
-`[reference? contents]` includes contents when a value is present and
-nonempty. `[!reference? contents]` handles missing or empty values. Integer
-zero and text `"0"` are present. `??` chooses the first present alternative;
-quoted strings can supply fallback text. Guards and fallbacks are lazy.
-Missing interpolation values emit nothing. A final filename must be nonempty.
+Missing and empty values are absent. Integer zero and text `"0"` are
+present. Missing values emit nothing. A final filename must be nonempty.
+`a ?: b` selects `a` when its presence test succeeds, otherwise `b`.
+The left operand is evaluated only once and the right operand only when
+needed. Quoted strings can supply fallback text.
+
+`condition ? value` returns `value` when the test succeeds, otherwise
+nothing. `condition ? yes : no` selects one branch. Each branch is one
+expression, so group compound output: `$album ? ($album /)`. Nested
+conditionals bind to the right; `:` attaches to the nearest unmatched `?`
+in its group. Elvis `?:` is one token; `? :` is not valid.
+
+`!value` negates its presence test and produces a boolean. Boolean conditions
+use their truth value; false does not pass a test. Booleans cannot be emitted,
+concatenated, or formatted. Compilation rejects every possible boolean output,
+including unreachable branches. For example, `!$album ? "Singles"` is valid,
+but a standalone `!$album` is not valid output. There are no boolean literals
+or boolean argument types.
+
+From strongest to weakest, operators bind as follows:
+
+| Operation | Binding |
+| --- | --- |
+| Parentheses | Group a longer expression as one operand |
+| Unary `!` | Negate the next operand; repeated negations nest right to left |
+| Formatting `\|` | Format the nearest operand; chains run left to right |
+| Elvis `?:` | Select the first successful operand, left to right |
+| Conditional `?` with optional `:` | One expression per branch, nesting right to left |
+| Adjacency | Concatenate expressions in order |
+
+`$a ?: $b | pad(2)` pads only `$b`; `($a ?: $b) | pad(2)` pads the selected
+value. `("By " $a) ?: "Unknown"` keeps `"By "` even when `$a` is absent.
+`!($date | year)` negates the formatted result, whereas `!$date | year`
+is rejected for trying to format a boolean.
 
 `| year` extracts a four digit year, prioritizing ISO style dates, then
 day/month/year style dates, then other four digit year matches. A present
-value with no matching year is an error. `| pad(width)` accepts widths from 0 through 1024 and left pads displayed
-text with zeros to a minimum width; it never truncates text. Formatters
-apply to the selected fallback value and can be chained. Path arguments
-cannot be formatted.
+value with no matching year is an error. `| pad(width)` accepts widths from
+0 through 1024 and left pads displayed text with zeros to a minimum width;
+it never truncates text. Formatters can be chained. Missing formatted input
+stays absent without running a formatter. Formatting cannot accept a path
+argument or any group that might return structural directory boundaries.
+
+Old `{...}`, `[...]`, and `??` expression syntax must be migrated manually.
 
 ## Compile, bind, and render
 
@@ -54,7 +87,7 @@ let template = Template::compile(
     r#"
     name: "Artist and title"
     arg prefix: path(default: "")
-    path: ({prefix} {$artist ?? "Unknown Artist"} / {$title})
+    path: (prefix ($artist ?: "Unknown Artist") / $title)
     "#,
 )?;
 
@@ -112,7 +145,7 @@ and should run on completed components after interpolation.
 
 A path argument inserts complete directory components and must be used
 at a component boundary. It supplies its own boundary, so write
-`{prefix} {$title}` rather than `{prefix} / {$title}`. Path arguments are
+`prefix $title` rather than `prefix / $title`. Path arguments are
 relative prefixes; leading input separators are discarded when splitting.
 A bare `/` as the first top-level expression sets the rendered root indicator.
 An empty expression before `/` is an invalid empty component. Repeated
@@ -141,18 +174,25 @@ cargo run -p tfmttools-picotmpl --example dump_ast -- examples/stef.tfmt
 ```
 
 The command reads one UTF-8 template file and writes one expression per line,
-indenting guard contents and keeping fallbacks and formatters inline. It omits
+indenting nested operations and conditional branches. It omits
 source text, spans, and template metadata. For example:
 
 ```text
 Path
-  Interpolation prefix
-  Interpolation $album_artist ?? $artist
+  Reference prefix
+  Sequence
+    Fallback
+      Reference $album_artist
+      Reference $artist
   Separator
-  Guard $album
-    Interpolation $album
-    Separator
-  Interpolation $title
+  Conditional
+    Condition
+      Reference $album
+    Then
+      Sequence
+        Reference $album
+        Separator
+  Reference $title
 ```
 
 Rust callers can use `Template::dump_ast()` for the same output. Inspection

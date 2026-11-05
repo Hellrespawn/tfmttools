@@ -14,7 +14,7 @@ fn text(value: &str) -> Scalar {
 
 #[test]
 fn quoted_literals_and_adjacent_values() {
-    let path = bind(r#"path: ("A" {$title} " B")"#)
+    let path = bind(r#"path: ("A" $title " B")"#)
         .render(|_| Ok::<_, Infallible>(Some(text("T"))))
         .unwrap();
     assert_eq!(path.components(), ["AT B"]);
@@ -22,7 +22,7 @@ fn quoted_literals_and_adjacent_values() {
 
 #[test]
 fn zero_is_present() {
-    let path = bind("path: ([$track? {$track}])")
+    let path = bind("path: ($track? ( $track))")
         .render(|_| Ok::<_, Infallible>(Some(Scalar::Integer(0))))
         .unwrap();
     assert_eq!(path.components(), ["0"]);
@@ -31,7 +31,7 @@ fn zero_is_present() {
 #[test]
 fn missing_and_empty_are_absent() {
     for value in [None, Some(text(""))] {
-        let path = bind(r#"path: ([$album? "Album"] [!$album? "Single"])"#)
+        let path = bind(r#"path: ($album? ( "Album") !$album? ( "Single"))"#)
             .render(|_| Ok::<_, Infallible>(value.clone()))
             .unwrap();
         assert_eq!(path.components(), ["Single"]);
@@ -41,7 +41,7 @@ fn missing_and_empty_are_absent() {
 #[test]
 fn fallback_is_lazy() {
     let mut calls = Vec::new();
-    let path = bind(r#"path: ({$album_artist ?? $artist ?? "Unknown"})"#)
+    let path = bind(r#"path: (($album_artist ?: $artist ?: "Unknown"))"#)
         .render(|name| {
             calls.push(name.to_owned());
             Ok::<_, Infallible>(Some(text("Album Artist")))
@@ -49,7 +49,7 @@ fn fallback_is_lazy() {
         .unwrap();
     assert_eq!(path.components(), ["Album Artist"]);
     assert_eq!(calls, ["album_artist"]);
-    let path = bind(r#"path: ({$album_artist ?? $artist ?? "Unknown"})"#)
+    let path = bind(r#"path: (($album_artist ?: $artist ?: "Unknown"))"#)
         .render(|_| Ok::<_, Infallible>(None))
         .unwrap();
     assert_eq!(path.components(), ["Unknown"]);
@@ -58,7 +58,7 @@ fn fallback_is_lazy() {
 #[test]
 fn skipped_guard_does_not_lookup_contents() {
     let mut calls = Vec::new();
-    let path = bind("path: ([$album? {$date | year} /] {$title})")
+    let path = bind("path: ($album? ( ($date | year) /) $title)")
         .render(|name| {
             calls.push(name.to_owned());
             Ok::<_, Infallible>(if name == "title" {
@@ -74,7 +74,7 @@ fn skipped_guard_does_not_lookup_contents() {
 
 #[test]
 fn resolver_error_has_reference_span() {
-    let source = "path: ({$title})";
+    let source = "path: ($title)";
     let error = bind(source)
         .render(|_| {
             Err::<Option<Scalar>, _>(io::Error::from(
@@ -93,7 +93,7 @@ fn resolver_error_has_reference_span() {
 #[test]
 fn all_references_are_visible_before_rendering() {
     let template =
-        Template::compile("path: ([$album? {$title}] {$title})").unwrap();
+        Template::compile("path: ($album? ( $title) $title)").unwrap();
     let names: Vec<_> =
         template.tag_references().iter().map(|r| r.name.as_str()).collect();
     assert_eq!(names, ["album", "title", "title"]);
@@ -102,7 +102,7 @@ fn all_references_are_visible_before_rendering() {
 #[test]
 fn whitespace_only_argument_is_preserved() {
     let template =
-        Template::compile(r#"arg suffix: string path: ("A" {suffix} "B")"#)
+        Template::compile(r#"arg suffix: string path: ("A" suffix "B")"#)
             .unwrap();
     let path = template
         .bind(&[" ".to_owned()])
@@ -115,7 +115,7 @@ fn whitespace_only_argument_is_preserved() {
 #[test]
 fn supplied_empty_value_overrides_default() {
     let template = Template::compile(
-        r#"arg suffix: string(default: "fallback") path: ("A" {suffix} "B")"#,
+        r#"arg suffix: string(default: "fallback") path: ("A" suffix "B")"#,
     )
     .unwrap();
     let path = template
@@ -129,12 +129,12 @@ fn supplied_empty_value_overrides_default() {
 #[test]
 fn year_extraction_and_padding() {
     for date in ["2024-03-10", "10-03-2024", "2024", "released in 2024"] {
-        let path = bind("path: ({$date | year})")
+        let path = bind("path: (($date | year))")
             .render(|_| Ok::<_, Infallible>(Some(text(date))))
             .unwrap();
         assert_eq!(path.components(), ["2024"], "{date}");
     }
-    let path = bind("path: ({$date | year | pad(6)})")
+    let path = bind("path: (($date | year | pad(6)))")
         .render(|_| Ok::<_, Infallible>(Some(text("2024"))))
         .unwrap();
     assert_eq!(path.components(), ["002024"]);
@@ -142,7 +142,7 @@ fn year_extraction_and_padding() {
 
 #[test]
 fn date_pattern_precedence() {
-    let path = bind("path: ({$date | year})")
+    let path = bind("path: (($date | year))")
         .render(|_| Ok::<_, Infallible>(Some(text("1999 then 2024-03-10"))))
         .unwrap();
     assert_eq!(path.components(), ["2024"]);
@@ -150,7 +150,7 @@ fn date_pattern_precedence() {
 
 #[test]
 fn bad_date_has_formatter_span() {
-    let source = "path: ({$date | year})";
+    let source = "path: (($date | year))";
     let error = bind(source)
         .render(|_| Ok::<_, Infallible>(Some(text("unknown"))))
         .unwrap_err();
@@ -161,7 +161,7 @@ fn bad_date_has_formatter_span() {
 
 #[test]
 fn absent_formatter_input_emits_nothing() {
-    let path = bind(r#"path: ({$date | year} "Song")"#)
+    let path = bind(r#"path: (($date | year) "Song")"#)
         .render(|_| Ok::<_, Infallible>(None))
         .unwrap();
     assert_eq!(path.components(), ["Song"]);
@@ -177,7 +177,7 @@ fn padding_is_minimum_width_and_zero_is_preserved() {
         (Scalar::Integer(-2), 3, "0-2"),
         (Scalar::Text("é".to_owned()), 2, "0é"),
     ] {
-        let path = bind(&format!("path: ({{$track | pad({width})}})"))
+        let path = bind(&format!("path: (($track | pad({width})))"))
             .render(|_| Ok::<_, Infallible>(Some(value.clone())))
             .unwrap();
         assert_eq!(path.components(), [expected]);
@@ -186,7 +186,7 @@ fn padding_is_minimum_width_and_zero_is_preserved() {
 
 #[test]
 fn formatter_applies_to_selected_fallback() {
-    let path = bind("path: ({$a ?? $b | pad(2)})")
+    let path = bind("path: ((($a ?: $b) | pad(2)))")
         .render(|name| {
             Ok::<_, Infallible>(if name == "b" {
                 Some(text("3"))
@@ -201,8 +201,8 @@ fn formatter_applies_to_selected_fallback() {
 #[test]
 fn formatters_reject_path_arguments_in_all_alternatives() {
     for source in [
-        "arg prefix: path(default: \"\") path: ({prefix | year})",
-        "arg prefix: path(default: \"\") path: ({$a ?? prefix | pad(2)})",
+        "arg prefix: path(default: \"\") path: ((prefix | year))",
+        "arg prefix: path(default: \"\") path: ((($a ?: prefix) | pad(2)))",
     ] {
         assert!(Template::compile(source).is_err());
     }
@@ -221,7 +221,7 @@ fn native_separators() {
 #[test]
 fn prefix_components() {
     let template = Template::compile(
-        r#"arg prefix: path path: ({prefix} "Artist" / "Song")"#,
+        r#"arg prefix: path path: (prefix "Artist" / "Song")"#,
     )
     .unwrap();
     for prefix in ["Music/Artists", "Music\\Artists", "/Music//Artists/"] {
@@ -238,7 +238,7 @@ fn prefix_components() {
 #[test]
 fn empty_prefix_has_no_boundary() {
     let path = bind(
-        r#"arg prefix: path(default: "") path: ({prefix} "Artist" / "Song")"#,
+        r#"arg prefix: path(default: "") path: (prefix "Artist" / "Song")"#,
     )
     .render(|_| Ok::<_, Infallible>(None))
     .unwrap();
@@ -248,7 +248,7 @@ fn empty_prefix_has_no_boundary() {
 #[test]
 fn argument_after_component_text_is_error() {
     let template =
-        Template::compile(r#"arg prefix: path path: ("A" {prefix} "B")"#)
+        Template::compile(r#"arg prefix: path path: ("A" prefix "B")"#)
             .unwrap();
     let error = template
         .bind(&["Music".to_owned()])
@@ -261,7 +261,7 @@ fn argument_after_component_text_is_error() {
 #[test]
 fn explicit_separator_after_path_argument_is_error() {
     let template =
-        Template::compile(r#"arg prefix: path path: ({prefix} / "Song")"#)
+        Template::compile(r#"arg prefix: path path: (prefix / "Song")"#)
             .unwrap();
     let error = template
         .bind(&["Music".to_owned()])
@@ -277,8 +277,8 @@ fn invalid_boundaries() {
         r#"path: ("A" / / "B")"#,
         r#"path: ("A" /)"#,
         "path: ()",
-        "path: ({$missing})",
-        r#"path: ("A" / {$missing})"#,
+        "path: ($missing)",
+        r#"path: ("A" / $missing)"#,
         r#"path: (/ / "A")"#,
     ] {
         assert!(
@@ -306,7 +306,7 @@ fn root_separator() {
 #[test]
 fn tag_separators_remain_component_text() {
     for value in ["Artist/Album", "Artist\\Album"] {
-        let path = bind("path: ({$artist})")
+        let path = bind("path: ($artist)")
             .render(|_| Ok::<_, Infallible>(Some(text(value))))
             .unwrap();
         assert_eq!(path.components(), [value]);
@@ -316,16 +316,132 @@ fn tag_separators_remain_component_text() {
 #[test]
 fn absent_initial_component_cannot_select_root() {
     for source in [
-        r#"path: ({$artist} / "Song")"#,
+        r#"path: ($artist / "Song")"#,
         r#"path: ("" / "Song")"#,
-        r#"arg prefix: path(default: "") path: ({prefix} / "Song")"#,
-        r#"path: ([$artist? "Artist"] / "Song")"#,
-        r#"path: ([$artist? / "Song"])"#,
+        r#"arg prefix: path(default: "") path: (prefix / "Song")"#,
+        r#"path: ($artist? ( "Artist") / "Song")"#,
+        r#"path: ($artist? ( / "Song"))"#,
     ] {
         let result = bind(source).render(|_| Ok::<_, Infallible>(None));
         assert!(result.is_err(), "{source}");
     }
-    let result = bind(r#"path: ([$artist? / "Song"])"#)
+    let result = bind(r#"path: ($artist? ( / "Song"))"#)
         .render(|_| Ok::<_, Infallible>(Some(text("Artist"))));
     assert!(result.is_err());
+}
+
+fn render_expression(expression: &str) -> Vec<String> {
+    bind(&format!("path: ({expression})"))
+        .render(|name| {
+            Ok::<_, Infallible>(match name {
+                "a" => Some(text("7")),
+                "b" => Some(text("3")),
+                "n" => Some(text("2")),
+                _ => None,
+            })
+        })
+        .unwrap()
+        .components()
+        .to_vec()
+}
+
+#[test]
+fn formatting_and_concatenation_binding() {
+    for (expression, expected) in
+        [(r#""." $n | pad(2)"#, ".02"), (r#"("." $n) | pad(3)"#, "0.2")]
+    {
+        assert_eq!(render_expression(expression), [expected], "{expression}");
+    }
+}
+
+#[test]
+fn elvis_binding_and_presence() {
+    for (expression, expected) in [
+        ("$a ?: $b | pad(2)", "7"),
+        ("($a ?: $b) | pad(2)", "07"),
+        (r#""By " $missing ?: "Unknown""#, "By Unknown"),
+        (r#"("By " $missing) ?: "Unknown""#, "By "),
+    ] {
+        assert_eq!(render_expression(expression), [expected], "{expression}");
+    }
+}
+
+#[test]
+fn conditional_branch_scope() {
+    for (expression, expected) in [
+        (r#"$missing ? $n | pad(2) " - ""#, " - "),
+        (r#"$missing ? ($n | pad(2) " - ") "Song""#, "Song"),
+        (r#"$missing ? "yes" : "no" "!""#, "no!"),
+        (r#"$a ? $missing ? "both" : "only a" : "no a""#, "only a"),
+        (r#"$a?$missing?:$b:"none""#, "3"),
+        (r#"$a?$missing?"both":"a":"none""#, "a"),
+    ] {
+        assert_eq!(render_expression(expression), [expected], "{expression}");
+    }
+}
+
+#[test]
+fn negation_and_elvis_keep_zero_present() {
+    for (value, expected, fallback) in [
+        (None, "absent", "fallback"),
+        (Some(text("")), "absent", "fallback"),
+        (Some(Scalar::Integer(0)), "present", "0"),
+        (Some(text("0")), "present", "0"),
+    ] {
+        for expression in [
+            r#"!$n ? "absent" : "present""#,
+            r#"!!$n ? "present" : "absent""#,
+            r#"(!$n ?: !$n) ? "absent" : "present""#,
+        ] {
+            let path = bind(&format!("path: ({expression})"))
+                .render(|_| Ok::<_, Infallible>(value.clone()))
+                .unwrap();
+            assert_eq!(path.components(), [expected], "{expression}");
+        }
+        let path = bind(r#"path: ($n ?: "fallback")"#)
+            .render(|_| Ok::<_, Infallible>(value.clone()))
+            .unwrap();
+        assert_eq!(path.components(), [fallback]);
+    }
+}
+
+#[test]
+fn selected_operands_are_evaluated_once() {
+    for (expression, present, expected) in [
+        (r#"$a ?: $b ?: "Unknown""#, true, "7"),
+        (r#"$a ? "yes" : $b"#, true, "yes"),
+        (r#"$a ? $b : "no""#, false, "no"),
+    ] {
+        let mut calls = Vec::new();
+        let path = bind(&format!("path: ({expression})"))
+            .render(|name| {
+                calls.push(name.to_owned());
+                assert_eq!(name, "a", "Skipped operand resolved");
+                Ok::<_, Infallible>(present.then(|| text("7")))
+            })
+            .unwrap();
+        assert_eq!(path.components(), [expected]);
+        assert_eq!(calls, ["a"]);
+    }
+    let error = bind(r#"path: (($date | year) ?: "Unknown")"#)
+        .render(|_| Ok::<_, Infallible>(Some(text("invalid"))))
+        .unwrap_err();
+    assert!(error.to_string().contains("year"));
+}
+
+#[test]
+fn grouped_paths_keep_boundaries() {
+    for expression in [
+        r#"("Artist" /) "Song""#,
+        r#""Artist" (/) "Song""#,
+        r#"(("Artist" /) ?: ("Unused" /)) "Song""#,
+    ] {
+        assert_eq!(render_expression(expression), ["Artist", "Song"]);
+    }
+    assert_eq!(render_expression(r#"($missing ? "Unused") "Song""#), ["Song"]);
+    assert!(
+        bind(r#"path: ((/ "Song"))"#)
+            .render(|_| Ok::<_, Infallible>(None))
+            .is_err()
+    );
 }

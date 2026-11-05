@@ -120,7 +120,7 @@ fn stef_directory_prefix_is_structural() {
 fn stef_outside_string_whitespace_does_not_change_output() {
     let expanded = SOURCE
         .replace("path: (", "path: (\n # path comment\n")
-        .replace("[$album?", "[ $album ?\n # album comment\n");
+        .replace("$album? (", "$album ? (\n # album comment\n");
     assert_eq!(render(&expanded, &tags(), &[]), [
         "Example Artist",
         "2024.02 - Example Album",

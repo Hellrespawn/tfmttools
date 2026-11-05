@@ -3,7 +3,7 @@ use pest::error::InputLocation;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::ast::{Alternative, Expression, Formatter, Reference};
+use crate::ast::{Expression, ExpressionKind, Formatter, Reference};
 use crate::template::Compiled;
 use crate::{ArgKind, ArgSpec, Diagnostic, Metadata, Span, TagReference};
 
@@ -44,8 +44,8 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
                 Rule::tag => "a '$tag' reference",
                 Rule::quoted => "a quoted string",
                 Rule::separator => "'/'",
-                Rule::interpolation => "an interpolation '{...}'",
-                Rule::guard => "a guard '[reference? ...]'",
+                Rule::conditional => "an expression",
+                Rule::unary => "a value or unary negation",
                 Rule::sequence => "a path sequence '(...)'",
                 Rule::argument => "an argument declaration",
                 Rule::definition => "a definition 'name: value'",
@@ -62,7 +62,20 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
     let message = if source.trim_start().starts_with(['{', '+']) {
         format!("{message}; migrate Jinja/frontmatter templates manually")
     } else {
-        message
+        let hint = match source[start..].chars().next() {
+            Some('{') => "use bare references or parentheses instead of braces",
+            Some('[') => {
+                "use condition ? (contents) instead of square brackets"
+            },
+            Some('?')
+                if source[start..].starts_with("??")
+                    || source[..start].ends_with('?') =>
+            {
+                "use ?: instead of ??"
+            },
+            _ => "",
+        };
+        if hint.is_empty() { message } else { format!("{message}; {hint}") }
     };
     Diagnostic::new(message, Span { start, end })
 }
@@ -241,62 +254,81 @@ impl Builder {
     ) -> Result<Vec<Expression>, Diagnostic> {
         let mut result = Vec::new();
         for node in nodes {
-            let location = span(&node);
-            result.push(match node.as_rule() {
-                Rule::quoted => {
-                    Expression::Literal(Self::literal(&node)?, location)
-                },
-                Rule::separator if root && result.is_empty() => {
-                    Expression::Root
-                },
-                Rule::separator => Expression::Separator(location),
-                Rule::interpolation => self.interpolation(node)?,
-                Rule::guard => {
-                    let mut parts = node.into_inner().peekable();
-                    let negative =
-                        parts.peek().unwrap().as_rule() == Rule::negative;
-                    if negative {
-                        parts.next();
-                    }
-                    let reference = self.reference(&parts.next().unwrap());
-                    Expression::Guard {
-                        reference,
-                        negative,
-                        contents: self.sequence(parts, false)?,
-                    }
-                },
-                _ => unreachable!(),
-            });
+            let mut expression = self.expression(node)?;
+            if root
+                && result.is_empty()
+                && matches!(expression.kind, ExpressionKind::Separator)
+            {
+                expression.kind = ExpressionKind::Root;
+            }
+            result.push(expression);
         }
         Ok(result)
     }
 
-    fn interpolation(
-        &mut self,
-        node: Node<'_>,
-    ) -> Result<Expression, Diagnostic> {
+    fn expression(&mut self, node: Node<'_>) -> Result<Expression, Diagnostic> {
         let location = span(&node);
-        let mut alternatives = Vec::new();
-        let mut formatters = Vec::new();
-        for node in node.into_inner() {
-            match node.as_rule() {
-                Rule::quoted => {
-                    alternatives
-                        .push(Alternative::Literal(Self::literal(&node)?));
-                },
-                Rule::tag | Rule::name => {
-                    alternatives
-                        .push(Alternative::Reference(self.reference(&node)));
-                },
-                Rule::formatter => formatters.push(formatter(node)?),
-                _ => unreachable!(),
-            }
-        }
-        Ok(Expression::Interpolation {
-            alternatives,
-            formatters,
-            span: location,
-        })
+        let kind = match node.as_rule() {
+            Rule::quoted => ExpressionKind::Literal(Self::literal(&node)?),
+            Rule::tag | Rule::name => {
+                ExpressionKind::Reference(self.reference(&node))
+            },
+            Rule::separator => ExpressionKind::Separator,
+            Rule::sequence => {
+                ExpressionKind::Sequence(
+                    self.sequence(node.into_inner(), false)?,
+                )
+            },
+            Rule::conditional => {
+                let mut parts = node.into_inner();
+                let condition = self.expression(parts.next().unwrap())?;
+                if let Some(consequent) = parts.next() {
+                    ExpressionKind::Conditional {
+                        condition: Box::new(condition),
+                        consequent: Box::new(self.expression(consequent)?),
+                        alternative: parts
+                            .next()
+                            .map(|part| self.expression(part).map(Box::new))
+                            .transpose()?,
+                    }
+                } else {
+                    return Ok(condition);
+                }
+            },
+            Rule::fallback => {
+                let mut alternatives = node
+                    .into_inner()
+                    .map(|part| self.expression(part))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if alternatives.len() == 1 {
+                    return Ok(alternatives.pop().unwrap());
+                }
+                ExpressionKind::Fallback(alternatives)
+            },
+            Rule::formatted => {
+                let mut parts = node.into_inner();
+                let input = self.expression(parts.next().unwrap())?;
+                let formatters =
+                    parts.map(formatter).collect::<Result<Vec<_>, _>>()?;
+                if formatters.is_empty() {
+                    return Ok(input);
+                }
+                ExpressionKind::Format { input: Box::new(input), formatters }
+            },
+            Rule::unary => {
+                let mut parts = node.into_inner();
+                let first = parts.next().unwrap();
+                if first.as_rule() == Rule::negation {
+                    ExpressionKind::Negate(Box::new(
+                        self.expression(parts.next().unwrap())?,
+                    ))
+                } else {
+                    return self.expression(first);
+                }
+            },
+            _ => unreachable!(),
+        };
+        Ok(Expression { kind, span: location })
     }
 }
 

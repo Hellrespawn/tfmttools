@@ -119,7 +119,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   represent references, literals, sequences, unary negation, formatting,
   Elvis, conditional branches, root, and separators with source spans.
 
-- [ ] **Step 1: Add binding tests in `tests/rendering.rs`.**
+- [x] **Step 1: Add binding tests in `tests/rendering.rs`.**
 
   Reuse `bind`, `text`, and the resolver helpers. With `a = "7"`,
   `b = "3"`, `n = "2"`, and absent `missing`, assert these components:
@@ -140,7 +140,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   Name the tests `formatting_and_concatenation_binding`,
   `elvis_binding_and_presence`, and `conditional_branch_scope`.
 
-- [ ] **Step 2: Add type and token tests in `tests/syntax.rs`.**
+- [x] **Step 2: Add type and token tests in `tests/syntax.rs`.**
 
   `booleans_are_rejected_only_in_invalid_contexts` must compile
   `path: ((!$album) ? "missing" : $title)` and
@@ -169,7 +169,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   character column 13, not a byte-based column. Retain source-slice checks
   for resolver and formatter spans after multibyte text.
 
-- [ ] **Step 3: Add behavioral edge tests in `tests/rendering.rs` and
+- [x] **Step 3: Add behavioral edge tests in `tests/rendering.rs` and
   `tests/arguments.rs`.**
 
   - `negation_and_elvis_keep_zero_present`: use missing, empty text, integer
@@ -196,7 +196,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   - Retain tests for repeated/trailing boundaries, empty final filenames,
     skipped leading expressions not selecting root, and native paths.
 
-- [ ] **Step 4: Run the new tests and verify failure.**
+- [x] **Step 4: Run the new tests and verify failure.**
 
   Run `cargo test -p tfmttools-picotmpl --test rendering`,
   `cargo test -p tfmttools-picotmpl --test syntax`, and
@@ -204,7 +204,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   fail under the existing parser; do not mistake an unrelated build error
   for the expected failure.
 
-- [ ] **Step 5: Implement the recursive parser and AST in the mapped files.**
+- [x] **Step 5: Implement the recursive parser and AST in the mapped files.**
 
   Implement the approved grammar: unary `!`, formatter chains, Elvis,
   right-nested conditionals with optional alternatives, and adjacency.
@@ -215,7 +215,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   Update the AST dump to show nested operations and branches without
   resolution; exact debug labels remain the implementer's choice.
 
-- [ ] **Step 6: Implement compile-time result validation.**
+- [x] **Step 6: Implement compile-time result validation.**
 
   Register and call `validation::validate` from `Template::compile`.
   Analyze every branch, even unreachable ones, and validate all arguments.
@@ -226,7 +226,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   boolean or structural capabilities. Reject boolean capabilities at the
   outer output. Keep argument default coercion and public `Scalar` intact.
 
-- [ ] **Step 7: Implement value evaluation and selected output emission.**
+- [x] **Step 7: Implement value evaluation and selected output emission.**
 
   Extend private values for boolean, absence, and ordered structural
   fragments. A sequence must preserve text, slash, and path-insertion events
@@ -238,7 +238,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   test. Emit selected fragments through existing `path::Builder` methods,
   preserving path-insertion boundaries and final-filename validation.
 
-- [ ] **Step 8: Migrate the library's existing tests, fixture, and README.**
+- [x] **Step 8: Migrate the library's existing tests, fixture, and README.**
 
   Use the approved Stef example. Preserve assertions about complete,
   missing, empty, and zero metadata. Update dump snapshots and standalone
@@ -248,7 +248,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   Update the README's Rust doctest and language reference, including the
   binding table, boolean errors, optional alternatives, and Elvis laziness.
 
-- [ ] **Step 9: Verify and commit the library change.**
+- [x] **Step 9: Verify and commit the library change.**
 
   Run `cargo test -p tfmttools-picotmpl`,
   `cargo test -p tfmttools-picotmpl --example dump_ast`, and

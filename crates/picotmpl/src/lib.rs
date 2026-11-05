@@ -8,6 +8,7 @@ mod parser;
 mod path;
 mod render;
 mod template;
+mod validation;
 mod value;
 
 pub use args::{ArgKind, ArgSpec, prohibited_character};

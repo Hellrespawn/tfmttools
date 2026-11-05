@@ -43,8 +43,8 @@ mod tests {
             .join("tests/fixtures/stef.tfmt");
         let output = dump(&path).unwrap();
         assert!(output.contains("\n"));
-        assert!(output.contains("  Guard $album\n"));
-        assert!(output.contains("    Interpolation $album\n"));
+        assert!(output.contains("  Conditional\n"));
+        assert!(output.contains("      Reference $album\n"));
     }
 
     #[test]
