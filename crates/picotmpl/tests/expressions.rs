@@ -198,3 +198,101 @@ fn comparisons_resolve_operands_once_in_order() {
         "Path\n  Conditional\n    Condition\n      Compare !=\n        Reference $a\n        Reference $b\n    Then\n      Literal \"different\"\n    Else\n      Literal \"same\""
     );
 }
+
+#[test]
+fn logical_presence_and_precedence() {
+    for (expression, expected) in [
+        ("$a && $b", false),
+        ("$a || $b", false),
+        ("0 && 1", true),
+        ("$a && 0", false),
+        ("0 && $a", false),
+        ("0 || $a", true),
+        ("$a || 0", true),
+        (r#""" || "0""#, true),
+        (r#""0" && 0"#, true),
+        ("!$a && !$b", true),
+        ("!!$a || !!$b", false),
+        ("1 == 1 || 1 == 2 && 1 == 2", true),
+        ("(1 == 1 || 1 == 2) && 1 == 2", false),
+        ("$a ?: 0 && 1", true),
+        ("0 | pad(2) == \"00\" && 1", true),
+        (r#"("dir" /) && 1"#, true),
+        ("(1 < 2) != (1 > 2) && 0", true),
+    ] {
+        condition(expression, expected);
+    }
+    assert_eq!(render(r#"$a || 0 ? $b && 1 ? "both" : "a" : "none""#), ["a"]);
+    let template =
+        Template::compile(r#"template: ($a || $b || $c ? "yes" : "no")"#)
+            .unwrap();
+    assert_eq!(
+        template.dump_ast(),
+        "Path\n  Conditional\n    Condition\n      Logical ||\n        Logical ||\n          Reference $a\n          Reference $b\n        Reference $c\n    Then\n      Literal \"yes\"\n    Else\n      Literal \"no\""
+    );
+}
+
+#[test]
+fn logical_short_circuit() {
+    for (operator, left, expected_calls, expected) in [
+        ("&&", None, vec!["a"], "no"),
+        ("||", Some(Scalar::Integer(0)), vec!["a"], "yes"),
+        ("&&", Some(Scalar::Integer(0)), vec!["a", "b"], "yes"),
+        ("||", None, vec!["a", "b"], "yes"),
+    ] {
+        let template = Template::compile(&format!(
+            r#"template: ($a {operator} $b ? "yes" : "no")"#
+        ))
+        .unwrap();
+        assert_eq!(
+            template
+                .tag_references()
+                .iter()
+                .map(|r| r.name.as_str())
+                .collect::<Vec<_>>(),
+            ["a", "b"]
+        );
+        let mut calls = Vec::new();
+        let bound = template.bind(&[]).unwrap();
+        let path = bound
+            .render(|name| {
+                calls.push(name.to_owned());
+                Ok::<_, Infallible>(if name == "a" {
+                    left.clone()
+                } else {
+                    Some(Scalar::Integer(1))
+                })
+            })
+            .unwrap();
+        assert_eq!(calls, expected_calls);
+        assert_eq!(path.components(), [expected]);
+        let result = bound.render(|name| {
+            if name == "a" { Ok(left.clone()) } else { Err("broken") }
+        });
+        assert_eq!(result.is_err(), expected_calls.len() == 2);
+    }
+}
+
+#[test]
+fn logical_syntax_and_validation() {
+    for expression in [
+        r#"1 & 2 ? "x""#,
+        r#"1 || ? "x""#,
+        r#"&& 1 ? "x""#,
+        r#"1 ||| 2 ? "x""#,
+        "1 && 2",
+        r#""x" (1 || 2)"#,
+        "(1 && 2) | pad(2)",
+        r#"1 ? "ok" : 1 && 2"#,
+        r#"0 || undeclared ? "x""#,
+        r#"$a && ("x" | unknown) ? "x""#,
+        r#"1 < 2 < 3 && 1 ? "x""#,
+    ] {
+        assert!(
+            Template::compile(&format!("template: ({expression})")).is_err(),
+            "{expression}"
+        );
+    }
+    condition(r#""0"|pad(2)=="00"||!0!=!1&&0"#, true);
+    condition(r#"!0!=!1||0&&1"#, true);
+}

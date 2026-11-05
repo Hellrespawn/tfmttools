@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::ast::{Expression, ExpressionKind, Formatter, Reference};
+use crate::ast::{
+    Expression, ExpressionKind, Formatter, LogicalOperator, Reference,
+};
 use crate::path::Builder;
 use crate::value::Value;
 use crate::{
@@ -67,6 +69,17 @@ fn evaluate<E>(
         },
         ExpressionKind::Negate(input) => {
             Value::Boolean(!evaluate(input, arguments, resolve)?.is_present())
+        },
+        ExpressionKind::Logical { left, operator, right } => {
+            let left = evaluate(left, arguments, resolve)?.is_present();
+            Value::Boolean(match operator {
+                LogicalOperator::And => {
+                    left && evaluate(right, arguments, resolve)?.is_present()
+                },
+                LogicalOperator::Or => {
+                    left || evaluate(right, arguments, resolve)?.is_present()
+                },
+            })
         },
         ExpressionKind::Compare { left, operator, right, operator_span } => {
             let left = evaluate(left, arguments, resolve)?;

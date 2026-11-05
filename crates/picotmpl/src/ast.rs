@@ -20,6 +20,21 @@ pub(crate) struct Expression {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub(crate) enum LogicalOperator {
+    And,
+    Or,
+}
+
+impl LogicalOperator {
+    pub(crate) fn symbol(self) -> &'static str {
+        match self {
+            Self::And => "&&",
+            Self::Or => "||",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum ComparisonOperator {
     Equal,
     NotEqual,
@@ -53,6 +68,11 @@ pub(crate) enum ExpressionKind {
     Reference(Reference),
     Sequence(Vec<Expression>),
     Negate(Box<Expression>),
+    Logical {
+        left: Box<Expression>,
+        operator: LogicalOperator,
+        right: Box<Expression>,
+    },
     Compare {
         left: Box<Expression>,
         operator: ComparisonOperator,
@@ -95,6 +115,9 @@ fn append_expression(
         },
         ExpressionKind::Sequence(_) => "Sequence".to_owned(),
         ExpressionKind::Negate(_) => "Negate".to_owned(),
+        ExpressionKind::Logical { operator, .. } => {
+            format!("Logical {}", operator.symbol())
+        },
         ExpressionKind::Compare { operator, .. } => {
             format!("Compare {}", operator.symbol())
         },
@@ -128,7 +151,8 @@ fn append_expression(
         | ExpressionKind::Format { input, .. } => {
             append_expression(input, depth + 1, lines);
         },
-        ExpressionKind::Compare { left, right, .. } => {
+        ExpressionKind::Compare { left, right, .. }
+        | ExpressionKind::Logical { left, right, .. } => {
             append_expression(left, depth + 1, lines);
             append_expression(right, depth + 1, lines);
         },

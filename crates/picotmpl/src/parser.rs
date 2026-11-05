@@ -4,7 +4,8 @@ use pest::iterators::Pair;
 use pest_derive::Parser;
 
 use crate::ast::{
-    ComparisonOperator, Expression, ExpressionKind, Formatter, Reference,
+    ComparisonOperator, Expression, ExpressionKind, Formatter, LogicalOperator,
+    Reference,
 };
 use crate::template::Compiled;
 use crate::{ArgKind, ArgSpec, Diagnostic, Metadata, Span, TagReference};
@@ -307,6 +308,29 @@ impl Builder {
                 } else {
                     return Ok(condition);
                 }
+            },
+            Rule::logical_or | Rule::logical_and => {
+                let operator = if node.as_rule() == Rule::logical_and {
+                    LogicalOperator::And
+                } else {
+                    LogicalOperator::Or
+                };
+                let mut parts = node.into_inner();
+                let mut left = self.expression(parts.next().unwrap())?;
+                while parts.next().is_some() {
+                    let right = self.expression(parts.next().unwrap())?;
+                    let span =
+                        Span { start: left.span.start, end: right.span.end };
+                    left = Expression {
+                        kind: ExpressionKind::Logical {
+                            left: Box::new(left),
+                            operator,
+                            right: Box::new(right),
+                        },
+                        span,
+                    };
+                }
+                return Ok(left);
             },
             Rule::comparison => {
                 let mut parts = node.into_inner();

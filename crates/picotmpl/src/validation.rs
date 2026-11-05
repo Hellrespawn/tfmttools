@@ -101,6 +101,11 @@ fn analyze(
             }
             result.boolean = true;
         },
+        ExpressionKind::Logical { left, right, .. } => {
+            analyze(left, arguments)?;
+            analyze(right, arguments)?;
+            result.boolean = true;
+        },
         ExpressionKind::Negate(input) => {
             analyze(input, arguments)?;
             result.boolean = true;
