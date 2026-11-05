@@ -16,7 +16,7 @@ path: (
     ]
     {$album} /
   ]
-  [$disc_number? {$disc_number | pad(1)}]
+  {$disc_number}
   [$track_number? {$track_number | pad(2)} " - "]
   [$album_artist? [$artist? {$artist} " - "]]
   {$title}
