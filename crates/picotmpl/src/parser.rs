@@ -270,6 +270,34 @@ impl Builder {
         Ok(result)
     }
 
+    fn comparison(&mut self, node: Node<'_>) -> Result<Expression, Diagnostic> {
+        let location = span(&node);
+        let mut parts = node.into_inner();
+        let left = self.expression(parts.next().unwrap())?;
+        let Some(operator) = parts.next() else {
+            return Ok(left);
+        };
+        let operator_span = span(&operator);
+        let operator = match operator.as_str() {
+            "==" => ComparisonOperator::Equal,
+            "!=" => ComparisonOperator::NotEqual,
+            "<" => ComparisonOperator::Less,
+            "<=" => ComparisonOperator::LessEqual,
+            ">" => ComparisonOperator::Greater,
+            ">=" => ComparisonOperator::GreaterEqual,
+            _ => unreachable!(),
+        };
+        Ok(Expression {
+            kind: ExpressionKind::Compare {
+                left: Box::new(left),
+                operator,
+                right: Box::new(self.expression(parts.next().unwrap())?),
+                operator_span,
+            },
+            span: location,
+        })
+    }
+
     fn expression(&mut self, node: Node<'_>) -> Result<Expression, Diagnostic> {
         let location = span(&node);
         let kind = match node.as_rule() {
@@ -332,29 +360,7 @@ impl Builder {
                 }
                 return Ok(left);
             },
-            Rule::comparison => {
-                let mut parts = node.into_inner();
-                let left = self.expression(parts.next().unwrap())?;
-                let Some(operator) = parts.next() else {
-                    return Ok(left);
-                };
-                let operator_span = span(&operator);
-                let operator = match operator.as_str() {
-                    "==" => ComparisonOperator::Equal,
-                    "!=" => ComparisonOperator::NotEqual,
-                    "<" => ComparisonOperator::Less,
-                    "<=" => ComparisonOperator::LessEqual,
-                    ">" => ComparisonOperator::Greater,
-                    ">=" => ComparisonOperator::GreaterEqual,
-                    _ => unreachable!(),
-                };
-                ExpressionKind::Compare {
-                    left: Box::new(left),
-                    operator,
-                    right: Box::new(self.expression(parts.next().unwrap())?),
-                    operator_span,
-                }
-            },
+            Rule::comparison => return self.comparison(node),
             Rule::fallback => {
                 let mut alternatives = node
                     .into_inner()

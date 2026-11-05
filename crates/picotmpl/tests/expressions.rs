@@ -141,9 +141,7 @@ fn comparison_errors_and_validation() {
     let error = bound
         .render(|_| Ok::<_, Infallible>(Some(Scalar::Text("2".to_owned()))))
         .unwrap_err();
-    let tfmttools_picotmpl::RenderError::Template(error) = error else {
-        panic!("expected template error")
-    };
+    let tfmttools_picotmpl::RenderError::Template(error) = error;
     assert_eq!(&source[error.span.start..error.span.end], ">=");
     assert!(error.message.contains("integer"), "{error}");
     // Absence makes ordering false, even when the other dynamic value is text.
@@ -294,7 +292,7 @@ fn logical_syntax_and_validation() {
         );
     }
     condition(r#""0"|pad(2)=="00"||!0!=!1&&0"#, true);
-    condition(r#"!0!=!1||0&&1"#, true);
+    condition("!0!=!1||0&&1", true);
 }
 
 #[test]
@@ -354,7 +352,7 @@ fn text_formatter_parameter_errors() {
         r#""x" | pad(1025)"#,
         r#""x" | year()"#,
         r#""x" | year(2)"#,
-        r#"(!$a) | lower"#,
+        "(!$a) | lower",
         r#"("x" /) | trim"#,
         r#"(1 ? "x" : ("y" /)) | upper"#,
         r#""x" | replace("x", "y") | pad()"#,
@@ -382,4 +380,17 @@ fn text_formatter_parameter_errors() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn year_formatter_preserves_adjacent_groups() {
+    for expression in [
+        r#""2024" | year (" suffix")"#,
+        r#""2024" | YEAR(" suffix")"#,
+        r#""2024" | year ((" suffix"))"#,
+    ] {
+        assert_eq!(render(expression), ["2024 suffix"], "{expression}");
+    }
+    assert_eq!(render(r#""2024" | year (1 2)"#), ["202412"]);
+    assert_eq!(render(r#""2024" | year (0 ?: 1)"#), ["20240"]);
 }

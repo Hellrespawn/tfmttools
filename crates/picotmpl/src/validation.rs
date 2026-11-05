@@ -1,7 +1,11 @@
-use crate::ast::{Expression, ExpressionKind};
+use crate::ast::{Expression, ExpressionKind, Reference};
 use crate::{ArgKind, ArgSpec, Diagnostic};
 
 #[derive(Clone, Copy, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "An expression can produce any combination of these types."
+)]
 struct Capabilities {
     boolean: bool,
     integer: bool,
@@ -40,23 +44,7 @@ fn analyze(
     let mut result = Capabilities::default();
     match &expression.kind {
         ExpressionKind::Reference(reference) => {
-            if !reference.tag {
-                let argument = arguments
-                    .iter()
-                    .find(|a| a.name == reference.name)
-                    .ok_or_else(|| {
-                        Diagnostic::new(
-                            format!("Undeclared argument '{}'", reference.name),
-                            reference.span,
-                        )
-                    })?;
-                result.structural = argument.kind == ArgKind::Path;
-                result.integer = argument.kind == ArgKind::Int;
-                result.text = argument.kind == ArgKind::String;
-            } else {
-                result.integer = true;
-                result.text = true;
-            }
+            result = reference_capabilities(reference, arguments)?;
         },
         ExpressionKind::Sequence(children)
         | ExpressionKind::Fallback(children) => {
@@ -140,4 +128,32 @@ fn analyze(
         ExpressionKind::Integer(_) => result.integer = true,
     }
     Ok(result)
+}
+
+fn reference_capabilities(
+    reference: &Reference,
+    arguments: &[ArgSpec],
+) -> Result<Capabilities, Diagnostic> {
+    if reference.tag {
+        return Ok(Capabilities {
+            integer: true,
+            text: true,
+            ..Capabilities::default()
+        });
+    }
+    let argument = arguments
+        .iter()
+        .find(|a| a.name == reference.name)
+        .ok_or_else(|| {
+            Diagnostic::new(
+                format!("Undeclared argument '{}'", reference.name),
+                reference.span,
+            )
+        })?;
+    Ok(Capabilities {
+        structural: argument.kind == ArgKind::Path,
+        integer: argument.kind == ArgKind::Int,
+        text: argument.kind == ArgKind::String,
+        ..Capabilities::default()
+    })
 }

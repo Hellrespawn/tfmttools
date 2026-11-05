@@ -30,6 +30,9 @@ formatted = { unary ~ formatter* }
 unary = { negation ~ unary | atom }
 negation = { "!" }
 atom = _{ tag | name | quoted | integer | sequence }
-formatter = { "|" ~ !"|" ~ name ~ formatter_arguments? }
+formatter = { "|" ~ !"|" ~ (year_formatter | name ~ formatter_arguments?) }
+// Preserve adjacent output groups after year, which only consumed numeric parameters.
+year_formatter = _{ &(^"year" ~ !name_tail) ~ name ~ year_arguments? }
+year_arguments = { "(" ~ number? ~ ")" }
 formatter_arguments = { "(" ~ (formatter_argument ~ ("," ~ formatter_argument)*)? ~ ")" }
 formatter_argument = _{ quoted | number }
