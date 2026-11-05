@@ -9,6 +9,7 @@ const HELP: &str = "\
 Usage: cargo xtask <task>
 
 Tasks:
+    dump-ast FILE     Pretty-print a template AST
     history-schema    Regenerate docs/history/schema-v1.sql
     check             cargo check --workspace
     completions       Generate shell completions into target/completions
@@ -40,6 +41,19 @@ fn main() -> ExitCode {
 
     match task.as_str() {
         "history-schema" => generate_history_schema(),
+        "dump-ast" => {
+            let mut args = vec![
+                "run",
+                "--quiet",
+                "-p",
+                "tfmttools-picotmpl",
+                "--example",
+                "dump_ast",
+                "--",
+            ];
+            args.extend(trailing_args.iter().map(String::as_str));
+            run_cargo(&args)
+        },
         "check" => run_cargo(&["check", "--workspace"]),
         "completions" => generate_completions(&trailing_args),
         "manpage" => generate_manpage(&trailing_args),

@@ -62,6 +62,9 @@ Supporting directories:
 - `packaging/` contains packaging metadata such as the Arch Linux
   `PKGBUILD`.
 
+To inspect a template's AST during development, run
+`cargo xtask dump-ast examples/stef.tfmt`.
+
 ## Usage
 
 Cleanup previews describe proposed deletions; dry runs say “Would delete”.

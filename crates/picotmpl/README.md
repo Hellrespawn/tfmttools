@@ -132,6 +132,34 @@ The library does not append file extensions or create directories.
 
 ## Diagnostics and development
 
+Inspect a template’s path AST as a compact tree:
+
+```sh
+cargo xtask dump-ast examples/stef.tfmt
+# Or run the standalone Cargo example:
+cargo run -p tfmttools-picotmpl --example dump_ast -- examples/stef.tfmt
+```
+
+The command reads one UTF-8 template file and writes one expression per line,
+indenting guard contents and keeping fallbacks and formatters inline. It omits
+source text, spans, and template metadata. For example:
+
+```text
+Path
+  Interpolation prefix
+  Interpolation $album_artist ?? $artist
+  Separator
+  Guard $album
+    Interpolation $album
+    Separator
+  Interpolation $title
+```
+
+Rust callers can use `Template::dump_ast()` for the same output. Inspection
+requires no argument binding or path rendering. File and compilation errors
+are written to stderr with a nonzero exit status. Compilation errors include
+the filename, line, and column. The debug output format may change.
+
 `Diagnostic` contains a message and UTF-8 byte span. Compiled templates retain
 their source text in the shared compiled representation. Use
 `Template::format_diagnostic()` or `BoundTemplate::format_diagnostic()` to format

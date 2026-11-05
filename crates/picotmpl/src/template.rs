@@ -62,6 +62,14 @@ impl BoundTemplate {
 }
 
 impl Template {
+    /// Inspect the path AST as a compact, indented tree without source spans.
+    /// Fallbacks and formatters appear inline; guard contents are nested.
+    /// The output format is intended for debugging and may change.
+    #[must_use]
+    pub fn dump_ast(&self) -> String {
+        crate::ast::dump(&self.inner.path)
+    }
+
     /// Format a diagnostic using this template's retained source text.
     /// The caller can prepend a filename or other source label.
     #[must_use]

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a picotmpl `dump_ast` Cargo example and `cargo xtask dump-ast FILE`
+  shortcut to print compact path AST trees without source spans.
+
 - Apply one filename character policy after interpolation to literals, tags,
   and arguments. Replace forbidden characters by default; `rename --strict`
   rejects them. Preserve interior whitespace and periods, reject prohibited
