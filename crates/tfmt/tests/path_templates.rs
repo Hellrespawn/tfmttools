@@ -78,7 +78,7 @@ fn history_lock_blocks_commands_in_other_processes_and_releases_on_drop() {
     let before = std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
 
     for arguments in
-        [vec!["rename", "--script", "path: ({$title})"], vec!["undo"], vec![
+        [vec!["rename", "--script", "template: ($title)"], vec!["undo"], vec![
             "clear-history",
         ]]
     {
@@ -139,7 +139,7 @@ fn historical_jinja_reuse_requests_explicit_replacement() {
         std::fs::read(root(&directory).join("renamed.mp3")).unwrap(),
         before
     );
-    let output = run(&directory, &["rename", "--script", "path: ({$title})"]);
+    let output = run(&directory, &["rename", "--script", "template: ($title)"]);
     assert!(
         output.status.success(),
         "{}",
@@ -186,11 +186,11 @@ fn template_arguments_are_validated_before_reading_audio() {
     let input = root(&directory).join("broken.mp3");
     std::fs::write(&input, "not audio").unwrap();
     for (template, args) in [
-        (r#"arg unused: string path: ("Song")"#, vec!["bad\n"]),
-        ("arg unused: string(default: \"bad\n\") path: (\"Song\")", vec![
+        (r#"arg unused: string template: ("Song")"#, vec!["bad\n"]),
+        ("arg unused: string(default: \"bad\n\") template: (\"Song\")", vec![
             "valid",
         ]),
-        (r#"path: ([$album? {$not_a_tag}] "Song")"#, vec![]),
+        (r#"template: ($album? ( $not_a_tag) "Song")"#, vec![]),
     ] {
         let mut arguments = vec!["rename", "--script", template, "--"];
         arguments.extend(args);
@@ -221,7 +221,7 @@ fn cleanup_preserves_target_with_parent_components_in_input_path() {
         "-i",
         "input/../input",
         "--script",
-        r#"path: ("input" / "Song")"#,
+        r#"template: ("input" / "Song")"#,
     ]);
     assert!(
         output.status.success(),
@@ -257,7 +257,7 @@ fn real_id3_number_pairs_supply_separate_totals() {
     let output = run(&directory, &[
         "rename",
         "--script",
-        r#"path: ({$track_number} "-" {$track_total ?? "missing"} "-" {$disc_total ?? "missing"})"#,
+        r#"template: ($track_number "-" ($track_total ?: "missing") "-" ($disc_total ?: "missing"))"#,
     ]);
     assert!(
         output.status.success(),
@@ -290,7 +290,7 @@ fn cleanup_resolution_failure_preserves_applied_action_history() {
         "-i",
         "input",
         "--script",
-        r#"path: ("input" / "Song")"#,
+        r#"template: ("input" / "Song")"#,
     ]);
     assert!(
         output.status.success(),
@@ -315,7 +315,7 @@ fn named_template_ignores_invalid_unselected_template() {
     let directory = TempDir::new().unwrap();
     let templates = root(&directory).join("config");
     std::fs::create_dir_all(&templates).unwrap();
-    std::fs::write(templates.join("selected.tfmt"), r#"path: ("Song")"#)
+    std::fs::write(templates.join("selected.tfmt"), r#"template: ("Song")"#)
         .unwrap();
     std::fs::write(templates.join("broken.tfmt"), "{{ title }}").unwrap();
     let output = run(&directory, &["rename", "--template", "selected"]);
@@ -334,7 +334,7 @@ fn duplicate_template_stems_are_ambiguous() {
     for extension in ["tfmt", "j2"] {
         std::fs::write(
             templates.join(format!("selected.{extension}")),
-            r#"path: ("Song")"#,
+            r#"template: ("Song")"#,
         )
         .unwrap();
     }
@@ -355,13 +355,13 @@ fn template_errors_use_lookup_name_instead_of_display_name() {
     let directory = historical_rename();
     let selected = root(&directory).join("config/selected.tfmt");
     for (source, expected) in [
-        ("name: \"Display name\"\npath: ({$unknown_tag})", "unknown_tag"),
+        ("name: \"Display name\"\ntemplate: ($unknown_tag)", "unknown_tag"),
         (
-            "name: \"Display name\"\narg required: string\npath: ({required})",
+            "name: \"Display name\"\narg required: string\ntemplate: (required)",
             "Missing required argument",
         ),
         (
-            "name: \"Display name\"\npath: ({$title | year})",
+            "name: \"Display name\"\ntemplate: (($title | year))",
             "Unable to extract a year",
         ),
     ] {
@@ -411,7 +411,7 @@ fn destination_ancestor_conflicts_fail_before_filesystem_changes() {
                 "-i",
                 "input",
                 "--script",
-                "path: ([$album? {$album} /] {$title})",
+                "template: ($album? ( $album /) $title)",
             ];
             if dry_run {
                 arguments.insert(0, "--dry-run");
@@ -437,7 +437,7 @@ fn strict_rejection_and_default_replacement_share_the_rendered_policy() {
     let directory = historical_rename();
     let before = std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
     let template =
-        r#"arg suffix: string path: (" Album. " / {$title} " / " {suffix})"#;
+        r#"arg suffix: string template: (" Album. " / $title " / " suffix)"#;
     let output =
         run(&directory, &["rename", "--strict", "--script", template, "bad?"]);
     assert!(!output.status.success());
@@ -466,7 +466,7 @@ fn strict_rejection_and_default_replacement_share_the_rendered_policy() {
         "rename",
         "--strict",
         "--script",
-        "path: ({$title})",
+        "template: ($title)",
     ]);
     assert!(output.status.success(), "{output:?}");
     assert_eq!(
@@ -477,9 +477,11 @@ fn strict_rejection_and_default_replacement_share_the_rendered_policy() {
 
 #[test]
 fn sanitized_paths_are_validated_before_files_move() {
-    for template in
-        [r#"path: ("CON?")"#, r#"path: ("...")"#, r#"path: ("Same?")"#]
-    {
+    for template in [
+        r#"template: ("CON?")"#,
+        r#"template: ("...")"#,
+        r#"template: ("Same?")"#,
+    ] {
         let directory = historical_rename();
         let before =
             std::fs::read(root(&directory).join("renamed.mp3")).unwrap();
@@ -499,4 +501,51 @@ fn sanitized_paths_are_validated_before_files_move() {
         assert!(!root(&directory).join("Same.mp3").exists());
         assert!(!root(&directory).join("CON.mp3").exists());
     }
+}
+
+#[test]
+fn boolean_output_is_rejected_before_rename() {
+    let directory = TempDir::new().unwrap();
+    std::fs::create_dir(root(&directory).join("config")).unwrap();
+    let input = root(&directory).join("original.mp3");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
+    std::fs::copy(fixture, &input).unwrap();
+    let before = std::fs::read(&input).unwrap();
+    for template in
+        ["template: (!$album)", r#"template: ("always" ? "Song" : !$album)"#]
+    {
+        let output = run(&directory, &["rename", "--script", template]);
+        assert!(!output.status.success());
+        let error = String::from_utf8_lossy(&output.stderr);
+        assert!(error.contains("boolean"), "{error}");
+        assert!(error.contains("1:"), "{error}");
+        assert_eq!(std::fs::read(&input).unwrap(), before);
+        assert!(!root(&directory).join("Song.mp3").exists());
+        assert!(!root(&directory).join("config/tfmt.hist").exists());
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+}
+
+#[test]
+fn conditional_and_elvis_inline_template() {
+    let directory = TempDir::new().unwrap();
+    std::fs::create_dir(root(&directory).join("config")).unwrap();
+    let input = root(&directory).join("original.mp3");
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3");
+    std::fs::copy(fixture, &input).unwrap();
+    let before = std::fs::read(&input).unwrap();
+    let output = run(&directory, &[
+        "--dry-run",
+        "rename",
+        "--script",
+        r#"template: (!$album ? "Single" : $artist ?: "Unknown" " - " $title)"#,
+    ]);
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Nightwish - Nemo.mp3"), "{stdout}");
+    assert_eq!(std::fs::read(&input).unwrap(), before);
+    assert!(!root(&directory).join("Nightwish - Nemo.mp3").exists());
+    assert!(!root(&directory).join("config/tfmt.hist").exists());
 }

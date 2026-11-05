@@ -10,6 +10,8 @@ Simplify picotmpl's punctuation and give expressions consistent composition
 rules. Quoted strings distinguish literals from references, so simple value
 insertion needs no delimiters. Parentheses group expressions instead of
 assigning separate delimiter shapes to insertion and conditions.
+The output expression is defined by `template:`; `path` remains an argument
+type for structural directory prefixes.
 
 This replaces the old syntax. Migrate executable templates, examples,
 tests, and current documentation together. Preserve existing layout output,
@@ -66,6 +68,8 @@ $album ? "yes" : "no"          # Conditional with an alternative
 
 Adjacent expressions concatenate. Whitespace outside strings is ignored;
 comments, escapes, identifier rules, and case handling stay unchanged.
+Templates and examples conventionally put a space before the conditional
+`?` operator; compact syntax remains valid.
 Quoted delimiter characters remain literal text. Old `{...}` and `[...]`
 syntax outside strings is rejected, as is the old `??` operator.
 
@@ -118,17 +122,17 @@ a final boolean remains a boolean and is subject to output validation.
 ### Conditionals and guards
 
 ```text
-$track_number? $track_number | pad(2) " - "
+$track_number ? $track_number | pad(2) " - "
 # Only the formatted number is conditional; the separator always emits.
 
-$track_number? ($track_number | pad(2) " - ")
+$track_number ? ($track_number | pad(2) " - ")
 # Both the number and separator are conditional.
 
-$album? $a ?: $b
-# Guard the entire fallback: $album? ($a ?: $b).
+$album ? $a ?: $b
+# Guard the entire fallback: $album ? ($a ?: $b).
 
-$a? $b? $title
-# Right-nested guards: $a? ($b? $title).
+$a ? $b ? $title
+# Right-nested guards: $a ? ($b ? $title).
 
 $album ? "yes" : "no" "!"
 # The exclamation mark follows either branch, unconditionally.
@@ -180,14 +184,14 @@ a text formatter. Reject these possibilities at compilation, even in a
 branch that appears unreachable:
 
 ```text
-path: (!$album)                         # Boolean output
-path: ($artist? !$album)                # Possible boolean output
-path: ("Album: " !$album)               # Boolean concatenation
-path: ((!$album ?: "Unknown"))          # Could select boolean true
-path: ((!$album | pad(2)) ? "missing")   # Boolean formatting
+template: (!$album)                         # Boolean output
+template: ($artist ? !$album)                # Possible boolean output
+template: ("Album: " !$album)               # Boolean concatenation
+template: ((!$album ?: "Unknown"))          # Could select boolean true
+template: ((!$album | pad(2)) ? "missing")   # Boolean formatting
 ```
 
-In contrast, `path: ((!$album) ? "missing" : $title)` is valid. A group
+In contrast, `template: ((!$album) ? "missing" : $title)` is valid. A group
 containing a single boolean preserves it; grouping does not stringify it.
 The parser accepts boolean expressions uniformly; these failures come from
 AST validation with a diagnostic on the offending expression.
@@ -202,20 +206,20 @@ These author-proposed details were included in the approved design:
   `!$a ?: $b` means `(!$a) ?: $b`; write `!($a ?: $b)` to negate a fallback.
   These binding details extend the agreed operator order.
 - Conditional inputs may be any expressions. For example,
-  `($a ?: $b)? $title` tests a fallback and
-  `("By " $artist)? $title` tests concatenated text.
+  `($a ?: $b) ? $title` tests a fallback and
+  `("By " $artist) ? $title` tests concatenated text.
 - Empty groups emit nothing and count as absent. A group around a single
   value preserves that value, including booleans, integers, and structural
   paths. Text concatenation displays integers as today; a concatenation
   containing only absent values is absent.
 - A conditional branch may itself be a conditional or `/`. The latter
   conditionally emits a boundary; it never sets the root indicator.
-- `path:` still requires an outer parenthesized expression. Thus
-  `path: ($title)`, `path: ($a ?: $b)`, and
-  `path: (($a ?: $b) | pad(2))` need no extra sequence wrapper.
+- `template:` still requires an outer parenthesized expression. Thus
+  `template: ($title)`, `template: ($a ?: $b)`, and
+  `template: (($a ?: $b) | pad(2))` need no extra sequence wrapper.
 - The root slash stays syntactic: only a bare slash that is the first
   direct segment of the outer path group sets the root indicator, as in
-  `path: (/ $title)`. A slash inside a nested group or guard remains a
+  `template: (/ $title)`. A slash inside a nested group or guard remains a
   directory boundary. Empty or skipped expressions cannot turn a later
   slash into a root.
 - Metadata definitions stay quoted strings. Argument settings and formatter
@@ -225,7 +229,7 @@ These author-proposed details were included in the approved design:
 An equivalent grammar sketch is:
 
 ```text
-path-body    := "(" sequence ")"
+template-body := "(" sequence ")"
 sequence     := conditional*
 conditional  := fallback ("?" conditional (":" conditional)?)?
               | "/"
@@ -302,19 +306,19 @@ arg prefix: path(
   description: "Directory prefix to place output under."
 )
 
-path: (
+template: (
   prefix ($album_artist ?: $artist) /
-  $album? (
-    $date? (
+  $album ? (
+    $date ? (
       $date | year
-      $album_sort? ("." $album_sort | pad(2))
+      $album_sort ? ("." $album_sort | pad(2))
       " - "
     )
     $album /
   )
   $disc_number
-  $track_number? ($track_number | pad(2) " - ")
-  $album_artist? $artist? ($artist " - ")
+  $track_number ? ($track_number | pad(2) " - ")
+  $album_artist ? $artist ? ($artist " - ")
   $title
 )
 ```

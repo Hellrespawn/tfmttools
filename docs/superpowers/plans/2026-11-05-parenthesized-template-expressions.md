@@ -124,7 +124,7 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   Reuse `bind`, `text`, and the resolver helpers. With `a = "7"`,
   `b = "3"`, `n = "2"`, and absent `missing`, assert these components:
 
-  | Source inside `path: (...)` | Expected filename |
+  | Source inside `template: (...)` | Expected filename |
   | --- | --- |
   | `"." $n \| pad(2)` | `.02` |
   | `("." $n) \| pad(3)` | `0.2` |
@@ -143,19 +143,19 @@ verified independently; workspace CLI snippets are migrated in Task 2.
 - [x] **Step 2: Add type and token tests in `tests/syntax.rs`.**
 
   `booleans_are_rejected_only_in_invalid_contexts` must compile
-  `path: ((!$album) ? "missing" : $title)` and
-  `path: ((!$a ?: !$b) ? "absent" : "present")`.
+  `template: ((!$album) ? "missing" : $title)` and
+  `template: ((!$a ?: !$b) ? "absent" : "present")`.
   It must reject each of the following at compilation with an in-bounds
   span identifying the offending operation:
 
   ```text
-  path: (!$album)
-  path: ($artist ? !$album)
-  path: ("Album: " !$album)
-  path: ((!$album ?: "Unknown"))
-  path: ((!$album | pad(2)) ? "missing")
-  path: ("always" ?: !$album)
-  path: ("always" ? "ok" : !$album)
+  template: (!$album)
+  template: ($artist ? !$album)
+  template: ("Album: " !$album)
+  template: ((!$album ?: "Unknown"))
+  template: ((!$album | pad(2)) ? "missing")
+  template: ("always" ?: !$album)
+  template: ("always" ? "ok" : !$album)
   ```
 
   `conditional_tokens_and_association` must accept `$a?$b?:$c:$d` and
@@ -164,9 +164,9 @@ verified independently; workspace CLI snippets are migrated in Task 2.
   without an operand. Add old-delimiter rejection cases while keeping
   quoted `{}`, `[]`, `??`, and `?:` valid literal text.
 
-  `unicode_diagnostic_columns` must use `path: ("é" !)` and assert the
+  `unicode_diagnostic_columns` must use `template: ("é" !)` and assert the
   missing-operand diagnostic points at `)` or its boundary with one-based
-  character column 13, not a byte-based column. Retain source-slice checks
+  character column 17, not a byte-based column. Retain source-slice checks
   for resolver and formatter spans after multibyte text.
 
 - [x] **Step 3: Add behavioral edge tests in `tests/rendering.rs` and
@@ -267,9 +267,9 @@ TFMTResult<Template>` and CLI template loading. Produce migrated sources,
 current help and docs, and passing workspace and fixture checks. No new
 command, option, history schema, or public API.
 
-- [ ] **Step 1: Migrate the file-map examples, fixtures, and Rust snippets.**
+- [x] **Step 1: Migrate the file-map examples, fixtures, and Rust snippets.**
 
-  Search using `rg -n -F 'path: (' crates examples tests/fixtures/cli
+  Search using `rg -n -F 'template: (' crates examples tests/fixtures/cli
   README.md` and targeted searches for `{\$`, guarded brackets, and `??`.
   Classify each match before editing: current source, rejection test,
   retained history metadata, or historical prose. Migrate current sources
@@ -278,11 +278,11 @@ command, option, history schema, or public API.
   diagnostics. Preserve fixture filenames, output paths, and rename history
   expectations. Do not regenerate or inspect bulky report assets.
 
-- [ ] **Step 2: Add CLI boundary checks to `tests/path_templates.rs`.**
+- [x] **Step 2: Add CLI boundary checks to `tests/path_templates.rs`.**
 
   Reuse its temp-directory CLI helpers and the existing audio fixture.
   `boolean_output_is_rejected_before_rename` must run an inline template
-  with `path: (!$album)`, assert failure with a located boolean diagnostic,
+  with `template: (!$album)`, assert failure with a located boolean diagnostic,
   and assert the original file bytes and name are unchanged and no target
   or applied history action exists. Repeat for a boolean hidden in an
   unreachable branch. `conditional_and_elvis_inline_template` must dry-run
@@ -291,7 +291,7 @@ command, option, history schema, or public API.
   from the fixture's existing metadata assertions rather than synthesizing
   a new audio asset.
 
-- [ ] **Step 3: Verify history remains independent of current syntax.**
+- [x] **Step 3: Verify history remains independent of current syntax.**
 
   Preserve `historical_rename`'s stored `{{ artist }}/{{ title }}` in
   `tests/path_templates.rs` and other retained history compatibility data.
@@ -301,7 +301,7 @@ command, option, history schema, or public API.
   history display still work for old stored strings without recompilation.
   Fix any actual integration regression at its existing boundary.
 
-- [ ] **Step 4: Finish current documentation and release notes.**
+- [x] **Step 4: Finish current documentation and release notes.**
 
   Update README syntax tables, CLI examples, and migration guidance;
   update CLI help examples and CHANGELOG. Document replacement of braces,
@@ -309,7 +309,7 @@ command, option, history schema, or public API.
   but intentional `("By " $a) ?: "Unknown"` behavior. Keep approved
   historical specs and the stored history format intact.
 
-- [ ] **Step 5: Run final checks and inspect the complete diff.**
+- [x] **Step 5: Run final checks and inspect the complete diff.**
 
   Run `cargo xtask test-integration`, `cargo test --workspace`,
   `cargo test -p tfmttools-picotmpl --example dump_ast`,

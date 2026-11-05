@@ -1,1 +1,1 @@
-path: ("input" / {$artist} " - " {$title})
+template: ("input" / $artist " - " $title)

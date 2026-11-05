@@ -7,7 +7,7 @@ fn compile(source: &str) -> Result<Template, tfmttools_picotmpl::Diagnostic> {
 #[test]
 fn definitions_and_forward_argument_references() {
     let template =
-        compile("path: (prefix $TITLE) arg prefix: string(default: \"\")")
+        compile("template: (prefix $TITLE) arg prefix: string(default: \"\")")
             .unwrap();
     assert_eq!(template.arguments().len(), 1);
     assert_eq!(template.arguments()[0].kind, ArgKind::String);
@@ -21,7 +21,7 @@ fn quoted_whitespace_and_comments() {
         # a comment
         name: "Quoted \"name\""
         description: "Windows \\ Unix /"
-        path: (" - # [{}] " $title) # another comment
+        template: (" - # [{}] " $title) # another comment
     "#;
     let template = compile(source).unwrap();
     assert_eq!(template.metadata().name.as_deref(), Some("Quoted \"name\""));
@@ -35,7 +35,7 @@ fn quoted_whitespace_and_comments() {
 #[test]
 fn nested_guards_and_negative_guards() {
     let template = compile(
-        r#"path: ($album? ( $date? ( ($date | year))) !$album? ( "Singles" /) $title)"#,
+        r#"template: ($album? ( $date? ( ($date | year))) !$album? ( "Singles" /) $title)"#,
     )
     .unwrap();
     let names: Vec<_> = template
@@ -49,9 +49,9 @@ fn nested_guards_and_negative_guards() {
 #[test]
 fn unknown_argument_and_option() {
     for source in [
-        "path: (undeclared)",
-        "arg prefix: path(required: false) path: ($title)",
-        "path: (!undeclared? ( $title))",
+        "template: (undeclared)",
+        "arg prefix: path(required: false) template: ($title)",
+        "template: (!undeclared? ( $title))",
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
@@ -60,12 +60,12 @@ fn unknown_argument_and_option() {
 #[test]
 fn duplicate_definitions() {
     for source in [
-        r#"name: "A" name: "B" path: ("x")"#,
-        r#"description: "A" description: "B" path: ("x")"#,
-        r#"path: ("A") path: ("B")"#,
-        r#"arg prefix: string arg PREFIX: path path: ("x")"#,
-        r#"arg prefix: string(default: "", default: "x") path: ("x")"#,
-        r#"arg prefix: string(description: "", description: "x") path: ("x")"#,
+        r#"name: "A" name: "B" template: ("x")"#,
+        r#"description: "A" description: "B" template: ("x")"#,
+        r#"template: ("A") template: ("B")"#,
+        r#"arg prefix: string arg PREFIX: path template: ("x")"#,
+        r#"arg prefix: string(default: "", default: "x") template: ("x")"#,
+        r#"arg prefix: string(description: "", description: "x") template: ("x")"#,
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
@@ -74,11 +74,11 @@ fn duplicate_definitions() {
 #[test]
 fn bad_formatter_syntax() {
     for source in [
-        "path: (($title | unknown))",
-        "path: (($track | pad()))",
-        "path: (($track | pad(-1)))",
-        "path: (($date | year(2)))",
-        "path: (($track | pad(2, 3)))",
+        "template: (($title | unknown))",
+        "template: (($track | pad()))",
+        "template: (($track | pad(-1)))",
+        "template: (($date | year(2)))",
+        "template: (($track | pad(2, 3)))",
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
@@ -86,16 +86,16 @@ fn bad_formatter_syntax() {
 
 #[test]
 fn diagnostic_unicode_positions() {
-    let source = "name: \"Été\"\npath: (\"é\" @)";
+    let source = "name: \"Été\"\ntemplate: (\"é\" @)";
     let error = compile(source).unwrap_err();
     assert_eq!(&source[error.span.start..error.span.end], "@");
-    assert_eq!(error.line_column(source), (2, 12));
+    assert_eq!(error.line_column(source), (2, 16));
 }
 
 #[test]
 fn compiled_template_outlives_source() {
     let template = {
-        let source = String::from("name: \"Owned\" path: ($title)");
+        let source = String::from("name: \"Owned\" template: ($title)");
         compile(&source).unwrap()
     };
     assert_eq!(template.metadata().name.as_deref(), Some("Owned"));
@@ -106,7 +106,7 @@ fn compiled_template_outlives_source() {
 fn binding_diagnostic_uses_retained_source() {
     let template = {
         let source =
-            String::from("name: \"Été\"\narg prefix: int\npath: (prefix)");
+            String::from("name: \"Été\"\narg prefix: int\ntemplate: (prefix)");
         compile(&source).unwrap()
     };
     let error = template.bind(&["invalid".to_owned()]).unwrap_err();
@@ -120,7 +120,7 @@ fn binding_diagnostic_uses_retained_source() {
 fn bound_render_diagnostic_outlives_template_and_source() {
     let bound = {
         let source =
-            String::from("name: \"Été\"\npath: (\"é\" ($date | year))");
+            String::from("name: \"Été\"\ntemplate: (\"é\" ($date | year))");
         compile(&source).unwrap().bind(&[]).unwrap()
     };
     let error = bound
@@ -138,7 +138,7 @@ fn bound_render_diagnostic_outlives_template_and_source() {
     };
     assert_eq!(
         bound.format_diagnostic(&error),
-        "2:21: Unable to extract a year from \"unknown\"",
+        "2:25: Unable to extract a year from \"unknown\"",
     );
 }
 
@@ -147,14 +147,14 @@ fn malformed_documents_and_strings() {
     for source in [
         "",
         "name: \"A\"",
-        "path: ($title",
-        "path: ($title? ( \"A\")",
-        "path: (\"unterminated)",
-        r#"path: ("invalid\n")"#,
-        "path: (bare)",
-        "path: ($)",
-        "arg 1prefix: string path: ($title)",
-        "arg prefix: unknown path: ($title)",
+        "template: ($title",
+        "template: ($title? ( \"A\")",
+        "template: (\"unterminated)",
+        r#"template: ("invalid\n")"#,
+        "template: (bare)",
+        "template: ($)",
+        "arg 1prefix: string template: ($title)",
+        "arg prefix: unknown template: ($title)",
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
@@ -163,55 +163,55 @@ fn malformed_documents_and_strings() {
 #[test]
 fn multiple_fallbacks_and_chained_formatters() {
     assert!(
-        compile(r#"path: ((($a ?: $b ?: "Unknown") | year | pad(6)))"#,)
+        compile(r#"template: ((($a ?: $b ?: "Unknown") | year | pad(6)))"#,)
             .is_ok()
     );
 }
 
 #[test]
 fn padding_width_is_bounded() {
-    assert!(compile("path: (($track | pad(1024)))").is_ok());
-    assert!(compile("path: (($track | pad(1025)))").is_err());
+    assert!(compile("template: (($track | pad(1024)))").is_ok());
+    assert!(compile("template: (($track | pad(1025)))").is_err());
 }
 
 #[test]
 fn lexical_boundaries_and_full_document_consumption() {
     for source in [
-        "pa th: (\"x\")",
-        "path: ($ title)",
-        "path: (($track | pad(1 2)))",
-        "path: (\"x\") trailing",
-        "arg prefix: string(default: \"x\", DEFAULT: \"y\") path: (prefix)",
+        "tem plate: (\"x\")",
+        "template: ($ title)",
+        "template: (($track | pad(1 2)))",
+        "template: (\"x\") trailing",
+        "arg prefix: string(default: \"x\", DEFAULT: \"y\") template: (prefix)",
     ] {
         assert!(compile(source).is_err(), "{source}");
     }
-    let template = compile("NAME: \"Été\"\u{2003}arg PREFIX: string(default: \"x\",) path: (prefix $custom-tag)").unwrap();
+    let template = compile("NAME: \"Été\"\u{2003}arg PREFIX: string(default: \"x\",) template: (prefix $custom-tag)").unwrap();
     assert_eq!(template.metadata().name.as_deref(), Some("Été"));
     assert_eq!(template.arguments()[0].name, "prefix");
     assert_eq!(template.tag_references()[0].name, "custom-tag");
-    let source = "name: \"é\"\npath: (";
+    let source = "name: \"é\"\ntemplate: (";
     let error = compile(source).unwrap_err();
     assert_eq!(error.span.start, source.len());
     assert_eq!(error.span.end, source.len());
-    assert_eq!(error.line_column(source), (2, 8));
+    assert_eq!(error.line_column(source), (2, 12));
 }
 
 #[test]
 fn booleans_are_rejected_only_in_invalid_contexts() {
     for source in [
-        r#"path: ((!$album) ? "missing" : $title)"#,
-        r#"path: ((!$a ?: !$b) ? "absent" : "present")"#,
+        r#"template: ((!$album) ? "missing" : $title)"#,
+        r#"template: ((!$a ?: !$b) ? "absent" : "present")"#,
     ] {
         compile(source).unwrap();
     }
     for source in [
-        "path: (!$album)",
-        "path: ($artist ? !$album)",
-        r#"path: ("Album: " !$album)"#,
-        r#"path: ((!$album ?: "Unknown"))"#,
-        r#"path: ((!$album | pad(2)) ? "missing")"#,
-        r#"path: ("always" ?: !$album)"#,
-        r#"path: ("always" ? "ok" : !$album)"#,
+        "template: (!$album)",
+        "template: ($artist ? !$album)",
+        r#"template: ("Album: " !$album)"#,
+        r#"template: ((!$album ?: "Unknown"))"#,
+        r#"template: ((!$album | pad(2)) ? "missing")"#,
+        r#"template: ("always" ?: !$album)"#,
+        r#"template: ("always" ? "ok" : !$album)"#,
     ] {
         let error = compile(source).unwrap_err();
         assert!(error.message.to_lowercase().contains("boolean"), "{error}");
@@ -223,9 +223,9 @@ fn booleans_are_rejected_only_in_invalid_contexts() {
 #[test]
 fn conditional_tokens_and_association() {
     for source in [
-        "path: ($a?$b?:$c:$d)",
-        r#"path: ($a?$b?"both":"a":"none")"#,
-        r#"path: ("{} [] ?? ?:")"#,
+        "template: ($a?$b?:$c:$d)",
+        r#"template: ($a?$b?"both":"a":"none")"#,
+        r#"template: ("{} [] ?? ?:")"#,
     ] {
         compile(source).unwrap();
     }
@@ -239,7 +239,7 @@ fn conditional_tokens_and_association() {
         "{$a}",
         "[$a? $b]",
     ] {
-        let source = format!("path: ({expression})");
+        let source = format!("template: ({expression})");
         let error = compile(&source).unwrap_err();
         assert!(source.get(error.span.start..error.span.end).is_some());
     }
@@ -247,20 +247,38 @@ fn conditional_tokens_and_association() {
 
 #[test]
 fn unicode_diagnostic_columns() {
-    let source = "path: (\"é\" !)";
+    let source = "template: (\"é\" !)";
     let error = compile(source).unwrap_err();
     assert_eq!(&source[error.span.start..error.span.end], ")");
-    assert_eq!(error.line_column(source), (1, 13));
+    assert_eq!(error.line_column(source), (1, 17));
 }
 
 #[test]
 fn old_syntax_has_migration_hints() {
     for (source, hint) in [
-        ("path: ({$title})", "parentheses"),
-        ("path: ([$album? $title])", "condition ?"),
-        ("path: ($artist ?? $title)", "?:"),
+        ("template: ({$title})", "parentheses"),
+        ("template: ([$album? $title])", "condition ?"),
+        ("template: ($artist ?? $title)", "?:"),
     ] {
         let error = compile(source).unwrap_err();
         assert!(error.message.contains(hint), "{error}");
     }
+}
+
+#[test]
+fn template_definition_is_distinct_from_path_argument_type() {
+    let template =
+        compile("arg prefix: path template: (prefix $title)").unwrap();
+    assert_eq!(template.arguments()[0].kind, ArgKind::Path);
+    let rendered = template
+        .bind(&["Music/Albums".to_owned()])
+        .unwrap()
+        .render(|_| {
+            Ok::<_, std::convert::Infallible>(Some(
+                tfmttools_picotmpl::Scalar::Text("Song".to_owned()),
+            ))
+        })
+        .unwrap();
+    assert_eq!(rendered.components(), ["Music", "Albums", "Song"]);
+    assert!(compile("path: ($title)").is_err());
 }

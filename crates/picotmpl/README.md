@@ -1,7 +1,7 @@
 # picotmpl
 
 A small language for constructing paths from metadata. Templates contain
-listing metadata, typed argument declarations, and a path rule. Compilation
+listing metadata, typed argument declarations, and a `template:` expression. Compilation
 owns its data; rendering uses a caller supplied resolver and performs no
 filesystem operations.
 
@@ -17,10 +17,10 @@ manifest; the language API does not depend on the workspace.
 name: "Artist and title"
 arg prefix: path(default: "", description: "Output directory.")
 
-path: (
+template: (
   prefix ($album_artist ?: $artist ?: "Unknown Artist") /
-  $album? ($album /)
-  $track_number? ($track_number | pad(2) " - ")
+  $album ? ($album /)
+  $track_number ? ($track_number | pad(2) " - ")
   $title
 )
 ```
@@ -42,6 +42,7 @@ nothing. `condition ? yes : no` selects one branch. Each branch is one
 expression, so group compound output: `$album ? ($album /)`. Nested
 conditionals bind to the right; `:` attaches to the nearest unmatched `?`
 in its group. Elvis `?:` is one token; `? :` is not valid.
+Examples put a space before `?` for readability; the space is optional.
 
 `!value` negates its presence test and produces a boolean. Boolean conditions
 use their truth value; false does not pass a test. Booleans cannot be emitted,
@@ -87,7 +88,7 @@ let template = Template::compile(
     r#"
     name: "Artist and title"
     arg prefix: path(default: "")
-    path: (prefix ($artist ?: "Unknown Artist") / $title)
+    template: (prefix ($artist ?: "Unknown Artist") / $title)
     "#,
 )?;
 

@@ -6,18 +6,18 @@ arg prefix: path(
   description: "Directory prefix to place output under."
 )
 
-path: (
-  {prefix} {$album_artist ?? $artist} /
-  [$album?
-    [$date?
-      {$date | year}
-      [$album_sort? "." {$album_sort | pad(2)}]
+template: (
+  prefix ($album_artist ?: $artist) /
+  $album ? (
+    $date ? (
+      $date | year
+      $album_sort ? ("." $album_sort | pad(2))
       " - "
-    ]
-    {$album} /
-  ]
-  [$disc_number? {$disc_number | pad(1)}]
-  [$track_number? {$track_number | pad(2)} " - "]
-  [$album_artist? [$artist? {$artist} " - "]]
-  {$title}
+    )
+    $album /
+  )
+  $disc_number
+  $track_number ? ($track_number | pad(2) " - ")
+  $album_artist ? $artist ? ($artist " - ")
+  $title
 )

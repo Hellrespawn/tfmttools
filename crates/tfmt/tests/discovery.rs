@@ -12,7 +12,7 @@ use lofty::tag::TagExt;
 
 #[test]
 fn incomplete_scan_does_not_rename_or_fix() {
-    for args in [vec!["rename", "--script", "path: (\"renamed\")"], vec![
+    for args in [vec!["rename", "--script", "template: (\"renamed\")"], vec![
         "validate",
         "characters",
         "--fix",

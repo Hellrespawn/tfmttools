@@ -23,7 +23,7 @@ fn commands_find_the_same_input_through_relative_and_absolute_paths() {
         for command in [vec!["validate", "characters"], vec![
             "rename",
             "--script",
-            "path: (\"renamed\")",
+            "template: (\"renamed\")",
         ]] {
             let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
                 .current_dir(dir.path())
@@ -106,7 +106,7 @@ fn recursion_depth_is_limited_to_256() {
                 depth,
             ]);
             if command == "rename" {
-                invocation.args(["--script", "path: (\"renamed\")"]);
+                invocation.args(["--script", "template: (\"renamed\")"]);
             }
             let output = invocation.output().unwrap();
             let accepted = matches!(depth, "0" | "256");

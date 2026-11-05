@@ -137,7 +137,7 @@ mod path_template_tests {
             "date",
         ] {
             assert!(
-                compile_audio_template(&format!("path: ({{${name}}})")).is_ok(),
+                compile_audio_template(&format!("template: (${name})")).is_ok(),
                 "{name}"
             );
         }
@@ -150,7 +150,7 @@ mod path_template_tests {
             "DATE",
         ] {
             assert!(
-                compile_audio_template(&format!("path: ({{${name}}})"))
+                compile_audio_template(&format!("template: (${name})"))
                     .is_err(),
                 "{name}"
             );
@@ -174,7 +174,7 @@ mod path_template_tests {
                     "title"
                 };
                 assert_eq!(
-                    render(&format!("path: ({{${name}}})"), &[(key, raw)]).0,
+                    render(&format!("template: (${name})"), &[(key, raw)]).0,
                     [expected]
                 );
             }
@@ -184,7 +184,7 @@ mod path_template_tests {
     #[test]
     fn overflowing_text_keeps_leading_zeros() {
         assert_eq!(
-            render("path: ({$title})", &[(
+            render("template: ($title)", &[(
                 ItemKey::TrackTitle,
                 "009223372036854775808"
             )])
@@ -195,7 +195,7 @@ mod path_template_tests {
 
     #[test]
     fn path_language_sanitizes_tags_and_reports_whitespace() {
-        let (components, warnings) = render("path: ({$artist} / {$title})", &[
+        let (components, warnings) = render("template: ($artist / $title)", &[
             (ItemKey::TrackArtist, " AC/DC: Live. "),
             (ItemKey::TrackTitle, "Song"),
         ]);
@@ -209,7 +209,7 @@ mod path_template_tests {
     #[test]
     fn path_language_retains_dates_numbers_and_aliases() {
         let (components, _) = render(
-            "path: ({$date | year} \"-\" {$disk_number} \"-\" {$track_number} \"-\" {$track_total} \"-\" {$movement_total})",
+            "template: (($date | year) \"-\" $disk_number \"-\" $track_number \"-\" $track_total \"-\" $movement_total)",
             &[
                 (ItemKey::RecordingDate, "2024-03-10"),
                 (ItemKey::Year, "1999"),
@@ -221,13 +221,13 @@ mod path_template_tests {
             ],
         );
         assert_eq!(components, ["2024-1-3-12-5"]);
-        let (components, _) = render("path: ({$date | year})", &[
+        let (components, _) = render("template: (($date | year))", &[
             (ItemKey::Year, "1999"),
             (ItemKey::OriginalReleaseDate, "1980"),
         ]);
         assert_eq!(components, ["1999"]);
         assert_eq!(
-            render("path: ({$date})", &[(
+            render("template: ($date)", &[(
                 ItemKey::OriginalReleaseDate,
                 "1980"
             )])
@@ -238,11 +238,11 @@ mod path_template_tests {
 
     #[test]
     fn path_language_presence_and_malformed_numbers() {
-        assert_eq!(render(r#"path: ([$track_number? {$track_number}] [!$artist? "missing"] )"#,
+        assert_eq!(render(r#"template: ($track_number? ( $track_number) !$artist? ( "missing") )"#,
             &[(ItemKey::TrackNumber, "0"), (ItemKey::TrackArtist, " ")]).0, ["0"]);
         for value in ["bad", "3/bad", "3/12/15", "18446744073709551616"] {
             assert_eq!(
-                render(r#"path: ({$track_number ?? "absent"})"#, &[(
+                render(r#"template: (($track_number ?: "absent"))"#, &[(
                     ItemKey::TrackNumber,
                     value
                 )])
@@ -251,7 +251,7 @@ mod path_template_tests {
             );
         }
         assert_eq!(
-            render("path: ({$title})", &[(
+            render("template: ($title)", &[(
                 ItemKey::TrackTitle,
                 "9223372036854775808"
             )])
@@ -259,7 +259,7 @@ mod path_template_tests {
             ["9223372036854775808"]
         );
         assert_eq!(
-            render(r#"path: ({$track_number ?? "absent"})"#, &[(
+            render(r#"template: (($track_number ?: "absent"))"#, &[(
                 ItemKey::TrackNumber,
                 "9223372036854775808"
             )])
@@ -275,7 +275,7 @@ mod path_template_tests {
     #[test]
     fn path_language_checks_skipped_unknown_tags() {
         let error = compile_audio_template(
-            "path: (\n [$album? {$not_a_tag}] \"Song\"\n)",
+            "template: (\n $album? ( $not_a_tag) \"Song\"\n)",
         )
         .unwrap_err();
         let message = error.to_string();
@@ -293,13 +293,13 @@ mod path_template_tests {
             let message =
                 compile_audio_template(source).unwrap_err().to_string();
             assert!(message.contains("migrat"), "{message}");
-            assert!(message.contains("path:"), "{message}");
+            assert!(message.contains("template:"), "{message}");
         }
     }
     #[test]
     fn path_language_native_destination_preserves_extension() {
         let template = compile_audio_template(
-            r#"arg prefix: path path: ({prefix} "Song.part")"#,
+            r#"arg prefix: path template: (prefix "Song.part")"#,
         )
         .unwrap();
         let bound = template.bind(&[r"Music\Artists".to_owned()]).unwrap();
@@ -313,7 +313,8 @@ mod path_template_tests {
                 .join("Artists")
                 .join("Song.part.mp3")
         );
-        let template = compile_audio_template(r#"path: (/ "Song")"#).unwrap();
+        let template =
+            compile_audio_template(r#"template: (/ "Song")"#).unwrap();
         let (target, _) = audio(&[])
             .construct_target_path(
                 &template.bind(&[]).unwrap(),
@@ -331,9 +332,9 @@ mod path_template_tests {
     #[test]
     fn character_policy_is_shared_by_literals_tags_and_arguments() {
         for (source, arguments) in [
-            (r#"path: (" A/B\\C?:. ")"#, vec![]),
-            ("path: ({$title})", vec![]),
-            ("arg value: string path: ({value})", vec![
+            (r#"template: (" A/B\\C?:. ")"#, vec![]),
+            ("template: ($title)", vec![]),
+            ("arg value: string template: (value)", vec![
                 " A/B\\C?:. ".to_owned(),
             ]),
         ] {
@@ -355,7 +356,7 @@ mod path_template_tests {
     #[test]
     fn character_policy_runs_after_interpolation() {
         let bound = compile_audio_template(
-            r#"arg suffix: string path: ("prefix" {$title} {suffix} "suffix")"#,
+            r#"arg suffix: string template: ("prefix" $title suffix "suffix")"#,
         )
         .unwrap()
         .bind(&[". ".to_owned()])
@@ -375,7 +376,7 @@ mod path_template_tests {
     #[test]
     fn only_path_arguments_introduce_boundaries() {
         let bound = compile_audio_template(
-            r#"arg prefix: path path: ({prefix} "A/B")"#,
+            r#"arg prefix: path template: (prefix "A/B")"#,
         )
         .unwrap()
         .bind(&[" Music\\Artists? /Album. ".to_owned()])
@@ -409,7 +410,7 @@ mod path_template_tests {
                         _ => ItemKey::TrackNumber,
                     };
                     let bound = compile_audio_template(&format!(
-                        "path: ({{${name} ?? \"fallback\"{formatter}}})"
+                        "template: ((${name} ?: \"fallback\"){formatter})"
                     ))
                     .unwrap()
                     .bind(&[])
@@ -426,18 +427,20 @@ mod path_template_tests {
             }
             for kind in ["string", "path", "int"] {
                 let template = compile_audio_template(&format!(
-                    "arg value: {kind} path: (\"Song\")"
+                    "arg value: {kind} template: (\"Song\")"
                 ))
                 .unwrap();
                 assert!(template.bind(&[format!("3{character}")]).is_err());
             }
             assert!(
-                compile_audio_template(&format!("path: (\"Song{character}\")"))
-                    .is_err()
+                compile_audio_template(&format!(
+                    "template: (\"Song{character}\")"
+                ))
+                .is_err()
             );
         }
         assert_eq!(
-            render("path: ({$title})", &[(
+            render("template: ($title)", &[(
                 ItemKey::TrackTitle,
                 "Cafe\u{301} 👩\u{200d}💻 ✈\u{fe0f}"
             )])
@@ -448,10 +451,11 @@ mod path_template_tests {
 
     #[test]
     fn path_language_render_errors_identify_file_and_source() {
-        let template = compile_audio_template("path: (\n {$date | year}\n)")
-            .unwrap()
-            .bind(&[])
-            .unwrap();
+        let template =
+            compile_audio_template("template: (\n ($date | year)\n)")
+                .unwrap()
+                .bind(&[])
+                .unwrap();
         let message = render_audio_path(
             &template,
             &audio(&[(ItemKey::RecordingDate, "invalid")]),
@@ -462,10 +466,11 @@ mod path_template_tests {
         assert!(message.contains("input/song.mp3"));
 
         assert!(message.contains("2:"));
-        let template = compile_audio_template(r#"path: ({$artist} / "Song")"#)
-            .unwrap()
-            .bind(&[])
-            .unwrap();
+        let template =
+            compile_audio_template(r#"template: ($artist / "Song")"#)
+                .unwrap()
+                .bind(&[])
+                .unwrap();
         assert!(render_audio_path(&template, &audio(&[]), false).is_err());
     }
     #[test]
@@ -519,10 +524,10 @@ mod path_template_tests {
     #[test]
     fn character_replacement_cannot_leave_empty_components() {
         for source in [
-            r#"path: (".")"#,
-            r#"path: ("..")"#,
-            r#"path: ("???" / "Song")"#,
-            r#"path: (" ")"#,
+            r#"template: (".")"#,
+            r#"template: ("..")"#,
+            r#"template: ("???" / "Song")"#,
+            r#"template: (" ")"#,
         ] {
             let bound =
                 compile_audio_template(source).unwrap().bind(&[]).unwrap();
@@ -537,7 +542,7 @@ mod path_template_tests {
     #[test]
     fn path_language_empty_dates_do_not_block_fallback() {
         assert_eq!(
-            render("path: ({$date})", &[
+            render("template: ($date)", &[
                 (ItemKey::RecordingDate, ""),
                 (ItemKey::Year, "1999"),
                 (ItemKey::OriginalReleaseDate, "1980"),
@@ -546,7 +551,7 @@ mod path_template_tests {
             ["1999"]
         );
         assert_eq!(
-            render("path: ({$date})", &[
+            render("template: ($date)", &[
                 (ItemKey::RecordingDate, ""),
                 (ItemKey::Year, ""),
                 (ItemKey::OriginalReleaseDate, "1980"),
@@ -573,7 +578,7 @@ mod path_template_tests {
                 (ItemKey::MovementNumber, "4/5"),
             ],
         ] {
-            assert_eq!(render(r#"path: ({$track_total ?? "missing"} "-" {$disc_total ?? "missing"} "-" {$movement_total ?? "missing"})"#, &values).0, ["12-2-5"]);
+            assert_eq!(render(r#"template: (($track_total ?: "missing") "-" ($disc_total ?: "missing") "-" ($movement_total ?: "missing"))"#, &values).0, ["12-2-5"]);
         }
     }
 }

@@ -66,7 +66,7 @@ fn rejects_all_old_json_histories_without_importing_or_changing_audio() {
             vec!["show-history"],
             vec!["undo"],
             vec!["redo"],
-            vec!["rename", "--script", "path: (\"Renamed\")"],
+            vec!["rename", "--script", "template: (\"Renamed\")"],
             vec!["validate", "characters", "--fix"],
             vec!["validate", "id3-encoding", "--fix"],
         ] {

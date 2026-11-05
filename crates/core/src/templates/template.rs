@@ -34,7 +34,7 @@ fn compilation_error(source: &str, error: &Diagnostic) -> TFMTError {
         || source.trim_start().starts_with("+++")
         || source.trim_start().starts_with("{#");
     let hint = if legacy {
-        " Legacy Jinja/frontmatter syntax requires manual migration; provide an explicit replacement with `--script 'path: ({$artist} / {$title})'` or `--template` pointing to a migrated file."
+        " Legacy Jinja/frontmatter syntax requires manual migration; provide an explicit replacement with `--script 'template: ($artist / $title)'` or `--template` pointing to a migrated file."
     } else {
         ""
     };

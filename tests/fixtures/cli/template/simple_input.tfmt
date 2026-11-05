@@ -1,1 +1,1 @@
-path: ({$artist} / {$title})
+template: ($artist / $title)

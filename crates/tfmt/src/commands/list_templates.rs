@@ -92,7 +92,7 @@ mod tests {
             description: "A test template."
             arg prefix: path(description: "Directory prefix.")
             arg suffix: string(default: "", description: "Optional suffix.")
-            path: ({prefix} {$title} {suffix})
+            template: (prefix $title suffix)
         "#,
         )
         .unwrap();
@@ -107,7 +107,7 @@ mod tests {
     #[test]
     fn listing_uses_lookup_name_without_metadata() {
         let template =
-            templates::compile("template", r#"path: ("Song")"#).unwrap();
+            templates::compile("template", r#"template: ("Song")"#).unwrap();
         assert_eq!(format_template(&template, "template"), "template");
     }
 }

@@ -6,7 +6,7 @@ fn compact_tree_preserves_structure_and_values() {
         r#"
         name: "Not part of the path AST"
         arg prefix: string
-        path: (
+        template: (
           / prefix "quoted \"text\"" /
           $album? ( $album / !$disc? ( "Single disc"))
           (($date ?: $year ?: "Unknown") | year | pad(4))
@@ -47,7 +47,7 @@ fn compact_tree_preserves_structure_and_values() {
 
 #[test]
 fn literals_preserve_spaces_and_escape_backslashes() {
-    let template = Template::compile(r#"path: ("  a \\ b  ")"#).unwrap();
+    let template = Template::compile(r#"template: ("  a \\ b  ")"#).unwrap();
     assert_eq!(
         template.dump_ast(),
         r#"Path

@@ -46,7 +46,7 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
                 Rule::separator => "'/'",
                 Rule::conditional => "an expression",
                 Rule::unary => "a value or unary negation",
-                Rule::sequence => "a path sequence '(...)'",
+                Rule::sequence => "a template expression '(...)'",
                 Rule::argument => "an argument declaration",
                 Rule::definition => "a definition 'name: value'",
                 Rule::formatter => "a formatter '| year' or '| pad(width)'",
@@ -108,16 +108,16 @@ pub(crate) fn parse(source: &str) -> Result<Compiled, Diagnostic> {
                 let name = parts.next().unwrap();
                 let value = parts.next().unwrap();
                 match name.as_str().to_ascii_lowercase().as_str() {
-                    "path" => {
+                    "template" => {
                         if path.is_some() {
                             return Err(Diagnostic::new(
-                                "Duplicate path definition",
+                                "Duplicate template definition",
                                 span(&name),
                             ));
                         }
                         if value.as_rule() != Rule::sequence {
                             return Err(Diagnostic::new(
-                                "Expected '(' after 'path:'",
+                                "Expected '(' after 'template:'",
                                 span(&value),
                             ));
                         }
@@ -159,7 +159,7 @@ pub(crate) fn parse(source: &str) -> Result<Compiled, Diagnostic> {
         }
     }
     let path = path.ok_or_else(|| {
-        Diagnostic::new("Missing path definition", Span {
+        Diagnostic::new("Missing template definition", Span {
             start: source.len(),
             end: source.len(),
         })

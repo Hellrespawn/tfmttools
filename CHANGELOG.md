@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Rename the output expression definition from `path:` to `template:`
+  to distinguish it from the `path` argument type. Update existing templates
+  to use the new definition name.
+
+- Replace picotmpl's `{...}`, `[...]`, and `??` syntax with bare references,
+  parenthesized expression grouping, and Elvis `?:`. Add unary `!` and
+  conditional `? value : alternative`; guard each branch as one expression.
+  Keep numeric zero present, evaluate selected branches lazily, and reject
+  possible boolean output or path formatting at compilation. Existing
+  templates require manual migration; stored undo/redo actions are unchanged.
+
 - Add a picotmpl `dump_ast` Cargo example and `cargo xtask dump-ast FILE`
   shortcut to print compact path AST trees without source spans.
 

@@ -162,7 +162,7 @@ Use `.tfmt` files and select them with `--template` (`-t`), or pass the same
 document syntax directly with `--script` (`-s`):
 
 ```sh
-tfmt --dry-run rename --script 'path: ({$artist} / {$title})'
+tfmt --dry-run rename --script 'template: ($artist / $title)'
 ```
 
 Template discovery still includes `.jinja` and `.j2` files, but their contents must
@@ -177,11 +177,13 @@ name: "Artist and title"
 description: "Place tracks under an optional directory prefix."
 arg prefix: path(default: "", description: "Directory prefix.")
 arg suffix: string(default: "")
-path: ({prefix} {$artist} / {$title} {suffix})
+template: (prefix $artist / $title suffix)
 ```
 
 Arguments are bare names; tags start with `$`. Adjacent expressions concatenate,
 with all literal text in double quotes. Whitespace outside strings is ignored.
+The `template:` definition contains the output expression; `path` is an
+argument type for directory prefixes.
 `#` starts a comment. Strings support escaped quotes (`\"`) and backslashes
 (`\\`); other escapes are rejected. Audio tag names use exact lowercase
 snake_case, such as `album_artist` and
@@ -195,19 +197,35 @@ are never imported; move them aside explicitly to start a new SQLite history.
 
 | Construct | Example | Meaning |
 | --- | --- | --- |
-| Tag interpolation | `{$title}` | Insert a prepared tag value. |
-| Argument interpolation | `{suffix}` | Insert a declared argument. |
-| Fallback | `{$album_artist ?? $artist ?? "Unknown"}` | Select the first present value. |
-| Positive guard | `[$album? {$album} /]` | Include content when present. |
-| Negative guard | `[!$album? "Singles" /]` | Include content when missing or empty. |
-| Year extraction | `{$date \| year}` | Extract a four-digit year. |
-| Number padding | `{$track_number \| pad(2)}` | Pad displayed text to a minimum width. |
+| Tag interpolation | `$title` | Insert a prepared tag value. |
+| Argument interpolation | `suffix` | Insert a declared argument. |
+| Elvis fallback | `$album_artist ?: $artist ?: "Unknown"` | Select the first present value. |
+| Positive guard | `$album ? ($album /)` | Include content when present. |
+| Negated condition | `!$album ? ("Singles" /)` | Include content when missing or empty. |
+| Alternative | `$album ? "Album" : "Single"` | Select one branch. |
+| Year extraction | `$date \| year` | Extract a four-digit year. |
+| Number padding | `$track_number \| pad(2)` | Pad displayed text to a minimum width. |
 
-Missing or empty values are absent; numeric zero is present. Guards and
-fallbacks evaluate only selected content. Nest guards for combined presence
-conditions. `year` checks ISO-style dates first, then day/month/year-style
-dates, then any four-digit year. Invalid present dates are errors. Padding
-accepts widths from 0 through 1024 and never truncates text.
+Missing or empty values are absent; numeric zero is present. Elvis evaluates
+its left operand once, and conditionals evaluate only the selected branch.
+Each conditional branch is one expression: group multiple output segments
+with parentheses. A space before `?` is conventional, but optional.
+Unary `!` produces a boolean for use in conditions;
+booleans cannot be emitted, concatenated, or formatted, even in unreachable
+branches. Boolean conditions use their truth value.
+
+Binding from strongest to weakest is `!`, formatting `|`, Elvis `?:`,
+conditional `?` with optional `:`, then concatenation. Parentheses override
+this order. Thus `$a ?: $b | pad(2)` pads only `$b`, while
+`($a ?: $b) | pad(2)` pads the selected value. A literal can keep a group
+present: `("By " $artist) ?: "Unknown"` emits `"By "` when artist is absent.
+Nested conditionals bind to the right, and `:` belongs to the nearest
+unmatched `?` in its group. Elvis `?:` cannot contain whitespace.
+
+`year` checks ISO-style dates first, then day/month/year-style dates, then
+any four-digit year. Invalid present dates are errors. Padding accepts
+widths from 0 through 1024 and never truncates text. Formatters cannot
+accept an expression that could return structural path components.
 
 A bare `/` separates components using the host platform's native separator.
 Quoted `/` and `\` are component text, subject to the filename character policy.
@@ -231,7 +249,7 @@ including unused arguments, before reading audio.
 
 A path argument splits on both `/` and `\`, discards empty segments, and inserts
 complete directory components. Leading separators do not make it absolute.
-Thus `{prefix} {$artist}` needs no `/` after `{prefix}`. A path argument must
+Thus `prefix $artist` needs no `/` after `prefix`. A path argument must
 occur at a component boundary; inserting one after unfinished text or following
 one immediately with `/` is an error.
 
@@ -240,15 +258,21 @@ See [the language reference](crates/picotmpl/README.md) and the full
 
 ### Migrating existing templates
 
-MiniJinja templates and TOML frontmatter are no longer supported. Migration
-is manual; there is no converter or compatibility mode.
+MiniJinja templates, TOML frontmatter, and the previous picotmpl delimiters
+are no longer supported. Migration is manual; there is no converter or
+compatibility mode.
 
 | Old syntax | New syntax |
 | --- | --- |
-| `{{ artist }}/{{ title }}` | `path: ({$artist} / {$title})` |
-| `{{ albumartist or artist }}` | `{$album_artist ?? $artist}` |
-| `{% if album %}...{% endif %}` | `[$album? ...]` |
-| `{{ tracknumber \| zero_pad(2) }}` | `{$track_number \| pad(2)}` |
+| `path: (...)` | `template: (...)` |
+| `{{ artist }}/{{ title }}` | `template: ($artist / $title)` |
+| `{{ albumartist or artist }}` | `$album_artist ?: $artist` |
+| `{% if album %}...{% endif %}` | `$album ? (...)` |
+| `{{ tracknumber \| zero_pad(2) }}` | `$track_number \| pad(2)` |
+| `{$title}` or `{prefix}` | `$title` or `prefix` |
+| `[$album? {$album} /]` | `$album ? ($album /)` |
+| `[!$album? "Singles" /]` | `!$album ? ("Singles" /)` |
+| `{$a ?? $b \| pad(2)}` | `($a ?: $b) \| pad(2)` |
 | Frontmatter `name = "Layout"` | `name: "Layout"` |
 | Positional `args[0]` | Declare an argument, then interpolate its bare name. |
 
@@ -264,7 +288,7 @@ the old `albumartist and artist ~ " - "` expression could produce a dangling
 comparisons, loops, includes, and arbitrary functions are unsupported.
 
 Saved filename references work after the referenced files are migrated.
-Reusing a saved Jinja inline template for a new rename fails with a migration
+Reusing a saved legacy inline template for a new rename fails with a migration
 hint; select an explicit replacement using `--script` or `--template`.
 Undo and redo replay actions stored in supported SQLite histories without
 parsing templates. Old JSON histories are rejected without importing them.

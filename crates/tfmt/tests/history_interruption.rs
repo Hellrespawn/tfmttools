@@ -151,7 +151,7 @@ fn interrupted_tag_attempt_reports_and_resolves_without_touching_files() {
                 vec!["redo"],
                 vec!["clear-history"],
                 vec!["validate", "characters", "--fix"],
-                vec!["rename", "--script", "path: (\"Renamed\")"],
+                vec!["rename", "--script", "template: (\"Renamed\")"],
             ] {
                 assert!(!run(&dir, &command).status.success(), "{command:?}");
                 assert_eq!(std::fs::read(&path).unwrap(), expected);
@@ -475,7 +475,7 @@ fn dry_run_reports_startup_interruption_once_across_commands_and_records() {
         let history_before = std::fs::read(&path).unwrap();
         let audio_before = std::fs::read(dir.path().join("song.mp3")).unwrap();
         for command in [
-            vec!["--dry-run", "rename", "--script", "path: (\"Renamed\")"],
+            vec!["--dry-run", "rename", "--script", "template: (\"Renamed\")"],
             vec!["--dry-run", "validate", "characters", "--fix"],
             vec!["--dry-run", "undo", "2"],
             vec!["--dry-run", "redo", "2"],

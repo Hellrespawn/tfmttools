@@ -29,7 +29,7 @@ fn piped_confirmation_requires_a_complete_affirmative_response() {
             .current_dir(directory.path())
             .args(["--simple", "-c"])
             .arg(directory.path().join("config"))
-            .args(["rename", "--script", "path: (\"renamed\")"])
+            .args(["rename", "--script", "template: (\"renamed\")"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -89,9 +89,9 @@ fn cleanup_output_reports_effects_only_after_success() {
             "rename",
             "--script",
             if fails {
-                "path: (\"blocked\", \"renamed\")"
+                "template: (\"blocked\", \"renamed\")"
             } else {
-                "path: (\"renamed\")"
+                "template: (\"renamed\")"
             },
         ]);
         let mut child = command
@@ -165,7 +165,7 @@ fn dry_run_image_cleanup_is_prospective_and_preserves_files() {
             "config",
             "rename",
             "--script",
-            "path: (\"renamed\")",
+            "template: (\"renamed\")",
         ])
         .output()
         .unwrap();
@@ -217,7 +217,7 @@ fn cleanup_preserves_relative_config_and_trash_directories() {
                 "--bin-directory",
                 trash,
                 "--script",
-                "path: (\"renamed\")",
+                "template: (\"renamed\")",
             ])
             .output()
             .unwrap();
@@ -262,7 +262,7 @@ fn cleanup_preserves_distinct_paths_and_undo_restores_them() {
             "-i",
             "music",
             "--script",
-            "path: (\"renamed\")",
+            "template: (\"renamed\")",
         ])
         .output()
         .unwrap();
@@ -318,7 +318,7 @@ fn cleanup_destination_collision_aborts_before_audio_moves() {
                 "-i",
                 "music",
                 "--script",
-                "path: (\"renamed\")",
+                "template: (\"renamed\")",
             ])
             .output()
             .unwrap();
