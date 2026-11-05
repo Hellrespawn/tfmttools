@@ -1,3 +1,4 @@
+#[cfg(unix)]
 use std::fs::File;
 use std::io::{Read, Write};
 
@@ -256,7 +257,17 @@ pub(super) fn single_link(path: &Utf8Path) -> FsResult<()> {
         }
         Ok(())
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        let file = std::fs::File::open(path)?;
+        if winapi_util::file::information(&file)?.number_of_links() != 1 {
+            return Err(FsError::Execution(format!(
+                "Cannot replace hard-linked audio file: {path}"
+            )));
+        }
+        Ok(())
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         let _ = path;
         Err(FsError::Execution(
@@ -265,7 +276,11 @@ pub(super) fn single_link(path: &Utf8Path) -> FsResult<()> {
         ))
     }
 }
+// Unix directory syncing can fail; callers share the same API on all platforms.
+#[cfg_attr(not(unix), allow(clippy::unnecessary_wraps))]
 pub(super) fn sync_parent(path: &Utf8Path) -> FsResult<()> {
+    #[cfg(not(unix))]
+    let _ = path;
     #[cfg(unix)]
     {
         File::open(path.parent().ok_or_else(|| conflict(path))?)?.sync_all()?;

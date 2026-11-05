@@ -28,5 +28,8 @@ thiserror = { workspace = true }
 assert_fs = { workspace = true }
 color-eyre = { workspace = true }
 
+[target.'cfg(windows)'.dependencies]
+winapi-util = { workspace = true }
+
 [lints]
 workspace = true

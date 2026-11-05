@@ -17,5 +17,6 @@ enum PlannedAction {
 
 pub use binary_patch::{apply_patch, byte_identity, create_patch_pair};
 pub use file_switch::{prepare_tag_edit, prepare_tag_replay};
+pub(crate) use prepared_execution::same_case_alias;
 pub use prepared_execution::{PreparedAction, prepare_action};
 pub use tag_edit::write_tag_candidate;

@@ -108,6 +108,29 @@ fn directory_removal_preserves_nonempty_contents() {
 }
 
 #[test]
+fn copy_preserves_read_only_permissions_without_reopening_for_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = path(&dir, "source");
+    let target = path(&dir, "target");
+    std::fs::write(&source, b"original").unwrap();
+    let writable = std::fs::metadata(&source).unwrap().permissions();
+    let mut read_only = writable.clone();
+    read_only.set_readonly(true);
+    std::fs::set_permissions(&source, read_only).unwrap();
+    let action =
+        Action::CopyFile { source: source.clone(), target: target.clone() };
+    let mut entry = prepare_action(&action, OperationKind::Apply).unwrap();
+    let result = entry.execute();
+    let permissions = std::fs::metadata(&target).unwrap().permissions();
+    std::fs::set_permissions(&source, writable.clone()).unwrap();
+    std::fs::set_permissions(&target, writable).unwrap();
+    result.unwrap();
+    assert!(permissions.readonly());
+    assert_eq!(std::fs::read(&source).unwrap(), b"original");
+    assert_eq!(std::fs::read(&target).unwrap(), b"original");
+}
+
+#[test]
 fn standalone_copy_undo_preserves_existing_original_and_redo_restores_copy() {
     let dir = tempfile::tempdir().unwrap();
     let source = path(&dir, "source");

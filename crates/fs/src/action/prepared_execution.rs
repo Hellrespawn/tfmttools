@@ -8,7 +8,7 @@ use super::file_switch::{
     TagSwitch, conflict, identity_if_regular, regular_file_metadata,
     sync_parent,
 };
-use crate::error::FsResult;
+use crate::error::{FsError, FsResult};
 
 pub struct PreparedAction {
     action: StoredAction,
@@ -173,7 +173,8 @@ fn execute_filesystem(action: &Action, kind: OperationKind) -> FsResult<()> {
             {
                 return Err(conflict(target));
             }
-            std::fs::File::open(target)?.sync_all()?;
+            // New copies were synced through the writable handle above.
+            // An existing undo destination has not been modified.
             sync_parent(target)?;
             if undo {
                 fs_err::remove_file(source)?;
@@ -200,22 +201,36 @@ fn execute_filesystem(action: &Action, kind: OperationKind) -> FsResult<()> {
     }
     Ok(())
 }
-fn same_case_alias(source: &Utf8Path, target: &Utf8Path) -> FsResult<bool> {
-    if source.parent() != target.parent()
-        || !source
-            .file_name()
-            .zip(target.file_name())
-            .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b))
+pub(crate) fn same_case_alias(
+    source: &Utf8Path,
+    target: &Utf8Path,
+) -> FsResult<bool> {
+    if !source
+        .file_name()
+        .zip(target.file_name())
+        .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b))
     {
         return Ok(false);
     }
-    #[cfg(unix)]
+    let parent = |path: &Utf8Path| {
+        let parent = path.parent().ok_or_else(|| conflict(path))?;
+        let parent = if parent.as_str().is_empty() {
+            Utf8Path::new(".")
+        } else {
+            parent
+        };
+        Ok::<_, FsError>(fs_err::canonicalize(parent)?)
+    };
+    let source_parent = parent(source)?;
+    if source_parent != parent(target)? {
+        return Ok(false);
+    }
+    #[cfg(any(unix, windows))]
     {
-        use std::os::unix::fs::MetadataExt;
         let source_name = source.file_name().unwrap();
         let target_name = target.file_name().unwrap();
         if source_name != target_name {
-            let names = fs_err::read_dir(source.parent().unwrap())?
+            let names = fs_err::read_dir(&source_parent)?
                 .map(|entry| entry.map(|entry| entry.file_name()))
                 .collect::<std::io::Result<Vec<_>>>()?;
             // Two directory entries can share an inode through hard links.
@@ -226,15 +241,27 @@ fn same_case_alias(source: &Utf8Path, target: &Utf8Path) -> FsResult<bool> {
                 return Ok(false);
             }
         }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
         let a = fs_err::metadata(source)?;
         let b = fs_err::metadata(target)?;
         Ok(a.dev() == b.dev() && a.ino() == b.ino())
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        let a = winapi_util::file::information(std::fs::File::open(source)?)?;
+        let b = winapi_util::file::information(std::fs::File::open(target)?)?;
+        Ok(a.volume_serial_number() == b.volume_serial_number()
+            && a.file_index() == b.file_index())
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         Ok(false)
     }
 }
+#[cfg_attr(not(unix), allow(clippy::unnecessary_wraps))]
 pub(super) fn crosses_devices(
     source: &Utf8Path,
     target: &Utf8Path,
@@ -259,5 +286,22 @@ pub(super) fn crosses_devices(
     #[cfg(not(unix))]
     {
         Ok(source.components().next() != target.components().next())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn case_alias_accepts_bare_relative_paths() {
+        let file = tempfile::Builder::new()
+            .prefix(".tfmt-case-alias-")
+            .tempfile_in(".")
+            .unwrap();
+        let source =
+            Utf8Path::new(file.path().file_name().unwrap().to_str().unwrap());
+        let target = source.as_str().to_uppercase();
+        assert!(same_case_alias(source, Utf8Path::new(&target)).unwrap());
     }
 }

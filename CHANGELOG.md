@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fix Windows tag replacement, copy syncing, and comparisons of paths using
+  mixed separators. Keep hard-linked audio protected by native Windows checks.
+  Make path diagnostics and history test cleanup portable.
+
 - Add picotmpl signed integer literals, scalar equality and numeric ordering,
   and short-circuit `&&`/`||` conditions. Add Unicode `lower`, `upper`, `trim`,
   and literal `replace("from", "to")` formatters. Keep existing precedence,

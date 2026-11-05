@@ -7,7 +7,10 @@ pub struct CaseInsensitivePathKey(String);
 impl CaseInsensitivePathKey {
     #[must_use]
     pub fn new(path: impl Display) -> Self {
-        Self(path.to_string().to_lowercase())
+        let path = path.to_string().to_lowercase();
+        #[cfg(windows)]
+        let path = path.replace('\\', "/");
+        Self(path)
     }
 }
 

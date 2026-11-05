@@ -76,6 +76,19 @@ fn source_change_before_switch_preserves_all_files() {
     assert!(entry.execute().is_err());
     assert_eq!(std::fs::read(&path).unwrap(), b"external");
 }
+#[test]
+fn hard_links_added_after_preparation_block_replacement() {
+    let (dir, path, change) = fixture();
+    let before = std::fs::read(&path).unwrap();
+    let mut entry =
+        prepare_tag_edit(&path, std::slice::from_ref(&change)).unwrap();
+    let link = dir.path().join("hard.mp3");
+    std::fs::hard_link(&path, &link).unwrap();
+    assert!(prepare_tag_edit(&path, &[change]).is_err());
+    assert!(entry.execute().is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert_eq!(std::fs::read(&link).unwrap(), before);
+}
 #[cfg(unix)]
 #[test]
 fn symlink_is_preserved_hard_links_and_redirected_symlinks_are_rejected() {

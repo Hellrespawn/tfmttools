@@ -160,7 +160,7 @@ fn read_only_reporting_keeps_the_loaded_snapshot_until_reload() {
             metadata: support::history::metadata("second"),
         })
         .unwrap();
-    let mut marker_free = History::open_read_only(path).unwrap();
+    let mut marker_free = History::open_read_only(path.clone()).unwrap();
     let attempt = writer
         .begin_attempt(
             run,
@@ -190,7 +190,11 @@ fn read_only_reporting_keeps_the_loaded_snapshot_until_reload() {
     assert!(marker_free.open_run().unwrap().is_none());
     assert!(marker_free.current_attempt().unwrap().is_none());
     assert_eq!(marker_free.records()[1].applied_count(), 1);
+    // Windows cannot unlink SQLite databases while readers hold them open.
+    drop(reader);
+    drop(marker_free);
     writer.remove().unwrap();
+    let mut marker_free = History::open_read_only(path).unwrap();
     marker_free.load().unwrap();
     assert!(marker_free.is_empty());
     assert!(marker_free.current_attempt().unwrap().is_none());

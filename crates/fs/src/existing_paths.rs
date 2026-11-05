@@ -13,7 +13,13 @@ pub fn existing_target_paths(
     let mut set = CaseInsensitivePathSet::new();
 
     for rename_action in rename_actions {
-        if rename_action.target().as_path().exists() {
+        if rename_action.target().as_path().exists()
+            && !crate::action::same_case_alias(
+                rename_action.source().as_path(),
+                rename_action.target().as_path(),
+            )
+            .unwrap_or(false)
+        {
             set.insert(rename_action.target());
         }
     }

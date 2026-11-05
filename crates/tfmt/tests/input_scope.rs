@@ -8,17 +8,19 @@ fn commands_find_the_same_input_through_relative_and_absolute_paths() {
     let input = dir.path().join("input with spaces");
     std::fs::create_dir(&input).unwrap();
     std::fs::write(input.join("broken.mp3"), b"invalid audio").unwrap();
-    let mut scopes = vec![
+    let scopes = vec![
         std::path::PathBuf::from("input with spaces"),
         std::path::PathBuf::from("./input with spaces"),
         input.clone(),
     ];
     #[cfg(unix)]
-    {
+    let scopes = {
+        let mut scopes = scopes;
         std::os::unix::fs::symlink(&input, dir.path().join("linked input"))
             .unwrap();
         scopes.push("linked input".into());
-    }
+        scopes
+    };
     for scope in scopes {
         for command in [vec!["validate", "characters"], vec![
             "rename",
@@ -43,7 +45,9 @@ fn commands_find_the_same_input_through_relative_and_absolute_paths() {
             assert!(report.contains("broken.mp3"), "{report}");
             if command[0] == "validate" {
                 assert!(
-                    report.contains(&format!("{}/broken.mp3", scope.display())),
+                    report.contains(
+                        &scope.join("broken.mp3").display().to_string()
+                    ),
                     "{report}"
                 );
                 if scope.is_relative() {

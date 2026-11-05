@@ -419,7 +419,7 @@ original to a temporary backup, installs the candidate, records completion, then
 removes the backup. This uses no additional backup copy. The portable switch
 briefly leaves the original pathname absent. Audio symlinks retain their links
 while the target is edited; hard-linked audio files are rejected. Audio
-replacement currently requires Unix hard-link checks, and preserves permissions
+replacement supports Unix and Windows hard-link checks, and preserves permissions
 but does not promise to preserve ACLs or extended attributes.
 
 Tag-edit undo/redo checks the expected complete file bytes and applies the
