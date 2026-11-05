@@ -22,6 +22,7 @@ pub(crate) struct Expression {
 #[derive(Clone, Debug)]
 pub(crate) enum ExpressionKind {
     Literal(String),
+    Integer(i64),
     Reference(Reference),
     Sequence(Vec<Expression>),
     Negate(Box<Expression>),
@@ -54,6 +55,7 @@ fn append_expression(
 ) {
     let label = match &expression.kind {
         ExpressionKind::Literal(text) => format!("Literal {text:?}"),
+        ExpressionKind::Integer(value) => format!("Integer {value}"),
         ExpressionKind::Reference(reference) => {
             let prefix = if reference.tag { "$" } else { "" };
             format!("Reference {prefix}{}", reference.name)

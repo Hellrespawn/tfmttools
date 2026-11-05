@@ -46,6 +46,7 @@ fn evaluate<E>(
 ) -> Result<Value, RenderError<E>> {
     Ok(match &expression.kind {
         ExpressionKind::Literal(text) => Value::Text(text.clone()),
+        ExpressionKind::Integer(value) => Value::Integer(*value),
         ExpressionKind::Reference(reference) => {
             reference_value(reference, arguments, resolve)?
         },

@@ -94,7 +94,7 @@ fn analyze(
         ExpressionKind::Root | ExpressionKind::Separator => {
             result.structural = true;
         },
-        ExpressionKind::Literal(_) => {},
+        ExpressionKind::Literal(_) | ExpressionKind::Integer(_) => {},
     }
     Ok(result)
 }

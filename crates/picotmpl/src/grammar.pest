@@ -7,6 +7,7 @@ name = @{ name_start ~ name_tail* }
 tag = @{ "$" ~ name_start ~ (name_tail | "-")* }
 quoted = @{ "\"" ~ ("\\\"" | "\\\\" | !("\"" | "\\") ~ ANY)* ~ "\"" }
 number = @{ "-"? ~ ASCII_DIGIT* }
+integer = @{ "-"? ~ ASCII_DIGIT+ ~ !name_tail }
 
 document = { SOI ~ (argument | definition)* ~ EOI }
 argument = { arg_keyword ~ name ~ ":" ~ name ~ settings? }
@@ -22,6 +23,6 @@ fallback = { formatted ~ ("?:" ~ formatted)* }
 formatted = { unary ~ formatter* }
 unary = { negation ~ unary | atom }
 negation = { "!" }
-atom = _{ tag | name | quoted | sequence }
+atom = _{ tag | name | quoted | integer | sequence }
 formatter = { "|" ~ name ~ width? }
 width = { "(" ~ number ~ ")" }

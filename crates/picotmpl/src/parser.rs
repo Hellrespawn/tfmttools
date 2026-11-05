@@ -41,6 +41,7 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
         .renamed_rules(|rule| {
             match rule {
                 Rule::name => "an identifier",
+                Rule::integer => "a signed decimal integer",
                 Rule::tag => "a '$tag' reference",
                 Rule::quoted => "a quoted string",
                 Rule::separator => "'/'",
@@ -270,6 +271,11 @@ impl Builder {
         let location = span(&node);
         let kind = match node.as_rule() {
             Rule::quoted => ExpressionKind::Literal(Self::literal(&node)?),
+            Rule::integer => ExpressionKind::Integer(
+                node.as_str().parse::<i64>().map_err(|_| {
+                    Diagnostic::new("Integer literal exceeds signed 64-bit range", location)
+                })?,
+            ),
             Rule::tag | Rule::name => {
                 ExpressionKind::Reference(self.reference(&node))
             },
