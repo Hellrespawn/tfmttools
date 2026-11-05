@@ -119,6 +119,10 @@ fn evaluate<E>(
                         })?
                     },
                     Formatter::Pad(width) => format::pad(&text, *width),
+                    Formatter::Lower => text.to_lowercase(),
+                    Formatter::Upper => text.to_uppercase(),
+                    Formatter::Trim => text.trim().to_owned(),
+                    Formatter::Replace { from, to } => text.replace(from, to),
                 };
             }
             Value::Text(text)

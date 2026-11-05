@@ -296,3 +296,90 @@ fn logical_syntax_and_validation() {
     condition(r#""0"|pad(2)=="00"||!0!=!1&&0"#, true);
     condition(r#"!0!=!1||0&&1"#, true);
 }
+
+#[test]
+fn text_formatter_results() {
+    for (expression, expected) in [
+        (r#"" Ab C " | trim | lower | replace(" ", "_")"#, "ab_c"),
+        (r#""Straße" | upper"#, "STRASSE"),
+        ("\"\u{2003}Ab\u{00a0}\" | trim", "Ab"),
+        (r#""AB" | LoWeR"#, "ab"),
+        (r#""aaaaa" | replace("aa", "b")"#, "bba"),
+        (r#""aAa" | replace("a", "")"#, "A"),
+        (r#"12 | lower | upper | trim | replace("1", "x")"#, "x2"),
+        (
+            r#"($missing | trim | upper | replace("a", "b")) ?: "fallback""#,
+            "fallback",
+        ),
+        (r#"("" | pad(2) | lower) ?: "fallback""#, "fallback"),
+        (r#"("  " | trim) ?: "fallback""#, "fallback"),
+        (r#""  " | trim | pad(2)"#, "00"),
+        (r#""abc" | replace("abc", "") | pad(2)"#, "00"),
+        (r#""a-b" | replace("-", "/")"#, "a/b"),
+        (r#""a\\b" | replace("\\", "\"")"#, "a\"b"),
+        (r#""2024-01-02" | lower | year | pad(6)"#, "002024"),
+    ] {
+        assert_eq!(render(expression), [expected], "{expression}");
+    }
+    condition(r#""  " | trim"#, false);
+    let template = Template::compile(
+        r#"template: ($title | trim | lower | upper | replace("a", "b"))"#,
+    )
+    .unwrap();
+    assert_eq!(
+        template.dump_ast(),
+        "Path\n  Format trim | lower | upper | replace(\"a\", \"b\")\n    Reference $title"
+    );
+}
+
+#[test]
+fn text_formatter_parameter_errors() {
+    for expression in [
+        r#""x" | replace("", "x")"#,
+        r#""x" | replace("x")"#,
+        r#""x" | replace("x", "y", "z")"#,
+        r#""x" | replace(1, "y")"#,
+        r#""x" | replace("x", 1)"#,
+        r#""x" | replace($a, "y")"#,
+        r#""x" | replace("x" "y")"#,
+        r#""x" | replace("x", "y""#,
+        r#""x" | replace("x", "y",)"#,
+        r#""x" | replace("x", "\n")"#,
+        r#""x" | lower()"#,
+        r#""x" | upper(1)"#,
+        r#""x" | trim("x")"#,
+        r#""x" | unknown"#,
+        r#""x" | pad("2")"#,
+        r#""x" | pad(-1)"#,
+        r#""x" | pad(1025)"#,
+        r#""x" | year()"#,
+        r#""x" | year(2)"#,
+        r#"(!$a) | lower"#,
+        r#"("x" /) | trim"#,
+        r#"(1 ? "x" : ("y" /)) | upper"#,
+        r#""x" | replace("x", "y") | pad()"#,
+    ] {
+        assert!(
+            Template::compile(&format!("template: ({expression})")).is_err(),
+            "{expression}"
+        );
+    }
+    for parameter in ["", "\n", "\u{202e}"] {
+        let source =
+            format!(r#"template: ("x" | replace("{parameter}", "y"))"#);
+        let error = Template::compile(&source).unwrap_err();
+        assert_eq!(
+            &source[error.span.start..error.span.end],
+            format!("\"{parameter}\"")
+        );
+    }
+    let source = "template: (\"x\" | replace(\"x\", \"\u{2066}\"))";
+    let error = Template::compile(source).unwrap_err();
+    assert_eq!(&source[error.span.start..error.span.end], "\"\u{2066}\"");
+    assert!(
+        Template::compile(
+            r#"arg p: path template: (("x" ?: p) | replace("x", "y"))"#
+        )
+        .is_err()
+    );
+}

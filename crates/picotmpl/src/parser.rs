@@ -53,8 +53,8 @@ fn syntax_error(source: &str, error: pest::error::Error<Rule>) -> Diagnostic {
                 Rule::sequence => "a template expression '(...)'",
                 Rule::argument => "an argument declaration",
                 Rule::definition => "a definition 'name: value'",
-                Rule::formatter => "a formatter '| year' or '| pad(width)'",
-                Rule::width | Rule::number => "a nonnegative padding width",
+                Rule::formatter => "a formatter after '|'",
+                Rule::number => "an integer formatter parameter",
                 Rule::EOI => "end of template",
                 _ => "valid template syntax",
             }
@@ -395,25 +395,60 @@ impl Builder {
 fn formatter(node: Node<'_>) -> Result<Formatter, Diagnostic> {
     let mut parts = node.into_inner();
     let name = parts.next().unwrap();
-    let width = parts.next();
-    match (name.as_str().to_ascii_lowercase().as_str(), width) {
-        ("year", None) => Ok(Formatter::Year(span(&name))),
-        ("pad", Some(width)) => {
-            let number = width.into_inner().next().unwrap();
+    let parameters = parts.next();
+    let arguments: Vec<_> = parameters
+        .as_ref()
+        .map(|parameters| parameters.clone().into_inner().collect())
+        .unwrap_or_default();
+    match (
+        name.as_str().to_ascii_lowercase().as_str(),
+        parameters.is_some(),
+        arguments.as_slice(),
+    ) {
+        ("year", false, []) => Ok(Formatter::Year(span(&name))),
+        ("lower", false, []) => Ok(Formatter::Lower),
+        ("upper", false, []) => Ok(Formatter::Upper),
+        ("trim", false, []) => Ok(Formatter::Trim),
+        ("pad", true, [number]) if number.as_rule() == Rule::number => {
             let width = number.as_str().parse::<usize>().map_err(|_| {
-                Diagnostic::new("Invalid padding width", span(&number))
+                Diagnostic::new("Invalid padding width", span(number))
             })?;
             if width > 1024 {
                 return Err(Diagnostic::new(
                     "Padding width exceeds maximum of 1024",
-                    span(&number),
+                    span(number),
                 ));
             }
             Ok(Formatter::Pad(width))
         },
-        ("year" | "pad", _) => {
+        ("replace", true, [from, to])
+            if from.as_rule() == Rule::quoted
+                && to.as_rule() == Rule::quoted =>
+        {
+            let value = Builder::literal(from)?;
+            if value.is_empty() {
+                return Err(Diagnostic::new(
+                    "Replacement search string must not be empty",
+                    span(from),
+                ));
+            }
+            Ok(Formatter::Replace { from: value, to: Builder::literal(to)? })
+        },
+        ("year" | "lower" | "upper" | "trim", _, _) => {
             Err(Diagnostic::new(
-                "Expected 'year' or 'pad(nonnegative width)'",
+                "This formatter takes no parameters or parentheses",
+                span(&name),
+            ))
+        },
+        ("pad", _, _) => {
+            Err(Diagnostic::new(
+                "Expected 'pad(nonnegative width)'",
+                span(&name),
+            ))
+        },
+        ("replace", _, _) => {
+            Err(Diagnostic::new(
+                "Expected 'replace(\"from\", \"to\")'",
                 span(&name),
             ))
         },

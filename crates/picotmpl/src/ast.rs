@@ -11,6 +11,10 @@ pub(crate) struct Reference {
 pub(crate) enum Formatter {
     Year(Span),
     Pad(usize),
+    Lower,
+    Upper,
+    Trim,
+    Replace { from: String, to: String },
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +132,12 @@ fn append_expression(
                     match formatter {
                         Formatter::Year(_) => "year".to_owned(),
                         Formatter::Pad(width) => format!("pad({width})"),
+                        Formatter::Lower => "lower".to_owned(),
+                        Formatter::Upper => "upper".to_owned(),
+                        Formatter::Trim => "trim".to_owned(),
+                        Formatter::Replace { from, to } => {
+                            format!("replace({from:?}, {to:?})")
+                        },
                     }
                 })
                 .collect::<Vec<_>>()
