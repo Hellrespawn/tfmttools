@@ -1,7 +1,8 @@
 # Parenthesized template expressions
 
-Status: revised draft for approval. After implementation, supersedes the
-expression syntax in the 2026-10-07 path template language design.
+Status: approved on 2026-11-05, including unary negation binding more tightly
+than formatting. After implementation, supersedes the expression syntax in
+the 2026-10-07 path template language design.
 
 ## Intent and scope
 
@@ -191,9 +192,9 @@ containing a single boolean preserves it; grouping does not stringify it.
 The parser accepts boolean expressions uniformly; these failures come from
 AST validation with a diagnostic on the offending expression.
 
-## Grouping details proposed by the author
+## Additional grouping and binding details
 
-These details complete the agreed behavior and are subject to approval:
+These author-proposed details were included in the approved design:
 
 - Unary negation binds more tightly than formatting. Consequently
   `!$date | year` attempts to format a boolean and is a compile error;
