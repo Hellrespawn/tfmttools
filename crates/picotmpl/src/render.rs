@@ -68,6 +68,11 @@ fn evaluate<E>(
         ExpressionKind::Negate(input) => {
             Value::Boolean(!evaluate(input, arguments, resolve)?.is_present())
         },
+        ExpressionKind::Compare { left, operator, right, operator_span } => {
+            let left = evaluate(left, arguments, resolve)?;
+            let right = evaluate(right, arguments, resolve)?;
+            Value::Boolean(left.compare(right, *operator, *operator_span)?)
+        },
         ExpressionKind::Fallback(alternatives) => {
             let mut selected = Value::Absent;
             for alternative in alternatives {

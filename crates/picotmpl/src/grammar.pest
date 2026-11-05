@@ -16,9 +16,11 @@ settings = { "(" ~ (setting ~ ("," ~ setting)* ~ ","?)? ~ ")" }
 setting = { name ~ ":" ~ quoted }
 definition = { name ~ ":" ~ (sequence | quoted) }
 sequence = { "(" ~ conditional* ~ ")" }
-conditional = { separator | fallback ~ (question ~ conditional ~ (":" ~ conditional)?)? }
+conditional = { separator | comparison ~ (question ~ conditional ~ (":" ~ conditional)?)? }
 question = _{ "?" ~ !":" }
 separator = { "/" }
+comparison = { fallback ~ (comparison_operator ~ fallback)? }
+comparison_operator = @{ "==" | "!=" | "<=" | ">=" | "<" | ">" }
 fallback = { formatted ~ ("?:" ~ formatted)* }
 formatted = { unary ~ formatter* }
 unary = { negation ~ unary | atom }

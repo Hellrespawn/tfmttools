@@ -3,7 +3,9 @@ use pest::error::InputLocation;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::ast::{Expression, ExpressionKind, Formatter, Reference};
+use crate::ast::{
+    ComparisonOperator, Expression, ExpressionKind, Formatter, Reference,
+};
 use crate::template::Compiled;
 use crate::{ArgKind, ArgSpec, Diagnostic, Metadata, Span, TagReference};
 
@@ -271,11 +273,16 @@ impl Builder {
         let location = span(&node);
         let kind = match node.as_rule() {
             Rule::quoted => ExpressionKind::Literal(Self::literal(&node)?),
-            Rule::integer => ExpressionKind::Integer(
-                node.as_str().parse::<i64>().map_err(|_| {
-                    Diagnostic::new("Integer literal exceeds signed 64-bit range", location)
-                })?,
-            ),
+            Rule::integer => {
+                ExpressionKind::Integer(node.as_str().parse::<i64>().map_err(
+                    |_| {
+                        Diagnostic::new(
+                            "Integer literal exceeds signed 64-bit range",
+                            location,
+                        )
+                    },
+                )?)
+            },
             Rule::tag | Rule::name => {
                 ExpressionKind::Reference(self.reference(&node))
             },
@@ -299,6 +306,29 @@ impl Builder {
                     }
                 } else {
                     return Ok(condition);
+                }
+            },
+            Rule::comparison => {
+                let mut parts = node.into_inner();
+                let left = self.expression(parts.next().unwrap())?;
+                let Some(operator) = parts.next() else {
+                    return Ok(left);
+                };
+                let operator_span = span(&operator);
+                let operator = match operator.as_str() {
+                    "==" => ComparisonOperator::Equal,
+                    "!=" => ComparisonOperator::NotEqual,
+                    "<" => ComparisonOperator::Less,
+                    "<=" => ComparisonOperator::LessEqual,
+                    ">" => ComparisonOperator::Greater,
+                    ">=" => ComparisonOperator::GreaterEqual,
+                    _ => unreachable!(),
+                };
+                ExpressionKind::Compare {
+                    left: Box::new(left),
+                    operator,
+                    right: Box::new(self.expression(parts.next().unwrap())?),
+                    operator_span,
                 }
             },
             Rule::fallback => {

@@ -1,3 +1,4 @@
+use crate::ast::ComparisonOperator;
 use crate::{Diagnostic, Span};
 
 #[derive(Clone, Debug)]
@@ -24,6 +25,64 @@ impl Value {
                 values.iter().any(|(value, _)| value.is_present())
             },
         }
+    }
+
+    fn into_comparable(self, span: Span) -> Result<Self, Diagnostic> {
+        let value = match self {
+            Self::Sequence(_) => Self::Text(self.into_text(span)?),
+            Self::Path(_) | Self::Root | Self::Separator => {
+                return Err(Diagnostic::new(
+                    "Cannot compare a path value",
+                    span,
+                ));
+            },
+            value => value,
+        };
+        Ok(match value {
+            Self::Text(text) if text.is_empty() => Self::Absent,
+            value => value,
+        })
+    }
+
+    pub(crate) fn compare(
+        self,
+        other: Self,
+        operator: ComparisonOperator,
+        span: Span,
+    ) -> Result<bool, Diagnostic> {
+        let left = self.into_comparable(span)?;
+        let right = other.into_comparable(span)?;
+        if operator.is_ordering() {
+            if matches!(left, Self::Absent) || matches!(right, Self::Absent) {
+                return Ok(false);
+            }
+            let (Self::Integer(left), Self::Integer(right)) = (left, right)
+            else {
+                return Err(Diagnostic::new(
+                    "Ordering requires two integers",
+                    span,
+                ));
+            };
+            return Ok(match operator {
+                ComparisonOperator::Less => left < right,
+                ComparisonOperator::LessEqual => left <= right,
+                ComparisonOperator::Greater => left > right,
+                ComparisonOperator::GreaterEqual => left >= right,
+                _ => unreachable!(),
+            });
+        }
+        let equal = match (left, right) {
+            (Self::Absent, Self::Absent) => true,
+            (Self::Text(left), Self::Text(right)) => left == right,
+            (Self::Integer(left), Self::Integer(right)) => left == right,
+            (Self::Boolean(left), Self::Boolean(right)) => left == right,
+            _ => false,
+        };
+        Ok(match operator {
+            ComparisonOperator::Equal => equal,
+            ComparisonOperator::NotEqual => !equal,
+            _ => unreachable!(),
+        })
     }
 
     pub(crate) fn into_text(self, span: Span) -> Result<String, Diagnostic> {

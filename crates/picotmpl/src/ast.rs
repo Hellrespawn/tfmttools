@@ -19,6 +19,33 @@ pub(crate) struct Expression {
     pub span: Span,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ComparisonOperator {
+    Equal,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+}
+
+impl ComparisonOperator {
+    pub(crate) fn symbol(self) -> &'static str {
+        match self {
+            Self::Equal => "==",
+            Self::NotEqual => "!=",
+            Self::Less => "<",
+            Self::LessEqual => "<=",
+            Self::Greater => ">",
+            Self::GreaterEqual => ">=",
+        }
+    }
+
+    pub(crate) fn is_ordering(self) -> bool {
+        !matches!(self, Self::Equal | Self::NotEqual)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) enum ExpressionKind {
     Literal(String),
@@ -26,6 +53,12 @@ pub(crate) enum ExpressionKind {
     Reference(Reference),
     Sequence(Vec<Expression>),
     Negate(Box<Expression>),
+    Compare {
+        left: Box<Expression>,
+        operator: ComparisonOperator,
+        right: Box<Expression>,
+        operator_span: Span,
+    },
     Format {
         input: Box<Expression>,
         formatters: Vec<Formatter>,
@@ -62,6 +95,9 @@ fn append_expression(
         },
         ExpressionKind::Sequence(_) => "Sequence".to_owned(),
         ExpressionKind::Negate(_) => "Negate".to_owned(),
+        ExpressionKind::Compare { operator, .. } => {
+            format!("Compare {}", operator.symbol())
+        },
         ExpressionKind::Format { formatters, .. } => {
             let names = formatters
                 .iter()
@@ -91,6 +127,10 @@ fn append_expression(
         ExpressionKind::Negate(input)
         | ExpressionKind::Format { input, .. } => {
             append_expression(input, depth + 1, lines);
+        },
+        ExpressionKind::Compare { left, right, .. } => {
+            append_expression(left, depth + 1, lines);
+            append_expression(right, depth + 1, lines);
         },
         ExpressionKind::Conditional { condition, consequent, alternative } => {
             for (label, branch) in [

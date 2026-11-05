@@ -54,3 +54,147 @@ fn integer_literal_diagnostics() {
         .unwrap();
     assert_eq!(path.components(), ["12Song"]);
 }
+
+fn condition(expression: &str, expected: bool) {
+    assert_eq!(
+        render(&format!(r#"({expression}) ? "yes" : "no""#)),
+        [if expected { "yes" } else { "no" }],
+        "{expression}"
+    );
+}
+
+#[test]
+fn comparison_values_and_types() {
+    for (expression, expected) in [
+        ("1 == 1", true),
+        ("1 == 2", false),
+        ("1 != 1", false),
+        ("1 != 2", true),
+        ("1 < 2", true),
+        ("1 < 1", false),
+        ("1 <= 1", true),
+        ("2 <= 1", false),
+        ("2 > 1", true),
+        ("1 > 1", false),
+        ("1 >= 1", true),
+        ("1 >= 2", false),
+        (r#"1 == "1""#, false),
+        (r#""a" == "a""#, true),
+        (r#""A" == "a""#, false),
+        (r#""a" != "b""#, true),
+        ("(!$a) == (!$b)", true),
+        ("(!$a) == (!!$a)", false),
+        ("(!!$a) == $b", false),
+        ("$a == $b", true),
+        (r#"$a == """#, true),
+        ("$a == 0", false),
+        ("$a != 0", true),
+        ("$a < 0", false),
+        ("0 >= $a", false),
+        (r#"(1 2) == "12""#, true),
+        (r#"(1) == "1""#, false),
+        ("() == $a", true),
+        ("($a $b) == $a", true),
+        (r#"($a ?: "Unknown") == "Unknown""#, true),
+        (r#"$a ?: "Unknown" == "Unknown""#, true),
+        ("(!$a ? 2 : 3) > 1", true),
+        ("(1 == 1) == (!0)", false),
+    ] {
+        condition(expression, expected);
+    }
+}
+
+#[test]
+fn comparison_errors_and_validation() {
+    for expression in [
+        "1 < 2 < 3",
+        "1 ==",
+        "== 1",
+        "1 === 1",
+        "1 = 1",
+        "1 == 1",
+        r#""prefix" (1 == 1)"#,
+        "(1 == 1) | pad(2)",
+        r#"1 ? "ok" : 1 == 1"#,
+        r#""ok" ?: (1 == 1)"#,
+        r#""1" < 2 ? "x""#,
+        r#"(!1) < 2 ? "x""#,
+        r#"("x" /) == "x" ? "x""#,
+        r#"(1 ? 1 : ("x" /)) == 1 ? "x""#,
+        r#"1 ? "ok" : ("x" < 2 ? "bad")"#,
+    ] {
+        assert!(
+            Template::compile(&format!("template: ({expression})")).is_err(),
+            "{expression}"
+        );
+    }
+    for expression in [r#"prefix == "" ? "x""#, r#"(1 ?: prefix) == 1 ? "x""#] {
+        assert!(
+            Template::compile(&format!(
+                "arg prefix: path template: ({expression})"
+            ))
+            .is_err()
+        );
+    }
+    let source = r#"template: ($number >= 1 ? "yes" : "no")"#;
+    let bound = Template::compile(source).unwrap().bind(&[]).unwrap();
+    let error = bound
+        .render(|_| Ok::<_, Infallible>(Some(Scalar::Text("2".to_owned()))))
+        .unwrap_err();
+    let tfmttools_picotmpl::RenderError::Template(error) = error else {
+        panic!("expected template error")
+    };
+    assert_eq!(&source[error.span.start..error.span.end], ">=");
+    assert!(error.message.contains("integer"), "{error}");
+    // Absence makes ordering false, even when the other dynamic value is text.
+    let path = Template::compile(r#"template: ($a < $b ? "yes" : "no")"#)
+        .unwrap()
+        .bind(&[])
+        .unwrap()
+        .render(|name| {
+            Ok::<_, Infallible>(
+                (name == "b").then(|| Scalar::Text("x".to_owned())),
+            )
+        })
+        .unwrap();
+    assert_eq!(path.components(), ["no"]);
+}
+
+#[test]
+fn comparisons_resolve_operands_once_in_order() {
+    let source = r#"template: ($a != $b ? "different" : "same")"#;
+    let template = Template::compile(source).unwrap();
+    assert_eq!(
+        template
+            .tag_references()
+            .iter()
+            .map(|r| r.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a", "b"]
+    );
+    let bound = template.bind(&[]).unwrap();
+    let mut calls = Vec::new();
+    let path = bound
+        .render(|name| {
+            calls.push(name.to_owned());
+            Ok::<_, Infallible>(Some(Scalar::Integer(1)))
+        })
+        .unwrap();
+    assert_eq!(calls, ["a", "b"]);
+    assert_eq!(path.components(), ["same"]);
+    let error = bound
+        .render(|name| if name == "b" { Err("broken") } else { Ok(None) })
+        .unwrap_err();
+    let tfmttools_picotmpl::RenderError::Resolver { name, span, source: cause } =
+        error
+    else {
+        panic!("expected resolver error")
+    };
+    assert_eq!(name, "b");
+    assert_eq!(cause, "broken");
+    assert_eq!(&source[span.start..span.end], "$b");
+    assert_eq!(
+        template.dump_ast(),
+        "Path\n  Conditional\n    Condition\n      Compare !=\n        Reference $a\n        Reference $b\n    Then\n      Literal \"different\"\n    Else\n      Literal \"same\""
+    );
+}
