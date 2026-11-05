@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add picotmpl signed integer literals, scalar equality and numeric ordering,
+  and short-circuit `&&`/`||` conditions. Add Unicode `lower`, `upper`, `trim`,
+  and literal `replace("from", "to")` formatters. Keep existing precedence,
+  presence tests, path safety, and boolean output validation. Comparisons
+  do not implicitly convert text to integers; missing ordering operands
+  return false.
+
 - Rename the output expression definition from `path:` to `template:`
   to distinguish it from the `path` argument type. Update existing templates
   to use the new definition name.

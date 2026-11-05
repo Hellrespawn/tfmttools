@@ -203,6 +203,12 @@ are never imported; move them aside explicitly to start a new SQLite history.
 | Positive guard | `$album ? ($album /)` | Include content when present. |
 | Negated condition | `!$album ? ("Singles" /)` | Include content when missing or empty. |
 | Alternative | `$album ? "Album" : "Single"` | Select one branch. |
+| Integer literal | `1`, `-1` | Insert a signed 64-bit integer. |
+| Equality | `$artist != $album_artist` | Compare values without implicit type conversion. |
+| Numeric ordering | `$disc_total > 1` | Compare integers. |
+| Both present | `$album && $date` | Test both values, skipping the right when the left is absent. |
+| Either present | `$album_artist \|\| $artist` | Test either value, skipping the right when the left is present. |
+| Text formatting | `$title \| trim \| lower \| replace(" ", "_")` | Normalize text for a filename. |
 | Year extraction | `$date \| year` | Extract a four-digit year. |
 | Number padding | `$track_number \| pad(2)` | Pad displayed text to a minimum width. |
 
@@ -210,11 +216,12 @@ Missing or empty values are absent; numeric zero is present. Elvis evaluates
 its left operand once, and conditionals evaluate only the selected branch.
 Each conditional branch is one expression: group multiple output segments
 with parentheses. A space before `?` is conventional, but optional.
-Unary `!` produces a boolean for use in conditions;
+Unary `!`, comparisons, `&&`, and `||` produce booleans for use in conditions;
 booleans cannot be emitted, concatenated, or formatted, even in unreachable
 branches. Boolean conditions use their truth value.
 
 Binding from strongest to weakest is `!`, formatting `|`, Elvis `?:`,
+comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`), `&&`, `||`,
 conditional `?` with optional `:`, then concatenation. Parentheses override
 this order. Thus `$a ?: $b | pad(2)` pads only `$b`, while
 `($a ?: $b) | pad(2)` pads the selected value. A literal can keep a group
@@ -226,6 +233,27 @@ unmatched `?` in its group. Elvis `?:` cannot contain whitespace.
 any four-digit year. Invalid present dates are errors. Padding accepts
 widths from 0 through 1024 and never truncates text. Formatters cannot
 accept an expression that could return structural path components.
+
+Integer literals use signed decimal notation, without a leading plus or
+arithmetic; `007` emits `7`. Equality compares values of the same type without
+conversion (`1 == "1"` is false). Missing and empty text compare equal, and
+both differ from zero and boolean false. Ordering requires integers; an absent
+operand returns false, and present text is an error. Comparisons evaluate both
+operands once, left to right. Comparison chains are invalid: write
+`1 < 2 && 2 < 3`. Structural path values cannot be compared.
+
+`&&` and `||` use presence, return booleans, and short circuit. Their skipped
+operands are still validated for unknown tags and invalid expressions.
+To emit a selected value, use `?:` or a conditional.
+
+`lower` and `upper` apply Unicode case conversion without locale rules;
+`trim` removes Unicode whitespace at both ends. `replace("from", "to")`
+replaces every nonoverlapping literal match, case sensitively. The search
+must be nonempty; the replacement may be empty. Parameters must be quoted
+literals with the usual character restrictions. `year`, `lower`, `upper`,
+and `trim` take no parentheses. Missing or empty input skips a formatter chain;
+a final empty result is absent. Once started, the chain continues through
+empty intermediate results (`"  " | trim | pad(2)` emits `00`).
 
 A bare `/` separates components using the host platform's native separator.
 Quoted `/` and `\` are component text, subject to the filename character policy.
@@ -284,8 +312,9 @@ comments to `description: "..."`.
 Guards and fallbacks now retain zero values. The migrated Stef example also
 omits the filename artist prefix when the track artist is missing or empty:
 the old `albumartist and artist ~ " - "` expression could produce a dangling
-`" - "`; the new nested guards require both tags to be present. General Jinja
-comparisons, loops, includes, and arbitrary functions are unsupported.
+`" - "`; the new nested guards require both tags to be present. Scalar comparisons
+and explicit `&&`/`||` are supported, but Jinja syntax, loops, includes,
+and arbitrary functions remain unsupported.
 
 Saved filename references work after the referenced files are migrated.
 Reusing a saved legacy inline template for a new rename fails with a migration

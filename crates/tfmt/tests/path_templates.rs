@@ -549,3 +549,106 @@ fn conditional_and_elvis_inline_template() {
     assert!(!root(&directory).join("Nightwish - Nemo.mp3").exists());
     assert!(!root(&directory).join("config/tfmt.hist").exists());
 }
+
+#[test]
+fn comparisons_logical_operators_and_text_formatters_rename_audio() {
+    use lofty::config::WriteOptions;
+    use lofty::file::{AudioFile, TaggedFileExt};
+    use lofty::tag::ItemKey;
+
+    for (album_artist, disc_total, expected) in [
+        ("Nightwish", "2", "1-song_name.mp3"),
+        ("Various Artists", "2", "1-Nightwish - song_name.mp3"),
+        ("Nightwish", "1", "song_name.mp3"),
+    ] {
+        let directory = historical_rename();
+        let source = root(&directory).join("renamed.mp3");
+        let mut file = lofty::read_from_path(&source).unwrap();
+        let tag = file.primary_tag_mut().unwrap();
+        tag.insert_text(ItemKey::TrackArtist, "Nightwish".into());
+        tag.insert_text(ItemKey::AlbumArtist, album_artist.into());
+        tag.insert_text(ItemKey::TrackTitle, " Song Name ".into());
+        tag.insert_text(ItemKey::DiscNumber, "1".into());
+        tag.insert_text(ItemKey::DiscTotal, disc_total.into());
+        file.save_to_path(&source, WriteOptions::default()).unwrap();
+        let before = std::fs::read(&source).unwrap();
+        let output = run(&directory, &[
+            "rename",
+            "--script",
+            r#"template: (
+                $disc_total > 1 ? ($disc_number "-")
+                $artist != $album_artist && $artist ? ($artist " - ")
+                $title | trim | lower | replace(" ", "_")
+            )"#,
+        ]);
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(
+            std::fs::read(root(&directory).join(expected)).unwrap(),
+            before
+        );
+        assert!(!source.exists());
+    }
+}
+
+#[test]
+fn skipped_logical_metadata_is_validated_before_reading_audio() {
+    let directory = TempDir::new().unwrap();
+    let input = root(&directory).join("broken.mp3");
+    std::fs::write(&input, "not audio").unwrap();
+    let output = run(&directory, &[
+        "rename",
+        "--script",
+        r#"template: (1 || $not_a_tag ? "Song" : "Other")"#,
+    ]);
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("not_a_tag"), "{error}");
+    assert!(error.contains("1:"), "{error}");
+    assert_eq!(std::fs::read_to_string(&input).unwrap(), "not audio");
+    assert!(!root(&directory).join("Song.mp3").exists());
+}
+
+#[test]
+fn dynamic_ordering_error_has_template_location_and_preserves_audio() {
+    let directory = historical_rename();
+    let source = root(&directory).join("renamed.mp3");
+    let before = std::fs::read(&source).unwrap();
+    let output = run(&directory, &[
+        "rename",
+        "--script",
+        r#"template: ($title > 1 ? "Song" : "Other")"#,
+    ]);
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("1:19:"), "{error}");
+    assert!(error.contains("integers"), "{error}");
+    assert!(error.contains("renamed.mp3"), "{error}");
+    assert_eq!(std::fs::read(&source).unwrap(), before);
+    assert!(!root(&directory).join("Song.mp3").exists());
+    assert!(!root(&directory).join("Other.mp3").exists());
+}
+
+#[test]
+fn replacement_generated_separators_follow_filename_policy() {
+    let directory = historical_rename();
+    let source = root(&directory).join("renamed.mp3");
+    let before = std::fs::read(&source).unwrap();
+    let template = r#"template: ($title | replace("e", "/"))"#;
+    let output = run(&directory, &["rename", "--strict", "--script", template]);
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("forbidden"), "{error}");
+    assert_eq!(std::fs::read(&source).unwrap(), before);
+    assert!(!root(&directory).join("N").exists());
+
+    let output = run(&directory, &["rename", "--script", template]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        std::fs::read(root(&directory).join("N-mo.mp3")).unwrap(),
+        before
+    );
+    assert!(!root(&directory).join("N").exists());
+    let output = run(&directory, &["undo"]);
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(std::fs::read(source).unwrap(), before);
+}

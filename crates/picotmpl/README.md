@@ -44,7 +44,8 @@ conditionals bind to the right; `:` attaches to the nearest unmatched `?`
 in its group. Elvis `?:` is one token; `? :` is not valid.
 Examples put a space before `?` for readability; the space is optional.
 
-`!value` negates its presence test and produces a boolean. Boolean conditions
+`!value` negates its presence test and produces a boolean. Comparisons and
+`&&`/`||` also produce booleans. Boolean conditions
 use their truth value; false does not pass a test. Booleans cannot be emitted,
 concatenated, or formatted. Compilation rejects every possible boolean output,
 including unreachable branches. For example, `!$album ? "Singles"` is valid,
@@ -59,6 +60,9 @@ From strongest to weakest, operators bind as follows:
 | Unary `!` | Negate the next operand; repeated negations nest right to left |
 | Formatting `\|` | Format the nearest operand; chains run left to right |
 | Elvis `?:` | Select the first successful operand, left to right |
+| Comparisons `==`, `!=`, `<`, `<=`, `>`, `>=` | Compare two values; comparison chains are rejected |
+| Logical `&&` | Test both operands, short circuiting left to right |
+| Logical `\|\|` | Test either operand, short circuiting left to right |
 | Conditional `?` with optional `:` | One expression per branch, nesting right to left |
 | Adjacency | Concatenate expressions in order |
 
@@ -74,6 +78,79 @@ value with no matching year is an error. `| pad(width)` accepts widths from
 it never truncates text. Formatters can be chained. Missing formatted input
 stays absent without running a formatter. Formatting cannot accept a path
 argument or any group that might return structural directory boundaries.
+
+## Comparisons, integers, and boolean operators
+
+Integer literals are signed decimal 64-bit values: `0`, `42`, `-1`.
+They emit canonical decimal text (`007` emits `7`), remain present at zero,
+and work with `pad`. Overflow is a compilation error. A minus must touch
+its digits; leading plus, floats, exponents, and arithmetic are unsupported.
+Separate a following bare reference with whitespace (`12 suffix`);
+`12suffix` is invalid. Quote numbers when leading zeros must survive.
+
+```text
+$artist != $album_artist ? ($artist " - ")
+$disc_total > 1 ? ($disc_number "-")
+$album && $date ? ($date | year " - " $album /)
+($album_artist || $artist) ? "Known" : "Unknown"
+```
+
+`==` and `!=` compare integers numerically, strings exactly and case
+sensitively, and booleans by their truth value. There is no implicit type
+conversion: `1 == "1"` is false. Missing and empty text compare equal;
+both differ from zero and boolean false. Unicode text is not normalized.
+A multi-expression scalar group compares as concatenated text:
+`(1 2) == "12"` is true, while `(1) == "1"` is false. A single grouped
+value, conditional branch, or fallback preserves its selected value's type.
+
+`<`, `<=`, `>`, and `>=` require two integers. If either value is absent,
+the result is false. Known noninteger operands fail compilation; metadata
+whose resolver returns present text fails at rendering, at the operator's
+source span. Ordering never compares strings lexically or parses them as
+numbers. Every comparison evaluates both operands once, left to right,
+and propagates resolver errors. Potentially structural operands, including
+path arguments and directory groups, cannot be compared.
+
+Comparisons bind below Elvis and above `&&`: `$a ?: 0 > 1` compares the
+selected value against `1`. Comparison chains such as `1 < 2 < 3` are
+invalid; write `1 < 2 && 2 < 3`.
+
+`&&` and `||` use the existing presence test, including zero being present,
+and return booleans rather than an operand. `&&` skips its right operand
+when the left test fails; `||` skips it when the left succeeds. `&&` binds
+above `||`, and both associate left to right. Structural presence tests
+remain allowed. Compilation and tag-reference inspection still visit
+skipped operands. To select an output value use `?:` or `? :`.
+
+## Text transformations
+
+`| lower` and `| upper` use Rust's Unicode case conversion without locale
+rules; uppercasing `"Straße"` produces `"STRASSE"`. `| trim` removes leading
+and trailing Unicode whitespace. `| replace("from", "to")` replaces all
+nonoverlapping literal matches, case sensitively. An empty search string
+is invalid; an empty replacement deletes matches. Parameters use the same
+quoted-string escapes and prohibited-character checks as other literals.
+
+```text
+$title | trim | lower | replace(" ", "_")
+("   " | trim) ?: "Untitled"
+```
+
+Formatters accept text, integers displayed as text, or scalar groups.
+Possible boolean or structural inputs fail compilation, even in skipped
+branches. Missing and empty input skip the entire chain. Once a chain
+starts, every formatter runs, even if an earlier result is empty:
+`"  " | trim | pad(2)` emits `00`. A final empty result is absent to
+fallback and conditional tests.
+
+`year`, `lower`, `upper`, and `trim` take no parameters or parentheses.
+Existing parenthesized output after `year` remains adjacency:
+`"2024" | year (" suffix")` emits `2024 suffix`.
+`pad(width)` requires one integer width from 0 through 1024.
+`replace("from", "to")` requires exactly two string literals; no trailing
+comma or expression parameters are accepted. Formatter names are case
+insensitive. Replacement-generated slashes remain component text and pass
+through the caller's filename policy; they cannot create directories.
 
 Old `{...}`, `[...]`, and `??` expression syntax must be migrated manually.
 

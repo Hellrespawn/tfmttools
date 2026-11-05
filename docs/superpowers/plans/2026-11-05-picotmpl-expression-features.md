@@ -1,6 +1,6 @@
 # Picotmpl Expression Features Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add comparisons, integer literals, text transformations, and explicit boolean operators to picotmpl.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 1.91.0, edition 2024, Pest, existing Cargo workspace test harness.
 
-**Spec:** The proposed language contract below extends `../specs/2026-11-05-parenthesized-template-syntax-design.md`. Status: proposed for review; the user requested a plan, not implementation. The semantic choices below are recommendations, not previously approved requirements.
+**Spec:** The proposed language contract below extends `../specs/2026-11-05-parenthesized-template-syntax-design.md`. Status: approved by the user and implemented on `picotmpl-expression-features` on 2026-11-05.
 
 ## Global Constraints
 
@@ -18,7 +18,7 @@
 - Do not change existing sample layouts merely to demonstrate new syntax.
 - No external API consumers require compatibility, but existing executable templates must retain their behavior.
 
-## Proposed language contract
+## Approved language contract
 
 ### Operators and binding
 
@@ -93,11 +93,11 @@ Support `==`, `!=`, `<`, `<=`, `>`, `>=`. Results are booleans and cannot appear
 
 **Interfaces:** Add `ExpressionKind::Integer(i64)`; evaluate it as existing `Value::Integer`. Public APIs remain unchanged.
 
-- [ ] Add tests `integer_expression_literals` and `integer_literal_diagnostics`: `0`, `007`, `-1`, both i64 bounds, overflow on either side, lone minus, `- 1`, `12abc`, numeric output, `0 ?: 9` yielding `0`, and `7 | pad(2)` yielding `07`. Check overflow spans and numeric AST output.
-- [ ] Run `cargo test -p tfmttools-picotmpl`; confirm new acceptance tests fail before implementation.
-- [ ] Add the numeric atom with token boundaries; parse directly as `i64`. Update AST rendering, evaluation, and validation without changing pad width behavior.
-- [ ] Run `cargo test -p tfmttools-picotmpl`; require all tests and doctests to pass.
-- [ ] Commit as `Add integer literals to template expressions`.
+- [x] Add tests `integer_expression_literals` and `integer_literal_diagnostics`: `0`, `007`, `-1`, both i64 bounds, overflow on either side, lone minus, `- 1`, `12abc`, numeric output, `0 ?: 9` yielding `0`, and `7 | pad(2)` yielding `07`. Check overflow spans and numeric AST output.
+- [x] Run `cargo test -p tfmttools-picotmpl`; confirm new acceptance tests fail before implementation.
+- [x] Add the numeric atom with token boundaries; parse directly as `i64`. Update AST rendering, evaluation, and validation without changing pad width behavior.
+- [x] Run `cargo test -p tfmttools-picotmpl`; require all tests and doctests to pass.
+- [x] Commit as `Add integer literals to template expressions`.
 
 ## Task 2: Scalar comparisons
 
@@ -105,13 +105,13 @@ Support `==`, `!=`, `<`, `<=`, `>`, `>=`. Results are booleans and cannot appear
 
 **Interfaces:** Add `ComparisonOperator::{Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual}` and `ExpressionKind::Compare { left: Box<Expression>, operator: ComparisonOperator, right: Box<Expression>, operator_span: Span }`. Add `Value::compare(self, other: Self, operator: ComparisonOperator, span: Span) -> Result<bool, Diagnostic>` to centralize normalization and comparison. Extend capability analysis to distinguish potential text/integer/boolean/absent/structural results; metadata remains dynamically text or integer or absent. Do not build a general type system.
 
-- [ ] Add `comparison_values_and_types`: each operator's true/false boundary cases; `1 == "1"` false; equal/unequal text and booleans; missing versus empty, zero, and another missing value; `(1 2) == "12"`; `(1) == "1"` false; comparisons of selected conditional/fallback values. Assert rendered branch text, not emitted boolean output.
-- [ ] Add `comparison_errors_and_validation`: overflow remains a literal error; chained comparisons, missing operands, boolean output/formatting, structural alternatives, known text ordering, and resolver-returned text ordering fail with useful spans. Absent ordering returns false. Invalid expressions in skipped branches still fail compilation.
-- [ ] Add resolver-call assertions proving both operands are evaluated once, left to right, and resolver errors retain their source and reference span. Check AST dump children and reference collection on both sides.
-- [ ] Run the picotmpl tests and confirm the new tests fail.
-- [ ] Implement the comparison precedence level, AST traversal, capability checks, and shared value comparison. Normalize a multi-child nonstructural sequence using existing text conversion; preserve single grouped values and selected branch types. Use operator spans for dynamic type errors.
-- [ ] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass, including Stef regressions.
-- [ ] Commit as `Add scalar comparisons to templates`.
+- [x] Add `comparison_values_and_types`: each operator's true/false boundary cases; `1 == "1"` false; equal/unequal text and booleans; missing versus empty, zero, and another missing value; `(1 2) == "12"`; `(1) == "1"` false; comparisons of selected conditional/fallback values. Assert rendered branch text, not emitted boolean output.
+- [x] Add `comparison_errors_and_validation`: overflow remains a literal error; chained comparisons, missing operands, boolean output/formatting, structural alternatives, known text ordering, and resolver-returned text ordering fail with useful spans. Absent ordering returns false. Invalid expressions in skipped branches still fail compilation.
+- [x] Add resolver-call assertions proving both operands are evaluated once, left to right, and resolver errors retain their source and reference span. Check AST dump children and reference collection on both sides.
+- [x] Run the picotmpl tests and confirm the new tests fail.
+- [x] Implement the comparison precedence level, AST traversal, capability checks, and shared value comparison. Normalize a multi-child nonstructural sequence using existing text conversion; preserve single grouped values and selected branch types. Use operator spans for dynamic type errors.
+- [x] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass, including Stef regressions.
+- [x] Commit as `Add scalar comparisons to templates`.
 
 ## Task 3: Lazy boolean conjunction and disjunction
 
@@ -119,13 +119,13 @@ Support `==`, `!=`, `<`, `<=`, `>`, `>=`. Results are booleans and cannot appear
 
 **Interfaces:** Add `LogicalOperator::{And, Or}` and `ExpressionKind::Logical { left: Box<Expression>, operator: LogicalOperator, right: Box<Expression> }`. Evaluation returns existing `Value::Boolean` and calls `Value::is_present`; reference inspection walks both children.
 
-- [ ] Add `logical_presence_and_precedence`: missing, empty, zero, text `"0"`, negated booleans, all truth-table combinations, structural presence, and left associativity. `1 == 1 || 1 == 2 && 1 == 2` must select true; grouped disjunction followed by conjunction must select false. Test existing Elvis/format/conditional binding alongside the new levels.
-- [ ] Add `logical_short_circuit`: resolver calls and errors are skipped for an absent left operand of `&&` and a present left operand of `||`; required operands run once. All references still appear in `tag_references()`.
-- [ ] Add syntax and validation cases for `||` versus `|`, `!=` versus `!`, lone `&`, missing operands, boolean output/concatenation/formatting, skipped invalid branches, nested ternaries, and comparison chains. Assert AST nesting for precedence.
-- [ ] Run picotmpl tests and confirm the new acceptance tests fail.
-- [ ] Implement precedence and short-circuit evaluation, updating capability analysis and dump traversal. Preserve unary negation's existing binding above formatting.
-- [ ] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass.
-- [ ] Commit as `Add lazy boolean operators to templates`.
+- [x] Add `logical_presence_and_precedence`: missing, empty, zero, text `"0"`, negated booleans, all truth-table combinations, structural presence, and left associativity. `1 == 1 || 1 == 2 && 1 == 2` must select true; grouped disjunction followed by conjunction must select false. Test existing Elvis/format/conditional binding alongside the new levels.
+- [x] Add `logical_short_circuit`: resolver calls and errors are skipped for an absent left operand of `&&` and a present left operand of `||`; required operands run once. All references still appear in `tag_references()`.
+- [x] Add syntax and validation cases for `||` versus `|`, `!=` versus `!`, lone `&`, missing operands, boolean output/concatenation/formatting, skipped invalid branches, nested ternaries, and comparison chains. Assert AST nesting for precedence.
+- [x] Run picotmpl tests and confirm the new acceptance tests fail.
+- [x] Implement precedence and short-circuit evaluation, updating capability analysis and dump traversal. Preserve unary negation's existing binding above formatting.
+- [x] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass.
+- [x] Commit as `Add lazy boolean operators to templates`.
 
 ## Task 4: Text formatters and literal string parameters
 
@@ -133,13 +133,13 @@ Support `==`, `!=`, `<`, `<=`, `>`, `>=`. Results are booleans and cannot appear
 
 **Interfaces:** Extend `Formatter` with `Lower`, `Upper`, `Trim`, and `Replace { from: String, to: String }`. Preserve existing `Year(Span)` and `Pad(usize)`. Parse generic literal formatter parameter lists locally, then validate name-specific arity and types; do not expose a formatter registration API.
 
-- [ ] Add `text_formatter_results`: `" Ab C " | trim | lower | replace(" ", "_")` yields `ab_c`; `"Straße" | upper` yields `STRASSE`; Unicode whitespace trims; repeated replacement uses nonoverlapping matches; empty replacement deletes matches; integer input stringifies. An absent input remains absent. Trimmed-to-empty text selects an enclosing fallback. Existing `year` and `pad` chains remain unchanged.
-- [ ] Add `text_formatter_parameter_errors`: empty search, wrong count/type, unknown formatter, unsupported escapes, prohibited controls, parameter expressions, missing commas/closing parentheses, and arguments supplied to zero-argument formatters. Preserve pad width diagnostics and limits. Check escaped quotes/backslashes and replacement parameter spans.
-- [ ] Test boolean and structural formatter rejection through branches, replacement-generated slash remaining component text, and an empty intermediate result continuing through `pad(2)` to yield `00`.
-- [ ] Run picotmpl tests and confirm the new tests fail.
-- [ ] Extend formatter parsing and AST dump labels; implement transformations with `to_lowercase`, `to_uppercase`, `trim`, and `replace`. Reuse literal validation and existing formatter input conversion. Do not duplicate sanitization here.
-- [ ] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass.
-- [ ] Commit as `Add text transformation formatters`.
+- [x] Add `text_formatter_results`: `" Ab C " | trim | lower | replace(" ", "_")` yields `ab_c`; `"Straße" | upper` yields `STRASSE`; Unicode whitespace trims; repeated replacement uses nonoverlapping matches; empty replacement deletes matches; integer input stringifies. An absent input remains absent. Trimmed-to-empty text selects an enclosing fallback. Existing `year` and `pad` chains remain unchanged.
+- [x] Add `text_formatter_parameter_errors`: empty search, wrong count/type, unknown formatter, unsupported escapes, prohibited controls, parameter expressions, missing commas/closing parentheses, and arguments supplied to zero-argument formatters. Preserve pad width diagnostics and limits. Check escaped quotes/backslashes and replacement parameter spans.
+- [x] Test boolean and structural formatter rejection through branches, replacement-generated slash remaining component text, and an empty intermediate result continuing through `pad(2)` to yield `00`.
+- [x] Run picotmpl tests and confirm the new tests fail.
+- [x] Extend formatter parsing and AST dump labels; implement transformations with `to_lowercase`, `to_uppercase`, `trim`, and `replace`. Reuse literal validation and existing formatter input conversion. Do not duplicate sanitization here.
+- [x] Run `cargo test -p tfmttools-picotmpl`; require all tests to pass.
+- [x] Commit as `Add text transformation formatters`.
 
 ## Task 5: CLI integration, documentation, and complete verification
 
@@ -147,14 +147,23 @@ Support `==`, `!=`, `<`, `<=`, `>`, `>=`. Results are booleans and cannot appear
 
 **Interfaces:** Use unchanged `Template::compile`, `bind`, `render`, and `tag_references` through existing audio-template adapters. Confirm which audio tags arrive as integers in `crates/core/src/templates/context.rs` before selecting numeric CLI fixtures.
 
-- [ ] Add CLI tests using existing test helpers for equal artist suppression, a multi-disc numeric condition, combined presence tests, and title normalization. Assert exact target paths and preserved source extension. Use integer arguments if fixture metadata does not provide a suitable numeric tag.
-- [ ] Add CLI cases proving unknown metadata in a skipped logical operand is still rejected, dynamic ordering failures identify the template location, and replacement-generated separators follow default sanitization and strict-mode rejection without unintended directories or file changes.
-- [ ] Run `cargo xtask test-cli`; fix only integration failures caused by the additions. Retain existing case-only rename and staging coverage; do not rewrite fixture scenarios unnecessarily.
-- [ ] Update README syntax tables and migration/unsupported-feature statements, including the exact precedence table, missing/type rules, Unicode casing, lazy evaluation, formatter signatures, examples, and diagnostics. Add a CHANGELOG entry. Keep the old approved syntax design as history and link this extension from current docs as appropriate once accepted.
-- [ ] Run `cargo +nightly fmt --all`, `cargo test --workspace`, `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`. All must pass; record exact blockers if the environment prevents a check. Do not claim an unrun check passed.
-- [ ] Review the final diff for exhaustive AST matches, tag reference traversal in skipped branches, unchanged public API, no new dependencies, and preserved fixture output. Check `git diff --check`.
-- [ ] Commit as `Document and verify template expression features`.
+- [x] Add CLI tests using existing test helpers for equal artist suppression, a multi-disc numeric condition, combined presence tests, and title normalization. Assert exact target paths and preserved source extension. Use integer arguments if fixture metadata does not provide a suitable numeric tag.
+- [x] Add CLI cases proving unknown metadata in a skipped logical operand is still rejected, dynamic ordering failures identify the template location, and replacement-generated separators follow default sanitization and strict-mode rejection without unintended directories or file changes.
+- [x] Run `cargo xtask test-cli`; fix only integration failures caused by the additions. Retain existing case-only rename and staging coverage; do not rewrite fixture scenarios unnecessarily.
+- [x] Update README syntax tables and migration/unsupported-feature statements, including the exact precedence table, missing/type rules, Unicode casing, lazy evaluation, formatter signatures, examples, and diagnostics. Add a CHANGELOG entry. Keep the old approved syntax design as history and link this extension from current docs as appropriate once accepted.
+- [x] Run `cargo +nightly fmt --all`, `cargo test --workspace`, `cargo +nightly clippy --workspace --all-targets`, and `cargo xtask lint`. All must pass; record exact blockers if the environment prevents a check. Do not claim an unrun check passed.
+- [x] Review the final diff for exhaustive AST matches, tag reference traversal in skipped branches, unchanged public API, no new dependencies, and preserved fixture output. Check `git diff --check`.
+- [x] Commit as `Document and verify template expression features`.
 
 ## Completion criteria
 
-All four requested feature groups have executable library coverage and documented semantics. CLI tests demonstrate real audio-template integration and caller-owned path safety. Existing picotmpl, Stef, CLI, history, and staging tests retain their behavior. No product implementation is part of this planning change.
+All four requested feature groups have executable library coverage and documented semantics. CLI tests demonstrate real audio-template integration and caller-owned path safety. Existing picotmpl, Stef, CLI, history, and staging tests retain their behavior. Implementation is complete. Workspace tests and the nightly format/Clippy gate pass without warnings.
+
+
+## Implementation notes
+
+- Feature tests live in `crates/picotmpl/tests/expressions.rs` instead of expanding the existing syntax/rendering modules.
+- Result capabilities track possible text/integer/boolean/structural output; absence is implicit and needs no extra flag. A localized Clippy allowance explains why these independent flags are intentional.
+- The final independent review found a compatibility regression in grouped text after `year`. A failing regression test reproduced it; the grammar now preserves existing `"2024" | year (" suffix")` adjacency while validating the new formatter signatures.
+- Verification: `cargo xtask test-cli`, `cargo test --workspace`, `cargo +nightly clippy --workspace --all-targets`, `cargo xtask lint`, and `git diff --check` passed. The final workspace and lint runs followed the compatibility fix; the final workspace suite includes all CLI tests.
+- No new dependencies, public API changes, existing fixture changes, or changes to the example layout were needed.
