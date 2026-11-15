@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve the current working directory and its ancestors during rename
+  cleanup, avoiding Windows sharing violations after files move elsewhere.
+
 - Preserve absolute path arguments, including Windows drive and UNC prefixes,
   when rendering destinations such as the prefix in `examples/stef.tfmt`.
 

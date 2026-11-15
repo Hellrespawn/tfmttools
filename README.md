@@ -436,7 +436,9 @@ undone, including the applied prefix of a partially undone record. Partial runs
 and records affected by failed or interrupted replay cannot be redone. Rename
 and cleanup actions are recorded in order, including staging moves and
 copy/remove steps. Cleanup confirmation happens before file changes, and the
-configuration and bin directories are protected from cleanup.
+configuration and bin directories are protected from cleanup. Cleanup also
+preserves the current working directory and its ancestors, while still removing
+eligible files and empty subdirectories beneath them.
 
 Cleanup preserves relative paths under `trash/<run ID>/`, so files such as
 `a/b.jpg` and `a_b.jpg` remain distinct. Cleanup destinations are validated

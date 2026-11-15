@@ -126,7 +126,7 @@ fn cleanup_output_reports_effects_only_after_success() {
             )
             .unwrap();
             let root = directory.path().canonicalize().unwrap();
-            assert!(history.records()[0].actions().iter().any(|action| {
+            assert!(!history.records()[0].actions().iter().any(|action| {
                 matches!(action, tfmttools_core::history::StoredAction::RemoveDir { path }
                     if std::path::Path::new(path).canonicalize().ok().as_ref() == Some(&root))
             }));
@@ -142,6 +142,47 @@ fn cleanup_output_reports_effects_only_after_success() {
             assert!(!directory.path().join("config/tfmt.hist").exists());
         }
     }
+}
+
+#[test]
+fn cleanup_preserves_working_directory_when_all_files_move_out() {
+    let directory = TempDir::new().unwrap();
+    let root = directory.path();
+    let source = root.join("source");
+    std::fs::create_dir_all(source.join("album")).unwrap();
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/cli/audio/Nightwish - Nemo.mp3"),
+        source.join("original.mp3"),
+    )
+    .unwrap();
+    std::fs::write(source.join("cover.jpg"), b"cover").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_tfmt"))
+        .current_dir(&source)
+        .args(["--simple", "--yes", "-c"])
+        .arg(root.join("config"))
+        .args([
+            "rename",
+            "--script",
+            "arg prefix: path template: (prefix \"renamed\")",
+            "--",
+        ])
+        .arg(root.join("destination"))
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert!(source.is_dir());
+    assert_eq!(std::fs::read_dir(&source).unwrap().count(), 0);
+    assert!(root.join("destination/renamed.mp3").is_file());
+    let history = tfmttools_core::history::History::open_read_only(
+        camino::Utf8PathBuf::try_from(root.join("config/tfmt.hist")).unwrap(),
+    )
+    .unwrap();
+    let source = source.canonicalize().unwrap();
+    assert!(!history.records()[0].actions().iter().any(|action| {
+        matches!(action, tfmttools_core::history::StoredAction::RemoveDir { path }
+            if std::path::Path::new(path).canonicalize().ok().as_ref() == Some(&source))
+    }));
 }
 
 #[test]

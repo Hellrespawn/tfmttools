@@ -124,6 +124,8 @@ fn discover_remaining_items(
     let bin = resolve_cleanup_directory(
         session.rename_options().bin_directory().as_path(),
     )?;
+    let working_directory =
+        current_dir_utf8()?.as_path().canonicalize_utf8()?;
 
     let remaining = PathIterator::new(&options)
         .map(|result| {
@@ -132,10 +134,13 @@ fn discover_remaining_items(
                 Ok((path, canonical))
             })
         })
-        .filter_ok(|(_, canonical)| {
-            !canonical.starts_with(&config)
-                && !canonical.starts_with(&bin)
-                && !protected_paths.contains(canonical)
+        .filter_ok(|(path, canonical)| {
+            // Keep the working directory and its ancestors. Filtering
+            // entries here still allows cleanup of their contents.
+            !(canonical.starts_with(&config)
+                || canonical.starts_with(&bin)
+                || protected_paths.contains(canonical)
+                || (path.is_dir() && working_directory.starts_with(canonical)))
         })
         .map_ok(|(path, _)| path)
         .collect::<FsResult<Vec<_>>>()?;
