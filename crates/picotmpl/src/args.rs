@@ -40,13 +40,24 @@ pub(crate) fn coerce(spec: &ArgSpec, raw: &str) -> Result<Value, Diagnostic> {
         },
         ArgKind::String => Ok(Value::Text(raw.to_owned())),
         ArgKind::Path => {
+            let mut anchor = std::path::PathBuf::new();
+            let mut remainder = raw;
+            if let Some(std::path::Component::Prefix(prefix)) =
+                std::path::Path::new(raw).components().next()
+            {
+                anchor.push(prefix.as_os_str());
+                remainder = &raw[prefix.as_os_str().len()..];
+            }
+            if remainder.starts_with(['/', '\\']) {
+                anchor.push(std::path::MAIN_SEPARATOR_STR);
+            }
             let mut components = Vec::new();
             for component in
-                raw.split(['/', '\\']).filter(|part| !part.is_empty())
+                remainder.split(['/', '\\']).filter(|part| !part.is_empty())
             {
                 components.push(component.to_owned());
             }
-            Ok(Value::Path(components))
+            Ok(Value::Path(crate::RenderedPath { components, anchor }))
         },
     }
 }

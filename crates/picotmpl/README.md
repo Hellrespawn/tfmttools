@@ -215,7 +215,9 @@ for an integer argument. Defaults apply only to omitted values, and a
 supplied empty string overrides a nonempty default. Extra values are errors.
 
 String arguments preserve their text. Path arguments split on `/` and `\`,
-discard empty input segments, and preserve the remaining components.
+discard empty input segments, and preserve the remaining components. Leading
+separators preserve the root; native Windows drive and UNC prefixes are retained
+separately from component text and are not changed by `try_map_components()`.
 Prohibited controls are rejected before coercion. Defaults are type-checked
 at compilation; binding checks supplied values, including unused arguments,
 before metadata resolution. Filename character replacement belongs to the caller
@@ -223,14 +225,14 @@ and should run on completed components after interpolation.
 
 A path argument inserts complete directory components and must be used
 at a component boundary. It supplies its own boundary, so write
-`prefix $title` rather than `prefix / $title`. Path arguments are
-relative prefixes; leading input separators are discarded when splitting.
+`prefix $title` rather than `prefix / $title`. Rooted or prefixed path
+arguments must occur at the start of the output path.
 A bare `/` as the first top-level expression sets the rendered root indicator.
 An empty expression before `/` is an invalid empty component. Repeated
 separators, trailing separators, and empty final filenames are errors.
 `to_path_buf()` uses the host platform's separator. On Windows a leading
-separator is rooted on the current drive; this language does not express
-drive or UNC prefixes.
+separator is rooted on the current drive; use a path argument to supply
+a drive or UNC prefix.
 
 The library preserves component text without filename sanitization, including
 slashes in literals and scalars. Callers must transform completed components

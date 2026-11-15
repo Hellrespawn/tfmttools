@@ -57,19 +57,13 @@ impl AudioFile {
         strict: bool,
     ) -> TFMTResult<(Utf8File, Vec<Warning>)> {
         let (path, warnings) = render_audio_path(template, self, strict)?;
-        let (filename, directories) = path
+        let (filename, _) = path
             .components()
             .split_last()
             .expect("Rendered path has a filename component");
-        let mut target_path = if path.is_rooted() {
-            Utf8PathBuf::from(std::path::MAIN_SEPARATOR_STR)
-        } else {
-            Utf8PathBuf::new()
-        };
-        for directory in directories {
-            target_path.push(directory);
-        }
-        target_path.push(format!("{filename}.{}", self.extension()));
+        let mut target_path = Utf8PathBuf::from_path_buf(path.to_path_buf())
+            .expect("Rendered path contains UTF-8 components");
+        target_path.set_file_name(format!("{filename}.{}", self.extension()));
 
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
@@ -327,6 +321,42 @@ mod path_template_tests {
             camino::Utf8Path::new(std::path::MAIN_SEPARATOR_STR)
                 .join("Song.mp3")
         );
+    }
+
+    #[test]
+    fn stef_template_preserves_absolute_prefix() {
+        let template =
+            compile_audio_template(include_str!("../../../examples/stef.tfmt"))
+                .unwrap();
+        let prefixes = [
+            std::path::MAIN_SEPARATOR_STR,
+            #[cfg(windows)]
+            r"C:\Syncthing\Music\New\",
+            #[cfg(windows)]
+            "C:/Syncthing/Music/New/",
+            #[cfg(windows)]
+            r"\\server\share\Music\",
+        ];
+        for prefix in prefixes {
+            let bound = template.bind(&[prefix.to_owned()]).unwrap();
+            let file = audio(&[
+                (ItemKey::TrackArtist, "Eihwar"),
+                (ItemKey::TrackTitle, "Berserkr"),
+            ]);
+            for strict in [false, true] {
+                let (target, _) = file
+                    .construct_target_path(
+                        &bound,
+                        &Utf8Directory::new("work"),
+                        strict,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    target.as_path(),
+                    Utf8Path::new(prefix).join("Eihwar").join("Berserkr.mp3")
+                );
+            }
+        }
     }
 
     #[test]

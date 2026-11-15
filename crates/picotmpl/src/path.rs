@@ -6,22 +6,18 @@ use crate::{Diagnostic, Span};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RenderedPath {
     pub(crate) components: Vec<String>,
-    pub(crate) rooted: bool,
+    pub(crate) anchor: PathBuf,
 }
 
 impl RenderedPath {
     #[must_use]
     pub fn is_rooted(&self) -> bool {
-        self.rooted
+        self.anchor.has_root()
     }
 
     #[must_use]
     pub fn to_path_buf(&self) -> PathBuf {
-        let mut path = if self.rooted {
-            PathBuf::from(std::path::MAIN_SEPARATOR_STR)
-        } else {
-            PathBuf::new()
-        };
+        let mut path = self.anchor.clone();
         for component in &self.components {
             path.push(component);
         }
@@ -49,7 +45,7 @@ impl RenderedPath {
 pub(crate) struct Builder {
     current: String,
     components: Vec<String>,
-    rooted: bool,
+    anchor: PathBuf,
 }
 
 impl Builder {
@@ -67,7 +63,7 @@ impl Builder {
     }
 
     pub fn root(&mut self) {
-        self.rooted = true;
+        self.anchor.push(std::path::MAIN_SEPARATOR_STR);
     }
 
     pub fn separator(&mut self, span: Span) -> Result<(), Diagnostic> {
@@ -83,7 +79,7 @@ impl Builder {
 
     pub fn insert(
         &mut self,
-        components: Vec<String>,
+        path: RenderedPath,
         span: Span,
     ) -> Result<(), Diagnostic> {
         if !self.current.is_empty() {
@@ -92,7 +88,18 @@ impl Builder {
                 span,
             ));
         }
-        self.components.extend(components);
+        if !path.anchor.as_os_str().is_empty() {
+            if !self.components.is_empty()
+                || !self.anchor.as_os_str().is_empty()
+            {
+                return Err(Diagnostic::new(
+                    "Rooted or prefixed path arguments must start the output path",
+                    span,
+                ));
+            }
+            self.anchor = path.anchor;
+        }
+        self.components.extend(path.components);
         Ok(())
     }
 
@@ -104,6 +111,6 @@ impl Builder {
             ));
         }
         self.components.push(self.current);
-        Ok(RenderedPath { components: self.components, rooted: self.rooted })
+        Ok(RenderedPath { components: self.components, anchor: self.anchor })
     }
 }

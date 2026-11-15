@@ -232,8 +232,23 @@ fn prefix_components() {
             .render(|_| Ok::<_, Infallible>(None))
             .unwrap();
         assert_eq!(path.components(), ["Music", "Artists", "Artist", "Song"]);
-        assert!(!path.is_rooted());
+        assert_eq!(path.is_rooted(), prefix.starts_with('/'));
     }
+}
+
+#[test]
+fn rooted_argument_requires_start_of_output() {
+    let template = Template::compile(
+        r#"arg prefix: path template: ("Music" / prefix "Song")"#,
+    )
+    .unwrap();
+    assert!(
+        template
+            .bind(&["/Artists".to_owned()])
+            .unwrap()
+            .render(|_| Ok::<_, Infallible>(None))
+            .is_err()
+    );
 }
 
 #[test]

@@ -259,7 +259,8 @@ A bare `/` separates components using the host platform's native separator.
 Quoted `/` and `\` are component text, subject to the filename character policy.
 Only a bare `/` as the first top-level expression requests the platform root;
 empty initial directories, repeated separators, and empty final filenames
-are errors. Windows drive and UNC prefixes are outside the initial grammar.
+are errors. Native Windows drive and UNC prefixes can be supplied through
+path arguments.
 
 ### Arguments
 
@@ -276,7 +277,9 @@ compilation. Prohibited controls are rejected in defaults and supplied values,
 including unused arguments, before reading audio.
 
 A path argument splits on both `/` and `\`, discards empty segments, and inserts
-complete directory components. Leading separators do not make it absolute.
+complete directory components. Leading separators preserve the root, and native
+Windows drive and UNC prefixes are preserved without filename sanitization.
+Rooted or prefixed arguments must occur at the start of the output path.
 Thus `prefix $artist` needs no `/` after `prefix`. A path argument must
 occur at a component boundary; inserting one after unfinished text or following
 one immediately with `/` is an error.

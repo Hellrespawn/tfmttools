@@ -7,7 +7,7 @@ pub(crate) enum Value {
     Text(String),
     Integer(i64),
     Boolean(bool),
-    Path(Vec<String>),
+    Path(crate::RenderedPath),
     Sequence(Vec<(Self, Span)>),
     Root,
     Separator,
@@ -20,7 +20,10 @@ impl Value {
             Self::Text(text) => !text.is_empty(),
             Self::Integer(_) | Self::Root | Self::Separator => true,
             Self::Boolean(value) => *value,
-            Self::Path(components) => !components.is_empty(),
+            Self::Path(path) => {
+                !path.components.is_empty()
+                    || !path.anchor.as_os_str().is_empty()
+            },
             Self::Sequence(values) => {
                 values.iter().any(|(value, _)| value.is_present())
             },

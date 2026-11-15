@@ -139,9 +139,11 @@ fn emit(
         Value::Absent => {},
         Value::Text(text) => output.append(&text, span)?,
         Value::Integer(value) => output.append(&value.to_string(), span)?,
-        Value::Path(components) => {
-            if !components.is_empty() {
-                output.insert(components, span)?;
+        Value::Path(path) => {
+            if !path.components.is_empty()
+                || !path.anchor.as_os_str().is_empty()
+            {
+                output.insert(path, span)?;
             }
         },
         Value::Sequence(values) => {

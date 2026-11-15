@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve absolute path arguments, including Windows drive and UNC prefixes,
+  when rendering destinations such as the prefix in `examples/stef.tfmt`.
+
 - Fix Windows tag replacement, copy syncing, and comparisons of paths using
   mixed separators. Keep hard-linked audio protected by native Windows checks.
   Make path diagnostics and history test cleanup portable.
