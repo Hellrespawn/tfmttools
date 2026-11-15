@@ -122,6 +122,7 @@ fn apply_and_store_fix(
         app_options.fs_mode(),
         actions.to_vec(),
         metadata,
+        || {},
     )?;
     report_actions(actions, false);
     println!("Saved run #{} to history.", app_options.run_id());

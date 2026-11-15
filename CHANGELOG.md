@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Restore the rename progress bar while applying file and cleanup actions.
+  Progress advances after each completed action and its history confirmation.
+
 - Preserve the current working directory and its ancestors during rename
   cleanup, avoiding Windows sharing violations after files move elsewhere.
 

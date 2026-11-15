@@ -7,6 +7,7 @@ use tracing::info;
 use super::{RenameDecision, cleanup, confirmation, planning, preview};
 use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
 use crate::history::load_history_for_mode;
+use crate::ui::ProgressBar;
 
 pub struct RenameSession<'a> {
     app_options: &'a TFMTOptions,
@@ -75,12 +76,30 @@ impl<'a> RenameSession<'a> {
                     actions,
                     &unchanged_files,
                 )?;
+                let bar =
+                    (!self.app_options.fs_mode().is_dry_run()).then(|| {
+                        ProgressBar::bar(
+                            self.app_options.display_mode(),
+                            "Applying actions:",
+                            "Applied actions.",
+                            actions.len() as u64,
+                            true,
+                        )
+                    });
                 crate::history::execution::execute_recorded(
                     &mut self.history,
                     self.app_options.fs_mode(),
                     actions,
                     metadata,
+                    || {
+                        if let Some(bar) = &bar {
+                            bar.inc_found();
+                        }
+                    },
                 )?;
+                if let Some(bar) = bar {
+                    bar.finish();
+                }
                 if !matches!(
                     self.app_options.fs_mode(),
                     tfmttools_core::util::FSMode::DryRun

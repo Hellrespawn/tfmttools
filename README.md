@@ -431,6 +431,9 @@ layout and encodings. If the file has changed since the operation, replay fails
 without overwriting it. New files and restored candidates are verified before
 installation; raw tag serialization is never used for undo/redo.
 
+Rename displays an action progress bar, hidden by `--simple` and in dry runs.
+It advances after each action completes and its history entry is confirmed.
+
 Commands stop on the first error. Confirmed actions stay in history and can be
 undone, including the applied prefix of a partially undone record. Partial runs
 and records affected by failed or interrupted replay cannot be redone. Rename

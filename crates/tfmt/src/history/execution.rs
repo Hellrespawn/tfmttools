@@ -85,6 +85,7 @@ pub(crate) fn execute_recorded(
     fs: FSMode,
     actions: Vec<Action>,
     metadata: ActionRecordMetadata,
+    on_action_completed: impl FnMut(),
 ) -> Result<Record> {
     let actions = absolute_actions(actions)?;
     guard_execution(history, fs)?;
@@ -104,6 +105,7 @@ pub(crate) fn execute_recorded(
             .enumerate()
             .map(|(p, a)| (p, StoredAction::from(&a)))
             .collect(),
+        on_action_completed,
     );
     finish_run(history, run, result)
 }
@@ -134,6 +136,7 @@ pub(crate) fn replay_record(
         run,
         ExecutionContext::Replay { record_id, direction },
         actions,
+        || {},
     );
     finish_run(history, run, result)
 }
@@ -196,6 +199,7 @@ fn execute_actions(
     run: RunId,
     context: ExecutionContext,
     actions: Vec<(usize, StoredAction)>,
+    mut on_action_completed: impl FnMut(),
 ) -> Result<()> {
     for (position, action) in actions {
         let mut prepared = prepare(history, context, position, &action)?;
@@ -207,6 +211,7 @@ fn execute_actions(
         prepared.execute()?;
         history.confirm_attempt(attempt).wrap_err_with(||format!("History completion could not be confirmed. Inspect the recorded history and retained paths: {}",prepared.details().paths.join(", ")))?;
         prepared.confirm().wrap_err_with(||format!("Action is confirmed in history. Remove leftover artifacts manually: {}",prepared.details().paths.join(", ")))?;
+        on_action_completed();
     }
     Ok(())
 }
@@ -249,11 +254,48 @@ mod manual_tests {
 
     use super::*;
     #[test]
+    fn progress_counts_completed_actions_but_not_dry_runs() {
+        for fs in [FSMode::Default, FSMode::DryRun] {
+            let directory = assert_fs::TempDir::new().unwrap();
+            let root =
+                Utf8PathBuf::try_from(directory.path().to_owned()).unwrap();
+            let mut history = History::new(root.join("history"));
+            let mut completed = 0;
+            let record = execute_recorded(
+                &mut history,
+                fs,
+                vec![
+                    Action::MakeDir(root.join("first")),
+                    Action::MakeDir(root.join("second")),
+                ],
+                ActionRecordMetadata::new(
+                    TemplateMetadata::Validation { value: "test".into() },
+                    vec![],
+                    "test".into(),
+                ),
+                || completed += 1,
+            )
+            .unwrap();
+            if fs.is_dry_run() {
+                assert_eq!(completed, 0);
+                assert!(!root.join("first").exists());
+                assert!(!root.join("second").exists());
+            } else {
+                assert_eq!(completed, 2);
+                assert_eq!(record.applied_count(), completed);
+                assert!(root.join("first").is_dir());
+                assert!(root.join("second").is_dir());
+            }
+        }
+    }
+
+    #[test]
     fn ordinary_error_preserves_confirmed_prefix_and_never_continues() {
         let d = assert_fs::TempDir::new().unwrap();
         let root = Utf8PathBuf::try_from(d.path().to_owned()).unwrap();
         let mut h = History::new(root.join("history"));
         let fs = FSMode::Default;
+        let mut completed = 0;
         let metadata = ActionRecordMetadata::new(
             TemplateMetadata::Validation { value: "test".into() },
             vec![],
@@ -271,13 +313,15 @@ mod manual_tests {
                     },
                     Action::MakeDir(root.join("last"))
                 ],
-                metadata
+                metadata,
+                || completed += 1
             )
             .is_err()
         );
         assert!(root.join("first").is_dir());
         assert!(!root.join("last").exists());
         assert_eq!(h.records()[0].applied_count(), 1);
+        assert_eq!(completed, 1);
         if let Some(a) = h.current_attempt().unwrap() {
             h.resolve_attempt(a.id, AttemptOutcome::NotApplied).unwrap();
         }
@@ -318,7 +362,8 @@ mod failure_tests {
                     Action::RemoveDir(obstruction.clone()),
                     Action::MakeDir(root.join("last"))
                 ],
-                metadata()
+                metadata(),
+                || {}
             )
             .is_err()
         );
@@ -362,7 +407,8 @@ mod failure_tests {
                 &mut history,
                 FSMode::Default,
                 vec![Action::MakeDir(root.join("new"))],
-                metadata()
+                metadata(),
+                || {}
             )
             .is_err()
         );
@@ -416,11 +462,19 @@ mod failure_tests {
         h.close_run(run, false).unwrap();
         let db = rusqlite::Connection::open(root.join("history")).unwrap();
         db.execute_batch("CREATE TRIGGER fail_confirmation BEFORE DELETE ON attempts BEGIN SELECT RAISE(ABORT,'injected failure'); END;").unwrap();
+        let mut completed = 0;
         assert!(
-            execute_recorded(&mut h, FSMode::Default, vec![action], metadata())
-                .is_err()
+            execute_recorded(
+                &mut h,
+                FSMode::Default,
+                vec![action],
+                metadata(),
+                || completed += 1
+            )
+            .is_err()
         );
         assert!(h.ensure_usable().is_err());
+        assert_eq!(completed, 0);
         db.execute_batch("DROP TRIGGER fail_confirmation").unwrap();
         h.load().unwrap();
         let a = h.current_attempt().unwrap().unwrap();
