@@ -1,7 +1,6 @@
 use camino::Utf8PathBuf;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FileOrName {
     File(Utf8PathBuf, String),
     Name(String),
