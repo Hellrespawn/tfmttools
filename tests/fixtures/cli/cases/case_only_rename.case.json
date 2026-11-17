@@ -4,13 +4,13 @@
     "initial-state": [
       {
         "path": "input/case-only/Nightwish - Nemo.mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       }
     ],
     "apply": [
       {
         "path": "input/case-only/nightwish - nemo.mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       }
     ]
   },

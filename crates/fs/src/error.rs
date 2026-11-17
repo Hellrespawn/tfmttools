@@ -15,9 +15,6 @@ pub enum FsError {
     #[error("Path exists but is not a file: {0}")]
     NotAFile(Utf8PathBuf),
 
-    #[error("File is too big for checksum: {0}")]
-    FileTooLargeError(Utf8PathBuf),
-
     #[error("Error while reading file: {0}\n{1}")]
     Lofty(Utf8PathBuf, #[source] lofty::error::FileParseError),
 

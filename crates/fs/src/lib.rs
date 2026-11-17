@@ -1,6 +1,5 @@
 mod action;
 mod audiofile;
-mod checksum;
 mod error;
 mod existing_paths;
 mod file_or_name;
@@ -16,7 +15,6 @@ pub use action::{
     write_tag_candidate,
 };
 pub use audiofile::read_audio_file;
-pub use checksum::{get_file_checksum, get_path_checksum};
 pub use error::{FsError, FsResult};
 pub use existing_paths::existing_target_paths;
 pub use file_or_name::FileOrName;

@@ -1754,7 +1754,6 @@ dependencies = [
 name = "tfmttools-fs"
 version = "0.24.0"
 dependencies = [
- "adler2",
  "assert_fs",
  "camino",
  "color-eyre",
@@ -1807,6 +1806,8 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]

@@ -17,12 +17,13 @@ use lofty::id3::v2::{Frame, Id3v2Tag};
 use lofty::tag::{ItemKey, Tag, TagType};
 use tfmttools_core::item_keys::parse_item_key;
 use tfmttools_core::tag_encoding::TagTextEncoding;
-use tfmttools_fs::{PathIterator, get_path_checksum};
+use tfmttools_fs::PathIterator;
 use tfmttools_test_harness::{
     CaseOutcome, CliCaseDetails, CliRunDetails, CommandOutcome, Expectation,
     ExpectationOutcome, ExpectationVerification, ExpectationsOutcome,
     FixtureDirs, ReportEnvelope, ReportFilters, RunFailure, Runner,
-    RunnerDetails, SourceMetadata, StepOutcome, write_report,
+    RunnerDetails, SourceMetadata, StepOutcome, get_path_checksum,
+    write_report,
 };
 
 use crate::case::{TestContext, populate_files, remap_initial_files};

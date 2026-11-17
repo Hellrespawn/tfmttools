@@ -4,21 +4,21 @@
     "initial-state": [
       {
         "path": "input/Nightwish - Elvenpath (Live).mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       },
       {
         "path": "input/Nightwish - Nemo.mp3",
-        "checksum": "781AABD2"
+        "checksum": "6cae378d38472d327418df5b885555dab95be6dc61cc04d869a1b539031b71b3"
       }
     ],
     "apply": [
       {
         "path": "input/Nightwish - Elvenpath (Live).mp3",
-        "checksum": "781AABD2"
+        "checksum": "6cae378d38472d327418df5b885555dab95be6dc61cc04d869a1b539031b71b3"
       },
       {
         "path": "input/Nightwish - Nemo.mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       }
     ]
   },

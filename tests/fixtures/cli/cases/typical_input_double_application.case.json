@@ -2,44 +2,44 @@
   "description": "Double apply, undo and redo of typical_input.tfmt",
   "expectations": {
     "initial-state": [
-      { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "64E9A6E7" },
+      { "path": "input/Amon Amarth - Under Siege.mp3", "checksum": "10d8e3a71129fccd87c0099639534ee4ae264b72a3b00b6f065c93d281187fda" },
       {
         "path": "input/Damjan Mravunac - Welcome To Heaven.ogg",
-        "checksum": "FFC58E16"
+        "checksum": "34054b1a3c6b0a10858cc528ebe3678a641e5dc238d27bf25c8773630e924784"
       },
       {
         "path": "input/Die Antwoord - Gucci Coochie (feat. Dita Von Teese).mp3",
-        "checksum": "3490B59A"
+        "checksum": "29bc9cde6da5552ea2dae7b6d042bedd9f35be85525688897429de2e304d177c"
       },
       {
         "path": "input/Lindemann - Ich Weiß Es Nicht.mp3",
-        "checksum": "40C9CD73"
+        "checksum": "e0d50d86a164f5a0d69678a66e33e93b381f404e3524326c8bcdd9aa4a4c8e9b"
       },
-      { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "5F144F41" },
+      { "path": "input/MASTER BOOT RECORD - Dune.mp3", "checksum": "e04fca281f4ae3ea4168766c9c93652848330cd6ddd1d18a4eecdd8d8fdf9108" },
       {
         "path": "input/MASTER BOOT RECORD - MYTH.NFO.mp3",
-        "checksum": "D4FA9F57"
+        "checksum": "52f6b9d8a953ee7cd4232eded344fb37d5a24407e4ee3c3b918d2fd6ada78243"
       },
       {
         "path": "input/MASTER BOOT RECORD - RAMDRIVE.SYS.mp3",
-        "checksum": "C3149CF3"
+        "checksum": "76c2abbb4e39d09cf177c212bf983b105bc93621373608c1282eca5874699ebc"
       },
       {
         "path": "input/MASTER BOOT RECORD - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-        "checksum": "C756AE33"
+        "checksum": "ca0075f46dbbb7cb651706b688f60bbbf15adc0b67bb54e2d18db22cb6b87f20"
       },
       {
         "path": "input/Nightwish - Elvenpath (Live).mp3",
-        "checksum": "781AABD2"
+        "checksum": "6cae378d38472d327418df5b885555dab95be6dc61cc04d869a1b539031b71b3"
       },
-      { "path": "input/Nightwish - Nemo.mp3", "checksum": "820F92DA" },
+      { "path": "input/Nightwish - Nemo.mp3", "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32" },
       {
         "path": "input/Nightwish - While Your Lips Are Still Red.mp3",
-        "checksum": "DCBC7996"
+        "checksum": "4db2d168befe27cd093ec9ae5e69e76008599d57caa19dc2b20bdd38ee6a0ef7"
       },
       {
         "path": "input/Van Pletzen - Benaaihilism.m4a",
-        "checksum": "166D0587"
+        "checksum": "ed38466d962d27062c3c56bc81f577f2633abb5740437fcd789e125015308022"
       },
       { "path": "input/extra/cover.jpg", "options": ["no-previous"] },
       { "path": "input/extra/description.txt", "options": ["no-previous"] }
@@ -47,51 +47,51 @@
     "apply1": [
       {
         "path": "output_dir/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
-        "checksum": "64E9A6E7"
+        "checksum": "10d8e3a71129fccd87c0099639534ee4ae264b72a3b00b6f065c93d281187fda"
       },
       {
         "path": "output_dir/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
-        "checksum": "FFC58E16"
+        "checksum": "34054b1a3c6b0a10858cc528ebe3678a641e5dc238d27bf25c8773630e924784"
       },
       {
         "path": "output_dir/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
-        "checksum": "3490B59A"
+        "checksum": "29bc9cde6da5552ea2dae7b6d042bedd9f35be85525688897429de2e304d177c"
       },
       {
         "path": "output_dir/Lindemann/2019 - F & M/02 - Ich Weiß Es Nicht.mp3",
-        "checksum": "40C9CD73"
+        "checksum": "e0d50d86a164f5a0d69678a66e33e93b381f404e3524326c8bcdd9aa4a4c8e9b"
       },
       {
         "path": "output_dir/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-        "checksum": "5F144F41"
+        "checksum": "e04fca281f4ae3ea4168766c9c93652848330cd6ddd1d18a4eecdd8d8fdf9108"
       },
       {
         "path": "output_dir/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
-        "checksum": "D4FA9F57"
+        "checksum": "52f6b9d8a953ee7cd4232eded344fb37d5a24407e4ee3c3b918d2fd6ada78243"
       },
       {
         "path": "output_dir/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
-        "checksum": "C3149CF3"
+        "checksum": "76c2abbb4e39d09cf177c212bf983b105bc93621373608c1282eca5874699ebc"
       },
       {
         "path": "output_dir/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-        "checksum": "C756AE33"
+        "checksum": "ca0075f46dbbb7cb651706b688f60bbbf15adc0b67bb54e2d18db22cb6b87f20"
       },
       {
         "path": "output_dir/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
-        "checksum": "781AABD2"
+        "checksum": "6cae378d38472d327418df5b885555dab95be6dc61cc04d869a1b539031b71b3"
       },
       {
         "path": "output_dir/Nightwish/2004 - Once/03 - Nemo.mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       },
       {
         "path": "output_dir/Nightwish/While Your Lips Are Still Red.mp3",
-        "checksum": "DCBC7996"
+        "checksum": "4db2d168befe27cd093ec9ae5e69e76008599d57caa19dc2b20bdd38ee6a0ef7"
       },
       {
         "path": "output_dir/Van Pletzen/Benaaihilism/101 - Van Pletzen - Benaaihilism.m4a",
-        "checksum": "166D0587"
+        "checksum": "ed38466d962d27062c3c56bc81f577f2633abb5740437fcd789e125015308022"
       },
       {
         "path": "config/trash/run_id/extra/cover.jpg",
@@ -105,51 +105,51 @@
     "apply2": [
       {
         "path": "output_dir2/Amon Amarth/2013 - Deceiver of the Gods/105 - Under Siege.mp3",
-        "checksum": "64E9A6E7"
+        "checksum": "10d8e3a71129fccd87c0099639534ee4ae264b72a3b00b6f065c93d281187fda"
       },
       {
         "path": "output_dir2/The Talos Principle/2015 - The Talos Principle OST/01 - Damjan Mravunac - Welcome To Heaven.ogg",
-        "checksum": "FFC58E16"
+        "checksum": "34054b1a3c6b0a10858cc528ebe3678a641e5dc238d27bf25c8773630e924784"
       },
       {
         "path": "output_dir2/Die Antwoord/2016 - Mount Ninji and da Nice Time Kid/05 - Gucci Coochie (feat. Dita Von Teese).mp3",
-        "checksum": "3490B59A"
+        "checksum": "29bc9cde6da5552ea2dae7b6d042bedd9f35be85525688897429de2e304d177c"
       },
       {
         "path": "output_dir2/Lindemann/2019 - F & M/02 - Ich Weiß Es Nicht.mp3",
-        "checksum": "40C9CD73"
+        "checksum": "e0d50d86a164f5a0d69678a66e33e93b381f404e3524326c8bcdd9aa4a4c8e9b"
       },
       {
         "path": "output_dir2/MASTER BOOT RECORD/WAREZ/Dune.mp3",
-        "checksum": "5F144F41"
+        "checksum": "e04fca281f4ae3ea4168766c9c93652848330cd6ddd1d18a4eecdd8d8fdf9108"
       },
       {
         "path": "output_dir2/MASTER BOOT RECORD/2017.01 - C-COPY . A -V/04 - MYTH.NFO.mp3",
-        "checksum": "D4FA9F57"
+        "checksum": "52f6b9d8a953ee7cd4232eded344fb37d5a24407e4ee3c3b918d2fd6ada78243"
       },
       {
         "path": "output_dir2/MASTER BOOT RECORD/2020.01 - FLOPPY DISK OVERDRIVE/07 - RAMDRIVE.SYS.mp3",
-        "checksum": "C3149CF3"
+        "checksum": "76c2abbb4e39d09cf177c212bf983b105bc93621373608c1282eca5874699ebc"
       },
       {
         "path": "output_dir2/MASTER BOOT RECORD/2016.03 - C-EDIT AUTOEXEC.BAT/05 - SET MIDI=SYNTH1 MAPG MODE1.mp3",
-        "checksum": "C756AE33"
+        "checksum": "ca0075f46dbbb7cb651706b688f60bbbf15adc0b67bb54e2d18db22cb6b87f20"
       },
       {
         "path": "output_dir2/Nightwish/2019 - Decades Live in Buenos Aires/12 - Elvenpath (Live).mp3",
-        "checksum": "781AABD2"
+        "checksum": "6cae378d38472d327418df5b885555dab95be6dc61cc04d869a1b539031b71b3"
       },
       {
         "path": "output_dir2/Nightwish/2004 - Once/03 - Nemo.mp3",
-        "checksum": "820F92DA"
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32"
       },
       {
         "path": "output_dir2/Nightwish/While Your Lips Are Still Red.mp3",
-        "checksum": "DCBC7996"
+        "checksum": "4db2d168befe27cd093ec9ae5e69e76008599d57caa19dc2b20bdd38ee6a0ef7"
       },
       {
         "path": "output_dir2/Van Pletzen/Benaaihilism/101 - Van Pletzen - Benaaihilism.m4a",
-        "checksum": "166D0587"
+        "checksum": "ed38466d962d27062c3c56bc81f577f2633abb5740437fcd789e125015308022"
       },
       {
         "path": "config/trash/run_id/extra/cover.jpg",

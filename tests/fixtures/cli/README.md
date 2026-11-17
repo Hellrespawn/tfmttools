@@ -45,13 +45,13 @@ Each case has this top-level shape:
     "initial-state": [
       {
         "path": "input/Nightwish - Nemo.mp3",
-        "checksum": "820F92DA",
+        "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32",
         "tags": { "TrackTitle": "Nemo" },
         "tag-encodings": { "TrackTitle": "UTF8" }
       }
     ],
     "apply": [
-      { "path": "Nightwish/Nemo.mp3", "checksum": "820F92DA" }
+      { "path": "Nightwish/Nemo.mp3", "checksum": "adfa2f06012d7f93b43b6038f23d2156e8531d2c42d2924886e0cdd005258e32" }
     ]
   },
   "tests": {
@@ -72,8 +72,9 @@ Each case has this top-level shape:
 - `tests`: ordered test steps.
 
 Expectation entries use paths relative to the temporary work directory.
-If `checksum` is present, it must match the file checksum calculated by
-the harness. If `checksum` is omitted, only file presence is checked.
+If `checksum` is present, it must match the lowercase hexadecimal SHA-256
+digest calculated by the harness over the first 60 MiB of the file. Bytes
+beyond that limit are ignored. If `checksum` is omitted, only file presence is checked.
 If `tags` is present, each key/value pair must match the audio file's
 primary tag. Tag keys use the same names accepted by templates, such as
 `TrackTitle`, `AlbumTitle`, or `Artist`.
