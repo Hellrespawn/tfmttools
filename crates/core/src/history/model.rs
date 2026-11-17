@@ -1,12 +1,9 @@
 use chrono::{DateTime, FixedOffset, Local};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{HistoryError, OperationKind, Result, StoredAction};
 
-#[derive(
-    Clone, Copy, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq,
-)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordState {
     Applied,
@@ -15,7 +12,7 @@ pub enum RecordState {
     Superseded,
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Record {
     id: Option<usize>,
@@ -180,7 +177,7 @@ impl Record {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TemplateMetadata {
     FileOrName { value: String },
@@ -188,7 +185,7 @@ pub enum TemplateMetadata {
     Validation { value: String },
 }
 
-#[derive(Debug, Serialize, Deserialize, JsonSchema, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ActionRecordMetadata {
     template: TemplateMetadata,
