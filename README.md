@@ -436,8 +436,10 @@ layout and encodings. If the file has changed since the operation, replay fails
 without overwriting it. New files and restored candidates are verified before
 installation; raw tag serialization is never used for undo/redo.
 
-Rename displays an action progress bar, hidden by `--simple` and in dry runs.
-It advances after each action completes and its history entry is confirmed.
+Rename displays file progress, followed by a separate cleanup progress bar.
+Each audio file counts once after its move and history confirmation complete;
+directory creation, staging moves, and copy/remove steps do not inflate the file
+total. Progress bars are hidden by `--simple` and in dry runs.
 
 Commands stop on the first error. Confirmed actions stay in history and can be
 undone, including the applied prefix of a partially undone record. Partial runs

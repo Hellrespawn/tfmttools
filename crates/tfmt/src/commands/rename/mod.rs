@@ -7,6 +7,9 @@ mod session;
 mod shared;
 mod template_resolution;
 
+use std::collections::HashSet;
+
+use camino::Utf8PathBuf;
 use color_eyre::Result;
 pub(crate) use session::RenameSession;
 use tfmttools_core::action::{Action, RenameAction};
@@ -26,6 +29,7 @@ pub(crate) struct RenamePlan {
 pub(crate) enum RenameDecision {
     Confirmed {
         actions: Vec<Action>,
+        destinations: HashSet<Utf8PathBuf>,
         unchanged_files: Vec<Utf8File>,
         metadata: ActionRecordMetadata,
     },

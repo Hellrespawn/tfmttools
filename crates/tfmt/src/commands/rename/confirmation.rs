@@ -1,6 +1,6 @@
 use color_eyre::Result;
 use itertools::Itertools;
-use tfmttools_core::util::Utf8File;
+use tfmttools_core::util::{Utf8File, Utf8PathExt};
 use tfmttools_fs::plan_actions;
 use tracing::trace;
 
@@ -29,12 +29,18 @@ pub fn confirm_and_plan(
         let confirmation = super::shared::confirm(session, "Move files?")?;
 
         if confirmation {
+            let destinations = plan
+                .actions
+                .iter()
+                .map(|action| action.target().as_path().to_owned())
+                .collect();
             let actions = plan_actions(
                 plan.actions,
                 session.rename_options().move_mode(),
             )?;
             Ok(RenameDecision::Confirmed {
                 actions,
+                destinations,
                 unchanged_files: plan.unchanged_files,
                 metadata: plan.metadata,
             })

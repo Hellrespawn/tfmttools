@@ -5,8 +5,9 @@
 - Accept `.` and `..` in path arguments and resolve directory navigation before
   presenting or applying rename destinations.
 
-- Restore the rename progress bar while applying file and cleanup actions.
-  Progress advances after each completed action and its history confirmation.
+- Show rename progress per audio file, with cleanup in a separate progress bar.
+  Progress advances after completed moves and their history confirmation;
+  directory creation and staging do not inflate the file total.
 
 - Preserve the current working directory and its ancestors during rename
   cleanup, avoiding Windows sharing violations after files move elsewhere.

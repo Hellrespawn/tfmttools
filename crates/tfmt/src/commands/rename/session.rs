@@ -1,4 +1,8 @@
+use std::collections::HashSet;
+
+use camino::Utf8PathBuf;
 use color_eyre::Result;
+use tfmttools_core::action::Action;
 use tfmttools_core::history::{History, LoadHistoryResult};
 use tfmttools_core::util::Utf8PathExt;
 use tfmttools_fs::PathIteratorOptions;
@@ -8,6 +12,20 @@ use super::{RenameDecision, cleanup, confirmation, planning, preview};
 use crate::cli::{RenameArgs, RenameOptions, TFMTOptions};
 use crate::history::load_history_for_mode;
 use crate::ui::ProgressBar;
+
+fn file_move_completions(
+    actions: &[Action],
+    destinations: &HashSet<Utf8PathBuf>,
+) -> Vec<bool> {
+    actions.iter().enumerate().map(|(index, action)| match action {
+        Action::MoveFile { target, .. } => destinations.contains(target),
+        Action::RemoveFile(source) => index.checked_sub(1).is_some_and(|previous| {
+            matches!(&actions[previous], Action::CopyFile { source: copied, target }
+                if copied == source && destinations.contains(target))
+        }),
+        _ => false,
+    }).collect()
+}
 
 pub struct RenameSession<'a> {
     app_options: &'a TFMTOptions,
@@ -68,32 +86,56 @@ impl<'a> RenameSession<'a> {
         match execution {
             RenameDecision::Confirmed {
                 actions,
+                destinations,
                 unchanged_files,
                 metadata,
             } => {
+                let completions =
+                    file_move_completions(&actions, &destinations);
                 let actions = cleanup::append_cleanup_actions(
                     self,
                     actions,
                     &unchanged_files,
                 )?;
-                let bar =
-                    (!self.app_options.fs_mode().is_dry_run()).then(|| {
-                        ProgressBar::bar(
-                            self.app_options.display_mode(),
-                            "Applying actions:",
-                            "Applied actions.",
-                            actions.len() as u64,
-                            true,
-                        )
-                    });
+                let cleanup_count = actions.len() - completions.len();
+                let display_progress = !self.app_options.fs_mode().is_dry_run();
+                let display_mode = self.app_options.display_mode();
+                let mut bar = display_progress.then(|| {
+                    ProgressBar::bar(
+                        display_mode,
+                        "Moving files:",
+                        "Moved files.",
+                        destinations.len() as u64,
+                        true,
+                    )
+                });
+                let mut position = 0;
                 crate::history::execution::execute_recorded(
                     &mut self.history,
                     self.app_options.fs_mode(),
                     actions,
                     metadata,
                     || {
-                        if let Some(bar) = &bar {
+                        if (position >= completions.len()
+                            || completions[position])
+                            && let Some(bar) = &bar
+                        {
                             bar.inc_found();
+                        }
+                        position += 1;
+                        if position == completions.len() {
+                            if let Some(bar) = bar.take() {
+                                bar.finish();
+                            }
+                            if display_progress && cleanup_count > 0 {
+                                bar = Some(ProgressBar::bar(
+                                    display_mode,
+                                    "Cleaning up:",
+                                    "Cleaned up.",
+                                    cleanup_count as u64,
+                                    true,
+                                ));
+                            }
                         }
                     },
                 )?;
@@ -122,5 +164,34 @@ impl<'a> RenameSession<'a> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use camino::Utf8PathBuf;
+    use tfmttools_core::action::Action;
+
+    use super::file_move_completions;
+
+    #[test]
+    fn file_progress_ignores_directories_staging_and_copy_until_source_removed()
+    {
+        let path = Utf8PathBuf::from;
+        let actions = vec![
+            Action::MakeDir(path("output")),
+            Action::MoveFile { source: path("a"), target: path("temporary") },
+            Action::MoveFile {
+                source: path("temporary"),
+                target: path("output/a"),
+            },
+            Action::CopyFile { source: path("b"), target: path("output/b") },
+            Action::RemoveFile(path("b")),
+        ];
+        let destinations =
+            [path("output/a"), path("output/b")].into_iter().collect();
+        assert_eq!(file_move_completions(&actions, &destinations), [
+            false, false, true, false, true
+        ]);
     }
 }
