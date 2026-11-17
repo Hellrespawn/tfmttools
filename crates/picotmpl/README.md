@@ -218,6 +218,9 @@ String arguments preserve their text. Path arguments split on `/` and `\`,
 discard empty input segments, and preserve the remaining components. Leading
 separators preserve the root; native Windows drive and UNC prefixes are retained
 separately from component text and are not changed by `try_map_components()`.
+On insertion, `.` is skipped and `..` removes the preceding output component.
+Unresolved leading parents are retained in the path anchor for the caller to
+resolve against its base directory before presenting or using the destination.
 Prohibited controls are rejected before coercion. Defaults are type-checked
 at compilation; binding checks supplied values, including unused arguments,
 before metadata resolution. Filename character replacement belongs to the caller

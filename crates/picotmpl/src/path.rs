@@ -99,7 +99,19 @@ impl Builder {
             }
             self.anchor = path.anchor;
         }
-        self.components.extend(path.components);
+        for component in path.components {
+            match component.as_str() {
+                "." => {},
+                ".." => {
+                    if self.components.pop().is_none()
+                        && !self.anchor.has_root()
+                    {
+                        self.anchor.push("..");
+                    }
+                },
+                _ => self.components.push(component),
+            }
+        }
         Ok(())
     }
 

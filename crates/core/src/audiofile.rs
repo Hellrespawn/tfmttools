@@ -68,8 +68,23 @@ impl AudioFile {
         // If target_path is an absolute path, join will clobber the
         // relative_path, so this is always safe.
         let target_path = relative_path.join_file(target_path);
+        let mut normalized = Utf8PathBuf::new();
+        for component in target_path.components() {
+            match component {
+                camino::Utf8Component::CurDir => {},
+                camino::Utf8Component::ParentDir => {
+                    if normalized.components().next_back()
+                        == Some(camino::Utf8Component::ParentDir)
+                        || (!normalized.pop() && !normalized.has_root())
+                    {
+                        normalized.push("..");
+                    }
+                },
+                _ => normalized.push(component.as_str()),
+            }
+        }
 
-        Ok((target_path, warnings))
+        Ok((Utf8File::new(normalized), warnings))
     }
 
     #[must_use]
@@ -321,6 +336,78 @@ mod path_template_tests {
             camino::Utf8Path::new(std::path::MAIN_SEPARATOR_STR)
                 .join("Song.mp3")
         );
+    }
+
+    #[test]
+    fn stef_template_resolves_path_argument_navigation() {
+        let template =
+            compile_audio_template(include_str!("../../../examples/stef.tfmt"))
+                .unwrap();
+        let base = Utf8Path::new(std::path::MAIN_SEPARATOR_STR)
+            .join("workspace")
+            .join("tfmttools");
+        let file = audio(&[
+            (ItemKey::TrackArtist, "Eihwar"),
+            (ItemKey::TrackTitle, "Berserkr"),
+        ]);
+        for prefix in [
+            "../tfmt_dst",
+            "./../tfmt_dst",
+            "unused/../../tfmt_dst",
+            r"..\tfmt_dst",
+        ] {
+            let bound = template.bind(&[prefix.to_owned()]).unwrap();
+            for strict in [false, true] {
+                let (target, _) = file
+                    .construct_target_path(
+                        &bound,
+                        &Utf8Directory::new(&base),
+                        strict,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    target.as_path(),
+                    base.parent().unwrap().join("tfmt_dst/Eihwar/Berserkr.mp3")
+                );
+                assert!(!target.components().any(|component| {
+                    matches!(component, camino::Utf8Component::ParentDir)
+                }));
+            }
+        }
+        for (prefix, expected) in [
+            (".", base.clone()),
+            ("..", base.parent().unwrap().to_owned()),
+            ("../../..", Utf8PathBuf::from(std::path::MAIN_SEPARATOR_STR)),
+        ] {
+            let bound = template.bind(&[prefix.to_owned()]).unwrap();
+            let (target, _) = file
+                .construct_target_path(
+                    &bound,
+                    &Utf8Directory::new(&base),
+                    false,
+                )
+                .unwrap();
+            assert_eq!(target.as_path(), expected.join("Eihwar/Berserkr.mp3"));
+        }
+    }
+
+    #[test]
+    fn navigation_in_tags_and_literals_is_still_rejected() {
+        for source in
+            [r#"template: ($title / "Song")"#, r#"template: (".." / "Song")"#]
+        {
+            let template =
+                compile_audio_template(source).unwrap().bind(&[]).unwrap();
+            assert!(
+                audio(&[(ItemKey::TrackTitle, "..")])
+                    .construct_target_path(
+                        &template,
+                        &Utf8Directory::new("work"),
+                        false
+                    )
+                    .is_err()
+            );
+        }
     }
 
     #[test]

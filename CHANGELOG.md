@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Accept `.` and `..` in path arguments and resolve directory navigation before
+  presenting or applying rename destinations.
+
 - Restore the rename progress bar while applying file and cleanup actions.
   Progress advances after each completed action and its history confirmation.
 

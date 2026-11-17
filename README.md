@@ -284,6 +284,11 @@ Thus `prefix $artist` needs no `/` after `prefix`. A path argument must
 occur at a component boundary; inserting one after unfinished text or following
 one immediately with `/` is an error.
 
+Path arguments accept `.` and `..` as directory navigation. Destinations resolve
+these segments against the current working directory before preview and execution,
+without requiring the destination to exist. Navigation is lexical and does not
+follow symlinks. Tags and literals still cannot create `.` or `..` components.
+
 See [the language reference](crates/picotmpl/README.md) and the full
 [Stef layout](examples/stef.tfmt).
 
