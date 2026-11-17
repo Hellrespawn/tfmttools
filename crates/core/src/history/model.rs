@@ -1,4 +1,4 @@
-use chrono::{DateTime, FixedOffset, Local};
+use jiff::ZonedDateTime;
 use serde::{Deserialize, Serialize};
 
 use super::{HistoryError, OperationKind, Result, StoredAction};
@@ -16,7 +16,7 @@ pub struct Record {
     id: Option<usize>,
     actions: Vec<StoredAction>,
     state: RecordState,
-    timestamp: DateTime<FixedOffset>,
+    timestamp: ZonedDateTime,
     metadata: ActionRecordMetadata,
     applied_count: usize,
     complete: bool,
@@ -58,7 +58,7 @@ impl Record {
             applied_count: items.len(),
             actions: items,
             state: RecordState::Applied,
-            timestamp: Local::now().fixed_offset(),
+            timestamp: ZonedDateTime::now(),
             metadata,
             complete: true,
             redo_allowed: true,
@@ -70,7 +70,7 @@ impl Record {
         id: usize,
         actions: Vec<StoredAction>,
         state: RecordState,
-        timestamp: DateTime<FixedOffset>,
+        timestamp: ZonedDateTime,
         metadata: ActionRecordMetadata,
         applied_count: usize,
         complete: bool,
@@ -160,8 +160,8 @@ impl Record {
     }
 
     #[must_use]
-    pub fn timestamp(&self) -> DateTime<FixedOffset> {
-        self.timestamp
+    pub fn timestamp(&self) -> &ZonedDateTime {
+        &self.timestamp
     }
 
     #[must_use]

@@ -7,9 +7,9 @@ use std::time::Instant;
 
 use assert_cmd::Command;
 use camino::{Utf8Path, Utf8PathBuf};
-use chrono::{SecondsFormat, Utc};
 use color_eyre::Result;
 use color_eyre::eyre::{WrapErr, eyre};
+use jiff::Timestamp;
 use libtest_mimic::{Arguments, Trial};
 use lofty::TextEncoding;
 use lofty::file::TaggedFileExt;
@@ -529,7 +529,7 @@ fn harness_environment() -> BTreeMap<String, String> {
 }
 
 fn timestamp() -> String {
-    Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
+    format!("{:.3}", Timestamp::now())
 }
 
 fn source_metadata() -> SourceMetadata {
@@ -602,5 +602,18 @@ mod discovery_tests {
         .unwrap_err();
         assert!(error.to_string().contains("fixtures/cases"));
         assert!(format!("{error:?}").contains("injected traversal error"));
+    }
+}
+
+#[cfg(test)]
+mod timestamp_tests {
+    #[test]
+    fn report_timestamp_is_utc_with_exactly_three_fractional_digits() {
+        let timestamp = super::timestamp();
+        assert_eq!(timestamp.len(), 24);
+        assert_eq!(&timestamp[19..20], ".");
+        assert!(timestamp[20..23].bytes().all(|byte| byte.is_ascii_digit()));
+        assert!(timestamp.ends_with('Z'));
+        assert!(timestamp.parse::<jiff::Timestamp>().is_ok());
     }
 }

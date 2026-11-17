@@ -17,7 +17,7 @@ tfmttools-test-harness = { path = "../test-harness" }
 assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
 camino = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 color-eyre = { workspace = true }
 fs-err = { workspace = true }
 libtest-mimic = { workspace = true }

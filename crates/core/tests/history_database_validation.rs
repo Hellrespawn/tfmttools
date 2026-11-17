@@ -64,16 +64,64 @@ fn read_only_access_does_not_modify_database() {
     assert_eq!(std::fs::read(path).unwrap(), before);
 }
 #[test]
-fn preserves_recorded_timestamp_offset() {
-    let dir = TempDir::new().unwrap();
-    let path = database(&dir);
-    Connection::open(&path).unwrap().execute_batch("INSERT INTO records(id,state,timestamp,metadata,complete) VALUES(7,'undone','2026-01-01T00:00:00+05:30','{\"template\":{\"type\":\"inline_template\",\"value\":\"test\"},\"arguments\":[],\"run_id\":\"r\"}',1)").unwrap();
-    let h = History::open_read_only(path).unwrap();
-    assert_eq!(h.records()[0].id(), Some(7));
-    assert_eq!(
-        h.records()[0].timestamp().to_rfc3339(),
-        "2026-01-01T00:00:00+05:30"
-    );
+fn preserves_recorded_timestamp_offset_and_precision() {
+    for (timestamp, expected) in [
+        ("2026-01-01T00:00:00+05:30", "2026-01-01T00:00:00+05:30"),
+        (
+            "2026-01-01T00:00:00.123456789-03:30",
+            "2026-01-01T00:00:00.123456789-03:30",
+        ),
+        ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00+00:00"),
+        ("2026-01-01t00:00:00z", "2026-01-01T00:00:00+00:00"),
+        ("2026-01-01 00:00:00-00:00", "2026-01-01T00:00:00+00:00"),
+        ("2026-01-01T00:00:00.001+23:59", "2026-01-01T00:00:00.001+23:59"),
+    ] {
+        let dir = TempDir::new().unwrap();
+        let path = database(&dir);
+        Connection::open(&path).unwrap().execute(
+            "INSERT INTO records(id,state,timestamp,metadata,complete) VALUES(7,'undone',?1,'{\"template\":{\"type\":\"inline_template\",\"value\":\"test\"},\"arguments\":[],\"run_id\":\"r\"}',1)",
+            [timestamp],
+        ).unwrap();
+        let h = History::open_read_only(path).unwrap();
+        assert_eq!(h.records()[0].id(), Some(7));
+        assert_eq!(
+            h.records()[0]
+                .timestamp()
+                .strftime("%Y-%m-%dT%H:%M:%S%.f%:z")
+                .to_string(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn rejects_non_rfc3339_history_timestamps_without_rewriting() {
+    for timestamp in [
+        "2026-01-01",
+        "2026-01-01T00:00:00",
+        "2026-01-01T00:00Z",
+        "20260101T000000Z",
+        "2026-01-01T00:00:00+05",
+        "2026-01-01T00:00:00+0530",
+        "2026-01-01T00:00:00+05:30:15",
+        "2026-01-01T00:00:00+24:00",
+        "2026-01-01T00:00:00Z[UTC]",
+        "2026-01-01T00:00:00+01:00[Europe/Amsterdam]",
+        "2026-01-01T00:00:00Z[foo=bar]",
+        "2026-01-01T00:00:00.Z",
+        "2026-01-01T00:00:00,123Z",
+        "+002026-01-01T00:00:00Z",
+    ] {
+        let dir = TempDir::new().unwrap();
+        let path = database(&dir);
+        Connection::open(&path).unwrap().execute(
+            "INSERT INTO records(id,state,timestamp,metadata,complete) VALUES(0,'applied',?1,'{\"template\":{\"type\":\"validation\",\"value\":\"test\"},\"arguments\":[],\"run_id\":\"r\"}',1)",
+            [timestamp],
+        ).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        assert!(History::open_read_only(path.clone()).is_err(), "{timestamp}");
+        assert_eq!(std::fs::read(path).unwrap(), before);
+    }
 }
 
 #[test]

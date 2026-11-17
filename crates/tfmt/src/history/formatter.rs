@@ -147,7 +147,7 @@ impl HistoryFormatter {
 
         let mut base_string = format!(
             "{} [#{}] ({})",
-            record.timestamp().format(DATE_FORMAT),
+            record.timestamp().strftime(DATE_FORMAT),
             summary.run_id,
             summary
         );

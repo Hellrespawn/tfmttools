@@ -111,7 +111,13 @@ impl History {
                     [],
                     |r| r.get(0),
                 )?;
-                tx.execute("INSERT INTO records(id,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,'applied',?2,?3,0,0,1)", params![id,chrono::Local::now().fixed_offset().to_rfc3339(),encode(&metadata)?])?;
+                let now = jiff::ZonedDateTime::now();
+                let timestamp = jiff::fmt::temporal::DateTimePrinter::new()
+                    .timestamp_with_offset_to_string(
+                        &now.timestamp(),
+                        now.offset(),
+                    );
+                tx.execute("INSERT INTO records(id,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(?1,'applied',?2,?3,0,0,1)", params![id,timestamp,encode(&metadata)?])?;
                 index(id)?
             },
             RunRequest::Replay { record_id: id, .. } => {

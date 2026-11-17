@@ -159,6 +159,41 @@ pub(super) fn read_record(
     read_record_row(connection, row)
 }
 
+// Jiff accepts broader Temporal syntax than the stored RFC 3339 contract.
+fn is_rfc3339(timestamp: &str) -> bool {
+    let Some((datetime, suffix)) = timestamp.as_bytes().split_at_checked(19)
+    else {
+        return false;
+    };
+    if !datetime.iter().zip(b"0000-00-00T00:00:00").all(|(&byte, &pattern)| {
+        match pattern {
+            b'0' => byte.is_ascii_digit(),
+            b'T' => matches!(byte, b'T' | b't' | b' '),
+            _ => byte == pattern,
+        }
+    }) {
+        return false;
+    }
+    let offset = if let Some(fraction) = suffix.strip_prefix(b".") {
+        let digits =
+            fraction.iter().take_while(|byte| byte.is_ascii_digit()).count();
+        if digits == 0 {
+            return false;
+        }
+        &fraction[digits..]
+    } else {
+        suffix
+    };
+    match offset {
+        [b'Z' | b'z'] => true,
+        [b'+' | b'-', h1, h2, b':', m1, m2] => {
+            [h1, h2, m1, m2].iter().all(|byte| byte.is_ascii_digit())
+                && [*h1, *h2] <= *b"23"
+        },
+        _ => false,
+    }
+}
+
 fn read_record_row(connection: &Connection, row: &Row<'_>) -> Result<Record> {
     let id: i64 = row.get(0)?;
     #[cfg(test)]
@@ -181,7 +216,21 @@ fn read_record_row(connection: &Connection, row: &Row<'_>) -> Result<Record> {
         },
     };
     let timestamp: String = row.get(2)?;
-    let timestamp = chrono::DateTime::parse_from_rfc3339(&timestamp)
+    if !is_rfc3339(&timestamp) {
+        return Err(HistoryError::LoadError(
+            "History timestamp must use RFC 3339".into(),
+        ));
+    }
+    let pieces = jiff::fmt::temporal::Pieces::parse(&timestamp)
+        .map_err(|e| HistoryError::LoadError(e.to_string()))?;
+    let offset = pieces.to_numeric_offset().ok_or_else(|| {
+        HistoryError::LoadError("History timestamp requires an offset".into())
+    })?;
+    let time = pieces.time().ok_or_else(|| {
+        HistoryError::LoadError("History timestamp requires a time".into())
+    })?;
+    let timestamp = jiff::tz::TimeZone::fixed(offset)
+        .to_zoned_datetime(pieces.date().to_datetime(time))
         .map_err(|e| HistoryError::LoadError(e.to_string()))?;
     let metadata: String = row.get(3)?;
     let metadata: ActionRecordMetadata = serde_json::from_str(&metadata)

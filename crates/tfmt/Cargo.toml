@@ -25,7 +25,7 @@ tfmttools-picotmpl = { workspace = true }
 tfmttools-core = { path = "../core" }
 tfmttools-fs = { path = "../fs" }
 camino = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 clap = { workspace = true }
 color-eyre = { workspace = true }
 console = { workspace = true }

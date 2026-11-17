@@ -20,7 +20,7 @@ camino = { workspace = true }
 lofty = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 fs-err = { workspace = true }
 serde_json = { workspace = true }
 

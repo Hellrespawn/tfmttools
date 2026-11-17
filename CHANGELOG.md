@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Replace Chrono with Jiff 1.0 for timestamps, preserving recorded history
+  offsets and UTC report timestamp precision. Keep history timestamps in
+  RFC 3339 format and reject Temporal annotations and abbreviated timestamps.
+
 - Accept `.` and `..` in path arguments and resolve directory navigation before
   presenting or applying rename destinations.
 

@@ -4,12 +4,12 @@ mod args;
 mod args_definition;
 pub(crate) mod options;
 
-use chrono::Local;
 #[cfg(not(feature = "debug"))]
 use clap::error::ErrorKind;
 use color_eyre::Result;
 #[cfg(not(feature = "debug"))]
 use color_eyre::eyre::Report;
+use jiff::ZonedDateTime;
 use tracing::{debug, info};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -107,9 +107,9 @@ fn render_cli_error(err: &Report, name: &str) {
 // directory.
 fn init_tracing() -> Option<WorkerGuard> {
     if std::env::var_os(LOG_ENV_VAR).is_some() {
-        let now = Local::now();
+        let now = ZonedDateTime::now();
 
-        let formatted = now.format("%Y%m%d.%H%M%S%3f");
+        let formatted = now.strftime("%Y%m%d.%H%M%S%3f");
 
         let file_appender = tracing_appender::rolling::never(
             std::env::current_dir().expect("Unable to get current directory."),
