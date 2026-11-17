@@ -286,30 +286,40 @@ mod tests {
             formatter.format_history(&history),
             "There is nothing to undo or redo."
         );
-        let record = Record::new(
-            vec![
-                StoredAction::MakeDir { path: "a".into() },
-                StoredAction::MakeDir { path: "b".into() },
-            ],
-            ActionRecordMetadata::new(
-                TemplateMetadata::Validation { value: "test".into() },
-                vec![],
-                "test".into(),
-            ),
+        let directory = assert_fs::TempDir::new().unwrap();
+        let path =
+            camino::Utf8PathBuf::try_from(directory.path().join("history"))
+                .unwrap();
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        connection
+            .execute_batch(tfmttools_core::history::history_schema_sql())
+            .unwrap();
+        connection.pragma_update(None, "user_version", 1).unwrap();
+        let metadata = ActionRecordMetadata::new(
+            TemplateMetadata::Validation { value: "test".into() },
+            vec![],
+            "test".into(),
         );
-        let mut value = serde_json::to_value(record).unwrap();
-        value["applied_count"] = 1.into();
-        value["complete"] = false.into();
-        value["redo_allowed"] = false.into();
-        let partial = serde_json::from_value(value).unwrap();
+        connection.execute(
+            "INSERT INTO records(id,state,timestamp,metadata,complete,applied_count,redo_allowed) VALUES(0,'applied','2026-01-01T00:00:00Z',?1,0,1,0)",
+            [serde_json::to_string(&metadata).unwrap()],
+        ).unwrap();
+        for (position, path) in (0_i64..).zip(["a", "b"]) {
+            connection.execute(
+                "INSERT INTO actions(record_id,position,payload) VALUES(0,?1,?2)",
+                rusqlite::params![position, serde_json::to_string(&StoredAction::MakeDir { path: path.into() }).unwrap()],
+            ).unwrap();
+        }
+        let loaded = History::open_read_only(path).unwrap();
+        let partial = &loaded.records()[0];
         assert!(
             formatter
-                .format_record(&partial)
+                .format_record(partial)
                 .ends_with("[applied 1/2, partial run, redo disabled]")
         );
         assert!(
             formatter
-                .format_records(&[&partial])
+                .format_records(&[partial])
                 .unwrap()
                 .contains("directories created")
         );

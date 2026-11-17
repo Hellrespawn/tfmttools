@@ -11,10 +11,7 @@ fn action(name: &str) -> StoredAction {
 }
 fn assert_reopened(history: &History, path: &Utf8PathBuf) {
     let reopened = History::open_read_only(path.clone()).unwrap();
-    assert_eq!(
-        serde_json::to_value(history.records()).unwrap(),
-        serde_json::to_value(reopened.records()).unwrap()
-    );
+    support::history::assert_records_eq(history.records(), reopened.records());
 }
 fn attempt(
     history: &mut History,

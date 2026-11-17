@@ -515,12 +515,9 @@ mod tests {
             );
             assert_eq!(ids.contains(&0), position == 0);
             assert_eq!(
-                encode(&h.records()).unwrap(),
-                encode(
-                    &database::read_records(h.connection.as_ref().unwrap())
-                        .unwrap()
-                )
-                .unwrap()
+                h.records(),
+                &database::read_records(h.connection.as_ref().unwrap())
+                    .unwrap()
             );
         }
         h.close_run(run, true).unwrap();
@@ -542,12 +539,9 @@ mod tests {
                     .unwrap();
                 assert!(ids.is_empty(), "replay decoded records: {ids:?}");
                 assert_eq!(
-                    encode(&h.records()).unwrap(),
-                    encode(
-                        &database::read_records(h.connection.as_ref().unwrap())
-                            .unwrap()
-                    )
-                    .unwrap()
+                    h.records(),
+                    &database::read_records(h.connection.as_ref().unwrap())
+                        .unwrap()
                 );
             }
             h.close_run(run, true).unwrap();

@@ -74,3 +74,10 @@ pub fn replay(
     }
     history.close_run(id, true).unwrap()
 }
+
+pub fn assert_records_eq(actual: &[Record], expected: &[Record]) {
+    assert_eq!(actual, expected);
+    for (actual, expected) in actual.iter().zip(expected) {
+        assert_eq!(actual.timestamp().offset(), expected.timestamp().offset());
+    }
+}

@@ -36,12 +36,12 @@ fn saves_sqlite_and_preserves_order_metadata_and_replay_states() {
         0,
         tfmttools_core::history::HistoryMode::Undo,
     );
-    let expected = serde_json::to_value(h.records()).unwrap();
+    let expected = h.records().to_vec();
     drop(h);
     assert!(std::fs::read(&path).unwrap().starts_with(b"SQLite format 3\0"));
     let mut loaded = History::new(path);
     loaded.load().unwrap();
-    assert_eq!(serde_json::to_value(loaded.records()).unwrap(), expected);
+    support::history::assert_records_eq(loaded.records(), &expected);
     assert_eq!(
         loaded.records_for(tfmttools_core::history::HistoryMode::Redo, None)[0]
             .id(),

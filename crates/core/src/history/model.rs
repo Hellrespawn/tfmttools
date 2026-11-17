@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{HistoryError, OperationKind, Result, StoredAction};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecordState {
     Applied,
     Undone,
@@ -12,8 +11,7 @@ pub enum RecordState {
     Superseded,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     id: Option<usize>,
     actions: Vec<StoredAction>,
@@ -177,7 +175,7 @@ impl Record {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum TemplateMetadata {
     FileOrName { value: String },
@@ -185,7 +183,7 @@ pub enum TemplateMetadata {
     Validation { value: String },
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ActionRecordMetadata {
     template: TemplateMetadata,

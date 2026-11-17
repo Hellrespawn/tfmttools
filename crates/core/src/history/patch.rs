@@ -1,17 +1,14 @@
 use rusqlite::{Connection, OptionalExtension, ToSql, params_from_iter};
-use serde::{Deserialize, Serialize};
 
 use super::{AttemptId, HistoryError, Record, Result, StoredAction};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ByteIdentity {
     pub length: u64,
     pub sha256: [u8; 32],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BinaryPatchPair {
     pub format: String,
     pub before: ByteIdentity,

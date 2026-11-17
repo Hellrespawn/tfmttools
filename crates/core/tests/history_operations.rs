@@ -182,14 +182,18 @@ fn replay_requires_an_existing_complete_record() {
 #[test]
 fn replay_eligibility_and_cursor_share_progress_rules() {
     use tfmttools_core::history::StoredAction;
-    let base = serde_json::to_value(Record::new(
+    let (directory, mut history) = history();
+    support::history::apply(
+        &mut history,
         vec![
             StoredAction::MakeDir { path: "a".into() },
             StoredAction::MakeDir { path: "b".into() },
         ],
         metadata(),
-    ))
-    .unwrap();
+    );
+    drop(history);
+    let path = Utf8PathBuf::try_from(directory.path().join("h.hist")).unwrap();
+    let connection = rusqlite::Connection::open(&path).unwrap();
     for (state, applied, redo, undo_ok, redo_ok, undo_pos, redo_pos) in [
         ("applied", 2, true, true, false, Some(1), None),
         ("applied", 1, true, true, true, Some(0), Some(1)),
@@ -198,12 +202,12 @@ fn replay_eligibility_and_cursor_share_progress_rules() {
         ("superseded", 0, false, false, false, None, None),
         ("applied", 1, false, true, false, Some(0), None),
     ] {
-        let mut value = base.clone();
-        value["state"] = state.into();
-        value["applied_count"] = applied.into();
-        value["complete"] = true.into();
-        value["redo_allowed"] = redo.into();
-        let record: Record = serde_json::from_value(value).unwrap();
+        connection.execute(
+            "UPDATE records SET state=?1,applied_count=?2,redo_allowed=?3 WHERE id=0",
+            rusqlite::params![state, applied, redo],
+        ).unwrap();
+        let loaded = History::open_read_only(path.clone()).unwrap();
+        let record = &loaded.records()[0];
         assert_eq!(record.can_undo(), undo_ok, "{state}/{applied}");
         assert_eq!(record.can_redo(), redo_ok, "{state}/{applied}");
         assert_eq!(record.next_action_position(OperationKind::Undo), undo_pos);
