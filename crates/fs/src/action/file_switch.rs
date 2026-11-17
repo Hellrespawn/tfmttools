@@ -74,11 +74,7 @@ pub fn prepare_tag_edit(
     let resolved = resolve_audio_path(path)?;
     single_link(&resolved)?;
     let before = fs_err::read(&resolved)?;
-    let mut candidate = Builder::new()
-        .prefix(".tfmt-candidate-")
-        .suffix(&format!(".{}", resolved.extension().unwrap_or("audio")))
-        .tempfile_in(resolved.parent().unwrap())?;
-    candidate.write_all(&before)?;
+    let candidate = create_candidate(&resolved, &before)?;
     write_tag_candidate(
         Utf8Path::from_path(candidate.path()).ok_or_else(|| {
             FsError::Execution("Non-UTF-8 candidate path".into())
@@ -87,11 +83,6 @@ pub fn prepare_tag_edit(
     )?;
     let after = fs_err::read(candidate.path())?;
     let pair = create_patch_pair(&before, &after)?;
-    fs_err::set_permissions(
-        candidate.path(),
-        fs_err::metadata(&resolved)?.permissions(),
-    )?;
-    candidate.as_file().sync_all()?;
     let action = StoredAction::EditTagValues {
         path: path.to_string(),
         changes: changes
@@ -122,16 +113,7 @@ pub fn prepare_tag_replay(
     single_link(&resolved)?;
     let bytes = fs_err::read(&resolved)?;
     let output = apply_patch(&bytes, pair, direction)?;
-    let mut candidate = Builder::new()
-        .prefix(".tfmt-candidate-")
-        .suffix(&format!(".{}", resolved.extension().unwrap_or("audio")))
-        .tempfile_in(resolved.parent().unwrap())?;
-    candidate.write_all(&output)?;
-    fs_err::set_permissions(
-        candidate.path(),
-        fs_err::metadata(&resolved)?.permissions(),
-    )?;
-    candidate.as_file().sync_all()?;
+    let candidate = create_candidate(&resolved, &output)?;
 
     finish_preparation(
         path,
@@ -143,6 +125,18 @@ pub fn prepare_tag_replay(
     )
 }
 
+fn create_candidate(
+    resolved: &Utf8Path,
+    bytes: &[u8],
+) -> FsResult<tempfile::NamedTempFile> {
+    let mut candidate = Builder::new()
+        .prefix(".tfmt-candidate-")
+        .suffix(&format!(".{}", resolved.extension().unwrap_or("audio")))
+        .tempfile_in(resolved.parent().unwrap())?;
+    candidate.write_all(bytes)?;
+    Ok(candidate)
+}
+
 fn finish_preparation(
     path: &Utf8Path,
     resolved: &Utf8Path,
@@ -151,6 +145,11 @@ fn finish_preparation(
     pair: BinaryPatchPair,
     direction: HistoryMode,
 ) -> FsResult<PreparedAction> {
+    fs_err::set_permissions(
+        candidate.path(),
+        fs_err::metadata(resolved)?.permissions(),
+    )?;
+    candidate.as_file().sync_all()?;
     let retained = Builder::new()
         .prefix(".tfmt-original-")
         .tempfile_in(resolved.parent().unwrap())?;

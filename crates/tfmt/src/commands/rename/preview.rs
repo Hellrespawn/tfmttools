@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use color_eyre::Result;
 use color_eyre::eyre::eyre;
@@ -79,17 +79,13 @@ fn format_warnings(warnings: &[Warning]) -> Option<String> {
 
     let mut lines: Vec<String> = Vec::new();
 
-    let mut whitespace_by_tag: HashMap<&str, usize> = HashMap::new();
+    let mut whitespace_by_tag: BTreeMap<&str, usize> = BTreeMap::new();
     for warning in warnings {
         let Warning::WhitespaceInTag { tag_name, .. } = warning;
         *whitespace_by_tag.entry(tag_name.as_str()).or_insert(0) += 1;
     }
 
-    let mut whitespace_entries: Vec<(&str, usize)> =
-        whitespace_by_tag.into_iter().collect();
-    whitespace_entries.sort_by_key(|(tag, _)| *tag);
-
-    for (tag, count) in whitespace_entries {
+    for (tag, count) in whitespace_by_tag {
         let file_word = if count == 1 { "file" } else { "files" };
         lines.push(format!(
             "  \u{26a0} {count} {file_word}: leading/trailing whitespace in `{tag}`"

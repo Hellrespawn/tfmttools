@@ -2,8 +2,6 @@ use camino::Utf8PathBuf;
 use tfmttools_core::action::{Action, CaseInsensitivePathSet, RenameAction};
 use tfmttools_core::util::{Utf8File, Utf8PathExt};
 
-use super::PlannedAction;
-
 pub(super) struct StagedRenamePlanner {
     reserved_paths: CaseInsensitivePathSet,
 }
@@ -23,7 +21,7 @@ impl StagedRenamePlanner {
     pub(super) fn plan(
         mut self,
         rename_actions: Vec<RenameAction>,
-    ) -> Vec<PlannedAction> {
+    ) -> Vec<Action> {
         let staged_actions = rename_actions
             .into_iter()
             .enumerate()
@@ -38,19 +36,19 @@ impl StagedRenamePlanner {
         let stage_sources = staged_actions
             .iter()
             .map(|(action, temporary_path)| {
-                PlannedAction::Action(Action::MoveFile {
+                Action::MoveFile {
                     source: action.source().to_owned().into_path_buf(),
                     target: temporary_path.clone(),
-                })
+                }
             })
             .collect::<Vec<_>>();
 
         let move_to_targets =
             staged_actions.into_iter().map(|(action, temporary_path)| {
-                PlannedAction::Action(Action::MoveFile {
+                Action::MoveFile {
                     source: temporary_path,
                     target: action.target().to_owned().into_path_buf(),
-                })
+                }
             });
 
         stage_sources.into_iter().chain(move_to_targets).collect()

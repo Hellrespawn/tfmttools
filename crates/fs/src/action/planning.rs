@@ -1,7 +1,6 @@
 use tfmttools_core::action::{Action, RenameAction};
 use tfmttools_core::util::MoveMode;
 
-use super::PlannedAction;
 use super::rename_planner::RenamePlanner;
 use crate::error::FsResult;
 
@@ -11,13 +10,7 @@ pub fn plan_actions(
     move_mode: MoveMode,
 ) -> FsResult<Vec<Action>> {
     let mut result = Vec::new();
-    for planned in RenamePlanner::new(rename_actions).plan() {
-        let action = match planned {
-            PlannedAction::Action(action) => action,
-            PlannedAction::Rename(rename) => {
-                Action::move_from_rename_action(&rename)
-            },
-        };
+    for action in RenamePlanner::new(rename_actions).plan() {
         if let Action::MoveFile { source, target } = &action
             && (matches!(move_mode, MoveMode::AlwaysCopy)
                 || super::prepared_execution::crosses_devices(source, target)?)
